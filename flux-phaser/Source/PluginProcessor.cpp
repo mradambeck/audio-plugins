@@ -128,6 +128,106 @@ namespace
             return juce::jmap(shapeAmount, 0.0f, shapeBreakpoint, sq, tri);
         return juce::jmap(shapeAmount, shapeBreakpoint, 1.0f, tri, sine);
     }
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected.
+    struct FactoryPreset
+    {
+        juce::String name;
+        std::vector<std::pair<juce::String, float>> values;
+    };
+
+    const std::vector<FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<FactoryPreset> presets = {
+            { "Chug Chug Chug", {
+                { FluxAudioProcessor::blendParamID, 54.29999923706055f },
+                { FluxAudioProcessor::brightnessParamID, 21.89999961853027f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 52.29999923706055f },
+                { FluxAudioProcessor::divisionParamID, 11.0f },
+                { FluxAudioProcessor::feedbackParamID, 57.10000228881836f },
+                { FluxAudioProcessor::gritParamID, 100.0f },
+                { FluxAudioProcessor::offsetParamID, -50.20000076293945f },
+                { FluxAudioProcessor::rateParamID, 0.1799999922513962f },
+                { FluxAudioProcessor::shapeParamID, 76.9000015258789f },
+                { FluxAudioProcessor::stagesParamID, 1.0f },
+                { FluxAudioProcessor::syncParamID, 0.0f },
+            } },
+            { "Did I Stutter", {
+                { FluxAudioProcessor::blendParamID, 60.0f },
+                { FluxAudioProcessor::brightnessParamID, 54.10000228881836f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 34.20000076293945f },
+                { FluxAudioProcessor::divisionParamID, 8.0f },
+                { FluxAudioProcessor::feedbackParamID, 74.5f },
+                { FluxAudioProcessor::gritParamID, 70.0f },
+                { FluxAudioProcessor::offsetParamID, -62.20000076293945f },
+                { FluxAudioProcessor::rateParamID, 0.119999997317791f },
+                { FluxAudioProcessor::shapeParamID, 0.0f },
+                { FluxAudioProcessor::stagesParamID, 6.0f },
+                { FluxAudioProcessor::syncParamID, 1.0f },
+            } },
+            { "Personal Space", {
+                { FluxAudioProcessor::blendParamID, 13.30000019073486f },
+                { FluxAudioProcessor::brightnessParamID, 81.4000015258789f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 18.70000076293945f },
+                { FluxAudioProcessor::divisionParamID, 11.0f },
+                { FluxAudioProcessor::feedbackParamID, 20.60000038146973f },
+                { FluxAudioProcessor::gritParamID, 0.0f },
+                { FluxAudioProcessor::offsetParamID, 80.20000457763672f },
+                { FluxAudioProcessor::rateParamID, 4.0f },
+                { FluxAudioProcessor::shapeParamID, 56.29999923706055f },
+                { FluxAudioProcessor::stagesParamID, 0.0f },
+                { FluxAudioProcessor::syncParamID, 1.0f },
+            } },
+            { "Spun Out", {
+                { FluxAudioProcessor::blendParamID, 23.10000038146973f },
+                { FluxAudioProcessor::brightnessParamID, 47.90000152587891f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 52.29999923706055f },
+                { FluxAudioProcessor::divisionParamID, 11.0f },
+                { FluxAudioProcessor::feedbackParamID, 12.10000038146973f },
+                { FluxAudioProcessor::gritParamID, 15.40000057220459f },
+                { FluxAudioProcessor::offsetParamID, -18.49999809265137f },
+                { FluxAudioProcessor::rateParamID, 0.1799999922513962f },
+                { FluxAudioProcessor::shapeParamID, 76.9000015258789f },
+                { FluxAudioProcessor::stagesParamID, 0.0f },
+                { FluxAudioProcessor::syncParamID, 0.0f },
+            } },
+            { "We Have Liftoff", {
+                { FluxAudioProcessor::blendParamID, 40.70000076293945f },
+                { FluxAudioProcessor::brightnessParamID, 36.5f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 74.30000305175781f },
+                { FluxAudioProcessor::divisionParamID, 11.0f },
+                { FluxAudioProcessor::feedbackParamID, 18.20000076293945f },
+                { FluxAudioProcessor::gritParamID, 6.300000190734863f },
+                { FluxAudioProcessor::offsetParamID, 2.600001573562622f },
+                { FluxAudioProcessor::rateParamID, 0.2199999988079071f },
+                { FluxAudioProcessor::shapeParamID, 100.0f },
+                { FluxAudioProcessor::stagesParamID, 3.0f },
+                { FluxAudioProcessor::syncParamID, 0.0f },
+            } },
+            { "What's Wrong", {
+                { FluxAudioProcessor::blendParamID, 82.9000015258789f },
+                { FluxAudioProcessor::brightnessParamID, 83.5f },
+                { FluxAudioProcessor::bypassParamID, 0.0f },
+                { FluxAudioProcessor::depthParamID, 61.5f },
+                { FluxAudioProcessor::divisionParamID, 5.0f },
+                { FluxAudioProcessor::feedbackParamID, 42.5f },
+                { FluxAudioProcessor::gritParamID, 9.90000057220459f },
+                { FluxAudioProcessor::offsetParamID, -29.69999885559082f },
+                { FluxAudioProcessor::rateParamID, 0.3999999761581421f },
+                { FluxAudioProcessor::shapeParamID, 78.80000305175781f },
+                { FluxAudioProcessor::stagesParamID, 5.0f },
+                { FluxAudioProcessor::syncParamID, 0.0f },
+            } },
+        };
+
+        return presets;
+    }
 }
 
 FluxAudioProcessor::FluxAudioProcessor()
@@ -501,10 +601,28 @@ bool FluxAudioProcessor::producesMidi() const { return false; }
 bool FluxAudioProcessor::isMidiEffect() const { return false; }
 double FluxAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int FluxAudioProcessor::getNumPrograms() { return 1; }
+int FluxAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
 int FluxAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-void FluxAudioProcessor::setCurrentProgram(int) {}
-const juce::String FluxAudioProcessor::getProgramName(int) { return {}; }
+
+void FluxAudioProcessor::setCurrentProgram(int index)
+{
+    const auto& presets = getFactoryPresets();
+    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
+        return;
+
+    currentProgramIndex = index;
+
+    for (auto& [paramID, value] : presets[(size_t) index].values)
+        if (auto* param = apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+}
+
+const juce::String FluxAudioProcessor::getProgramName(int index)
+{
+    const auto& presets = getFactoryPresets();
+    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
+}
+
 void FluxAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void FluxAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

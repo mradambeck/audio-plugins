@@ -39,6 +39,208 @@ namespace
     // clamped to this same range before being handed to the engine.
     constexpr float minDelayMs = 0.0f;
     constexpr float maxDelayMs = 1000.0f;
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected.
+    struct FactoryPreset
+    {
+        juce::String name;
+        std::vector<std::pair<juce::String, float>> values;
+    };
+
+    const std::vector<FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<FactoryPreset> presets = {
+            { "Extra Padding", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 0.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.0f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 10.80000019073486f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 0.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 8.199999809265137f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 0.800000011920929f },
+                { GradientAudioProcessor::driftAmountAParamID, 48.5f },
+                { GradientAudioProcessor::driftAmountBParamID, 90.30000305175781f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 33.20000076293945f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 61.60000228881836f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 132.9000244140625f },
+                { GradientAudioProcessor::linkEnabledParamID, 1.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, 3.999999284744263f },
+                { GradientAudioProcessor::mixPercentAParamID, 48.60000228881836f },
+                { GradientAudioProcessor::mixPercentBParamID, 35.5f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 2.000000476837158f },
+                { GradientAudioProcessor::outputTrimDbBParamID, 2.000000476837158f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 50.0f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, -4.000000476837158f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::spliceModeAParamID, 2.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 2.0f },
+                { GradientAudioProcessor::widthPercentParamID, 66.0999984741211f },
+            } },
+            { "Get Away From Me", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 0.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.80000019073486f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 10.90000057220459f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 0.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 59.60000228881836f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 64.5999984741211f },
+                { GradientAudioProcessor::driftAmountAParamID, 9.699999809265137f },
+                { GradientAudioProcessor::driftAmountBParamID, 9.40000057220459f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 77.5f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 84.70000457763672f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 1.490116119384766e-05f },
+                { GradientAudioProcessor::linkEnabledParamID, 0.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::mixPercentAParamID, 50.70000076293945f },
+                { GradientAudioProcessor::mixPercentBParamID, 50.0f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 3.576278686523438e-07f },
+                { GradientAudioProcessor::outputTrimDbBParamID, -0.09999964386224747f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, -5.090000629425049f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, 7.089999198913574f },
+                { GradientAudioProcessor::spliceModeAParamID, 2.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 2.0f },
+                { GradientAudioProcessor::widthPercentParamID, 85.4000015258789f },
+            } },
+            { "Marked as Safe", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 0.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.0f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 10.80000019073486f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 0.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 0.9000000357627869f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 0.800000011920929f },
+                { GradientAudioProcessor::driftAmountAParamID, 23.70000076293945f },
+                { GradientAudioProcessor::driftAmountBParamID, 45.0f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 17.5f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 9.300000190734863f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 1.490116119384766e-05f },
+                { GradientAudioProcessor::linkEnabledParamID, 0.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::mixPercentAParamID, 40.79999923706055f },
+                { GradientAudioProcessor::mixPercentBParamID, 38.90000152587891f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 2.000000476837158f },
+                { GradientAudioProcessor::outputTrimDbBParamID, 1.700000405311584f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, -14.79999923706055f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 15.90000057220459f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::spliceModeAParamID, 2.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 2.0f },
+                { GradientAudioProcessor::widthPercentParamID, 87.9000015258789f },
+            } },
+            { "Oh I get it", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 0.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.0f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 10.80000019073486f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 0.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 20.70000076293945f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 0.800000011920929f },
+                { GradientAudioProcessor::driftAmountAParamID, 48.5f },
+                { GradientAudioProcessor::driftAmountBParamID, 65.9000015258789f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 18.20000076293945f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 93.70000457763672f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 363.6000061035156f },
+                { GradientAudioProcessor::linkEnabledParamID, 1.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, 0.2899994552135468f },
+                { GradientAudioProcessor::mixPercentAParamID, 48.60000228881836f },
+                { GradientAudioProcessor::mixPercentBParamID, 57.40000152587891f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 2.000000476837158f },
+                { GradientAudioProcessor::outputTrimDbBParamID, 2.000000476837158f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 50.0f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, 4.999999523162842f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::spliceModeAParamID, 2.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 2.0f },
+                { GradientAudioProcessor::widthPercentParamID, 59.0f },
+            } },
+            { "Skitter Scatter", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 1.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.80000019073486f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 10.90000057220459f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 0.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 59.60000228881836f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 64.5999984741211f },
+                { GradientAudioProcessor::driftAmountAParamID, 74.30000305175781f },
+                { GradientAudioProcessor::driftAmountBParamID, 80.80000305175781f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 27.0f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 50.40000152587891f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 1.490116119384766e-05f },
+                { GradientAudioProcessor::linkEnabledParamID, 0.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::mixPercentAParamID, 37.90000152587891f },
+                { GradientAudioProcessor::mixPercentBParamID, 37.60000228881836f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 3.400000333786011f },
+                { GradientAudioProcessor::outputTrimDbBParamID, 3.600000381469727f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, 2.999999284744263f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, 7.089999198913574f },
+                { GradientAudioProcessor::spliceModeAParamID, 2.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 2.0f },
+                { GradientAudioProcessor::widthPercentParamID, 65.0f },
+            } },
+            { "The Other Side", {
+                { GradientAudioProcessor::bypassParamID, 0.0f },
+                { GradientAudioProcessor::crossFeedbackEnabledParamID, 0.0f },
+                { GradientAudioProcessor::crossfadeLengthMsAParamID, 11.80000019073486f },
+                { GradientAudioProcessor::crossfadeLengthMsBParamID, 8.0f },
+                { GradientAudioProcessor::delaySubdivisionAParamID, 13.0f },
+                { GradientAudioProcessor::delaySubdivisionBParamID, 5.0f },
+                { GradientAudioProcessor::delaySyncEnabledAParamID, 1.0f },
+                { GradientAudioProcessor::delaySyncEnabledBParamID, 0.0f },
+                { GradientAudioProcessor::delayTimeMsAParamID, 59.60000228881836f },
+                { GradientAudioProcessor::delayTimeMsBParamID, 0.0f },
+                { GradientAudioProcessor::driftAmountAParamID, 62.40000152587891f },
+                { GradientAudioProcessor::driftAmountBParamID, 9.100000381469727f },
+                { GradientAudioProcessor::dualModeEnabledParamID, 1.0f },
+                { GradientAudioProcessor::feedbackPercentAParamID, 118.0999984741211f },
+                { GradientAudioProcessor::feedbackPercentBParamID, 130.5f },
+                { GradientAudioProcessor::linkDelayIntervalMsParamID, 1.490116119384766e-05f },
+                { GradientAudioProcessor::linkEnabledParamID, 1.0f },
+                { GradientAudioProcessor::linkPitchIntervalSemitonesParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::mixPercentAParamID, 42.90000152587891f },
+                { GradientAudioProcessor::mixPercentBParamID, 38.0f },
+                { GradientAudioProcessor::outputTrimDbAParamID, 3.576278686523438e-07f },
+                { GradientAudioProcessor::outputTrimDbBParamID, 3.576278686523438e-07f },
+                { GradientAudioProcessor::pitchFineCentsAParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchFineCentsBParamID, 7.450580596923828e-07f },
+                { GradientAudioProcessor::pitchSemitonesAParamID, 2.999999284744263f },
+                { GradientAudioProcessor::pitchSemitonesBParamID, -5.364418029785156e-07f },
+                { GradientAudioProcessor::spliceModeAParamID, 0.0f },
+                { GradientAudioProcessor::spliceModeBParamID, 0.0f },
+                { GradientAudioProcessor::widthPercentParamID, 100.0f },
+            } },
+        };
+
+        return presets;
+    }
 }
 
 GradientAudioProcessor::GradientAudioProcessor()
@@ -448,10 +650,28 @@ bool GradientAudioProcessor::producesMidi() const { return false; }
 bool GradientAudioProcessor::isMidiEffect() const { return false; }
 double GradientAudioProcessor::getTailLengthSeconds() const { return 2.0; }
 
-int GradientAudioProcessor::getNumPrograms() { return 1; }
+int GradientAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
 int GradientAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-void GradientAudioProcessor::setCurrentProgram(int) {}
-const juce::String GradientAudioProcessor::getProgramName(int) { return {}; }
+
+void GradientAudioProcessor::setCurrentProgram(int index)
+{
+    const auto& presets = getFactoryPresets();
+    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
+        return;
+
+    currentProgramIndex = index;
+
+    for (auto& [paramID, value] : presets[(size_t) index].values)
+        if (auto* param = apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+}
+
+const juce::String GradientAudioProcessor::getProgramName(int index)
+{
+    const auto& presets = getFactoryPresets();
+    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
+}
+
 void GradientAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void GradientAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

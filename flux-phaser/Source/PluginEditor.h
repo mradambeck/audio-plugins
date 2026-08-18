@@ -32,6 +32,8 @@ private:
     juce::Label titleLabel;
     juce::Label tagLabel;
 
+    juce::ComboBox presetCombo;
+
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 

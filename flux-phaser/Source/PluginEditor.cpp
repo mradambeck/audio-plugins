@@ -132,6 +132,22 @@ FluxAudioProcessorEditor::FluxAudioProcessorEditor(FluxAudioProcessor& p)
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff8a7f96));
     addAndMakeVisible(tagLabel);
 
+    // Left unselected on startup (rather than showing the first preset's name) so that picking it
+    // is always a real selection change - JUCE's ComboBox doesn't fire onChange when you choose the
+    // item that's already showing, which would otherwise make the first preset unreachable from
+    // this menu once the plugin loads with its own default parameter values rather than the
+    // preset's.
+    presetCombo.setLookAndFeel(&lookAndFeel);
+    presetCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
+    presetCombo.setTextWhenNothingSelected("Preset");
+    for (int i = 0; i < processorRef.getNumPrograms(); ++i)
+        presetCombo.addItem(processorRef.getProgramName(i), i + 1);
+    addAndMakeVisible(presetCombo);
+    presetCombo.onChange = [this]
+    {
+        processorRef.setCurrentProgram(presetCombo.getSelectedItemIndex());
+    };
+
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("BYPASS");
     addAndMakeVisible(bypassButton);
@@ -432,6 +448,8 @@ void FluxAudioProcessorEditor::resized()
     const auto bypassWidth = (int) std::ceil(9.0f + 8.0f + bypassTextWidth + 24.0f);
     bypassButton.setBounds(header.removeFromRight(bypassWidth).withSizeKeepingCentre(bypassWidth, 28)
                                 .expanded((int) FluxLookAndFeel::buttonShadowMargin));
+    header.removeFromRight(14);
+    presetCombo.setBounds(header.removeFromRight(128).withSizeKeepingCentre(128, 28));
 
     const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);

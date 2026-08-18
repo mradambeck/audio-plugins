@@ -72,6 +72,8 @@ private:
 
     juce::Label titleLabel, tagLabel;
 
+    juce::ComboBox presetCombo;
+
     juce::TextButton panicButton;
     juce::TextButton pageButton;
     bool showingPageOne = true;

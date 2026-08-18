@@ -54,6 +54,94 @@ namespace
     constexpr float dryCompRatio = 4.0f;
     constexpr float dryCompAttackMs = 10.0f;
     constexpr float dryCompReleaseMs = 100.0f;
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected.
+    struct FactoryPreset
+    {
+        juce::String name;
+        std::vector<std::pair<juce::String, float>> values;
+    };
+
+    const std::vector<FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<FactoryPreset> presets = {
+            { "Color Me Radd", {
+                { CorrosionAudioProcessor::biasParamID, -0.3459999561309814f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 0.6760000586509705f },
+                { CorrosionAudioProcessor::compParamID, 0.203000009059906f },
+                { CorrosionAudioProcessor::driveParamID, 2.920000076293945f },
+                { CorrosionAudioProcessor::dryParamID, -2.235174179077148e-06f },
+                { CorrosionAudioProcessor::outputParamID, -15.07000160217285f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.7500000596046448f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.07700000703334808f },
+                { CorrosionAudioProcessor::toneParamID, 2648.0f },
+            } },
+            { "Deja Vu", {
+                { CorrosionAudioProcessor::biasParamID, -0.2349999696016312f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 0.8830000162124634f },
+                { CorrosionAudioProcessor::compParamID, 0.9780000448226929f },
+                { CorrosionAudioProcessor::driveParamID, 48.27000045776367f },
+                { CorrosionAudioProcessor::dryParamID, -12.5200023651123f },
+                { CorrosionAudioProcessor::outputParamID, -26.29000091552734f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.8730000257492065f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.6690000295639038f },
+                { CorrosionAudioProcessor::toneParamID, 5579.0f },
+            } },
+            { "How So", {
+                { CorrosionAudioProcessor::biasParamID, -0.2409999668598175f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 0.331000030040741f },
+                { CorrosionAudioProcessor::compParamID, 0.7440000176429749f },
+                { CorrosionAudioProcessor::driveParamID, 27.96999931335449f },
+                { CorrosionAudioProcessor::dryParamID, -6.210001945495605f },
+                { CorrosionAudioProcessor::outputParamID, -27.17000198364258f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.6440000534057617f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.8560000658035278f },
+                { CorrosionAudioProcessor::toneParamID, 5248.0f },
+            } },
+            { "LoJack", {
+                { CorrosionAudioProcessor::biasParamID, -0.2379999607801437f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 0.0f },
+                { CorrosionAudioProcessor::compParamID, 0.7240000367164612f },
+                { CorrosionAudioProcessor::driveParamID, 11.47999954223633f },
+                { CorrosionAudioProcessor::dryParamID, -2.235174179077148e-06f },
+                { CorrosionAudioProcessor::outputParamID, -22.38000106811523f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.8570000529289246f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.906000018119812f },
+                { CorrosionAudioProcessor::toneParamID, 921.0f },
+            } },
+            { "Vintage Modern", {
+                { CorrosionAudioProcessor::biasParamID, -0.6419999599456787f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 0.690000057220459f },
+                { CorrosionAudioProcessor::compParamID, 0.1830000132322311f },
+                { CorrosionAudioProcessor::driveParamID, 26.85999870300293f },
+                { CorrosionAudioProcessor::dryParamID, -2.235174179077148e-06f },
+                { CorrosionAudioProcessor::outputParamID, -28.10000228881836f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.6530000567436218f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.3190000057220459f },
+                { CorrosionAudioProcessor::toneParamID, 3733.0f },
+            } },
+            { "We're Doomed", {
+                { CorrosionAudioProcessor::biasParamID, -0.4439999759197235f },
+                { CorrosionAudioProcessor::bypassParamID, 0.0f },
+                { CorrosionAudioProcessor::characterParamID, 1.0f },
+                { CorrosionAudioProcessor::compParamID, 0.2900000214576721f },
+                { CorrosionAudioProcessor::driveParamID, 19.43000030517578f },
+                { CorrosionAudioProcessor::dryParamID, -13.11000156402588f },
+                { CorrosionAudioProcessor::outputParamID, -21.92000198364258f },
+                { CorrosionAudioProcessor::rectBlendParamID, 0.3800000250339508f },
+                { CorrosionAudioProcessor::rectMixParamID, 0.9190000295639038f },
+                { CorrosionAudioProcessor::toneParamID, 6596.0f },
+            } },
+        };
+
+        return presets;
+    }
 }
 
 CorrosionAudioProcessor::CorrosionAudioProcessor()
@@ -429,10 +517,28 @@ bool CorrosionAudioProcessor::producesMidi() const { return false; }
 bool CorrosionAudioProcessor::isMidiEffect() const { return false; }
 double CorrosionAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int CorrosionAudioProcessor::getNumPrograms() { return 1; }
-int CorrosionAudioProcessor::getCurrentProgram() { return 0; }
-void CorrosionAudioProcessor::setCurrentProgram(int) {}
-const juce::String CorrosionAudioProcessor::getProgramName(int) { return {}; }
+int CorrosionAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
+int CorrosionAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
+
+void CorrosionAudioProcessor::setCurrentProgram(int index)
+{
+    const auto& presets = getFactoryPresets();
+    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
+        return;
+
+    currentProgramIndex = index;
+
+    for (auto& [paramID, value] : presets[(size_t) index].values)
+        if (auto* param = apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+}
+
+const juce::String CorrosionAudioProcessor::getProgramName(int index)
+{
+    const auto& presets = getFactoryPresets();
+    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
+}
+
 void CorrosionAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void CorrosionAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

@@ -59,6 +59,8 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void updateFilters();
 
+    int currentProgramIndex = 0;
+
     std::atomic<float>* gateParam = nullptr;
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* widthParam = nullptr;
