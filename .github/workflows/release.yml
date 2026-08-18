@@ -34,20 +34,28 @@ jobs:
           cd installers
           ./build-all.sh
 
+      # Besides each plugin's full installer, also publish the raw AU/VST3 bundles zipped up
+      # (ditto -k, not zip -r, so the code signature / extended attributes on the bundle survive
+      # the round trip intact) for anyone who'd rather drag-install than run a .pkg.
       - name: Collect release assets
         run: |
           mkdir -p release-assets
-          cp caverns-delay/installer/output/Caverns-Installer.pkg release-assets/
-          cp damage-fuzz/installer/output/Damage-Installer.pkg release-assets/
-          cp corrosion-drive/installer/output/Corrosion-Installer.pkg release-assets/
-          cp flux-phaser/installer/output/Flux-Installer.pkg release-assets/
-          cp alloy-bass/installer/output/Alloy-Installer.pkg release-assets/
-          cp gradient-pitch/installer/output/Gradient-Installer.pkg release-assets/
+          for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient"; do
+            repo="${entry%%:*}"
+            name="${entry##*:}"
+            cp "$repo/installer/output/${name}-Installer.pkg" release-assets/
+            ditto -c -k --keepParent \
+              "$repo/build/${name}_artefacts/Release/AU/${name}.component" \
+              "release-assets/${name}-AU.zip"
+            ditto -c -k --keepParent \
+              "$repo/build/${name}_artefacts/Release/VST3/${name}.vst3" \
+              "release-assets/${name}-VST3.zip"
+          done
           cp installers/output/WildJagPlugins-Installer.pkg release-assets/
           ls -la release-assets/
 
       # Publishes/updates a single rolling "latest" release so the Pages site can link stable
-      # /releases/latest/download/<file>.pkg URLs that always point at the current build off main.
+      # /releases/latest/download/<file> URLs that always point at the current build off main.
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -55,4 +63,6 @@ jobs:
           name: Latest build
           body: Automatically built from the latest commit on main. Not a versioned release.
           make_latest: true
-          files: release-assets/*.pkg
+          files: |
+            release-assets/*.pkg
+            release-assets/*.zip
