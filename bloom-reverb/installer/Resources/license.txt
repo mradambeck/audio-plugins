@@ -1,0 +1,5 @@
+Bloom
+Copyright (c) Wild Jag
+
+This software is provided for personal use. By installing this software you
+agree to use it at your own risk. No warranty is expressed or implied.

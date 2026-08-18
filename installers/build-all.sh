@@ -21,7 +21,7 @@ mkdir -p "$OUT_DIR"
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR"
 
-for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient"; do
+for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient" "bloom-reverb:Bloom"; do
     repo="${entry%%:*}"
     name="${entry##*:}"
     echo "==> Building $name component packages"

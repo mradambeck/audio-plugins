@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>Bloom</title>
+    <organization>com.wildjag</organization>
+    <domains enable_currentUserHome="true" enable_localSystem="true" enable_anywhere="false"/>
+    <options customize="always" require-scripts="false"/>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <license file="license.txt" mime-type="text/plain"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <choices-outline>
+        <line choice="choice_au"/>
+        <line choice="choice_vst3"/>
+        <line choice="choice_standalone"/>
+    </choices-outline>
+
+    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Bloom.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.au.pkg"/>
+    </choice>
+    <choice id="choice_vst3" title="VST3" description="Installs Bloom.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.vst3.pkg"/>
+    </choice>
+    <choice id="choice_standalone" title="Standalone App" description="Installs Bloom.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.standalone.pkg"/>
+    </choice>
+
+    <pkg-ref id="com.wildjag.bloom.au.pkg" version="0.1.0" onConclusion="none">Bloom-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.vst3.pkg" version="0.1.0" onConclusion="none">Bloom-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.standalone.pkg" version="0.1.0" onConclusion="none">Bloom-Standalone-Component.pkg</pkg-ref>
+</installer-gui-script>

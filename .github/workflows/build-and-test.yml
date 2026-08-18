@@ -25,6 +25,8 @@ jobs:
             name: Alloy
           - dir: gradient-pitch
             name: Gradient
+          - dir: bloom-reverb
+            name: Bloom
 
     steps:
       - uses: actions/checkout@v4
