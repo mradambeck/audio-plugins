@@ -1,480 +1,242 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wild Jag &mdash; Audio Plugins</title>
-<meta name="description" content="Six hardware-inspired audio plugins for macOS, free and open source: Caverns, Damage, Corrosion, Flux, Alloy, and Gradient.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0a0c0d;
-    --panel-top: #262d2f;
-    --panel-bottom: #171c1d;
-    --ink: #e7f3f1;
-    --ink-dim: #9fb0ac;
-    --border: rgba(230, 236, 230, 0.14);
-    --card-border: rgba(230, 236, 230, 0.1);
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wild Jag &mdash; Audio Plugins</title>
+    <meta
+      name="description"
+      content="Six hardware-inspired audio plugins for macOS, free and open source: Caverns, Damage, Corrosion, Flux, Alloy, and Gradient."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Oswald:wght@500;600&family=Inter:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <!-- <img class="logo" src="assets/WildJagLogo.svg" alt="Wild Jag" /> -->
+        <p class="tagline">Free &amp; open source</p>
+        <h1>Six hardware-inspired audio plugins for macOS</h1>
+        <p class="sub">
+          Bucket-brigade delay, fuzz, overdrive, phaser, a stacked mono synth,
+          and a pitch-shifting delay &mdash; each one built with JUCE, styled
+          after 1980s rack-gear hardware, and free to use under the AGPLv3.
+        </p>
+      </div>
+    </header>
 
-    --caverns: #5be6cc;
-    --caverns-muted: #579e92;
-    --damage: #f04c42;
-    --damage-muted: #b34d4a;
-    --corrosion: #e6df5c;
-    --corrosion-muted: #aeaa62;
-    --flux: #b47bf0;
-    --flux-muted: #8070b8;
-    --alloy: #6ea8c9;
-    --alloy-muted: #4e7691;
-    --gradient: #f0a177;
-    --gradient-muted: #ce7954;
-  }
-
-  * { box-sizing: border-box; }
-
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Oxanium', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-  }
-
-  body {
-    background:
-      radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(87, 158, 146, 0.08), transparent),
-      var(--bg);
-  }
-
-  a { color: inherit; }
-
-  .wrap {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 24px;
-  }
-
-  /* Header */
-  header {
-    padding: 64px 0 40px;
-    text-align: center;
-  }
-
-  header img.logo {
-    height: 40px;
-    margin-bottom: 22px;
-    opacity: 0.95;
-  }
-
-  header p.tagline {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ink-dim);
-    font-size: 13px;
-    margin: 0 0 8px;
-  }
-
-  header h1 {
-    font-size: clamp(28px, 4vw, 40px);
-    font-weight: 800;
-    letter-spacing: 0.01em;
-    margin: 0 0 18px;
-  }
-
-  header p.sub {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 500;
-    color: var(--ink-dim);
-    max-width: 560px;
-    margin: 0 auto;
-    line-height: 1.6;
-    font-size: 15px;
-  }
-
-  /* Download-all CTA */
-  .cta-band {
-    max-width: 1180px;
-    margin: 8px auto 56px;
-    padding: 0 24px;
-  }
-
-  .cta-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    flex-wrap: wrap;
-    background: linear-gradient(160deg, var(--panel-top), var(--panel-bottom));
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 28px 32px;
-  }
-
-  .cta-card .cta-text {
-    min-width: 0;
-  }
-
-  .cta-card .cta-text h2 {
-    margin: 0 0 6px;
-    font-size: 19px;
-    font-weight: 700;
-  }
-
-  .cta-card .cta-text p {
-    margin: 0;
-    font-family: 'Oswald', sans-serif;
-    font-size: 13.5px;
-    color: var(--ink-dim);
-    font-weight: 500;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Oxanium', sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    text-decoration: none;
-    padding: 13px 22px;
-    border-radius: 8px;
-    white-space: nowrap;
-    transition: transform 0.12s ease, filter 0.12s ease;
-  }
-
-  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
-  .btn:active { transform: translateY(0); }
-
-  .btn-primary {
-    background: #e7f3f1;
-    color: #0c211d;
-  }
-
-  .btn-ghost {
-    background: transparent;
-    border: 1.5px solid var(--border);
-    color: var(--ink);
-  }
-
-  /* Plugin grid */
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
-    gap: 24px;
-    padding-bottom: 72px;
-    min-width: 0;
-  }
-
-  .card {
-    background: linear-gradient(160deg, var(--panel-top), var(--panel-bottom));
-    border: 1px solid var(--card-border);
-    border-radius: 14px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .card .shot {
-    background: #101314;
-    border-bottom: 1px solid var(--card-border);
-    aspect-ratio: 16 / 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .card .shot img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: center;
-  }
-
-  .card .body {
-    padding: 22px 24px 24px;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-  }
-
-  .card .name-row {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 4px;
-  }
-
-  .card h3 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: 0.01em;
-  }
-
-  .card .kind {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 500;
-    font-size: 10.5px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--ink-dim);
-  }
-
-  .card p.desc {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 500;
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: var(--ink-dim);
-    margin: 8px 0 20px;
-    flex: 1;
-  }
-
-  .card .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .card .formats {
-    font-family: 'Oswald', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    color: var(--ink-dim);
-    font-weight: 500;
-    min-width: 0;
-  }
-
-  .card .btn {
-    padding: 10px 18px;
-    font-size: 12px;
-  }
-
-  /* Per-plugin accent */
-  .card[data-plugin="caverns"] h3 { color: var(--caverns); }
-  .card[data-plugin="caverns"] .btn-accent { background: var(--caverns); color: #0c211d; }
-  .card[data-plugin="damage"] h3 { color: var(--damage); }
-  .card[data-plugin="damage"] .btn-accent { background: var(--damage); color: #241009; }
-  .card[data-plugin="corrosion"] h3 { color: var(--corrosion); }
-  .card[data-plugin="corrosion"] .btn-accent { background: var(--corrosion); color: #241f0c; }
-  .card[data-plugin="flux"] h3 { color: var(--flux); }
-  .card[data-plugin="flux"] .btn-accent { background: var(--flux); color: #1c1526; }
-  .card[data-plugin="alloy"] h3 { color: var(--alloy); }
-  .card[data-plugin="alloy"] .btn-accent { background: var(--alloy); color: #0a1519; }
-  .card[data-plugin="gradient"] h3 { color: var(--gradient); }
-  .card[data-plugin="gradient"] .btn-accent { background: var(--gradient); color: #241209; }
-
-  /* Notes */
-  .notes {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 24px 48px;
-  }
-
-  .notes .box {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px 24px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--ink-dim);
-    font-weight: 500;
-  }
-
-  .notes .box strong { color: var(--ink); }
-
-  .notes .box code {
-    background: rgba(230, 236, 230, 0.08);
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-  }
-
-  /* Footer */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 32px 0 48px;
-  }
-
-  footer .wrap {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  footer p {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 500;
-    font-size: 12.5px;
-    color: var(--ink-dim);
-    margin: 0;
-  }
-
-  footer a.gh {
-    font-family: 'Oxanium', sans-serif;
-    font-weight: 700;
-    font-size: 13px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--ink);
-    border: 1.5px solid var(--border);
-    padding: 9px 16px;
-    border-radius: 8px;
-  }
-
-  footer a.gh:hover { filter: brightness(1.15); }
-
-  @media (max-width: 640px) {
-    header { padding: 44px 0 32px; }
-    .cta-card { flex-direction: column; align-items: flex-start; text-align: left; }
-    .cta-card .btn { align-self: stretch; justify-content: center; }
-  }
-</style>
-</head>
-<body>
-
-<header>
-  <div class="wrap">
-    <img class="logo" src="assets/WildJagLogo.svg" alt="Wild Jag">
-    <p class="tagline">Free &amp; open source</p>
-    <h1>Six hardware-inspired audio plugins for macOS</h1>
-    <p class="sub">Bucket-brigade delay, fuzz, overdrive, phaser, a stacked mono synth, and a
-      pitch-shifting delay &mdash; each one built with JUCE, styled after 1980s rack-gear hardware,
-      and free to use under the AGPLv3.</p>
-  </div>
-</header>
-
-<div class="cta-band">
-  <div class="cta-card">
-    <div class="cta-text">
-      <h2>Install everything at once</h2>
-      <p>One .pkg with a checkbox per plugin and per format (AU / VST3 / Standalone).</p>
+    <div class="cta-band">
+      <div class="cta-card">
+        <div class="cta-text">
+          <h2>Install everything at once</h2>
+          <p class="desc">
+            One .pkg with a checkbox per plugin and per format (AU / VST3 /
+            Standalone).
+          </p>
+        </div>
+        <a
+          class="btn btn-primary"
+          href="https://github.com/mradambeck/audio-plugins/releases/latest/download/WildJagPlugins-Installer.pkg"
+        >
+          Download All Six
+        </a>
+      </div>
     </div>
-    <a class="btn btn-primary" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/WildJagPlugins-Installer.pkg">
-      Download All Six
-    </a>
-  </div>
-</div>
 
-<div class="wrap">
-  <div class="grid">
+    <div class="wrap">
+      <div class="grid">
+        <div class="card" data-plugin="caverns">
+          <div class="shot">
+            <img
+              src="assets/screenshots/Caverns.png"
+              alt="Caverns plugin window"
+            />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Caverns</h3>
+              <span class="kind">Bucket Brigade Delay</span>
+            </div>
+            <p class="desc">
+              A bucket-brigade-style stereo delay with independent L/R time,
+              tape-style degrade and modulation for pitch wobble and lo-fi
+              character, and tempo sync.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Caverns-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
+        </div>
 
-    <div class="card" data-plugin="caverns">
-      <div class="shot"><img src="assets/screenshots/Caverns.png" alt="Caverns plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Caverns</h3><span class="kind">Delay</span></div>
-        <p class="desc">A bucket-brigade-style stereo delay with independent L/R time, tape-style
-          degrade and modulation for pitch wobble and lo-fi character, and tempo sync.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Caverns-Installer.pkg">Download</a>
+        <div class="card" data-plugin="damage">
+          <div class="shot">
+            <img
+              src="assets/screenshots/Damage.png"
+              alt="Damage plugin window"
+            />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Damage</h3>
+              <span class="kind">FM Mangled Fuzz</span>
+            </div>
+            <p class="desc">
+              FM-mangled fuzz &mdash; a square-wave/pulse-width fuzz stage that
+              can be cross-modulated by its own internal oscillator, plus a
+              level-following noise gate.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Damage-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-plugin="corrosion">
+          <div class="shot">
+            <img
+              src="assets/screenshots/Corrosion.png"
+              alt="Corrosion plugin window"
+            />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Corrosion</h3>
+              <span class="kind">Overdrive</span>
+            </div>
+            <p class="desc">
+              Tanh-based overdrive/distortion with an asymmetric bias stage for
+              even-harmonic warmth and an optional rectifier stage for a more
+              aggressive character. Great for color in small blend amounts, or
+              full-on distortion when pushed to the max.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Corrosion-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-plugin="flux">
+          <div class="shot">
+            <img src="assets/screenshots/Flux.png" alt="Flux plugin window" />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Flux</h3>
+              <span class="kind">Analog Phase Shifter</span>
+            </div>
+            <p class="desc">
+              An analog-style phase shifter with a switchable stage count from 2
+              to 36, plus a Color section for shaping the phased signal before
+              the dry/wet blend.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Flux-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-plugin="alloy">
+          <div class="shot">
+            <img src="assets/screenshots/Alloy.png" alt="Alloy plugin window" />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Alloy</h3>
+              <span class="kind">Stacked Mono Synth</span>
+            </div>
+            <p class="desc">
+              A mono synth combining an analog oscillator channel, with an FM
+              voice stacked on top. Voiced for EBM bass, usable for anything.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Alloy-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="card" data-plugin="gradient">
+          <div class="shot">
+            <img
+              src="assets/screenshots/Gradient.png"
+              alt="Gradient plugin window"
+            />
+          </div>
+          <div class="body">
+            <div class="name-row">
+              <h3>Gradient</h3>
+              <span class="kind">Pitch Shifting Delay</span>
+            </div>
+            <p class="desc">
+              A pitch-shifting delay loosely inspired by the H910. Two
+              independent units can run in Dual mode, Linked, or Cross-feedback,
+              for evolving, self-modulating textures.
+            </p>
+            <div class="row">
+              <span class="formats">AU &middot; VST3 &middot; Standalone</span>
+              <a
+                class="btn btn-accent"
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Gradient-Installer.pkg"
+                >Download</a
+              >
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="card" data-plugin="damage">
-      <div class="shot"><img src="assets/screenshots/Damage.png" alt="Damage plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Damage</h3><span class="kind">Fuzz</span></div>
-        <p class="desc">FM-mangled fuzz &mdash; a square-wave/pulse-width fuzz stage that can be
-          cross-modulated by its own internal oscillator, plus a level-following noise gate.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Damage-Installer.pkg">Download</a>
-        </div>
+    <div class="notes">
+      <div class="box">
+        <strong>macOS only.</strong> Each installer lets you choose which
+        formats to install (AU / VST3 / Standalone) and whether to install for
+        all users of the Mac or just yourself. <br /><br />
+        <strong>Unsigned.</strong> These builds are ad-hoc signed, not notarized
+        with a paid Apple Developer ID.
+        <strong>On first run, Gatekeeper may block the installer</strong>
+        &mdash; right-click it and choose <strong>Open</strong>, or approve it
+        under <strong>System Settings &rarr; Privacy &amp; Security</strong>.
       </div>
     </div>
 
-    <div class="card" data-plugin="corrosion">
-      <div class="shot"><img src="assets/screenshots/Corrosion.png" alt="Corrosion plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Corrosion</h3><span class="kind">Overdrive</span></div>
-        <p class="desc">Tanh-based overdrive/distortion with an asymmetric bias stage for
-          even-harmonic warmth and an optional rectifier stage for a more aggressive character.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Corrosion-Installer.pkg">Download</a>
-        </div>
+    <footer>
+      <div class="wrap">
+        <p>
+          Wild Jag &middot; Licensed under AGPLv3 &middot; Source built with
+          <a href="https://juce.com">JUCE</a>
+        </p>
+        <a class="gh" href="https://github.com/mradambeck/audio-plugins"
+          >View source on GitHub &rarr;</a
+        >
       </div>
-    </div>
-
-    <div class="card" data-plugin="flux">
-      <div class="shot"><img src="assets/screenshots/Flux.png" alt="Flux plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Flux</h3><span class="kind">Phaser</span></div>
-        <p class="desc">An analog-style phase shifter with a switchable stage count from 2 to 36,
-          plus a Color section for shaping the phased signal before the dry/wet blend.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Flux-Installer.pkg">Download</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" data-plugin="alloy">
-      <div class="shot"><img src="assets/screenshots/Alloy.png" alt="Alloy plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Alloy</h3><span class="kind">Synth</span></div>
-        <p class="desc">A stacked mono synth combining an analog oscillator with unison and a sub,
-          an FM voice, and a built-in arpeggiator &mdash; voiced for bass, usable for anything.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Alloy-Installer.pkg">Download</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" data-plugin="gradient">
-      <div class="shot"><img src="assets/screenshots/Gradient.png" alt="Gradient plugin window"></div>
-      <div class="body">
-        <div class="name-row"><h3>Gradient</h3><span class="kind">Pitch Delay</span></div>
-        <p class="desc">A pitch-shifting delay with two independent units that can run in Dual
-          mode, Linked, or Cross-feedback, for evolving, self-modulating textures.</p>
-        <div class="row">
-          <span class="formats">AU &middot; VST3 &middot; Standalone</span>
-          <a class="btn btn-accent" href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Gradient-Installer.pkg">Download</a>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<div class="notes">
-  <div class="box">
-    <strong>macOS only.</strong> Each installer lets you choose which formats to install
-    (AU / VST3 / Standalone) and whether to install for all users of the Mac or just yourself.
-    <br><br>
-    <strong>Unsigned.</strong> These builds are ad-hoc signed, not notarized with a paid Apple
-    Developer ID. On first run, Gatekeeper may block the installer &mdash; right-click it and
-    choose <strong>Open</strong>, or approve it under
-    <strong>System Settings &rarr; Privacy &amp; Security</strong>.
-  </div>
-</div>
-
-<footer>
-  <div class="wrap">
-    <p>Wild Jag &middot; Licensed under AGPLv3 &middot; Source built with <a href="https://juce.com">JUCE</a></p>
-    <a class="gh" href="https://github.com/mradambeck/audio-plugins">View source on GitHub &rarr;</a>
-  </div>
-</footer>
-
-</body>
+    </footer>
+  </body>
 </html>
