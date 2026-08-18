@@ -1,0 +1,58 @@
+name: Build and publish installers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the JUCE *source* checkout is cacheable across runs (see common/cmake/FetchJUCE.cmake).
+      - name: Cache JUCE checkout
+        uses: actions/cache@v4
+        with:
+          path: .deps
+          key: juce-9.0.1
+
+      - name: Build each plugin's own installer
+        run: |
+          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch; do
+            echo "==> Configuring $repo"
+            cmake -S "$repo" -B "$repo/build" -G Xcode
+            echo "==> Building $repo installer"
+            "./$repo/installer/build.sh"
+          done
+
+      - name: Build the combined installer
+        run: |
+          cd installers
+          ./build-all.sh
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          cp caverns-delay/installer/output/Caverns-Installer.pkg release-assets/
+          cp damage-fuzz/installer/output/Damage-Installer.pkg release-assets/
+          cp corrosion-drive/installer/output/Corrosion-Installer.pkg release-assets/
+          cp flux-phaser/installer/output/Flux-Installer.pkg release-assets/
+          cp alloy-bass/installer/output/Alloy-Installer.pkg release-assets/
+          cp gradient-pitch/installer/output/Gradient-Installer.pkg release-assets/
+          cp installers/output/WildJagPlugins-Installer.pkg release-assets/
+          ls -la release-assets/
+
+      # Publishes/updates a single rolling "latest" release so the Pages site can link stable
+      # /releases/latest/download/<file>.pkg URLs that always point at the current build off main.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          body: Automatically built from the latest commit on main. Not a versioned release.
+          make_latest: true
+          files: release-assets/*.pkg
