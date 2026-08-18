@@ -267,6 +267,35 @@ header p.sub {
   font-size: 12px;
 }
 
+.card .raw-links {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Oswald", sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+}
+
+.card .raw-links .raw-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.card .raw-links a {
+  color: var(--ink-dim);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--card-border);
+}
+
+.card .raw-links a:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
 /* Per-plugin accent */
 .card[data-plugin="caverns"] h3 {
   color: var(--caverns);

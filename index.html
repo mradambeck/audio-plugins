@@ -75,6 +75,17 @@
                 >Download</a
               >
             </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Caverns-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Caverns-VST3.zip"
+                >VST3</a
+              >
+            </div>
           </div>
         </div>
 
@@ -101,6 +112,17 @@
                 class="btn btn-accent"
                 href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Damage-Installer.pkg"
                 >Download</a
+              >
+            </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Damage-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Damage-VST3.zip"
+                >VST3</a
               >
             </div>
           </div>
@@ -132,6 +154,17 @@
                 >Download</a
               >
             </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Corrosion-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Corrosion-VST3.zip"
+                >VST3</a
+              >
+            </div>
           </div>
         </div>
 
@@ -157,6 +190,17 @@
                 >Download</a
               >
             </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Flux-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Flux-VST3.zip"
+                >VST3</a
+              >
+            </div>
           </div>
         </div>
 
@@ -179,6 +223,17 @@
                 class="btn btn-accent"
                 href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Alloy-Installer.pkg"
                 >Download</a
+              >
+            </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Alloy-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Alloy-VST3.zip"
+                >VST3</a
               >
             </div>
           </div>
@@ -209,6 +264,17 @@
                 >Download</a
               >
             </div>
+            <div class="raw-links">
+              <span class="raw-label">Just the plugin:</span>
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Gradient-AU.zip"
+                >AU</a
+              >
+              <a
+                href="https://github.com/mradambeck/audio-plugins/releases/latest/download/Gradient-VST3.zip"
+                >VST3</a
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -224,6 +290,21 @@
         <strong>On first run, Gatekeeper may block the installer</strong>
         &mdash; right-click it and choose <strong>Open</strong>, or approve it
         under <strong>System Settings &rarr; Privacy &amp; Security</strong>.
+        <br /><br />
+        <strong>"Just the plugin" downloads</strong> are the raw
+        <code>.component</code>/<code>.vst3</code> file, zipped &mdash; unzip
+        it and drag it into
+        <code>~/Library/Audio/Plug-Ins/Components</code> (AU) or
+        <code>~/Library/Audio/Plug-Ins/VST3</code> (VST3) yourself. Since
+        there's no installer to carry the Gatekeeper approval, macOS may
+        refuse to load it in your DAW until you clear the quarantine flag it
+        picked up from the browser download:
+        <code
+          >xattr -dr com.apple.quarantine
+          ~/Library/Audio/Plug-Ins/Components/Name.component</code
+        >
+        (swap in the actual path). The regular installer above doesn't need
+        this.
       </div>
     </div>
 
