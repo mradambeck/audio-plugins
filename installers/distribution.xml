@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>Wild Jag Plugins</title>
+    <organization>com.wildjag</organization>
+    <domains enable_currentUserHome="true" enable_localSystem="true" enable_anywhere="false"/>
+    <options customize="always" require-scripts="false"/>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <license file="license.txt" mime-type="text/plain"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <choices-outline>
+        <line choice="choice_caverns">
+            <line choice="choice_caverns_au"/>
+            <line choice="choice_caverns_vst3"/>
+            <line choice="choice_caverns_standalone"/>
+        </line>
+        <line choice="choice_damage">
+            <line choice="choice_damage_au"/>
+            <line choice="choice_damage_vst3"/>
+            <line choice="choice_damage_standalone"/>
+        </line>
+        <line choice="choice_corrosion">
+            <line choice="choice_corrosion_au"/>
+            <line choice="choice_corrosion_vst3"/>
+            <line choice="choice_corrosion_standalone"/>
+        </line>
+        <line choice="choice_flux">
+            <line choice="choice_flux_au"/>
+            <line choice="choice_flux_vst3"/>
+            <line choice="choice_flux_standalone"/>
+        </line>
+        <line choice="choice_alloy">
+            <line choice="choice_alloy_au"/>
+            <line choice="choice_alloy_vst3"/>
+            <line choice="choice_alloy_standalone"/>
+        </line>
+        <line choice="choice_gradient">
+            <line choice="choice_gradient_au"/>
+            <line choice="choice_gradient_vst3"/>
+            <line choice="choice_gradient_standalone"/>
+        </line>
+    </choices-outline>
+
+    <choice id="choice_caverns" title="Caverns" description="Caverns - reverb/delay plugin."/>
+    <choice id="choice_caverns_au" title="Audio Unit (AU)" description="Installs Caverns.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.caverns.au.pkg"/>
+    </choice>
+    <choice id="choice_caverns_vst3" title="VST3" description="Installs Caverns.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.caverns.vst3.pkg"/>
+    </choice>
+    <choice id="choice_caverns_standalone" title="Standalone App" description="Installs Caverns.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.caverns.standalone.pkg"/>
+    </choice>
+
+    <choice id="choice_damage" title="Damage" description="Damage - fuzz/distortion plugin."/>
+    <choice id="choice_damage_au" title="Audio Unit (AU)" description="Installs Damage.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.damage.au.pkg"/>
+    </choice>
+    <choice id="choice_damage_vst3" title="VST3" description="Installs Damage.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.damage.vst3.pkg"/>
+    </choice>
+    <choice id="choice_damage_standalone" title="Standalone App" description="Installs Damage.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.damage.standalone.pkg"/>
+    </choice>
+
+    <choice id="choice_corrosion" title="Corrosion" description="Corrosion - lo-fi drive plugin."/>
+    <choice id="choice_corrosion_au" title="Audio Unit (AU)" description="Installs Corrosion.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.corrosion.au.pkg"/>
+    </choice>
+    <choice id="choice_corrosion_vst3" title="VST3" description="Installs Corrosion.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.corrosion.vst3.pkg"/>
+    </choice>
+    <choice id="choice_corrosion_standalone" title="Standalone App" description="Installs Corrosion.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.corrosion.standalone.pkg"/>
+    </choice>
+
+    <choice id="choice_flux" title="Flux" description="Flux - analog phase shifter plugin."/>
+    <choice id="choice_flux_au" title="Audio Unit (AU)" description="Installs Flux.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.flux.au.pkg"/>
+    </choice>
+    <choice id="choice_flux_vst3" title="VST3" description="Installs Flux.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.flux.vst3.pkg"/>
+    </choice>
+    <choice id="choice_flux_standalone" title="Standalone App" description="Installs Flux.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.flux.standalone.pkg"/>
+    </choice>
+
+    <choice id="choice_alloy" title="Alloy" description="Alloy - industrial bass synth."/>
+    <choice id="choice_alloy_au" title="Audio Unit (AU)" description="Installs Alloy.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.alloy.au.pkg"/>
+    </choice>
+    <choice id="choice_alloy_vst3" title="VST3" description="Installs Alloy.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.alloy.vst3.pkg"/>
+    </choice>
+    <choice id="choice_alloy_standalone" title="Standalone App" description="Installs Alloy.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.alloy.standalone.pkg"/>
+    </choice>
+
+    <choice id="choice_gradient" title="Gradient" description="Gradient - pitch shifting delay plugin."/>
+    <choice id="choice_gradient_au" title="Audio Unit (AU)" description="Installs Gradient.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.gradient.au.pkg"/>
+    </choice>
+    <choice id="choice_gradient_vst3" title="VST3" description="Installs Gradient.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.gradient.vst3.pkg"/>
+    </choice>
+    <choice id="choice_gradient_standalone" title="Standalone App" description="Installs Gradient.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.gradient.standalone.pkg"/>
+    </choice>
+
+    <pkg-ref id="com.wildjag.caverns.au.pkg" version="0.1.0" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="0.1.0" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="0.1.0" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.damage.au.pkg" version="0.1.0" onConclusion="none">Damage-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.vst3.pkg" version="0.1.0" onConclusion="none">Damage-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.standalone.pkg" version="0.1.0" onConclusion="none">Damage-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.corrosion.au.pkg" version="0.1.0" onConclusion="none">Corrosion-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.corrosion.vst3.pkg" version="0.1.0" onConclusion="none">Corrosion-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.corrosion.standalone.pkg" version="0.1.0" onConclusion="none">Corrosion-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.flux.au.pkg" version="0.1.0" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.vst3.pkg" version="0.1.0" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.standalone.pkg" version="0.1.0" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.alloy.au.pkg" version="0.1.0" onConclusion="none">Alloy-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.alloy.vst3.pkg" version="0.1.0" onConclusion="none">Alloy-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.alloy.standalone.pkg" version="0.1.0" onConclusion="none">Alloy-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.gradient.au.pkg" version="0.1.0" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="0.1.0" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="0.1.0" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
+</installer-gui-script>

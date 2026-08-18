@@ -1,0 +1,47 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: caverns-delay
+            name: Caverns
+          - dir: damage-fuzz
+            name: Damage
+          - dir: corrosion-drive
+            name: Corrosion
+          - dir: flux-phaser
+            name: Flux
+          - dir: alloy-bass
+            name: Alloy
+          - dir: gradient-pitch
+            name: Gradient
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the JUCE *source* checkout is cacheable across runs (see common/cmake/FetchJUCE.cmake) --
+      # each plugin's own build/ directory is not, since it's a fresh configure per job.
+      - name: Cache JUCE checkout
+        uses: actions/cache@v4
+        with:
+          path: .deps
+          key: juce-9.0.1
+
+      - name: Configure
+        run: cmake -S ${{ matrix.dir }} -B ${{ matrix.dir }}/build
+
+      - name: Build ${{ matrix.name }}Tests
+        run: cmake --build ${{ matrix.dir }}/build --config Release --target ${{ matrix.name }}Tests
+
+      - name: Run ${{ matrix.name }}Tests
+        run: ${{ matrix.dir }}/build/${{ matrix.name }}Tests_artefacts/Release/${{ matrix.name }}Tests

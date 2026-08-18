@@ -1,0 +1,56 @@
+# Build directories
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!common/cmake/*.cmake
+
+# Fetched dependencies (see common/cmake/FetchJUCE.cmake)
+.deps/
+
+# Xcode
+*.xcuserdata/
+*.xcworkspace/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcshareddata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# JUCE
+/Builds/
+JuceLibraryCode/
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Mac
+.DS_Store
+Icon?
+._*
+
+# Plugins / binaries
+*.vst3
+*.component
+*.dylib
+*.bundle
+*.app
+
+# Installer build output. The leading **/ matters: a pattern with a slash in the middle, e.g.
+# "installer/stage/", is anchored to the repo root and won't match inside each plugin folder --
+# only a bare single-segment pattern like "build/" above is recursive by default. Each plugin's
+# own installer folder is "installer/" (singular); the root group installer is "installers/"
+# (plural) -- both need covering, they're different directories.
+**/installer/stage/
+**/installer/output/
+installers/stage/
+installers/output/
+*.pkg
