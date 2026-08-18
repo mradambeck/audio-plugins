@@ -38,7 +38,7 @@ jobs:
           key: juce-9.0.1
 
       - name: Configure
-        run: cmake -S ${{ matrix.dir }} -B ${{ matrix.dir }}/build
+        run: cmake -S ${{ matrix.dir }} -B ${{ matrix.dir }}/build -G Xcode
 
       - name: Build ${{ matrix.name }}Tests
         run: cmake --build ${{ matrix.dir }}/build --config Release --target ${{ matrix.name }}Tests
