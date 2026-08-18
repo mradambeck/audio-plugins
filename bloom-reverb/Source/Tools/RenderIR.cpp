@@ -60,8 +60,8 @@ int main(int argc, char* argv[])
     {
         std::fprintf(stderr,
             "Usage: BloomRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]\n"
-            "                     [--diffusion 0.5] [--feedback 85] [--size 1.0] [--damping 35]\n"
-            "                     [--bandwidth 15000] [--bitdepth 16] [--mix 100]\n");
+            "                     [--diffusion 0.5] [--feedback 99] [--size 1.0] [--damping 20]\n"
+            "                     [--bandwidth 19000] [--bitdepth 13] [--mix 100]\n");
         return 1;
     }
 
@@ -69,13 +69,16 @@ int main(int argc, char* argv[])
     const auto sampleRate = getFloatArg(args, "sampleRate", 44100.0f);
     const auto seconds = getFloatArg(args, "seconds", 4.0f);
 
+    // Fallback defaults below match PluginProcessor's own createParameterLayout() defaults (tuned
+    // against reference-irs/ - see that function's comments), so an unqualified run of this tool
+    // renders what the plugin actually ships with, not some other placeholder.
     BloomAudioProcessor processor;
     setParam(processor, BloomAudioProcessor::diffusionParamID, getFloatArg(args, "diffusion", 0.5f));
-    setParam(processor, BloomAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 85.0f));
+    setParam(processor, BloomAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 99.0f));
     setParam(processor, BloomAudioProcessor::sizeParamID, getFloatArg(args, "size", 1.0f));
-    setParam(processor, BloomAudioProcessor::dampingParamID, getFloatArg(args, "damping", 35.0f));
-    setParam(processor, BloomAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 15000.0f));
-    setParam(processor, BloomAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 16.0f));
+    setParam(processor, BloomAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
+    setParam(processor, BloomAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
+    setParam(processor, BloomAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
     // Default 100% wet: this tool captures the ALGORITHM's impulse response for comparison
     // against reference-irs/, where a dry click at sample 0 would only get in the way.
     setParam(processor, BloomAudioProcessor::mixParamID, getFloatArg(args, "mix", 100.0f));
@@ -112,6 +115,12 @@ int main(int argc, char* argv[])
     }
 
     outFile.getParentDirectory().createDirectory();
+
+    // File::createOutputStream() appends at the current end of an existing file rather than
+    // truncating it - deleting first is the standard JUCE idiom for "overwrite", and matters a lot
+    // here since rerendering to the same path (the natural workflow while tuning) would otherwise
+    // silently corrupt the WAV into old-data-plus-new-data rather than replacing it.
+    outFile.deleteFile();
 
     juce::WavAudioFormat wavFormat;
     std::unique_ptr<juce::FileOutputStream> stream(outFile.createOutputStream());

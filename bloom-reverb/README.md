@@ -5,9 +5,11 @@
 A diffuse algorithmic reverb (AU / VST3 / Standalone) emulating the Alesis Midiverb II "Bloom"
 algorithm (presets 45 and 49): energy density builds slowly before decaying, rather than a
 discrete-tap swelling delay or an envelope applied to a normal reverb tail. The buildup emerges
-from an 8-line, Hadamard-mixed feedback delay network (FDN) run with the diffusion coefficient
-near its 0.5 sweet spot - see "How it works" below for why that specifically is what produces the
-character, and what "buildup" actually means here.
+from a bank of short feedback combs ahead of an 8-line, Hadamard-mixed feedback delay network
+(FDN) tank - see "How it works" below for why the buildup needed that burst stage specifically,
+and what "buildup" actually means here. Default parameters are tuned against real Midiverb II
+captures (`reference-irs/`, scored via `tools/compare_irs.py`): ~0.96 envelope correlation against
+both preset 45 and preset 49 at time of writing.
 
 See the [root README](../README.md) for shared build requirements, the exFAT/apostrophe build
 gotchas, and running tests across all plugins at once.
@@ -59,9 +61,14 @@ pieces support that, on top of the usual `BloomTests` unit-test target:
 
    ```sh
    cmake --build build --config Release --target BloomRenderIR
-   build/BloomRenderIR_artefacts/Release/BloomRenderIR --out rendered-irs/mine.wav --seconds 4 \
-       --diffusion 0.5 --feedback 90 --size 1.0 --damping 35 --bandwidth 15000 --bitdepth 16
+   build/BloomRenderIR_artefacts/Release/BloomRenderIR --out rendered-irs/mine.wav --seconds 4
    ```
+
+   Run with no parameter flags, this renders the plugin's actual current defaults (flags override
+   individual parameters, e.g. `--feedback 90 --size 1.5`, for A/B testing against a fixed
+   baseline). Rerunning to the same `--out` path correctly overwrites it - `File::createOutputStream()`
+   appends by default, which silently corrupted comparisons during tuning until this tool started
+   deleting the target file first; worth knowing if you ever touch this file.
 3. **`tools/compare_irs.py`** - scores a rendered IR against a reference one (RMS envelope overlay,
    echo-density-over-time overlay, spectrogram, envelope correlation, log-spectral distance):
 
@@ -75,29 +82,39 @@ them as scripts rather than one-off checks.
 
 ## How it works
 
-The core is `BloomFDNEngine`: 8 delay lines (mutually prime lengths, so no periodic reinforcement/
-metallic ringing), mixed every sample by a fixed 8x8 Hadamard matrix (energy-preserving, so overall
-stability is governed purely by the scalar Feedback gain and the per-line one-pole Damping filter,
-not by the matrix). A short 3-stage allpass chain diffuses the input ahead of the network. No
-delay-line modulation anywhere - the network is deliberately static/unmodulated, matching the
+The core is `BloomFDNEngine`, in two stages:
+
+1. **A burst comb bank** (6 short, mutually-prime feedback combs per channel, fed by a 3-stage
+   input allpass diffuser) - this is what actually produces the audible swell. Each comb turns the
+   input into its own train of exponentially-decaying repeats; summed across several mutually-prime
+   delay lengths (no single repeat rate dominating into a metallic ring), the windowed RMS of that
+   sum genuinely rises for a while as more repeats overlap, before falling once decay outpaces new
+   overlap. Its own decay time - independent of the main tank's much longer tail - is scaled by
+   `Size`, exactly matching the spec's "Size is the de facto attack-time control."
+2. **The main tank**: 8 delay lines (mutually prime lengths, so no periodic reinforcement/metallic
+   ringing), mixed every sample by a fixed 8x8 Hadamard matrix (energy-preserving, so stability is
+   governed purely by the scalar Feedback gain and the per-line one-pole Damping filter, not by the
+   matrix). This is responsible for the long decay tail, not the attack.
+
+No delay-line modulation anywhere in either stage - deliberately static/unmodulated, matching the
 original hardware's grainy character.
 
-**On "buildup":** an orthogonal (energy-preserving) cross-mix scaled by a single feedback gain is
-provably front-loaded - its *raw energy/RMS* can only ever be highest at the moment of injection
-and fall from there (confirmed empirically while building this; see `BloomFDNEngineTests.cpp`'s
-comments for the reasoning). What genuinely does build over time in this topology is **echo
-density**: the count of distinguishable reflections per time window, which starts sparse (a
-handful of first-order arrivals) and measurably increases as multiple generations of reflections
-through the Hadamard mix interleave into a denser texture, before eventually thinning out again as
-the tail decays. That density curve - not the loudness contour - is Bloom's actual signature, and
-it's what both `BloomFDNEngineTests.cpp` and `tools/compare_irs.py` measure. `Size` scales the
-delay line lengths and is therefore the de facto attack-time control: longer lines mean more
-samples/round-trips before the network reaches full density, i.e. a slower bloom.
+**Why two stages, not one:** an orthogonal (energy-preserving) cross-mix scaled by a single scalar
+feedback gain is provably front-loaded - its raw RMS envelope can only ever be highest at the
+moment of injection and fall from there (this is a real mathematical property of that topology, not
+a tuning issue). An early version relied on the tank alone, on the theory that *echo density* -
+not raw RMS - was Bloom's real signature; that produced measurable density growth but, once real
+reference IRs were available to check against, the hardware's own RMS envelope turned out to
+genuinely swell too, not just its density. The burst stage above is what closes that gap: it's a
+real per-sample recursive filter driven by the actual input, not a precomputed gain curve, so it
+doesn't run afoul of "don't fake the swell with an envelope."
 
 Lo-fi coloration (bandwidth-limiting lowpass + bit-depth quantization) is applied to the wet output
-after the FDN, reintroducing the ~15kHz bandwidth and 12-16 bit grain of the original hardware -
-both are tunable parameters rather than hardcoded, so they get dialled in against the reference IRs
-rather than guessed.
+after the FDN. Defaults (Damping 20%, Bandwidth 19kHz, Bit Depth 13) came out of sweeping each
+parameter against `tools/compare_irs.py`'s log-spectral-distance score on both reference IRs -
+notably, both reference captures scored *worse* under heavier damping/narrower bandwidth than the
+spec's "~15kHz, fairly damped" assumption suggested; a little bit-depth grain (not none) did help.
+See `PluginProcessor.cpp`'s `createParameterLayout()` for the per-parameter notes.
 
 The UI is currently a stock `GenericAudioProcessorEditor` (auto-built sliders, one per parameter) -
 per the build order, the hardware-panel UI (see the `juce-hardware-panel-ui` skill; accent colour
@@ -105,16 +122,20 @@ per the build order, the hardware-panel UI (see the `juce-hardware-panel-ui` ski
 
 ## Parameters
 
-| Parameter | Range | Description |
-|---|---|---|
-| Diffusion | 0.3 - 0.7 | Input allpass diffuser coefficient; centered near 0.5 per the Bloom spec |
-| Feedback | 0 - 100% | Decay/tail-length control (internally capped below unity gain) |
-| Size | 0.25x - 4.0x | Scales the FDN's delay line lengths - the de facto attack-time control |
-| Damping | 0 - 100% | Per-line feedback-path one-pole lowpass - controls HF decay rate |
-| Bandwidth | 1kHz - 20kHz | Output lowpass cutoff (lo-fi bandwidth limit) |
-| Bit Depth | 4 - 16 bit | Output quantization depth (lo-fi grain) |
-| Mix | 0 - 100% | Dry/wet balance |
-| Bypass | on/off | |
+| Parameter | Range | Default | Description |
+|---|---|---|---|
+| Diffusion | 0.3 - 0.7 | 0.5 | Input allpass diffuser coefficient; centered near 0.5 per the Bloom spec |
+| Feedback | 0 - 100% | 99% | Decay/tail-length control (internally capped below unity gain) |
+| Size | 0.25x - 4.0x | 1.0x | Scales the burst stage and FDN's delay line lengths - the de facto attack-time control |
+| Damping | 0 - 100% | 20% | Per-line feedback-path one-pole lowpass - controls HF decay rate |
+| Bandwidth | 1kHz - 20kHz | 19kHz | Output lowpass cutoff (lo-fi bandwidth limit) |
+| Bit Depth | 4 - 16 bit | 13 bit | Output quantization depth (lo-fi grain) |
+| Mix | 0 - 100% | 40% | Dry/wet balance |
+| Bypass | on/off | off | |
+
+Feedback/Damping/Bandwidth/Bit Depth defaults are the result of tuning against `reference-irs/`
+(see "How it works" above) - Diffusion/Size stayed at their spec-suggested values since sweeping
+them didn't improve the match further.
 
 ## Project structure
 

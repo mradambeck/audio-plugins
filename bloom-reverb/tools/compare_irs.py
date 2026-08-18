@@ -157,7 +157,7 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(3, 1, figsize=(10, 10))
+    fig, axes = plt.subplots(4, 1, figsize=(10, 13))
 
     timeRendered = np.arange(len(rmsRendered)) * args.window_ms / 1000.0
     timeReference = np.arange(len(rmsReference)) * args.window_ms / 1000.0
@@ -181,6 +181,12 @@ def main():
     axes[2].set_title("Rendered (Bloom) spectrogram")
     axes[2].set_xlabel("Time (s)")
     axes[2].set_ylabel("Frequency (Hz)")
+
+    fReference, tReference, sxxReference = spectrogram(referenceData, fs=targetRate, nperseg=nperseg)
+    axes[3].pcolormesh(tReference, fReference, 10 * np.log10(sxxReference + 1.0e-12), shading="gouraud")
+    axes[3].set_title("Reference (Midiverb) spectrogram")
+    axes[3].set_xlabel("Time (s)")
+    axes[3].set_ylabel("Frequency (Hz)")
 
     fig.tight_layout()
 

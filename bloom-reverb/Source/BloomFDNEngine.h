@@ -10,10 +10,17 @@
 // FDN is easier to keep stable while tuning Diffusion/Feedback/Size against the reference Midiverb
 // captures, and produces the same territory of sound.
 //
-// The buildup itself is not an envelope: it emerges from echo density increasing as the impulse
-// takes more round trips through the 8-way Hadamard mix before the network's output reaches full
-// density. No delay-line modulation is applied anywhere in this class (no chorus/pitch drift) -
-// this matches the original hardware's static, unmodulated, slightly grainy diffusion.
+// The buildup itself is not an envelope: it emerges from a bank of short feedback combs the input
+// passes through before the main tank (see BurstCombLine below) - the windowed RMS of several
+// mutually-prime decaying repeat-trains summed together genuinely rises for a while as more
+// repeats overlap, before falling once decay outpaces new overlap. That's a real per-sample
+// recursive filter responding to the actual input, not a precomputed gain curve. (An earlier
+// version relied solely on the main tank's own echo DENSITY increasing over time, on the theory
+// that a passive energy-preserving cross-mix can only ever lose RMS energy from the moment of
+// injection - true, but comparison against real Midiverb captures showed the hardware's own RMS
+// envelope genuinely swells too, not just its density, hence the burst stage.) No delay-line
+// modulation is applied anywhere in this class (no chorus/pitch drift) - this matches the original
+// hardware's static, unmodulated, slightly grainy diffusion.
 //
 // Two independent instances are NOT needed for stereo: a single 8-line network is shared between
 // channels (even-indexed lines seeded from L, odd-indexed from R; L output reads the even lines,
@@ -90,6 +97,28 @@ private:
         float processSample(float x);
     };
 
+    // The actual mechanism behind the audible swell (see the class comment's "On buildup" note):
+    // a bank of short, mutually-prime feedback combs the (allpass-smoothed) input passes through
+    // before ever reaching the main 8-line tank. Each comb turns the input into its own train of
+    // exponentially-decaying repeats; summed across several mutually-prime delays (so no single
+    // repeat rate dominates - that would just be a metallic comb filter), the windowed RMS of that
+    // sum genuinely rises for a while as more of each line's repeats overlap, before falling once
+    // decay outpaces new overlap. This is a real, tunable per-sample recursive filter driven by the
+    // actual input, not a precomputed time-keyed gain curve. Its own decay time (independent of the
+    // main tank's much longer Feedback-controlled tail) sets how long the buildup itself takes,
+    // scaled by Size exactly as the spec calls for.
+    struct BurstCombLine
+    {
+        std::vector<float> buffer;
+        int writePos = 0;
+        int delaySamples = 1;
+        float feedbackGain = 0.0f;
+
+        void prepare(int maxDelaySamples);
+        void reset();
+        float processSample(float x);
+    };
+
     // 8x8 Hadamard matrix (+-1 entries, Sylvester construction), normalised by 1/sqrt(8) at use
     // time - an orthogonal (energy-preserving) mix, which keeps overall network stability governed
     // purely by the scalar feedback gain and the damping coefficient rather than by the matrix.
@@ -103,6 +132,31 @@ private:
     std::array<float, numLines> dampingState {};
 
     std::array<AllpassStage, 3> allpassL, allpassR;
+
+    static constexpr int numBurstLines = 6;
+
+    // Mutually prime (no shared factors, so no single repeat rate dominates into a metallic ring),
+    // spread across roughly the same order of magnitude as baseAttackMs below - short lines alone
+    // saturate (all their repeats overlap) almost immediately, which pulls the RMS peak far earlier
+    // than the attack duration actually calls for; spreading lengths out this way is what makes the
+    // peak-timing controllable via baseAttackMs at all. Scaled by sizeMultiplier like the main tank.
+    static constexpr std::array<float, numBurstLines> baseBurstLengthsMs {
+        13.0f, 37.0f, 61.0f, 89.0f, 113.0f, 149.0f
+    };
+
+    // How long the burst (attack/buildup) takes at sizeMultiplier == 1, in ms - calibrated against
+    // the real Midiverb reference IRs' observed rise-to-peak time. Scaled by Size exactly like the
+    // main tank's lines, so Size remains the single "how slow is the bloom" control.
+    static constexpr float baseAttackMs = 650.0f;
+
+    // Fraction of a burst line's initial amplitude it should have decayed to by baseAttackMs *
+    // sizeMultiplier - i.e. how "used up" the attack is considered by the time the main tail takes
+    // over. Lower = a more clearly bounded attack window; higher = a longer-lingering burst tail.
+    static constexpr float burstFloor = 0.1f;
+
+    std::array<BurstCombLine, numBurstLines> burstL, burstR;
+
+    void updateBurstLines();
 
     float sizeMultiplier = 1.0f;
     float feedbackGain = 0.85f;

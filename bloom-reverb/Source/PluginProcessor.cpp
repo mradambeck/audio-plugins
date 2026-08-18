@@ -34,11 +34,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
         juce::AudioParameterFloatAttributes()
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2); })));
 
+    // Default 99%: tuned against reference-irs/preset-45.wav and preset-49.wav (real Midiverb II
+    // captures) - both have a ~3.5s decay tail, which needs feedback pushed close to its ceiling to
+    // reproduce (85% dies out within ~1.3s, far short of the real hardware's tail).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{feedbackParamID, 1},
         "Feedback",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
-        85.0f,
+        99.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
@@ -55,35 +58,40 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
             .withLabel("x")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2) + "x"; })));
 
+    // Default 20%: tuned against the reference IRs via tools/compare_irs.py's log-spectral-distance
+    // score - higher damping settings (tried up to 65%) consistently scored WORSE, i.e. the real
+    // hardware's tail is brighter for longer than the spec's "~15kHz, fairly damped" assumption
+    // suggested. Swept 0-65%; the log-spectral-distance score bottomed out in the 15-25% band.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{dampingParamID, 1},
         "Damping",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
-        35.0f,
+        20.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
 
-    // Default left near-transparent (18kHz, just inside most listeners' audible ceiling) rather
-    // than guessing at the ~15kHz character called out in the spec - that gets tuned against the
-    // reference Midiverb IRs once the comparison harness exists (build order step 4), not baked in
-    // as an assumed default here.
+    // Default 19kHz: also tuned against the reference IRs (see Damping above) - narrower bandwidths
+    // scored worse, consistent with Damping's finding that these particular captures are brighter
+    // than the spec's ~15kHz assumption. Left as a parameter rather than raised in the spec's own
+    // range, since a different reference capture (or a future preset) may well want it darker.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{bandwidthHzParamID, 1},
         "Bandwidth",
         juce::NormalisableRange<float>(1000.0f, 20000.0f, 1.0f, 0.3f),
-        18000.0f,
+        19000.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("Hz")
             .withStringFromValueFunction([](float v, int) { return juce::String((int) v) + " Hz"; })));
 
-    // Default 16 (transparent at this precision) for the same reason as Bandwidth above - the
-    // authentic 12-16 bit grain amount is a tuning target, not a guess.
+    // Default 13: unlike Damping/Bandwidth, a LITTLE quantization grain (not none) did measurably
+    // improve the log-spectral-distance match against the reference IRs - consistent with real
+    // 12-16 bit hardware having some audible grain even when otherwise fairly bright/undamped.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{bitDepthParamID, 1},
         "Bit Depth",
         juce::NormalisableRange<float>(4.0f, 16.0f, 0.1f),
-        16.0f,
+        13.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("bit")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " bit"; })));

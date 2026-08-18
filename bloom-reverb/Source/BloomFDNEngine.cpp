@@ -55,6 +55,33 @@ float BloomFDNEngine::AllpassStage::processSample(float x)
     return y;
 }
 
+void BloomFDNEngine::BurstCombLine::prepare(int maxDelaySamples)
+{
+    buffer.assign((size_t) std::max(maxDelaySamples, 1), 0.0f);
+    writePos = 0;
+}
+
+void BloomFDNEngine::BurstCombLine::reset()
+{
+    std::fill(buffer.begin(), buffer.end(), 0.0f);
+    writePos = 0;
+}
+
+float BloomFDNEngine::BurstCombLine::processSample(float x)
+{
+    // Read-before-write, same ordering as the main tank's lines: the OUTPUT is whatever was
+    // written delaySamples ago, not this sample's input. That's what makes y[0] == 0 for an
+    // impulse into an empty buffer - the input only starts appearing in the output D samples
+    // later, which is the entire point (an immediate, undiminished pass-through here would let
+    // the full click straight through and defeat the burst stage's whole purpose).
+    const auto readPos = (writePos + (int) buffer.size() - delaySamples) % (int) buffer.size();
+    const auto y = buffer[(size_t) readPos];
+
+    buffer[(size_t) writePos] = x + feedbackGain * y;
+    writePos = (writePos + 1) % (int) buffer.size();
+    return y;
+}
+
 void BloomFDNEngine::prepare(double sampleRate)
 {
     sampleRateHz = sampleRate;
@@ -72,7 +99,15 @@ void BloomFDNEngine::prepare(double sampleRate)
         allpassR[i].prepare(capacity);
     }
 
+    for (size_t i = 0; i < burstL.size(); ++i)
+    {
+        const auto capacity = msToSamples(baseBurstLengthsMs[i] * maxSizeMultiplier, sampleRateHz);
+        burstL[i].prepare(capacity);
+        burstR[i].prepare(capacity);
+    }
+
     updateLineLengths();
+    updateBurstLines();
     setBandwidthHz(15000.0f);
     reset();
 }
@@ -87,6 +122,9 @@ void BloomFDNEngine::reset()
 
     for (auto& stage : allpassL) stage.reset();
     for (auto& stage : allpassR) stage.reset();
+
+    for (auto& line : burstL) line.reset();
+    for (auto& line : burstR) line.reset();
 
     bandwidthStateL = 0.0f;
     bandwidthStateR = 0.0f;
@@ -116,6 +154,37 @@ void BloomFDNEngine::setSize(float multiplier)
 
     sizeMultiplier = clamped;
     updateLineLengths();
+    updateBurstLines();
+}
+
+void BloomFDNEngine::updateBurstLines()
+{
+    const auto attackTimeSamples = (float) msToSamples(baseAttackMs * sizeMultiplier, sampleRateHz);
+
+    for (size_t i = 0; i < burstL.size(); ++i)
+    {
+        const auto capacity = (int) burstL[i].buffer.size();
+        const auto wanted = msToSamples(baseBurstLengthsMs[i] * sizeMultiplier, sampleRateHz);
+        const auto newLength = std::max(1, std::min(capacity, wanted));
+
+        // g^(attackTimeSamples / D) = burstFloor  =>  g = burstFloor^(D / attackTimeSamples). Every
+        // line reaches the same floor at the same wall-clock time despite having a different D, so
+        // the overall attack duration is set by baseAttackMs*Size, not by any one line's own length.
+        const auto g = std::pow(burstFloor, (float) newLength / attackTimeSamples);
+
+        if (newLength != burstL[i].delaySamples)
+        {
+            std::fill(burstL[i].buffer.begin(), burstL[i].buffer.end(), 0.0f);
+            std::fill(burstR[i].buffer.begin(), burstR[i].buffer.end(), 0.0f);
+            burstL[i].writePos = 0;
+            burstR[i].writePos = 0;
+            burstL[i].delaySamples = newLength;
+            burstR[i].delaySamples = newLength;
+        }
+
+        burstL[i].feedbackGain = g;
+        burstR[i].feedbackGain = g;
+    }
 }
 
 void BloomFDNEngine::updateLineLengths()
@@ -171,6 +240,21 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
         for (auto& stage : allpassR)
             diffusedR = stage.processSample(diffusedR);
 
+        // The burst comb bank turns each channel's (already smoothed) near-impulse into a
+        // decorrelated train of repeats whose SUM'S windowed RMS genuinely rises for a while
+        // before falling - see BurstCombLine's comment for why. This, not the main tank's own
+        // (energy-preserving, provably front-loaded) cross-mix, is what actually produces Bloom's
+        // audible swell; the main tank below is responsible for the long decay tail only.
+        constexpr float burstNorm = 1.0f / (float) numBurstLines;
+        float burstOutL = 0.0f, burstOutR = 0.0f;
+        for (size_t i = 0; i < burstL.size(); ++i)
+        {
+            burstOutL += burstL[i].processSample(diffusedL);
+            burstOutR += burstR[i].processSample(diffusedR);
+        }
+        burstOutL *= burstNorm;
+        burstOutR *= burstNorm;
+
         std::array<float, numLines> lineOut {};
         for (int i = 0; i < numLines; ++i)
         {
@@ -201,7 +285,7 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
 
         for (int i = 0; i < numLines; ++i)
         {
-            const auto injection = (i % 2 == 0) ? diffusedL : diffusedR;
+            const auto injection = (i % 2 == 0) ? burstOutL : burstOutR;
             auto& buf = lineBuffers[(size_t) i];
             buf[(size_t) writePos[(size_t) i]] = mixed[(size_t) i] + injection;
             writePos[(size_t) i] = (writePos[(size_t) i] + 1) % (int) buf.size();
