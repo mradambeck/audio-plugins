@@ -96,6 +96,92 @@ namespace
 
         return std::exp(-1.0f / (0.001f * timeMs * static_cast<float>(sampleRate)));
     }
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected.
+    struct FactoryPreset
+    {
+        juce::String name;
+        std::vector<std::pair<juce::String, float>> values;
+    };
+
+    const std::vector<FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<FactoryPreset> presets = {
+            { "Always Leave a Note", {
+                { DamageAudioProcessor::bypassParamID, 0.0f },
+                { DamageAudioProcessor::driveParamID, 52.14999771118164f },
+                { DamageAudioProcessor::dryParamID, 83.5999984741211f },
+                { DamageAudioProcessor::gateParamID, -47.0f },
+                { DamageAudioProcessor::highPassParamID, 240.0f },
+                { DamageAudioProcessor::lowPassParamID, 1381.0f },
+                { DamageAudioProcessor::oscFreqParamID, 166.3699951171875f },
+                { DamageAudioProcessor::oscillateParamID, 1.0f },
+                { DamageAudioProcessor::slowReleaseParamID, 0.0f },
+                { DamageAudioProcessor::squareParamID, 0.0f },
+                { DamageAudioProcessor::wetParamID, 49.0f },
+                { DamageAudioProcessor::widthParamID, 29.39999961853027f },
+            } },
+            { "Breaking Up Is Hard To Do", {
+                { DamageAudioProcessor::bypassParamID, 0.0f },
+                { DamageAudioProcessor::driveParamID, 9.139999389648438f },
+                { DamageAudioProcessor::dryParamID, 100.0f },
+                { DamageAudioProcessor::gateParamID, -34.20000076293945f },
+                { DamageAudioProcessor::highPassParamID, 1109.0f },
+                { DamageAudioProcessor::lowPassParamID, 5142.0f },
+                { DamageAudioProcessor::oscFreqParamID, 125.0199966430664f },
+                { DamageAudioProcessor::oscillateParamID, 1.0f },
+                { DamageAudioProcessor::slowReleaseParamID, 1.0f },
+                { DamageAudioProcessor::squareParamID, 1.0f },
+                { DamageAudioProcessor::wetParamID, 14.40000057220459f },
+                { DamageAudioProcessor::widthParamID, 63.29999923706055f },
+            } },
+            { "Old Dogs New Tricks", {
+                { DamageAudioProcessor::bypassParamID, 0.0f },
+                { DamageAudioProcessor::driveParamID, 21.09000015258789f },
+                { DamageAudioProcessor::dryParamID, 58.29999923706055f },
+                { DamageAudioProcessor::gateParamID, -47.0f },
+                { DamageAudioProcessor::highPassParamID, 28.0f },
+                { DamageAudioProcessor::lowPassParamID, 883.0f },
+                { DamageAudioProcessor::oscFreqParamID, 2.379999876022339f },
+                { DamageAudioProcessor::oscillateParamID, 1.0f },
+                { DamageAudioProcessor::slowReleaseParamID, 0.0f },
+                { DamageAudioProcessor::squareParamID, 1.0f },
+                { DamageAudioProcessor::wetParamID, 27.89999961853027f },
+                { DamageAudioProcessor::widthParamID, 29.39999961853027f },
+            } },
+            { "Oops Didn't Mean To", {
+                { DamageAudioProcessor::bypassParamID, 0.0f },
+                { DamageAudioProcessor::driveParamID, 3.220000028610229f },
+                { DamageAudioProcessor::dryParamID, 72.0999984741211f },
+                { DamageAudioProcessor::gateParamID, -43.70000076293945f },
+                { DamageAudioProcessor::highPassParamID, 265.0f },
+                { DamageAudioProcessor::lowPassParamID, 2475.0f },
+                { DamageAudioProcessor::oscFreqParamID, 125.0199966430664f },
+                { DamageAudioProcessor::oscillateParamID, 1.0f },
+                { DamageAudioProcessor::slowReleaseParamID, 0.0f },
+                { DamageAudioProcessor::squareParamID, 0.0f },
+                { DamageAudioProcessor::wetParamID, 40.40000152587891f },
+                { DamageAudioProcessor::widthParamID, 33.70000076293945f },
+            } },
+            { "What's Wrong", {
+                { DamageAudioProcessor::bypassParamID, 0.0f },
+                { DamageAudioProcessor::driveParamID, 2.230000019073486f },
+                { DamageAudioProcessor::dryParamID, 45.5f },
+                { DamageAudioProcessor::gateParamID, -33.70000076293945f },
+                { DamageAudioProcessor::highPassParamID, 115.0f },
+                { DamageAudioProcessor::lowPassParamID, 1009.0f },
+                { DamageAudioProcessor::oscFreqParamID, 21.17000007629395f },
+                { DamageAudioProcessor::oscillateParamID, 1.0f },
+                { DamageAudioProcessor::slowReleaseParamID, 0.0f },
+                { DamageAudioProcessor::squareParamID, 0.0f },
+                { DamageAudioProcessor::wetParamID, 142.6000061035156f },
+                { DamageAudioProcessor::widthParamID, 46.79999923706055f },
+            } },
+        };
+
+        return presets;
+    }
 }
 
 DamageAudioProcessor::DamageAudioProcessor()
@@ -479,10 +565,28 @@ bool DamageAudioProcessor::producesMidi() const { return false; }
 bool DamageAudioProcessor::isMidiEffect() const { return false; }
 double DamageAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int DamageAudioProcessor::getNumPrograms() { return 1; }
-int DamageAudioProcessor::getCurrentProgram() { return 0; }
-void DamageAudioProcessor::setCurrentProgram(int) {}
-const juce::String DamageAudioProcessor::getProgramName(int) { return {}; }
+int DamageAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
+int DamageAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
+
+void DamageAudioProcessor::setCurrentProgram(int index)
+{
+    const auto& presets = getFactoryPresets();
+    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
+        return;
+
+    currentProgramIndex = index;
+
+    for (auto& [paramID, value] : presets[(size_t) index].values)
+        if (auto* param = apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+}
+
+const juce::String DamageAudioProcessor::getProgramName(int index)
+{
+    const auto& presets = getFactoryPresets();
+    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
+}
+
 void DamageAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void DamageAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

@@ -52,6 +52,8 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void updateToneFilter();
 
+    int currentProgramIndex = 0;
+
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* toneParam = nullptr;
     // Used to read Color's own NormalisableRange (respecting its skew) so the companion EQ dip's

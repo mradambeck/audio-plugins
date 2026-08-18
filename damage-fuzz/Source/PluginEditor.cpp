@@ -158,6 +158,22 @@ DamageAudioProcessorEditor::DamageAudioProcessorEditor(DamageAudioProcessor& p)
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
+    // Left unselected on startup (rather than showing the first preset's name) so that picking it
+    // is always a real selection change - JUCE's ComboBox doesn't fire onChange when you choose the
+    // item that's already showing, which would otherwise make the first preset unreachable from
+    // this menu once the plugin loads with its own default parameter values rather than the
+    // preset's.
+    presetCombo.setLookAndFeel(&lookAndFeel);
+    presetCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
+    presetCombo.setTextWhenNothingSelected("Preset");
+    for (int i = 0; i < processorRef.getNumPrograms(); ++i)
+        presetCombo.addItem(processorRef.getProgramName(i), i + 1);
+    addAndMakeVisible(presetCombo);
+    presetCombo.onChange = [this]
+    {
+        processorRef.setCurrentProgram(presetCombo.getSelectedItemIndex());
+    };
+
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("Bypass");
     addAndMakeVisible(bypassButton);
@@ -435,6 +451,8 @@ void DamageAudioProcessorEditor::resized()
     const auto bypassShadowMargin = (int) DamageLookAndFeel::buttonShadowMargin;
     bypassButton.setBounds(header.removeFromRight(buttonWidth).withSizeKeepingCentre(buttonWidth, buttonHeight)
                                 .expanded(bypassShadowMargin));
+    header.removeFromRight(14);
+    presetCombo.setBounds(header.removeFromRight(128).withSizeKeepingCentre(128, 28));
 
     // Baseline-align "DAMAGE" and the tag line -- simply giving both labels the same box and
     // vertically centring each independently doesn't line up their baselines, since the two
