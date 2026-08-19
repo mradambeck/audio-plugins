@@ -19,8 +19,8 @@
   --alloy-muted: #4e7691;
   --gradient: #f0a177;
   --gradient-muted: #ce7954;
-  --bloom: #d74377;
-  --bloom-muted: #a74467;
+  --shields: #d74377;
+  --shields-muted: #a74467;
 }
 
 * {
@@ -341,11 +341,11 @@ header p.sub {
   background: var(--gradient);
   color: #241209;
 }
-.card[data-plugin="bloom"] h3 {
-  color: var(--bloom);
+.card[data-plugin="shields"] h3 {
+  color: var(--shields);
 }
-.card[data-plugin="bloom"] .btn-accent {
-  background: var(--bloom);
+.card[data-plugin="shields"] .btn-accent {
+  background: var(--shields);
   color: #2f0e1a;
 }
 
