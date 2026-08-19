@@ -22,7 +22,7 @@ jobs:
 
       - name: Build each plugin's own installer
         run: |
-          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch bloom-reverb; do
+          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch shields-reverb; do
             echo "==> Configuring $repo"
             cmake -S "$repo" -B "$repo/build" -G Xcode
             echo "==> Building $repo installer"
@@ -40,7 +40,7 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p release-assets
-          for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient" "bloom-reverb:Bloom"; do
+          for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient" "shields-reverb:Shields"; do
             repo="${entry%%:*}"
             name="${entry##*:}"
             cp "$repo/installer/output/${name}-Installer.pkg" release-assets/

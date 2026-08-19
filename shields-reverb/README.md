@@ -1,6 +1,6 @@
-# Bloom
+# Shields
 
-*Shoegaze inspired reverb.* (Highlight colour: `#D74377`.)
+*Swell Reverb.* (Highlight colour: `#D74377`.)
 
 A diffuse algorithmic reverb (AU / VST3 / Standalone) emulating the Alesis Midiverb II "Bloom"
 algorithm (presets 45 and 49): energy density builds slowly before decaying, rather than a
@@ -17,51 +17,51 @@ gotchas, and running tests across all plugins at once.
 ## Building
 
 ```sh
-cd bloom-reverb
+cd shields-reverb
 cmake -B build -G Xcode
-cmake --build build --config Release --target Bloom_All
+cmake --build build --config Release --target Shields_All
 ```
 
-To build a single format only: `--target Bloom_AU`, `Bloom_VST3`, or `Bloom_Standalone`.
+To build a single format only: `--target Shields_AU`, `Shields_VST3`, or `Shields_Standalone`.
 
 ## Installation
 
 `COPY_PLUGIN_AFTER_BUILD` is enabled, so a successful build automatically copies the plugin into
 the standard user plugin directories:
 
-- **AU:** `~/Library/Audio/Plug-Ins/Components/Bloom.component`
-- **VST3:** `~/Library/Audio/Plug-Ins/VST3/Bloom.vst3`
+- **AU:** `~/Library/Audio/Plug-Ins/Components/Shields.component`
+- **VST3:** `~/Library/Audio/Plug-Ins/VST3/Shields.vst3`
 
 Restart your DAW (or run AU validation, below) after installing. The Standalone app is built to
-`build/Bloom_artefacts/Release/Standalone/Bloom.app`.
+`build/Shields_artefacts/Release/Standalone/Shields.app`.
 
 ## Launching the Standalone app
 
 ```sh
-cmake --build build --config Debug --target Bloom_Standalone
-open build/Bloom_artefacts/Debug/Standalone/Bloom.app
+cmake --build build --config Debug --target Shields_Standalone
+open build/Shields_artefacts/Debug/Standalone/Shields.app
 ```
 
 ## Validating the AU (auval)
 
 ```sh
-auval -v aufx Blom WJag
+auval -v aufx Shld WJag
 ```
 
 ## Offline validation workflow
 
 This plugin's DSP is tuned against real hardware captures rather than by ear alone. Two extra
-pieces support that, on top of the usual `BloomTests` unit-test target:
+pieces support that, on top of the usual `ShieldsTests` unit-test target:
 
 1. **`reference-irs/`** - ground-truth Midiverb II impulse response captures. See that folder's own
    README for expected filenames. Never read at runtime; the algorithm is real-time and parametric,
    not a convolution reverb.
-2. **`BloomRenderIR`** (a console app, not a plugin format) - feeds an impulse through the real
-   `BloomAudioProcessor` and writes the result to WAV:
+2. **`ShieldsRenderIR`** (a console app, not a plugin format) - feeds an impulse through the real
+   `ShieldsAudioProcessor` and writes the result to WAV:
 
    ```sh
-   cmake --build build --config Release --target BloomRenderIR
-   build/BloomRenderIR_artefacts/Release/BloomRenderIR --out rendered-irs/mine.wav --seconds 4
+   cmake --build build --config Release --target ShieldsRenderIR
+   build/ShieldsRenderIR_artefacts/Release/ShieldsRenderIR --out rendered-irs/mine.wav --seconds 4
    ```
 
    Run with no parameter flags, this renders the plugin's actual current defaults (flags override
@@ -82,7 +82,7 @@ them as scripts rather than one-off checks.
 
 ## How it works
 
-The core is `BloomFDNEngine`, in two stages:
+The core is `ShieldsFDNEngine`, in two stages:
 
 1. **A burst comb bank** (6 short, mutually-prime feedback combs per channel, fed by a 3-stage
    input allpass diffuser) - this is what actually produces the audible swell. Each comb turns the
@@ -110,7 +110,7 @@ line silenced) and finding the same ~1000Hz peak 30-40dB above the noise floor r
 single line was active, versus real Midiverb captures in `reference-irs/` whose peaks never exceed
 ~12dB. Mutual primality of the *millisecond* values never protected against this - it's an
 alignment with the sample rate itself, not between the lines. Nudging every length off the
-whole-ms grid (see `baseLineLengthsMs`/`baseBurstLengthsMs` in `BloomFDNEngine.h`) fixed it, and as
+whole-ms grid (see `baseLineLengthsMs`/`baseBurstLengthsMs` in `ShieldsFDNEngine.h`) fixed it, and as
 a side effect improved the match against both reference IRs (envelope correlation 0.937->0.943,
 log-spectral distance ~6.7dB->~5.1dB) - the coincidental ringing wasn't just audible, it was also
 pulling the model away from the real hardware's own (much smoother) spectrum. A max-gain cap on the
@@ -154,7 +154,7 @@ peaks - confirmed both in this engine's own rendered IRs (peaks up to ~35-40dB a
 floor at typical settings) and, less severely, in the real Midiverb captures themselves (~8-12dB
 peaks) - so a *little* of this is authentic small-FDN/hardware character, not a bug. How prominent
 it got here traced to the burst/tank delay lengths originally being whole milliseconds (see
-`BloomFDNEngine.h`'s `baseBurstLengthsMs` comment for the full story - fixed by nudging every length
+`ShieldsFDNEngine.h`'s `baseBurstLengthsMs` comment for the full story - fixed by nudging every length
 off that grid) and to the burst bank's shortest line sitting close to its stability ceiling (fixed
 with `maxBurstGain`). What's left after both of those fixes is the genuine, static-topology
 resonance the original spec anticipated when it flagged "optional modulation" as a possible later
@@ -164,16 +164,16 @@ are short-lived transients, not where a sustained resonance would live), blurrin
 motion. At 0% it's not just "very quiet" - the read path never even switches to fractional
 interpolation, so the engine renders bit-identically to how it did before Wobble existed. At 100% on
 a representative high-Feedback setting, measured peak prominence drops from ~35dB to ~20dB (median
-~15dB to ~9dB, close to the real hardware's own ~7dB median) - see `BloomFDNEngine::setWobble()`'s
+~15dB to ~9dB, close to the real hardware's own ~7dB median) - see `ShieldsFDNEngine::setWobble()`'s
 comment for the mechanism.
 
 The UI is the full hardware-panel treatment (see the `juce-hardware-panel-ui` skill; accent colour
-`#D74377`), built from the approved mockup at `mockups/bloom-mockup-v1.html` after the core
+`#D74377`), built from the approved mockup at `mockups/shields-mockup-v1.html` after the core
 algorithm was validated against the reference IRs. Five sections - Diffusion (Diffusion/Size),
 Decay (Feedback/Damping), Tone (Bandwidth/Bit Depth), Motion (Wobble, a single knob), Mix
 (independent Dry/Wet knobs, matching Caverns' Dry/Wet convention - not a single crossfading Mix
-parameter). `BloomLookAndFeel` is a thin subclass of the shared `wildjag::HardwarePanelLookAndFeel`
-supplying Bloom's accent pair and the two embedded fonts (shared Oxanium/Oswald from
+parameter). `ShieldsLookAndFeel` is a thin subclass of the shared `wildjag::HardwarePanelLookAndFeel`
+supplying Shields's accent pair and the two embedded fonts (shared Oxanium/Oswald from
 `common/Assets/`, no plugin-specific typeface).
 
 ## Parameters
@@ -198,18 +198,18 @@ them didn't improve the match further.
 ## Project structure
 
 ```
-bloom-reverb/
+shields-reverb/
 ├── CMakeLists.txt
 ├── Source/
 │   ├── PluginProcessor.h/.cpp   # Parameter state, dry/wet mix, buffer plumbing
-│   ├── BloomFDNEngine.h/.cpp    # The diffuse reverb core (see "How it works" above)
-│   ├── BloomLookAndFeel.h/.cpp  # Thin subclass of the shared HardwarePanelLookAndFeel
-│   ├── PluginEditor.h/.cpp      # Hardware-panel UI (see mockups/bloom-mockup-v1.html)
-│   ├── Tests/                   # BloomTests: headless UnitTest console app (DSP core only)
-│   └── Tools/RenderIR.cpp       # BloomRenderIR: offline IR-render console app
-├── mockups/bloom-mockup-v1.html  # Approved HTML/CSS mockup the real UI was built from
+│   ├── ShieldsFDNEngine.h/.cpp    # The diffuse reverb core (see "How it works" above)
+│   ├── ShieldsLookAndFeel.h/.cpp  # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── PluginEditor.h/.cpp      # Hardware-panel UI (see mockups/shields-mockup-v1.html)
+│   ├── Tests/                   # ShieldsTests: headless UnitTest console app (DSP core only)
+│   └── Tools/RenderIR.cpp       # ShieldsRenderIR: offline IR-render console app
+├── mockups/shields-mockup-v1.html  # Approved HTML/CSS mockup the real UI was built from
 ├── reference-irs/                # Ground-truth Midiverb II captures (see its own README)
-├── rendered-irs/                 # BloomRenderIR output (gitignored, regenerable)
+├── rendered-irs/                 # ShieldsRenderIR output (gitignored, regenerable)
 ├── tools/compare_irs.py          # Offline IR comparison/scoring script
 └── installer/                    # This plugin's .pkg installer (see installers/README.md)
 ```

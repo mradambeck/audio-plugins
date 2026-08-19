@@ -10,7 +10,7 @@ macOS `.pkg` installers for the Wild Jag plugins:
 | Flux      | `flux-phaser/`     | Analog phase shifter plugin |
 | Alloy     | `alloy-bass/`      | Industrial bass synth       |
 | Gradient  | `gradient-pitch/`  | Pitch shifting delay plugin |
-| Bloom     | `bloom-reverb/`    | Shoegaze inspired reverb    |
+| Shields   | `shields-reverb/`  | Swell reverb                |
 
 Each plugin builds AU, VST3, and Standalone formats. Every installer (per-plugin and group) lets you choose:
 
