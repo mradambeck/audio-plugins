@@ -1,0 +1,81 @@
+#pragma once
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+#include "BloomFDNEngine.h"
+
+// Shoegaze-inspired diffuse reverb built around an 8-line Hadamard-mixed FDN (BloomFDNEngine) -
+// see that class for the DSP core itself. This processor owns parameter state, the dry/wet mix,
+// and stereo buffer plumbing; no per-sample DSP math lives here beyond mixing dry against the
+// engine's wet output.
+class BloomAudioProcessor : public juce::AudioProcessor
+{
+public:
+    BloomAudioProcessor();
+    ~BloomAudioProcessor() override;
+
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
+
+    const juce::String getName() const override;
+
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool isMidiEffect() const override;
+    double getTailLengthSeconds() const override;
+
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    static constexpr auto diffusionParamID = "diffusion";
+    static constexpr auto feedbackParamID = "feedback";
+    static constexpr auto sizeParamID = "size";
+    static constexpr auto dampingParamID = "damping";
+    static constexpr auto bandwidthHzParamID = "bandwidthHz";
+    static constexpr auto bitDepthParamID = "bitDepth";
+    static constexpr auto dryParamID = "dry";
+    static constexpr auto wetParamID = "wet";
+    static constexpr auto wobbleParamID = "wobble";
+    static constexpr auto bypassParamID = "bypass";
+
+    // Exposed so the offline IR-render harness (Source/Tools/RenderIR.cpp) can drive the engine
+    // directly from fixed CLI-specified values without going through the host-automation path.
+    BloomFDNEngine& getEngineForRenderHarness() { return engine; }
+
+private:
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    std::atomic<float>* diffusionParam = nullptr;
+    std::atomic<float>* feedbackParam = nullptr;
+    std::atomic<float>* sizeParam = nullptr;
+    std::atomic<float>* dampingParam = nullptr;
+    std::atomic<float>* bandwidthHzParam = nullptr;
+    std::atomic<float>* bitDepthParam = nullptr;
+    std::atomic<float>* dryParam = nullptr;
+    std::atomic<float>* wetParam = nullptr;
+    std::atomic<float>* wobbleParam = nullptr;
+    std::atomic<float>* bypassParam = nullptr;
+
+    BloomFDNEngine engine;
+
+    // Scratch buffers holding the engine's wet output before the dry/wet mix, sized in
+    // prepareToPlay() to the host's maximum block size.
+    juce::AudioBuffer<float> wetBuffer;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BloomAudioProcessor)
+};

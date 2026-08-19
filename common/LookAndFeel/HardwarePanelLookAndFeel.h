@@ -11,6 +11,12 @@ namespace wildjag
     // HardwarePanelTheme (accent colours + typefaces) and, rarely, a paintRotarySliderOverlay()
     // override for a knob decoration beyond the standard cap/ticks/pointer (e.g. Damage's live
     // gate-level tick).
+    //
+    // Building a NEW plugin's HTML mockup before writing any C++? See MOCKUP_GROUND_TRUTH.md in
+    // this same folder first -- it pulls the exact knob geometry/stroke weights and per-label
+    // font/colour choices out of this file and PluginEditor.cpp into one place, since guessing
+    // them from a screenshot has repeatedly produced a visibly-wrong mockup (dots instead of
+    // lines, wrong font on value readouts, wrong dim-text colours).
     class HardwarePanelLookAndFeel : public juce::LookAndFeel_V4
     {
     public:

@@ -39,6 +39,11 @@
             <line choice="choice_gradient_vst3"/>
             <line choice="choice_gradient_standalone"/>
         </line>
+        <line choice="choice_bloom">
+            <line choice="choice_bloom_au"/>
+            <line choice="choice_bloom_vst3"/>
+            <line choice="choice_bloom_standalone"/>
+        </line>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns" description="Caverns - reverb/delay plugin."/>
@@ -107,6 +112,17 @@
         <pkg-ref id="com.wildjag.gradient.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_bloom" title="Bloom" description="Bloom - shoegaze inspired reverb."/>
+    <choice id="choice_bloom_au" title="Audio Unit (AU)" description="Installs Bloom.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.au.pkg"/>
+    </choice>
+    <choice id="choice_bloom_vst3" title="VST3" description="Installs Bloom.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.vst3.pkg"/>
+    </choice>
+    <choice id="choice_bloom_standalone" title="Standalone App" description="Installs Bloom.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.bloom.standalone.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="0.1.0" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="0.1.0" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="0.1.0" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -130,4 +146,8 @@
     <pkg-ref id="com.wildjag.gradient.au.pkg" version="0.1.0" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="0.1.0" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="0.1.0" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.bloom.au.pkg" version="0.1.0" onConclusion="none">Bloom-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.vst3.pkg" version="0.1.0" onConclusion="none">Bloom-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.standalone.pkg" version="0.1.0" onConclusion="none">Bloom-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

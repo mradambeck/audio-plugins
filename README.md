@@ -14,6 +14,7 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Flux | [`flux-phaser/`](flux-phaser/) | Analog-style phase shifter |
 | Alloy | [`alloy-bass/`](alloy-bass/) | Stacked analog + FM mono synth |
 | Gradient | [`gradient-pitch/`](gradient-pitch/) | Pitch-shifting delay |
+| Bloom | [`bloom-reverb/`](bloom-reverb/) | Diffuse algorithmic reverb with a slow-building "bloom" swell |
 
 Each plugin has its own README with build/launch instructions specific to that plugin and a
 description of how it works; this README covers everything shared across the whole monorepo.
@@ -32,8 +33,9 @@ audio-plugins/
 ├── flux-phaser/
 ├── alloy-bass/
 ├── gradient-pitch/
+├── bloom-reverb/
 ├── installers/               # Combined "install everything" .pkg builder
-├── scripts/                  # build-all.sh / test-all.sh (loop over all 6 plugins)
+├── scripts/                  # build-all.sh / test-all.sh (loop over all plugins)
 ├── .claude/skills/            # Project-scoped Claude Code skills for this catalog's conventions
 └── .deps/                     # (generated) JUCE checkout, fetched by CMake -- not committed
 ```
@@ -89,7 +91,7 @@ and Standalone-launch instructions.
 scripts/build-all.sh
 ```
 
-Configures and builds all 6 plugins' AU/VST3/Standalone formats in Release, one at a time (each
+Configures and builds all plugins' AU/VST3/Standalone formats in Release, one at a time (each
 still an independent CMake project — this is a loop, not a unified super-build).
 
 ## Testing
@@ -116,7 +118,7 @@ Exits non-zero if any plugin's suite fails — safe to wire into CI (see
 ## Installers
 
 Each plugin has its own `installer/` folder producing a standalone `.pkg`; `installers/` at the
-repo root builds one combined installer covering all 6 plugins. See
+repo root builds one combined installer covering every plugin. See
 [`installers/README.md`](installers/README.md) for the full build/verify process.
 
 ## Contributing / AI-assisted development
