@@ -1,4 +1,4 @@
-#include "../BloomFDNEngine.h"
+#include "../ShieldsFDNEngine.h"
 
 #include <juce_core/juce_core.h>
 
@@ -11,7 +11,7 @@ namespace
     constexpr double testSampleRate = 44100.0;
 
     // Runs an impulse through a freshly-prepared engine and returns the wet stereo output.
-    std::vector<float> renderImpulseLeft(BloomFDNEngine& engine, int numSamples)
+    std::vector<float> renderImpulseLeft(ShieldsFDNEngine& engine, int numSamples)
     {
         std::vector<float> left((size_t) numSamples, 0.0f), right((size_t) numSamples, 0.0f);
         left[0] = 1.0f;
@@ -23,18 +23,18 @@ namespace
 // Correctness checks a by-ear-only pass can't catch: whether the network stays bounded at a high
 // feedback setting (a stability bug here would only show up as an unpleasant surprise days into
 // tuning), and whether the impulse response's echo density actually grows over time rather than
-// being loudest immediately - the latter is Bloom's entire reason for existing, so it's worth an
+// being loudest immediately - the latter is Shields's entire reason for existing, so it's worth an
 // automated regression check independent of the offline IR-comparison harness in tools/.
-class BloomFDNEngineTests : public juce::UnitTest
+class ShieldsFDNEngineTests : public juce::UnitTest
 {
 public:
-    BloomFDNEngineTests() : juce::UnitTest("BloomFDNEngine", "Bloom") {}
+    ShieldsFDNEngineTests() : juce::UnitTest("ShieldsFDNEngine", "Shields") {}
 
     void runTest() override
     {
         beginTest("Silence in produces silence out once primed with default parameters");
         {
-            BloomFDNEngine engine;
+            ShieldsFDNEngine engine;
             engine.prepare(testSampleRate);
 
             std::vector<float> left(512, 0.0f), right(512, 0.0f);
@@ -46,7 +46,7 @@ public:
 
         beginTest("A high-feedback impulse response stays bounded (no runaway growth)");
         {
-            BloomFDNEngine engine;
+            ShieldsFDNEngine engine;
             engine.prepare(testSampleRate);
             engine.setDiffusion(0.5f);
             engine.setFeedback(1.0f); // max - internally clamped below unity gain
@@ -63,7 +63,7 @@ public:
             }
         }
 
-        beginTest("Echo density rises over the buildup window - the 'bloom' itself");
+        beginTest("Echo density rises over the buildup window - the 'swell' itself");
         {
             // Per the spec, the actual signature of Bloom's buildup is echo DENSITY over time
             // (count of distinguishable reflections per window), not raw loudness contour - an
@@ -75,7 +75,7 @@ public:
             // is the COUNT of resolvable peaks per window, since decorrelated-length lines only
             // start compounding into a dense, noise-like texture after several round trips - this
             // is what tools/compare_irs.py will also measure against the real reference IRs.
-            BloomFDNEngine engine;
+            ShieldsFDNEngine engine;
             engine.prepare(testSampleRate);
             engine.setDiffusion(0.5f);
             engine.setFeedback(0.9f);
@@ -122,4 +122,4 @@ public:
     }
 };
 
-static BloomFDNEngineTests bloomFDNEngineTests;
+static ShieldsFDNEngineTests shieldsFDNEngineTests;

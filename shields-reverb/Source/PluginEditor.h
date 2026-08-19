@@ -2,17 +2,17 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
-#include "BloomLookAndFeel.h"
+#include "ShieldsLookAndFeel.h"
 
 // Hardware-panel UI (see .claude/skills/juce-hardware-panel-ui and
 // common/LookAndFeel/MOCKUP_GROUND_TRUTH.md) built directly from the approved mockup at
-// mockups/bloom-mockup-v1.html. No factory presets exist yet (BloomAudioProcessor::getNumPrograms()
+// mockups/shields-mockup-v1.html. No factory presets exist yet (ShieldsAudioProcessor::getNumPrograms()
 // returns 1), so unlike Caverns/Gradient there is no preset combo in the header.
-class BloomAudioProcessorEditor : public juce::AudioProcessorEditor
+class ShieldsAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
-    explicit BloomAudioProcessorEditor(BloomAudioProcessor&);
-    ~BloomAudioProcessorEditor() override;
+    explicit ShieldsAudioProcessorEditor(ShieldsAudioProcessor&);
+    ~ShieldsAudioProcessorEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -22,9 +22,9 @@ private:
     void rebuildChassisTexture();
     void drawHardwareSection(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& label);
 
-    BloomAudioProcessor& processorRef;
+    ShieldsAudioProcessor& processorRef;
 
-    BloomLookAndFeel lookAndFeel;
+    ShieldsLookAndFeel lookAndFeel;
 
     juce::Image chassisTexture;
     juce::Rectangle<float> diffusionSectionBounds, decaySectionBounds, toneSectionBounds,
@@ -60,7 +60,7 @@ private:
     juce::Label bitDepthLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitDepthAttachment;
 
-    // Optional, off-by-default delay-line modulation (see BloomFDNEngine::setWobble()'s comment) -
+    // Optional, off-by-default delay-line modulation (see ShieldsFDNEngine::setWobble()'s comment) -
     // its own single-knob section, positioned between Tone and Mix per the original build order's
     // final ("optional modulation") step.
     juce::Slider wobbleSlider;
@@ -78,5 +78,5 @@ private:
     juce::Label wetLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> wetAttachment;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BloomAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShieldsAudioProcessorEditor)
 };

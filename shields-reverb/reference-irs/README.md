@@ -1,7 +1,7 @@
 # reference-irs/
 
-Ground-truth impulse response captures from a real Alesis Midiverb II, used to tune Bloom's FDN
-parameters and to score `tools/compare_irs.py` runs. **Not** used at runtime - Bloom is a real-time
+Ground-truth impulse response captures from a real Alesis Midiverb II, used to tune Shields's FDN
+parameters and to score `tools/compare_irs.py` runs. **Not** used at runtime - Shields is a real-time
 parametric algorithm, not a convolution reverb; these files only ever get read offline by the
 tuning workflow.
 
@@ -22,11 +22,11 @@ the comparison script does a simple onset-alignment, not a full cross-correlatio
 
 ## Usage
 
-Once files are here, render Bloom's own IR at matching settings and compare:
+Once files are here, render Shields's own IR at matching settings and compare:
 
 ```sh
-cd bloom-reverb
-build/BloomRenderIR_artefacts/Release/BloomRenderIR --out rendered-irs/mine.wav --seconds 4 \
+cd shields-reverb
+build/ShieldsRenderIR_artefacts/Release/ShieldsRenderIR --out rendered-irs/mine.wav --seconds 4 \
     --diffusion 0.5 --feedback 90 --size 1.0 --damping 35 --bandwidth 15000 --bitdepth 16
 python3 tools/compare_irs.py rendered-irs/mine.wav reference-irs/preset-45.wav
 ```

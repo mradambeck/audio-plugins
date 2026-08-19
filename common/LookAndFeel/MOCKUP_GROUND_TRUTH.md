@@ -3,7 +3,7 @@
 When building an HTML/CSS mockup for a new plugin (see the `juce-hardware-panel-ui` skill's
 "Design process" section), the values below are **already decided** by this file's own drawing
 code and by the established `PluginEditor.cpp` pattern (Caverns is the reference). Eyeballing a
-screenshot to guess these produced a real, repeated back-and-forth while building Bloom's mockup —
+screenshot to guess these produced a real, repeated back-and-forth while building Shields's mockup —
 every value here was wrong on the first pass, caught only by reading this code directly. Read this
 file first; only fall back to screenshot comparison for things that genuinely aren't code constants
 (the chassis texture's exact visual weight, for instance).
@@ -24,7 +24,7 @@ normal zoom — the flute/tick bands are only a few px wide.
 | Pointer | `capRadius * 0.32` to `capRadius - 5.0` | |
 
 Stroke weights/opacities (get these wrong and the ticks/flutes read as "dots" instead of lines —
-this exact mistake shipped twice on Bloom's mockup before being caught):
+this exact mistake shipped twice on Shields's mockup before being caught):
 
 | Element | Width | Colour/opacity |
 |---|---|---|
@@ -53,7 +53,7 @@ Two embedded faces exist (`HardwarePanelTheme::displayTypeface`/`smallPrintTypef
 
 ## Text colour: three separate dim tiers, not one
 
-There is no single "muted grey" reused everywhere — conflating these is what made Bloom's first
+There is no single "muted grey" reused everywhere — conflating these is what made Shields's first
 mockup pass read as "brighter/heavier" than the reference when compared side by side:
 
 - General readable text (combo/preset text, knob name labels): the bright `ink` tone

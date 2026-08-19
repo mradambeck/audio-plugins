@@ -1,6 +1,6 @@
 #include "PluginProcessor.h"
 
-BloomAudioProcessor::BloomAudioProcessor()
+ShieldsAudioProcessor::ShieldsAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
@@ -18,9 +18,9 @@ BloomAudioProcessor::BloomAudioProcessor()
     bypassParam = apvts.getRawParameterValue(bypassParamID);
 }
 
-BloomAudioProcessor::~BloomAudioProcessor() = default;
+ShieldsAudioProcessor::~ShieldsAudioProcessor() = default;
 
-juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createParameterLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
@@ -49,7 +49,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
 
     // The plugin's de facto "attack time" control (per spec, no separate envelope parameter):
     // scales the FDN's delay-line lengths, so a larger Size means more samples/round-trips before
-    // the network reaches full echo density, i.e. a slower bloom.
+    // the network reaches full echo density, i.e. a slower shields.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{sizeParamID, 1},
         "Size",
@@ -120,7 +120,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
 
     // Optional, opt-in delay-line modulation - off (0%) by default, so the plugin's core character
     // stays exactly the static/unmodulated "grainy hardware" sound it was tuned for; see
-    // BloomFDNEngine::setWobble()'s comment for the DSP and the "How it works" README section for
+    // ShieldsFDNEngine::setWobble()'s comment for the DSP and the "How it works" README section for
     // why this exists (blurring the small-FDN resonant peaks a player who wants that has a way to,
     // without changing anyone else's default sound at all).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -138,21 +138,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
     return {params.begin(), params.end()};
 }
 
-void BloomAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void ShieldsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     engine.prepare(sampleRate);
     wetBuffer.setSize(2, samplesPerBlock);
 }
 
-void BloomAudioProcessor::releaseResources() {}
+void ShieldsAudioProcessor::releaseResources() {}
 
-bool BloomAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool ShieldsAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo()
            && layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void BloomAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 
@@ -193,24 +193,24 @@ void BloomAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 }
 
-// createEditor() lives in PluginEditor.cpp, not here - keeps PluginProcessor.cpp (and BloomTests,
+// createEditor() lives in PluginEditor.cpp, not here - keeps PluginProcessor.cpp (and ShieldsTests,
 // which links only this file) free of any GUI/LookAndFeel/font dependency.
-bool BloomAudioProcessor::hasEditor() const { return true; }
+bool ShieldsAudioProcessor::hasEditor() const { return true; }
 
-const juce::String BloomAudioProcessor::getName() const { return JucePlugin_Name; }
+const juce::String ShieldsAudioProcessor::getName() const { return JucePlugin_Name; }
 
-bool BloomAudioProcessor::acceptsMidi() const { return false; }
-bool BloomAudioProcessor::producesMidi() const { return false; }
-bool BloomAudioProcessor::isMidiEffect() const { return false; }
-double BloomAudioProcessor::getTailLengthSeconds() const { return 8.0; }
+bool ShieldsAudioProcessor::acceptsMidi() const { return false; }
+bool ShieldsAudioProcessor::producesMidi() const { return false; }
+bool ShieldsAudioProcessor::isMidiEffect() const { return false; }
+double ShieldsAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
-int BloomAudioProcessor::getNumPrograms() { return 1; }
-int BloomAudioProcessor::getCurrentProgram() { return 0; }
-void BloomAudioProcessor::setCurrentProgram(int) {}
-const juce::String BloomAudioProcessor::getProgramName(int) { return {}; }
-void BloomAudioProcessor::changeProgramName(int, const juce::String&) {}
+int ShieldsAudioProcessor::getNumPrograms() { return 1; }
+int ShieldsAudioProcessor::getCurrentProgram() { return 0; }
+void ShieldsAudioProcessor::setCurrentProgram(int) {}
+const juce::String ShieldsAudioProcessor::getProgramName(int) { return {}; }
+void ShieldsAudioProcessor::changeProgramName(int, const juce::String&) {}
 
-void BloomAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
+void ShieldsAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     if (auto state = apvts.copyState(); state.isValid())
     {
@@ -219,7 +219,7 @@ void BloomAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     }
 }
 
-void BloomAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+void ShieldsAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
@@ -228,5 +228,5 @@ void BloomAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new BloomAudioProcessor();
+    return new ShieldsAudioProcessor();
 }
