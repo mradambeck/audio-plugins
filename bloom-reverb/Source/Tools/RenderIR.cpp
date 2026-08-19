@@ -18,12 +18,14 @@
 // Usage:
 //   BloomRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]
 //                  [--diffusion 0.5] [--feedback 85] [--size 1.0] [--damping 35]
-//                  [--bandwidth 15000] [--bitdepth 16] [--mix 100]
+//                  [--bandwidth 15000] [--bitdepth 16] [--dry 0] [--wet 100] [--wobble 0]
 //
 // Every parameter flag matches the units the plugin's own parameter uses (diffusion 0.3-0.7,
-// feedback/damping/mix as a percentage 0-100, size as a multiplier, bandwidth in Hz, bitdepth in
-// bits) - not normalised 0-1 APVTS values - so a value copied from this tool's output maps
-// directly onto where the corresponding knob would sit.
+// feedback/damping/dry/wet as a percentage 0-100 (wet can go to 200), size as a multiplier,
+// bandwidth in Hz, bitdepth in bits) - not normalised 0-1 APVTS values - so a value copied from
+// this tool's output maps directly onto where the corresponding knob would sit. --dry/--wet
+// default to 0/100 here specifically (NOT the plugin's own 100/40 defaults) so this tool captures
+// the ALGORITHM's impulse response in isolation, without a dry click at sample 0 in the way.
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -61,7 +63,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: BloomRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]\n"
             "                     [--diffusion 0.5] [--feedback 99] [--size 1.0] [--damping 20]\n"
-            "                     [--bandwidth 19000] [--bitdepth 13] [--mix 100]\n");
+            "                     [--bandwidth 19000] [--bitdepth 13] [--dry 0] [--wet 100] [--wobble 0]\n");
         return 1;
     }
 
@@ -71,7 +73,10 @@ int main(int argc, char* argv[])
 
     // Fallback defaults below match PluginProcessor's own createParameterLayout() defaults (tuned
     // against reference-irs/ - see that function's comments), so an unqualified run of this tool
-    // renders what the plugin actually ships with, not some other placeholder.
+    // renders what the plugin actually ships with, not some other placeholder - EXCEPT dry/wet,
+    // deliberately overridden to 0/100 (not the plugin's real 100/40 defaults): this tool captures
+    // the ALGORITHM's impulse response for comparison against reference-irs/, where a dry click at
+    // sample 0 would only get in the way.
     BloomAudioProcessor processor;
     setParam(processor, BloomAudioProcessor::diffusionParamID, getFloatArg(args, "diffusion", 0.5f));
     setParam(processor, BloomAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 99.0f));
@@ -79,9 +84,9 @@ int main(int argc, char* argv[])
     setParam(processor, BloomAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
     setParam(processor, BloomAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
     setParam(processor, BloomAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
-    // Default 100% wet: this tool captures the ALGORITHM's impulse response for comparison
-    // against reference-irs/, where a dry click at sample 0 would only get in the way.
-    setParam(processor, BloomAudioProcessor::mixParamID, getFloatArg(args, "mix", 100.0f));
+    setParam(processor, BloomAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
+    setParam(processor, BloomAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
+    setParam(processor, BloomAudioProcessor::wobbleParamID, getFloatArg(args, "wobble", 0.0f));
 
     constexpr int blockSize = 512;
     processor.prepareToPlay((double) sampleRate, blockSize);

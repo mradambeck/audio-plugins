@@ -8,7 +8,7 @@ discrete-tap swelling delay or an envelope applied to a normal reverb tail. The 
 from a bank of short feedback combs ahead of an 8-line, Hadamard-mixed feedback delay network
 (FDN) tank - see "How it works" below for why the buildup needed that burst stage specifically,
 and what "buildup" actually means here. Default parameters are tuned against real Midiverb II
-captures (`reference-irs/`, scored via `tools/compare_irs.py`): ~0.96 envelope correlation against
+captures (`reference-irs/`, scored via `tools/compare_irs.py`): ~0.94 envelope correlation against
 both preset 45 and preset 49 at time of writing.
 
 See the [root README](../README.md) for shared build requirements, the exFAT/apostrophe build
@@ -99,6 +99,24 @@ The core is `BloomFDNEngine`, in two stages:
 No delay-line modulation anywhere in either stage - deliberately static/unmodulated, matching the
 original hardware's grainy character.
 
+**Delay lengths are deliberately non-integer milliseconds.** They started out as whole-ms values
+(easy to read, still mutually prime as integers) - 19/23/29/31/37/41/43/47 for the tank,
+13/37/61/89/113/149 for the burst bank - but that turned out to be its own bug: any comb filter
+whose period is exactly N whole milliseconds has a tooth at its own Nth harmonic landing almost
+exactly on 1000Hz (N cycles at 1000Hz = N ms = one full period), regardless of N. Since every line
+in both stages was a whole-ms value, all 14 of them reinforced each other at 1000/2000/3000Hz etc
+on top of each other - confirmed by rendering each burst line in isolation (feedback=0, every other
+line silenced) and finding the same ~1000Hz peak 30-40dB above the noise floor regardless of which
+single line was active, versus real Midiverb captures in `reference-irs/` whose peaks never exceed
+~12dB. Mutual primality of the *millisecond* values never protected against this - it's an
+alignment with the sample rate itself, not between the lines. Nudging every length off the
+whole-ms grid (see `baseLineLengthsMs`/`baseBurstLengthsMs` in `BloomFDNEngine.h`) fixed it, and as
+a side effect improved the match against both reference IRs (envelope correlation 0.937->0.943,
+log-spectral distance ~6.7dB->~5.1dB) - the coincidental ringing wasn't just audible, it was also
+pulling the model away from the real hardware's own (much smoother) spectrum. A max-gain cap on the
+burst bank (`maxBurstGain`) stayed in as a secondary safeguard against any one line's feedback gain
+creeping too close to instability, though it turned out to be a minor contributor next to this.
+
 **Why two stages, not one:** an orthogonal (energy-preserving) cross-mix scaled by a single scalar
 feedback gain is provably front-loaded - its raw RMS envelope can only ever be highest at the
 moment of injection and fall from there (this is a real mathematical property of that topology, not
@@ -131,9 +149,32 @@ in the bass below ~400Hz, roughly balanced through the mids, excessive above ~6-
 the shelf pair targets. Not exposed as parameters since they're compensating for an inherent
 character gap between this topology and the real unit, not something a player would want to sweep.
 
-The UI is currently a stock `GenericAudioProcessorEditor` (auto-built sliders, one per parameter) -
-per the build order, the hardware-panel UI (see the `juce-hardware-panel-ui` skill; accent colour
-`#D74377`) comes only after the core algorithm is validated against the reference IRs.
+**Wobble (optional, off by default):** an 8-line FDN at high Feedback has real, audible resonant
+peaks - confirmed both in this engine's own rendered IRs (peaks up to ~35-40dB above the noise
+floor at typical settings) and, less severely, in the real Midiverb captures themselves (~8-12dB
+peaks) - so a *little* of this is authentic small-FDN/hardware character, not a bug. How prominent
+it got here traced to the burst/tank delay lengths originally being whole milliseconds (see
+`BloomFDNEngine.h`'s `baseBurstLengthsMs` comment for the full story - fixed by nudging every length
+off that grid) and to the burst bank's shortest line sitting close to its stability ceiling (fixed
+with `maxBurstGain`). What's left after both of those fixes is the genuine, static-topology
+resonance the original spec anticipated when it flagged "optional modulation" as a possible later
+addition. Wobble is that addition: a slow (<0.4Hz per line), small (~1.5ms depth at 100%), mutually-
+detuned sinusoidal drift on each of the main tank's 8 read positions (not the burst bank - its lines
+are short-lived transients, not where a sustained resonance would live), blurring those peaks into
+motion. At 0% it's not just "very quiet" - the read path never even switches to fractional
+interpolation, so the engine renders bit-identically to how it did before Wobble existed. At 100% on
+a representative high-Feedback setting, measured peak prominence drops from ~35dB to ~20dB (median
+~15dB to ~9dB, close to the real hardware's own ~7dB median) - see `BloomFDNEngine::setWobble()`'s
+comment for the mechanism.
+
+The UI is the full hardware-panel treatment (see the `juce-hardware-panel-ui` skill; accent colour
+`#D74377`), built from the approved mockup at `mockups/bloom-mockup-v1.html` after the core
+algorithm was validated against the reference IRs. Five sections - Diffusion (Diffusion/Size),
+Decay (Feedback/Damping), Tone (Bandwidth/Bit Depth), Motion (Wobble, a single knob), Mix
+(independent Dry/Wet knobs, matching Caverns' Dry/Wet convention - not a single crossfading Mix
+parameter). `BloomLookAndFeel` is a thin subclass of the shared `wildjag::HardwarePanelLookAndFeel`
+supplying Bloom's accent pair and the two embedded fonts (shared Oxanium/Oswald from
+`common/Assets/`, no plugin-specific typeface).
 
 ## Parameters
 
@@ -145,7 +186,9 @@ per the build order, the hardware-panel UI (see the `juce-hardware-panel-ui` ski
 | Damping | 0 - 100% | 20% | Per-line feedback-path one-pole lowpass - controls HF decay rate |
 | Bandwidth | 1kHz - 20kHz | 19kHz | Output lowpass cutoff (lo-fi bandwidth limit) |
 | Bit Depth | 4 - 16 bit | 13 bit | Output quantization depth (lo-fi grain) |
-| Mix | 0 - 100% | 40% | Dry/wet balance |
+| Wobble | 0 - 100% | 0% | Optional main-tank delay-line modulation - blurs resonant peaks into motion; off by default, renders bit-identically to no-Wobble at 0% |
+| Dry | 0 - 100% | 100% | Dry signal gain |
+| Wet | 0 - 200% | 40% | Wet (processed) signal gain - independent of Dry, can exceed unity |
 | Bypass | on/off | off | |
 
 Feedback/Damping/Bandwidth/Bit Depth defaults are the result of tuning against `reference-irs/`
@@ -160,9 +203,11 @@ bloom-reverb/
 ├── Source/
 │   ├── PluginProcessor.h/.cpp   # Parameter state, dry/wet mix, buffer plumbing
 │   ├── BloomFDNEngine.h/.cpp    # The diffuse reverb core (see "How it works" above)
-│   ├── PluginEditor.h/.cpp      # Currently a stock GenericAudioProcessorEditor
+│   ├── BloomLookAndFeel.h/.cpp  # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── PluginEditor.h/.cpp      # Hardware-panel UI (see mockups/bloom-mockup-v1.html)
 │   ├── Tests/                   # BloomTests: headless UnitTest console app (DSP core only)
 │   └── Tools/RenderIR.cpp       # BloomRenderIR: offline IR-render console app
+├── mockups/bloom-mockup-v1.html  # Approved HTML/CSS mockup the real UI was built from
 ├── reference-irs/                # Ground-truth Midiverb II captures (see its own README)
 ├── rendered-irs/                 # BloomRenderIR output (gitignored, regenerable)
 ├── tools/compare_irs.py          # Offline IR comparison/scoring script

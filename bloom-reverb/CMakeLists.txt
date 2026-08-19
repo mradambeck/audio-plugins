@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 
 juce_add_plugin(Bloom
     COMPANY_NAME "Wild Jag"
@@ -24,10 +25,17 @@ juce_add_plugin(Bloom
     PRODUCT_NAME "Bloom"
 )
 
+juce_add_binary_data(BloomBinaryData
+    SOURCES
+        ../common/Assets/Oxanium-Bold.ttf
+        ../common/Assets/Oswald-SemiBold.ttf
+)
+
 target_sources(Bloom
     PRIVATE
         Source/BloomFDNEngine.cpp
         Source/PluginProcessor.cpp
+        Source/BloomLookAndFeel.cpp
         Source/PluginEditor.cpp
 )
 
@@ -40,6 +48,8 @@ target_compile_definitions(Bloom
 
 target_link_libraries(Bloom
     PRIVATE
+        BloomBinaryData
+        HardwarePanelLookAndFeel
         juce::juce_audio_utils
     PUBLIC
         juce::juce_recommended_config_flags
@@ -85,6 +95,7 @@ target_sources(BloomRenderIR
     PRIVATE
         Source/BloomFDNEngine.cpp
         Source/PluginProcessor.cpp
+        Source/BloomLookAndFeel.cpp
         Source/PluginEditor.cpp
         Source/Tools/RenderIR.cpp
 )
@@ -94,10 +105,13 @@ target_compile_definitions(BloomRenderIR
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JucePlugin_Name="Bloom"
+        JucePlugin_VersionString="0.1.0"
 )
 
 target_link_libraries(BloomRenderIR
     PRIVATE
+        BloomBinaryData
+        HardwarePanelLookAndFeel
         juce::juce_audio_utils
         juce::juce_audio_formats
     PUBLIC

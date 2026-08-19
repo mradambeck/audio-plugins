@@ -48,7 +48,9 @@ public:
     static constexpr auto dampingParamID = "damping";
     static constexpr auto bandwidthHzParamID = "bandwidthHz";
     static constexpr auto bitDepthParamID = "bitDepth";
-    static constexpr auto mixParamID = "mix";
+    static constexpr auto dryParamID = "dry";
+    static constexpr auto wetParamID = "wet";
+    static constexpr auto wobbleParamID = "wobble";
     static constexpr auto bypassParamID = "bypass";
 
     // Exposed so the offline IR-render harness (Source/Tools/RenderIR.cpp) can drive the engine
@@ -64,7 +66,9 @@ private:
     std::atomic<float>* dampingParam = nullptr;
     std::atomic<float>* bandwidthHzParam = nullptr;
     std::atomic<float>* bitDepthParam = nullptr;
-    std::atomic<float>* mixParam = nullptr;
+    std::atomic<float>* dryParam = nullptr;
+    std::atomic<float>* wetParam = nullptr;
+    std::atomic<float>* wobbleParam = nullptr;
     std::atomic<float>* bypassParam = nullptr;
 
     BloomFDNEngine engine;

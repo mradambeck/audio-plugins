@@ -1,5 +1,4 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
 
 BloomAudioProcessor::BloomAudioProcessor()
     : AudioProcessor(BusesProperties()
@@ -13,7 +12,9 @@ BloomAudioProcessor::BloomAudioProcessor()
     dampingParam = apvts.getRawParameterValue(dampingParamID);
     bandwidthHzParam = apvts.getRawParameterValue(bandwidthHzParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
-    mixParam = apvts.getRawParameterValue(mixParamID);
+    dryParam = apvts.getRawParameterValue(dryParamID);
+    wetParam = apvts.getRawParameterValue(wetParamID);
+    wobbleParam = apvts.getRawParameterValue(wobbleParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
 }
 
@@ -96,11 +97,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout BloomAudioProcessor::createP
             .withLabel("bit")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " bit"; })));
 
+    // Independent Dry/Wet gains (matching Caverns' convention), not a single crossfading Mix
+    // knob - Wet gets headroom past unity (up to 200%) so it can be pushed louder than the dry
+    // tap itself rather than topping out at matching it.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{mixParamID, 1},
-        "Mix",
+        juce::ParameterID{dryParamID, 1},
+        "Dry",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        100.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("%")
+            .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{wetParamID, 1},
+        "Wet",
+        juce::NormalisableRange<float>(0.0f, 200.0f, 0.1f),
         40.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("%")
+            .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
+
+    // Optional, opt-in delay-line modulation - off (0%) by default, so the plugin's core character
+    // stays exactly the static/unmodulated "grainy hardware" sound it was tuned for; see
+    // BloomFDNEngine::setWobble()'s comment for the DSP and the "How it works" README section for
+    // why this exists (blurring the small-FDN resonant peaks a player who wants that has a way to,
+    // without changing anyone else's default sound at all).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{wobbleParamID, 1},
+        "Wobble",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        0.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
@@ -143,6 +170,7 @@ void BloomAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     engine.setDamping(dampingParam->load() * 0.01f);
     engine.setBandwidthHz(bandwidthHzParam->load());
     engine.setBitDepth(bitDepthParam->load());
+    engine.setWobble(wobbleParam->load() * 0.01f);
 
     wetBuffer.setSize(2, numSamples, false, false, true);
     wetBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
@@ -150,8 +178,8 @@ void BloomAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     engine.processStereo(wetBuffer.getWritePointer(0), wetBuffer.getWritePointer(1), numSamples);
 
-    const auto wet = mixParam->load() * 0.01f;
-    const auto dry = 1.0f - wet;
+    const auto dryGain = dryParam->load() * 0.01f;
+    const auto wetGain = wetParam->load() * 0.01f;
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
@@ -160,16 +188,13 @@ void BloomAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     for (int i = 0; i < numSamples; ++i)
     {
-        left[i] = left[i] * dry + wetLeft[i] * wet;
-        right[i] = right[i] * dry + wetRight[i] * wet;
+        left[i] = left[i] * dryGain + wetLeft[i] * wetGain;
+        right[i] = right[i] * dryGain + wetRight[i] * wetGain;
     }
 }
 
-juce::AudioProcessorEditor* BloomAudioProcessor::createEditor()
-{
-    return new BloomAudioProcessorEditor(*this);
-}
-
+// createEditor() lives in PluginEditor.cpp, not here - keeps PluginProcessor.cpp (and BloomTests,
+// which links only this file) free of any GUI/LookAndFeel/font dependency.
 bool BloomAudioProcessor::hasEditor() const { return true; }
 
 const juce::String BloomAudioProcessor::getName() const { return JucePlugin_Name; }

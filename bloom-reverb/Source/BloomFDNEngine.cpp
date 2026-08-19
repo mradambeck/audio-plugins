@@ -13,6 +13,21 @@ namespace
     {
         return std::max(1, (int) std::round(ms * 0.001f * (float) sampleRateHz));
     }
+
+    // Linear interpolation between the two integer taps bracketing a fractional delay - used only
+    // by Wobble (see setWobble()'s comment); the plain integer-tap read elsewhere in this file is
+    // untouched, so Wobble=0 never routes through this at all.
+    float readFractionalDelay(const std::vector<float>& buf, int writePos, float delaySamplesFrac)
+    {
+        const auto bufSize = (int) buf.size();
+        const auto delayFloor = (int) delaySamplesFrac;
+        const auto frac = delaySamplesFrac - (float) delayFloor;
+        const auto pos0 = (writePos + bufSize - delayFloor) % bufSize;
+        const auto pos1 = (pos0 + bufSize - 1) % bufSize;
+        const auto y0 = buf[(size_t) pos0];
+        const auto y1 = buf[(size_t) pos1];
+        return y0 + (y1 - y0) * frac;
+    }
 }
 
 // Sylvester construction: H1 = [1]; H(2N) = [[H_N, H_N], [H_N, -H_N]]. Listed here fully expanded
@@ -65,6 +80,7 @@ void BloomFDNEngine::BurstCombLine::reset()
 {
     std::fill(buffer.begin(), buffer.end(), 0.0f);
     writePos = 0;
+    fadeWeight = 0.0f;
 }
 
 float BloomFDNEngine::BurstCombLine::processSample(float x)
@@ -74,11 +90,23 @@ float BloomFDNEngine::BurstCombLine::processSample(float x)
     // impulse into an empty buffer - the input only starts appearing in the output D samples
     // later, which is the entire point (an immediate, undiminished pass-through here would let
     // the full click straight through and defeat the burst stage's whole purpose).
-    const auto readPos = (writePos + (int) buffer.size() - delaySamples) % (int) buffer.size();
-    const auto y = buffer[(size_t) readPos];
+    const auto bufSize = (int) buffer.size();
+    const auto readPos = (writePos + bufSize - delaySamples) % bufSize;
+    auto y = buffer[(size_t) readPos];
+
+    // Mid-crossfade after a Size change (see lengthChangeFadeMs) - blend in the old tap position,
+    // fading it out linearly. Both taps read from the SAME still-live buffer (nothing was cleared),
+    // so this is a genuine crossfade between two valid delayed signals, not a fade from/to silence.
+    if (fadeWeight > 0.0f)
+    {
+        const auto oldReadPos = (writePos + bufSize - fadeFromDelay) % bufSize;
+        const auto oldY = buffer[(size_t) oldReadPos];
+        y += (oldY - y) * fadeWeight;
+        fadeWeight = std::max(0.0f, fadeWeight - fadeStep);
+    }
 
     buffer[(size_t) writePos] = x + feedbackGain * y;
-    writePos = (writePos + 1) % (int) buffer.size();
+    writePos = (writePos + 1) % bufSize;
     return y;
 }
 
@@ -174,6 +202,11 @@ float BloomFDNEngine::Biquad::processSample(float x)
 void BloomFDNEngine::prepare(double sampleRate)
 {
     sampleRateHz = sampleRate;
+    lengthChangeFadeStep = 1.0f / (float) std::max(1, msToSamples(lengthChangeFadeMs, sampleRateHz));
+
+    // One-pole time-constant smoother - see targetSizeMultiplier's comment for why this exists.
+    // Standard exponential smoothing coefficient for reaching ~63% of a step in sizeSmoothingMs.
+    sizeSmoothingCoeff = 1.0f - std::exp(-1.0f / (sizeSmoothingMs * 0.001f * (float) sampleRateHz));
 
     for (int i = 0; i < numLines; ++i)
     {
@@ -193,6 +226,8 @@ void BloomFDNEngine::prepare(double sampleRate)
         const auto capacity = msToSamples(baseBurstLengthsMs[i] * maxSizeMultiplier, sampleRateHz);
         burstL[i].prepare(capacity);
         burstR[i].prepare(capacity);
+        burstL[i].fadeStep = lengthChangeFadeStep;
+        burstR[i].fadeStep = lengthChangeFadeStep;
     }
 
     updateLineLengths();
@@ -214,6 +249,8 @@ void BloomFDNEngine::reset()
 
     writePos.fill(0);
     dampingState.fill(0.0f);
+    fadeWeight.fill(0.0f);
+    wobblePhase.fill(0.0f);
 
     for (auto& stage : allpassL) stage.reset();
     for (auto& stage : allpassR) stage.reset();
@@ -250,13 +287,9 @@ void BloomFDNEngine::setFeedback(float feedback01)
 
 void BloomFDNEngine::setSize(float multiplier)
 {
-    const auto clamped = std::max(0.25f, std::min(maxSizeMultiplier, multiplier));
-    if (std::abs(clamped - sizeMultiplier) < 1.0e-6f)
-        return;
-
-    sizeMultiplier = clamped;
-    updateLineLengths();
-    updateBurstLines();
+    // Just the target - see targetSizeMultiplier's comment. Actually applied per-sample in
+    // processStereo(), which glides sizeMultiplier toward this and recomputes lengths as it moves.
+    targetSizeMultiplier = std::max(0.25f, std::min(maxSizeMultiplier, multiplier));
 }
 
 void BloomFDNEngine::updateBurstLines()
@@ -271,15 +304,22 @@ void BloomFDNEngine::updateBurstLines()
 
         // g^(attackTimeSamples / D) = burstFloor  =>  g = burstFloor^(D / attackTimeSamples). Every
         // line reaches the same floor at the same wall-clock time despite having a different D, so
-        // the overall attack duration is set by baseAttackMs*Size, not by any one line's own length.
-        const auto g = std::pow(burstFloor, (float) newLength / attackTimeSamples);
+        // the overall attack duration is set by baseAttackMs*Size, not by any one line's own length
+        // - EXCEPT clamped at maxBurstGain (see that constant's comment), which the shortest line
+        // would otherwise blow past into audible-ringing territory.
+        const auto g = std::min(maxBurstGain, std::pow(burstFloor, (float) newLength / attackTimeSamples));
 
-        if (newLength != burstL[i].delaySamples)
+        // Only start a new crossfade once the previous one has fully settled (fadeWeight == 0) -
+        // see updateLineLengths()'s comment on the main tank's identical guard for why: retriggering
+        // mid-fade was itself producing a discontinuity, which per-sample smoothing (now changing
+        // the target far more often than the fade's own duration) made far more frequent.
+        if (newLength != burstL[i].delaySamples && burstL[i].fadeWeight <= 0.0f)
         {
-            std::fill(burstL[i].buffer.begin(), burstL[i].buffer.end(), 0.0f);
-            std::fill(burstR[i].buffer.begin(), burstR[i].buffer.end(), 0.0f);
-            burstL[i].writePos = 0;
-            burstR[i].writePos = 0;
+            // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment.
+            burstL[i].fadeFromDelay = burstL[i].delaySamples;
+            burstR[i].fadeFromDelay = burstR[i].delaySamples;
+            burstL[i].fadeWeight = 1.0f;
+            burstR[i].fadeWeight = 1.0f;
             burstL[i].delaySamples = newLength;
             burstR[i].delaySamples = newLength;
         }
@@ -297,14 +337,23 @@ void BloomFDNEngine::updateLineLengths()
         const auto wanted = msToSamples(baseLineLengthsMs[(size_t) i] * sizeMultiplier, sampleRateHz);
         const auto newLength = std::max(1, std::min(capacity, wanted));
 
-        if (newLength != delaySamples[(size_t) i])
+        // The fadeWeight <= 0 guard matters once sizeMultiplier is smoothed continuously (see
+        // targetSizeMultiplier's comment): without it, a still-in-progress fade gets discarded and
+        // restarted from scratch every time the smoothed value crosses another integer-sample
+        // boundary - which, under continuous smoothing, can happen well before the previous fade's
+        // lengthChangeFadeMs has elapsed. Restarting mid-fade snaps straight to 100% of whatever the
+        // OLD fade's primary tap was, abruptly dropping that fade's own in-progress blend - a real
+        // discontinuity, and a more frequent one than the clicks this mechanism was built to fix.
+        // Waiting for the current fade to finish first means every fade always runs uninterrupted.
+        if (newLength != delaySamples[(size_t) i] && fadeWeight[(size_t) i] <= 0.0f)
         {
-            // A structural length change invalidates whatever stale audio sits at the newly
-            // (in/ex)cluded offsets in this line's fixed-capacity buffer - clearing it avoids a
-            // pop from reading old content at the wrong phase, at the cost of a brief silence in
-            // that one line (inaudible against the other seven still ringing).
-            std::fill(lineBuffers[(size_t) i].begin(), lineBuffers[(size_t) i].end(), 0.0f);
-            writePos[(size_t) i] = 0;
+            // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment
+            // (this used to clear the buffer and reset writePos on every length change, which was
+            // itself an audible click: the buffer already holds a continuous, valid rolling history
+            // at every offset up to its capacity, so there was never any "stale" data to protect
+            // against, only a hard jump to silence introduced right where the tail was still live).
+            fadeFromDelay[(size_t) i] = delaySamples[(size_t) i];
+            fadeWeight[(size_t) i] = 1.0f;
             delaySamples[(size_t) i] = newLength;
         }
     }
@@ -335,6 +384,11 @@ void BloomFDNEngine::setBitDepth(float bits)
     bitDepthLevels = std::pow(2.0f, clampedBits - 1.0f);
 }
 
+void BloomFDNEngine::setWobble(float wobbleAmount01)
+{
+    wobbleAmount = clamp01(wobbleAmount01);
+}
+
 void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
 {
     constexpr float hadamardNorm = 0.353553390593f; // 1/sqrt(8)
@@ -342,6 +396,14 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
 
     for (int n = 0; n < numSamples; ++n)
     {
+        // Glide sizeMultiplier toward its target and re-derive lengths every sample - see
+        // targetSizeMultiplier's comment. Each of these internally only does real work (buffer
+        // fade setup, burst gain pow()) when a line's own rounded length actually changes, so this
+        // is cheap on the vast majority of samples where nothing has moved enough to matter.
+        sizeMultiplier += (targetSizeMultiplier - sizeMultiplier) * sizeSmoothingCoeff;
+        updateLineLengths();
+        updateBurstLines();
+
         auto diffusedL = left[n];
         for (auto& stage : allpassL)
             diffusedL = stage.processSample(diffusedL);
@@ -369,9 +431,53 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
         for (int i = 0; i < numLines; ++i)
         {
             auto& buf = lineBuffers[(size_t) i];
-            const auto len = delaySamples[(size_t) i];
-            const auto readPos = (writePos[(size_t) i] + (int) buf.size() - len) % (int) buf.size();
-            lineOut[(size_t) i] = buf[(size_t) readPos];
+            const auto bufSize = (int) buf.size();
+
+            // Wobble (see setWobble()) - phase always advances so turning it on mid-playback starts
+            // from wherever it happens to be, not a reset; modSamples stays exactly 0.0 whenever
+            // wobbleAmount is 0, and the branch below skips interpolation entirely in that case, so
+            // Wobble=0 reads bit-identically to how this loop worked before Wobble existed at all.
+            wobblePhase[(size_t) i] += wobbleRateHz[(size_t) i] * 2.0f * pi / (float) sampleRateHz;
+            if (wobblePhase[(size_t) i] > 2.0f * pi)
+                wobblePhase[(size_t) i] -= 2.0f * pi;
+            const auto wobbleDepthSamples = wobbleDepthMs * 0.001f * (float) sampleRateHz;
+            const auto modSamples = wobbleAmount * wobbleDepthSamples * std::sin(wobblePhase[(size_t) i]);
+
+            float y;
+            if (wobbleAmount > 0.0f)
+            {
+                const auto capacity = (float) bufSize;
+                const auto fracDelay = std::max(1.0f, std::min(capacity - 2.0f, (float) delaySamples[(size_t) i] + modSamples));
+                y = readFractionalDelay(buf, writePos[(size_t) i], fracDelay);
+            }
+            else
+            {
+                const auto readPos = (writePos[(size_t) i] + bufSize - delaySamples[(size_t) i]) % bufSize;
+                y = buf[(size_t) readPos];
+            }
+
+            // Mid-crossfade after a Size change (see lengthChangeFadeMs) - both taps read from the
+            // same still-live buffer, so this blends two valid delayed signals, not fades to/from
+            // silence.
+            if (fadeWeight[(size_t) i] > 0.0f)
+            {
+                float oldY;
+                if (wobbleAmount > 0.0f)
+                {
+                    const auto capacity = (float) bufSize;
+                    const auto oldFracDelay = std::max(1.0f, std::min(capacity - 2.0f, (float) fadeFromDelay[(size_t) i] + modSamples));
+                    oldY = readFractionalDelay(buf, writePos[(size_t) i], oldFracDelay);
+                }
+                else
+                {
+                    const auto oldReadPos = (writePos[(size_t) i] + bufSize - fadeFromDelay[(size_t) i]) % bufSize;
+                    oldY = buf[(size_t) oldReadPos];
+                }
+                y += (oldY - y) * fadeWeight[(size_t) i];
+                fadeWeight[(size_t) i] = std::max(0.0f, fadeWeight[(size_t) i] - lengthChangeFadeStep);
+            }
+
+            lineOut[(size_t) i] = y;
         }
 
         // Damping filter in each feedback path (leaky integrator: higher dampingCoefficient means

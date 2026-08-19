@@ -19,8 +19,9 @@
 // that a passive energy-preserving cross-mix can only ever lose RMS energy from the moment of
 // injection - true, but comparison against real Midiverb captures showed the hardware's own RMS
 // envelope genuinely swells too, not just its density, hence the burst stage.) No delay-line
-// modulation is applied anywhere in this class (no chorus/pitch drift) - this matches the original
-// hardware's static, unmodulated, slightly grainy diffusion.
+// modulation is applied by default (no chorus/pitch drift) - this matches the original hardware's
+// static, unmodulated, slightly grainy diffusion. Wobble (see setWobble()) is the one opt-in
+// exception, off at 0 and never applied unless the player asks for it.
 //
 // Two independent instances are NOT needed for stereo: a single 8-line network is shared between
 // channels (even-indexed lines seeded from L, odd-indexed from R; L output reads the even lines,
@@ -61,6 +62,21 @@ public:
     // grain of the original 12-16 bit hardware. 16 is effectively transparent at float32 precision.
     void setBitDepth(float bits);
 
+    // 0-1, default/off at 0. Optional, opt-in delay-line modulation on the main tank ONLY (not the
+    // burst bank - its lines are short-lived transients scaled by Size, not where the sustained-tail
+    // resonance this exists for actually lives) - a slow, per-line, mutually-detuned sinusoidal
+    // drift on each line's read position (max ~1.5ms depth at Wobble=100%, rates under 0.4Hz so it
+    // reads as slow movement, not an obvious chorus). Genuinely off at 0: the read path only
+    // switches from the plain integer tap to a fractionally-interpolated one when wobbleAmount > 0,
+    // so a Wobble of 0 renders identically to the class's original static behavior, not just close
+    // to it. Exists to answer the "some knob settings produce audible resonant frequencies"
+    // question from tuning: those resonances are a genuine, static-topology consequence of a small
+    // (8-line) FDN at high Feedback (confirmed against the real Midiverb references too - see
+    // README's "How it works"), not a bug, and the spec explicitly ruled out fixing it by modulating
+    // by default. This gives a player who wants it a way to blur those peaks into motion without
+    // changing the default, unmodulated character at all.
+    void setWobble(float wobbleAmount01);
+
     // In-place stereo process: L/R in, replaced with the wet signal out. Dry/wet mixing happens in
     // the processor, not here, so this class stays testable as a pure "wet generator."
     void processStereo(float* left, float* right, int numSamples);
@@ -70,8 +86,11 @@ private:
 
     // Mutually prime line lengths (ms) - no shared factors means no periodic reinforcement between
     // lines, which is what avoids the metallic/ringing comb-filter character the spec calls out.
+    // Deliberately NOT whole milliseconds (see baseBurstLengthsMs below for why - the same problem
+    // applies here, and was actually the dominant source of it: 8 lines outnumber the burst bank's
+    // 6, so more coincident harmonics stacked at the same frequencies).
     static constexpr std::array<float, numLines> baseLineLengthsMs {
-        19.0f, 23.0f, 29.0f, 31.0f, 37.0f, 41.0f, 43.0f, 47.0f
+        19.3f, 23.7f, 29.1f, 31.6f, 37.4f, 41.9f, 43.2f, 47.8f
     };
 
     // Upper bound on setSize()'s multiplier - buffers are sized for this at prepare() so changing
@@ -114,6 +133,13 @@ private:
         int delaySamples = 1;
         float feedbackGain = 0.0f;
 
+        // See lengthChangeFadeMs's comment: a Size change crossfades from the old tap position
+        // rather than clearing the buffer. fadeStep is copied from the engine's shared constant at
+        // prepare() time (fixed duration, same for every line).
+        int fadeFromDelay = 0;
+        float fadeWeight = 0.0f;
+        float fadeStep = 1.0f;
+
         void prepare(int maxDelaySamples);
         void reset();
         float processSample(float x);
@@ -145,6 +171,32 @@ private:
     std::array<int, numLines> delaySamples {};
     std::array<float, numLines> dampingState {};
 
+    // Size-change crossfade state for the main tank lines - see lengthChangeFadeMs's comment.
+    std::array<int, numLines> fadeFromDelay {};
+    std::array<float, numLines> fadeWeight {};
+
+    // Duration of the crossfade applied when a line's delay length changes (Size knob moving),
+    // replacing an earlier "clear the buffer" approach that was itself the click, not a fix for
+    // one: the circular buffer already holds a continuous, valid rolling history at every offset up
+    // to its capacity (nothing in it is ever stale), so hard-clearing to silence and jumping the
+    // read tap there was an audible discontinuity injected into a still-ringing (often high-
+    // Feedback) tail every time the knob crossed an integer-sample boundary. Started at 10ms; still
+    // audible on a fast knob sweep, so raised to 30ms - still short enough to track a drag
+    // responsively, long enough that the blend itself disappears into the tail.
+    static constexpr float lengthChangeFadeMs = 30.0f;
+    float lengthChangeFadeStep = 1.0f;
+
+    // Wobble state - see setWobble()'s comment. Slow, per-line, mutually distinct rates (no shared
+    // factors, same rationale as the line lengths themselves) so all 8 lines drift out of phase
+    // with each other rather than breathing in visible lockstep. Depth is deliberately small (this
+    // is meant to blur fixed resonant peaks, not add an obvious pitch-bend/chorus effect).
+    static constexpr std::array<float, numLines> wobbleRateHz {
+        0.071f, 0.089f, 0.107f, 0.113f, 0.131f, 0.149f, 0.167f, 0.181f
+    };
+    static constexpr float wobbleDepthMs = 1.5f;
+    std::array<float, numLines> wobblePhase {};
+    float wobbleAmount = 0.0f;
+
     std::array<AllpassStage, 3> allpassL, allpassR;
 
     static constexpr int numBurstLines = 6;
@@ -154,8 +206,21 @@ private:
     // saturate (all their repeats overlap) almost immediately, which pulls the RMS peak far earlier
     // than the attack duration actually calls for; spreading lengths out this way is what makes the
     // peak-timing controllable via baseAttackMs at all. Scaled by sizeMultiplier like the main tank.
+    //
+    // Deliberately NOT whole milliseconds, despite "mutually prime" earlier having only been
+    // checked on the integer ms values (13, 37, 61, 89, 113, 149) - that check missed a much
+    // stronger coincidence than shared integer factors: a comb filter whose period is exactly N
+    // whole milliseconds always has a tooth at its own Nth harmonic landing almost exactly on
+    // 1000Hz (N cycles at 1000Hz = N ms = one full period), REGARDLESS of N. Every line here was a
+    // whole-ms value, so all 6 (and, worse, all 8 main-tank lines too) shared strong constructive
+    // reinforcement at 1000/2000/3000Hz etc, on top of each other - confirmed by rendering each
+    // burst line in isolation (feedback=0, all others silenced) and finding the SAME ~1000Hz peak
+    // regardless of which single line was active alone, 30-40dB above the noise floor - versus the
+    // real Midiverb references in reference-irs/, whose peaks never exceed ~12dB. That gap, not
+    // this bank's per-line feedback gain, was the real source of the audible "resonant frequency"
+    // complaint. The fractional offsets below break every line out of the 1kHz-multiple grid.
     static constexpr std::array<float, numBurstLines> baseBurstLengthsMs {
-        13.0f, 37.0f, 61.0f, 89.0f, 113.0f, 149.0f
+        13.4f, 37.9f, 61.2f, 89.6f, 113.3f, 149.7f
     };
 
     // How long the burst (attack/buildup) takes at sizeMultiplier == 1, in ms - calibrated against
@@ -168,11 +233,39 @@ private:
     // over. Lower = a more clearly bounded attack window; higher = a longer-lingering burst tail.
     static constexpr float burstFloor = 0.1f;
 
+    // Ceiling on a burst line's per-sample feedback gain (see updateBurstLines()). Solving
+    // g^(D/attackTimeSamples) = burstFloor for the SHORTEST line (13ms) demands g ~= 0.955 - each
+    // round trip only needs to lose ~0.4dB to hit the floor in time, since a short line gets so few
+    // round trips before baseAttackMs elapses. That's audible as a distinct, slowly-decaying pitch
+    // (a "boing") riding on top of the intended broadband swell, confirmed by comparing this
+    // engine's own spectral peaks against reference-irs/: ~150 peaks up to 30-50dB above the noise
+    // floor, versus the real hardware's ~40 peaks none louder than ~12dB. Capping gain trades a
+    // slightly-early floor crossing for the short lines against killing that audible ringing - the
+    // five longer lines (37-149ms have more round trips to spend in the same wall-clock window, so
+    // they land under this cap on their own and are unaffected.
+    static constexpr float maxBurstGain = 0.85f;
+
     std::array<BurstCombLine, numBurstLines> burstL, burstR;
 
     void updateBurstLines();
 
+    // setSize() only used to write straight into sizeMultiplier and call updateLineLengths()/
+    // updateBurstLines() immediately - but setSize() is called once per processBlock(), i.e. at
+    // host block-rate, not sample-rate. With a large host buffer (or a fast knob drag), that meant
+    // sizeMultiplier could take a big step between calls, and every line whose rounded length that
+    // step crossed changed all at once, each crossfading (see lengthChangeFadeMs) between two tap
+    // positions that were now far apart in the tail - two much-less-correlated points in a still-
+    // recirculating signal, which blends as an audible wobble even though no individual sample is
+    // discontinuous. targetSizeMultiplier holds the raw incoming value; sizeMultiplier now glides
+    // toward it via a one-pole smoother ticked every sample in processStereo(), which calls
+    // updateLineLengths()/updateBurstLines() every sample too - each internally still only acts
+    // when a line's own rounded length actually changes, so this stays cheap, but now that almost
+    // always happens one sample at a time instead of many at once.
+    static constexpr float sizeSmoothingMs = 60.0f;
+    float targetSizeMultiplier = 1.0f;
     float sizeMultiplier = 1.0f;
+    float sizeSmoothingCoeff = 1.0f;
+
     float feedbackGain = 0.85f;
     float dampingCoefficient = 0.35f;
     float diffusionCoefficient = 0.5f;
