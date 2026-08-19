@@ -10,13 +10,13 @@
 #include <memory>
 #include <string>
 
-// Offline impulse-response render harness for Bloom (build order step 2). Feeds a single-sample
-// impulse through the real BloomAudioProcessor (not a re-implementation of the DSP) and writes the
+// Offline impulse-response render harness for Shields (build order step 2). Feeds a single-sample
+// impulse through the real ShieldsAudioProcessor (not a re-implementation of the DSP) and writes the
 // result to a WAV file, so tools/compare_irs.py can compare it against a captured reference IR in
 // reference-irs/ without ever needing to build/load the plugin itself in a DAW.
 //
 // Usage:
-//   BloomRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]
+//   ShieldsRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]
 //                  [--diffusion 0.5] [--feedback 85] [--size 1.0] [--damping 35]
 //                  [--bandwidth 15000] [--bitdepth 16] [--dry 0] [--wet 100] [--wobble 0]
 //
@@ -46,7 +46,7 @@ namespace
         return it == args.end() ? defaultValue : std::stof(it->second);
     }
 
-    void setParam(BloomAudioProcessor& processor, const char* paramID, float rawValue)
+    void setParam(ShieldsAudioProcessor& processor, const char* paramID, float rawValue)
     {
         if (auto* param = processor.apvts.getParameter(paramID))
             param->setValueNotifyingHost(param->convertTo0to1(rawValue));
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     if (outIt == args.end())
     {
         std::fprintf(stderr,
-            "Usage: BloomRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]\n"
+            "Usage: ShieldsRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]\n"
             "                     [--diffusion 0.5] [--feedback 99] [--size 1.0] [--damping 20]\n"
             "                     [--bandwidth 19000] [--bitdepth 13] [--dry 0] [--wet 100] [--wobble 0]\n");
         return 1;
@@ -77,16 +77,16 @@ int main(int argc, char* argv[])
     // deliberately overridden to 0/100 (not the plugin's real 100/40 defaults): this tool captures
     // the ALGORITHM's impulse response for comparison against reference-irs/, where a dry click at
     // sample 0 would only get in the way.
-    BloomAudioProcessor processor;
-    setParam(processor, BloomAudioProcessor::diffusionParamID, getFloatArg(args, "diffusion", 0.5f));
-    setParam(processor, BloomAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 99.0f));
-    setParam(processor, BloomAudioProcessor::sizeParamID, getFloatArg(args, "size", 1.0f));
-    setParam(processor, BloomAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
-    setParam(processor, BloomAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
-    setParam(processor, BloomAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
-    setParam(processor, BloomAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
-    setParam(processor, BloomAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
-    setParam(processor, BloomAudioProcessor::wobbleParamID, getFloatArg(args, "wobble", 0.0f));
+    ShieldsAudioProcessor processor;
+    setParam(processor, ShieldsAudioProcessor::diffusionParamID, getFloatArg(args, "diffusion", 0.5f));
+    setParam(processor, ShieldsAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 99.0f));
+    setParam(processor, ShieldsAudioProcessor::sizeParamID, getFloatArg(args, "size", 1.0f));
+    setParam(processor, ShieldsAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
+    setParam(processor, ShieldsAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
+    setParam(processor, ShieldsAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
+    setParam(processor, ShieldsAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
+    setParam(processor, ShieldsAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
+    setParam(processor, ShieldsAudioProcessor::wobbleParamID, getFloatArg(args, "wobble", 0.0f));
 
     constexpr int blockSize = 512;
     processor.prepareToPlay((double) sampleRate, blockSize);

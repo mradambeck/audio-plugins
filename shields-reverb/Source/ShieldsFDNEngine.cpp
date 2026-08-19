@@ -1,4 +1,4 @@
-#include "BloomFDNEngine.h"
+#include "ShieldsFDNEngine.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +34,7 @@ namespace
 // (not built at runtime) since it's a fixed 8x8 constant - normalisation by 1/sqrt(8) happens once
 // per sample in processStereo() rather than being baked into these entries, so the entries stay
 // exactly +-1 and easy to eyeball against the standard construction.
-const std::array<std::array<float, BloomFDNEngine::numLines>, BloomFDNEngine::numLines> BloomFDNEngine::hadamard {{
+const std::array<std::array<float, ShieldsFDNEngine::numLines>, ShieldsFDNEngine::numLines> ShieldsFDNEngine::hadamard {{
     {{ 1,  1,  1,  1,  1,  1,  1,  1 }},
     {{ 1, -1,  1, -1,  1, -1,  1, -1 }},
     {{ 1,  1, -1, -1,  1,  1, -1, -1 }},
@@ -45,20 +45,20 @@ const std::array<std::array<float, BloomFDNEngine::numLines>, BloomFDNEngine::nu
     {{ 1, -1, -1,  1, -1,  1,  1, -1 }},
 }};
 
-void BloomFDNEngine::AllpassStage::prepare(int maxDelaySamples)
+void ShieldsFDNEngine::AllpassStage::prepare(int maxDelaySamples)
 {
     buffer.assign((size_t) std::max(maxDelaySamples, 1), 0.0f);
     delaySamples = (int) buffer.size();
     writePos = 0;
 }
 
-void BloomFDNEngine::AllpassStage::reset()
+void ShieldsFDNEngine::AllpassStage::reset()
 {
     std::fill(buffer.begin(), buffer.end(), 0.0f);
     writePos = 0;
 }
 
-float BloomFDNEngine::AllpassStage::processSample(float x)
+float ShieldsFDNEngine::AllpassStage::processSample(float x)
 {
     const auto readPos = (writePos + (int) buffer.size() - delaySamples) % (int) buffer.size();
     const auto delayed = buffer[(size_t) readPos];
@@ -70,20 +70,20 @@ float BloomFDNEngine::AllpassStage::processSample(float x)
     return y;
 }
 
-void BloomFDNEngine::BurstCombLine::prepare(int maxDelaySamples)
+void ShieldsFDNEngine::BurstCombLine::prepare(int maxDelaySamples)
 {
     buffer.assign((size_t) std::max(maxDelaySamples, 1), 0.0f);
     writePos = 0;
 }
 
-void BloomFDNEngine::BurstCombLine::reset()
+void ShieldsFDNEngine::BurstCombLine::reset()
 {
     std::fill(buffer.begin(), buffer.end(), 0.0f);
     writePos = 0;
     fadeWeight = 0.0f;
 }
 
-float BloomFDNEngine::BurstCombLine::processSample(float x)
+float ShieldsFDNEngine::BurstCombLine::processSample(float x)
 {
     // Read-before-write, same ordering as the main tank's lines: the OUTPUT is whatever was
     // written delaySamples ago, not this sample's input. That's what makes y[0] == 0 for an
@@ -110,7 +110,7 @@ float BloomFDNEngine::BurstCombLine::processSample(float x)
     return y;
 }
 
-void BloomFDNEngine::Biquad::setLowShelf(float freqHz, float gainDb, double sampleRateHzIn)
+void ShieldsFDNEngine::Biquad::setLowShelf(float freqHz, float gainDb, double sampleRateHzIn)
 {
     // Standard RBJ Audio EQ Cookbook low-shelf, shelf slope S=1 (the "as steep as possible without
     // overshoot" case - there's no reason to want resonance/overshoot for a broadband tonal-balance
@@ -137,7 +137,7 @@ void BloomFDNEngine::Biquad::setLowShelf(float freqHz, float gainDb, double samp
     a2 = rawA2 / rawA0;
 }
 
-void BloomFDNEngine::Biquad::setHighShelf(float freqHz, float gainDb, double sampleRateHzIn)
+void ShieldsFDNEngine::Biquad::setHighShelf(float freqHz, float gainDb, double sampleRateHzIn)
 {
     // RBJ Audio EQ Cookbook high-shelf, same S=1 slope rationale as setLowShelf().
     const auto A = std::pow(10.0f, gainDb / 40.0f);
@@ -162,7 +162,7 @@ void BloomFDNEngine::Biquad::setHighShelf(float freqHz, float gainDb, double sam
     a2 = rawA2 / rawA0;
 }
 
-void BloomFDNEngine::Biquad::setPeak(float freqHz, float gainDb, float q, double sampleRateHzIn)
+void ShieldsFDNEngine::Biquad::setPeak(float freqHz, float gainDb, float q, double sampleRateHzIn)
 {
     // RBJ Audio EQ Cookbook peaking EQ (bell).
     const auto A = std::pow(10.0f, gainDb / 40.0f);
@@ -184,12 +184,12 @@ void BloomFDNEngine::Biquad::setPeak(float freqHz, float gainDb, float q, double
     a2 = rawA2 / rawA0;
 }
 
-void BloomFDNEngine::Biquad::reset()
+void ShieldsFDNEngine::Biquad::reset()
 {
     x1 = x2 = y1 = y2 = 0.0f;
 }
 
-float BloomFDNEngine::Biquad::processSample(float x)
+float ShieldsFDNEngine::Biquad::processSample(float x)
 {
     const auto y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
     x2 = x1;
@@ -199,7 +199,7 @@ float BloomFDNEngine::Biquad::processSample(float x)
     return y;
 }
 
-void BloomFDNEngine::prepare(double sampleRate)
+void ShieldsFDNEngine::prepare(double sampleRate)
 {
     sampleRateHz = sampleRate;
     lengthChangeFadeStep = 1.0f / (float) std::max(1, msToSamples(lengthChangeFadeMs, sampleRateHz));
@@ -242,7 +242,7 @@ void BloomFDNEngine::prepare(double sampleRate)
     reset();
 }
 
-void BloomFDNEngine::reset()
+void ShieldsFDNEngine::reset()
 {
     for (auto& buf : lineBuffers)
         std::fill(buf.begin(), buf.end(), 0.0f);
@@ -269,7 +269,7 @@ void BloomFDNEngine::reset()
     midPeakR.reset();
 }
 
-void BloomFDNEngine::setDiffusion(float diffusion)
+void ShieldsFDNEngine::setDiffusion(float diffusion)
 {
     diffusionCoefficient = std::max(0.3f, std::min(0.7f, diffusion));
 
@@ -277,7 +277,7 @@ void BloomFDNEngine::setDiffusion(float diffusion)
     for (auto& stage : allpassR) stage.coefficient = diffusionCoefficient;
 }
 
-void BloomFDNEngine::setFeedback(float feedback01)
+void ShieldsFDNEngine::setFeedback(float feedback01)
 {
     // Ceiling held safely below 1.0: the Hadamard mix is orthogonal (energy-preserving), so this
     // scalar alone governs whether the network decays or sustains indefinitely.
@@ -285,14 +285,14 @@ void BloomFDNEngine::setFeedback(float feedback01)
     feedbackGain = clamp01(feedback01) * maxFeedbackGain;
 }
 
-void BloomFDNEngine::setSize(float multiplier)
+void ShieldsFDNEngine::setSize(float multiplier)
 {
     // Just the target - see targetSizeMultiplier's comment. Actually applied per-sample in
     // processStereo(), which glides sizeMultiplier toward this and recomputes lengths as it moves.
     targetSizeMultiplier = std::max(0.25f, std::min(maxSizeMultiplier, multiplier));
 }
 
-void BloomFDNEngine::updateBurstLines()
+void ShieldsFDNEngine::updateBurstLines()
 {
     const auto attackTimeSamples = (float) msToSamples(baseAttackMs * sizeMultiplier, sampleRateHz);
 
@@ -329,7 +329,7 @@ void BloomFDNEngine::updateBurstLines()
     }
 }
 
-void BloomFDNEngine::updateLineLengths()
+void ShieldsFDNEngine::updateLineLengths()
 {
     for (int i = 0; i < numLines; ++i)
     {
@@ -359,12 +359,12 @@ void BloomFDNEngine::updateLineLengths()
     }
 }
 
-void BloomFDNEngine::setDamping(float damping01)
+void ShieldsFDNEngine::setDamping(float damping01)
 {
     dampingCoefficient = clamp01(damping01);
 }
 
-void BloomFDNEngine::setBandwidthHz(float hz)
+void ShieldsFDNEngine::setBandwidthHz(float hz)
 {
     const auto clampedHz = std::max(200.0f, std::min((float) (sampleRateHz * 0.45), hz));
 
@@ -378,18 +378,18 @@ void BloomFDNEngine::setBandwidthHz(float hz)
     bandwidthCoefficient = std::exp(-2.0f * pi * clampedHz / (float) sampleRateHz);
 }
 
-void BloomFDNEngine::setBitDepth(float bits)
+void ShieldsFDNEngine::setBitDepth(float bits)
 {
     const auto clampedBits = std::max(4.0f, std::min(16.0f, bits));
     bitDepthLevels = std::pow(2.0f, clampedBits - 1.0f);
 }
 
-void BloomFDNEngine::setWobble(float wobbleAmount01)
+void ShieldsFDNEngine::setWobble(float wobbleAmount01)
 {
     wobbleAmount = clamp01(wobbleAmount01);
 }
 
-void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
+void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
 {
     constexpr float hadamardNorm = 0.353553390593f; // 1/sqrt(8)
     constexpr float outputTapGain = 0.5f;           // 1/sqrt(4): four taps summed per channel
@@ -415,7 +415,7 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
         // The burst comb bank turns each channel's (already smoothed) near-impulse into a
         // decorrelated train of repeats whose SUM'S windowed RMS genuinely rises for a while
         // before falling - see BurstCombLine's comment for why. This, not the main tank's own
-        // (energy-preserving, provably front-loaded) cross-mix, is what actually produces Bloom's
+        // (energy-preserving, provably front-loaded) cross-mix, is what actually produces Shields's
         // audible swell; the main tank below is responsible for the long decay tail only.
         constexpr float burstNorm = 1.0f / (float) numBurstLines;
         float burstOutL = 0.0f, burstOutR = 0.0f;

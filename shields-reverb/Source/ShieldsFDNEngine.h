@@ -3,7 +3,7 @@
 #include <array>
 #include <vector>
 
-// The diffuse reverb core behind Bloom's "slow buildup" character: an 8-line feedback delay
+// The diffuse reverb core behind Shields's "slow buildup" character: an 8-line feedback delay
 // network (FDN) with Hadamard feedback mixing, per-line one-pole damping in the feedback path,
 // and a short series-allpass diffuser on the input ahead of the network. Deliberately not a bank
 // of parallel comb filters into series allpasses (classic Schroeder/Moorer) - the Hadamard-mixed
@@ -27,10 +27,10 @@
 // channels (even-indexed lines seeded from L, odd-indexed from R; L output reads the even lines,
 // R output reads the odd lines), which is both cheaper than two full networks and produces a more
 // correlated, natural stereo image than fully independent L/R diffusers would.
-class BloomFDNEngine
+class ShieldsFDNEngine
 {
 public:
-    BloomFDNEngine() = default;
+    ShieldsFDNEngine() = default;
 
     void prepare(double sampleRate);
     void reset();
@@ -45,9 +45,9 @@ public:
     // control.
     void setFeedback(float feedback01);
 
-    // Multiplier on the base (mutually-prime-ms) delay line lengths. This is Bloom's de facto
+    // Multiplier on the base (mutually-prime-ms) delay line lengths. This is Shields's de facto
     // "attack time" control per the spec: longer lines mean more round trips (samples) before the
-    // network reaches full echo density, so the bloom is slower without any separate envelope.
+    // network reaches full echo density, so the shields is slower without any separate envelope.
     void setSize(float sizeMultiplier);
 
     // 0-1, one-pole lowpass coefficient applied to each line's feedback-path signal - controls how
@@ -225,7 +225,7 @@ private:
 
     // How long the burst (attack/buildup) takes at sizeMultiplier == 1, in ms - calibrated against
     // the real Midiverb reference IRs' observed rise-to-peak time. Scaled by Size exactly like the
-    // main tank's lines, so Size remains the single "how slow is the bloom" control.
+    // main tank's lines, so Size remains the single "how slow is the shields" control.
     static constexpr float baseAttackMs = 650.0f;
 
     // Fraction of a burst line's initial amplitude it should have decayed to by baseAttackMs *

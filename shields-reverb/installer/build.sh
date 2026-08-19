@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds a macOS .pkg installer for Bloom.
+# Builds a macOS .pkg installer for Shields.
 #
 # Each format (AU, VST3, Standalone) is packaged as its own relocatable
 # component package, so the installer can offer independent checkboxes for
@@ -10,16 +10,16 @@ set -euo pipefail
 # lets Installer.app resolve the destination itself).
 #
 # Output:
-#   installer/output/Bloom-AU-Component.pkg          - flat component packages
-#   installer/output/Bloom-VST3-Component.pkg          (also consumed by the
-#   installer/output/Bloom-Standalone-Component.pkg    group installer)
-#   installer/output/Bloom-Installer.pkg              - double-clickable installer
+#   installer/output/Shields-AU-Component.pkg          - flat component packages
+#   installer/output/Shields-VST3-Component.pkg          (also consumed by the
+#   installer/output/Shields-Standalone-Component.pkg    group installer)
+#   installer/output/Shields-Installer.pkg              - double-clickable installer
 #                                                        with welcome/license screens
 #
 # Usage: installer/build.sh [--component-only]
 
-PLUGIN_NAME="Bloom"
-BUNDLE_ID="com.wildjag.bloom"
+PLUGIN_NAME="Shields"
+BUNDLE_ID="com.wildjag.shields"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALLER_DIR="$ROOT_DIR/installer"

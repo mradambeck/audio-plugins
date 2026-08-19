@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-// Headless entry point for Bloom's UnitTest suite (currently just BloomFDNEngine's stability and
+// Headless entry point for Shields's UnitTest suite (currently just ShieldsFDNEngine's stability and
 // echo-density-buildup checks) - a small standalone console app rather than a hook inside the
 // plugin itself, so it can be run on its own without building/loading a full AU/VST3/Standalone.
 int main()

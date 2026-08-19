@@ -1,11 +1,11 @@
-#include "BloomLookAndFeel.h"
+#include "ShieldsLookAndFeel.h"
 #include "BinaryData.h"
 
 namespace
 {
-    // Accent pair derived from the given highlight colour #D74377 (see mockups/bloom-mockup-v1.html
+    // Accent pair derived from the given highlight colour #D74377 (see mockups/shields-mockup-v1.html
     // for the HSL derivation) - accentBrightLo is the highlight colour itself.
-    const wildjag::HardwarePanelTheme bloomTheme
+    const wildjag::HardwarePanelTheme shieldsTheme
     {
         .accentMuted = juce::Colour{0xffA74467},
         .accentBrightHi = juce::Colour{0xffEC6594},
@@ -16,4 +16,4 @@ namespace
     };
 }
 
-BloomLookAndFeel::BloomLookAndFeel() : HardwarePanelLookAndFeel(bloomTheme) {}
+ShieldsLookAndFeel::ShieldsLookAndFeel() : HardwarePanelLookAndFeel(shieldsTheme) {}

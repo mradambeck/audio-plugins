@@ -2,17 +2,17 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include "BloomFDNEngine.h"
+#include "ShieldsFDNEngine.h"
 
-// Shoegaze-inspired diffuse reverb built around an 8-line Hadamard-mixed FDN (BloomFDNEngine) -
+// Shoegaze-inspired diffuse reverb built around an 8-line Hadamard-mixed FDN (ShieldsFDNEngine) -
 // see that class for the DSP core itself. This processor owns parameter state, the dry/wet mix,
 // and stereo buffer plumbing; no per-sample DSP math lives here beyond mixing dry against the
 // engine's wet output.
-class BloomAudioProcessor : public juce::AudioProcessor
+class ShieldsAudioProcessor : public juce::AudioProcessor
 {
 public:
-    BloomAudioProcessor();
-    ~BloomAudioProcessor() override;
+    ShieldsAudioProcessor();
+    ~ShieldsAudioProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -55,7 +55,7 @@ public:
 
     // Exposed so the offline IR-render harness (Source/Tools/RenderIR.cpp) can drive the engine
     // directly from fixed CLI-specified values without going through the host-automation path.
-    BloomFDNEngine& getEngineForRenderHarness() { return engine; }
+    ShieldsFDNEngine& getEngineForRenderHarness() { return engine; }
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -71,11 +71,11 @@ private:
     std::atomic<float>* wobbleParam = nullptr;
     std::atomic<float>* bypassParam = nullptr;
 
-    BloomFDNEngine engine;
+    ShieldsFDNEngine engine;
 
     // Scratch buffers holding the engine's wet output before the dry/wet mix, sized in
     // prepareToPlay() to the host's maximum block size.
     juce::AudioBuffer<float> wetBuffer;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BloomAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShieldsAudioProcessor)
 };

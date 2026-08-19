@@ -2,19 +2,19 @@
 // Adapted directly from caverns-delay/Source/PluginEditor.cpp, the canonical reference
 // implementation for the juce-hardware-panel-ui skill. The chassis/panel/header/footer chrome in
 // paint() (before the four drawHardwareSection(...) calls), rebuildChassisTexture(), and
-// drawHardwareSection() are COPY-VERBATIM - see that file's own banner comment. Bloom differs from
+// drawHardwareSection() are COPY-VERBATIM - see that file's own banner comment. Shields differs from
 // Caverns in having no preset combo (no factory presets exist yet) and no Timer-driven
-// sync/link display logic (none of Bloom's parameters are tempo-derived).
+// sync/link display logic (none of Shields's parameters are tempo-derived).
 // ============================================================================
 
 #include "PluginEditor.h"
 #include "BinaryData.h"
 
-// Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - BloomTests
-// links only BloomFDNEngine.cpp against juce_core, no editor/LookAndFeel/fonts.
-juce::AudioProcessorEditor* BloomAudioProcessor::createEditor()
+// Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - ShieldsTests
+// links only ShieldsFDNEngine.cpp against juce_core, no editor/LookAndFeel/fonts.
+juce::AudioProcessorEditor* ShieldsAudioProcessor::createEditor()
 {
-    return new BloomAudioProcessorEditor(*this);
+    return new ShieldsAudioProcessorEditor(*this);
 }
 
 namespace
@@ -46,7 +46,7 @@ namespace
     constexpr int sectionPaddingBottom = 20;
 
     constexpr int defaultKnobSize = 88;
-    constexpr int sizeKnobSize = 112;        // Size reads larger - it's Bloom's de facto attack-
+    constexpr int sizeKnobSize = 112;        // Size reads larger - it's Shields's de facto attack-
                                               // time control, the closest thing to a "hero" knob
     constexpr int knobNameHeight = 28;
     constexpr int knobTextBoxHeight = 20;
@@ -55,7 +55,7 @@ namespace
     // needed here (1040->1132) so Diffusion/Decay/Tone's own knob spacing is untouched.
 }
 
-void BloomAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void ShieldsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                     const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (building its internal value
@@ -73,24 +73,24 @@ void BloomAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::La
 
     // Not attachToComponent(): the mockup's DOM order inside .knob-cell is knob, then name, then
     // value - the name sits BELOW the knob, not above. Positioned manually in resized() instead,
-    // in the gap BloomLookAndFeel's (inherited) drawRotarySlider leaves for it.
+    // in the gap ShieldsLookAndFeel's (inherited) drawRotarySlider leaves for it.
     label.setText(labelText.toUpperCase(), juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(label);
 }
 
-BloomAudioProcessorEditor::BloomAudioProcessorEditor(BloomAudioProcessor& p)
+ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
-    titleLabel.setText("BLOOM", juce::dontSendNotification);
+    titleLabel.setText("SHIELDS", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::topLeft);
     titleLabel.setFont(lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f));
     titleLabel.setColour(juce::Label::textColourId, juce::Colour(0xffEC6594));
     addAndMakeVisible(titleLabel);
 
-    tagLabel.setText(juce::String("Shoegaze inspired reverb").toUpperCase(), juce::dontSendNotification);
+    tagLabel.setText(juce::String("Swell Reverb").toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
     tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
@@ -100,7 +100,7 @@ BloomAudioProcessorEditor::BloomAudioProcessorEditor(BloomAudioProcessor& p)
     bypassButton.setButtonText("BYPASS");
     addAndMakeVisible(bypassButton);
     bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processorRef.apvts, BloomAudioProcessor::bypassParamID, bypassButton);
+        processorRef.apvts, ShieldsAudioProcessor::bypassParamID, bypassButton);
 
     setupRotarySlider(diffusionSlider, diffusionLabel, "Diffusion");
     setupRotarySlider(sizeSlider, sizeLabel, "Size");
@@ -113,35 +113,35 @@ BloomAudioProcessorEditor::BloomAudioProcessorEditor(BloomAudioProcessor& p)
     setupRotarySlider(wetSlider, wetLabel, "Wet");
 
     diffusionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::diffusionParamID, diffusionSlider);
+        processorRef.apvts, ShieldsAudioProcessor::diffusionParamID, diffusionSlider);
     sizeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::sizeParamID, sizeSlider);
+        processorRef.apvts, ShieldsAudioProcessor::sizeParamID, sizeSlider);
     feedbackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::feedbackParamID, feedbackSlider);
+        processorRef.apvts, ShieldsAudioProcessor::feedbackParamID, feedbackSlider);
     dampingAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::dampingParamID, dampingSlider);
+        processorRef.apvts, ShieldsAudioProcessor::dampingParamID, dampingSlider);
     bandwidthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::bandwidthHzParamID, bandwidthSlider);
+        processorRef.apvts, ShieldsAudioProcessor::bandwidthHzParamID, bandwidthSlider);
     bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::bitDepthParamID, bitDepthSlider);
+        processorRef.apvts, ShieldsAudioProcessor::bitDepthParamID, bitDepthSlider);
     wobbleAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::wobbleParamID, wobbleSlider);
+        processorRef.apvts, ShieldsAudioProcessor::wobbleParamID, wobbleSlider);
     dryAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::dryParamID, drySlider);
+        processorRef.apvts, ShieldsAudioProcessor::dryParamID, drySlider);
     wetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, BloomAudioProcessor::wetParamID, wetSlider);
+        processorRef.apvts, ShieldsAudioProcessor::wetParamID, wetSlider);
 
     setSize(1306, 362);
 }
 
-BloomAudioProcessorEditor::~BloomAudioProcessorEditor()
+ShieldsAudioProcessorEditor::~ShieldsAudioProcessorEditor()
 {
     setLookAndFeel(nullptr);
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void BloomAudioProcessorEditor::rebuildChassisTexture()
+void ShieldsAudioProcessorEditor::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -185,7 +185,7 @@ void BloomAudioProcessorEditor::rebuildChassisTexture()
 
 // COPY-VERBATIM (see banner at top of file): unbroken border + centred badge that hugs its text,
 // sitting inside the border rather than straddling it.
-void BloomAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void ShieldsAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                        const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -205,7 +205,7 @@ void BloomAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rec
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void BloomAudioProcessorEditor::paint(juce::Graphics& g)
+void ShieldsAudioProcessorEditor::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -271,7 +271,7 @@ void BloomAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.drawRoundedRectangle(fullPanelBounds, 8.0f, 1.0f);
 
-    // --- PLUGIN-SPECIFIC: section names/grouping, matched to Bloom's actual parameters. ---
+    // --- PLUGIN-SPECIFIC: section names/grouping, matched to Shields's actual parameters. ---
     drawHardwareSection(g, diffusionSectionBounds, "Diffusion");
     drawHardwareSection(g, decaySectionBounds, "Decay");
     drawHardwareSection(g, toneSectionBounds, "Tone");
@@ -284,7 +284,7 @@ void BloomAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
     g.setColour(juce::Colour(0xff586566));
-    g.drawText(juce::String::fromUTF8("BLOOM \xC2\xB7 v") + JucePlugin_VersionString,
+    g.drawText(juce::String::fromUTF8("SHIELDS \xC2\xB7 v") + JucePlugin_VersionString,
                footerArea.removeFromLeft(180.0f), juce::Justification::centredLeft);
 
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
@@ -292,7 +292,7 @@ void BloomAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::centredRight);
 }
 
-void BloomAudioProcessorEditor::resized()
+void ShieldsAudioProcessorEditor::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -302,11 +302,11 @@ void BloomAudioProcessorEditor::resized()
     const auto bypassTextWidth = juce::GlyphArrangement::getStringWidth(bypassFont, "BYPASS");
     const auto bypassWidth = (int) std::ceil(9.0f + 8.0f + bypassTextWidth + 24.0f);
     bypassButton.setBounds(header.removeFromRight(bypassWidth).withSizeKeepingCentre(bypassWidth, 28)
-                                .expanded((int) BloomLookAndFeel::buttonShadowMargin));
+                                .expanded((int) ShieldsLookAndFeel::buttonShadowMargin));
 
     const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
-    const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, "BLOOM") + 8;
+    const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, "SHIELDS") + 8;
     const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 
     auto titleBounds = header.removeFromLeft(titleWidth);
@@ -346,7 +346,7 @@ void BloomAudioProcessorEditor::resized()
 
     // Positions a rotary knob + its name label together, matching the mockup's .knob-cell DOM
     // order (knob, then name, then value): the slider's own bounds span knob + name-gap + built-in
-    // value textbox, and BloomLookAndFeel's (inherited) drawRotarySlider flush-tops the circle
+    // value textbox, and ShieldsLookAndFeel's (inherited) drawRotarySlider flush-tops the circle
     // within that, leaving the name-gap blank for this label to occupy.
     auto positionKnob = [](juce::Rectangle<int> cell, int knobSize, juce::Slider& slider, juce::Label& nameLabel)
     {
@@ -355,7 +355,7 @@ void BloomAudioProcessorEditor::resized()
         nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
     };
 
-    // ---- Diffusion: Diffusion + Size (the larger "hero" knob - Bloom's attack-time control). ----
+    // ---- Diffusion: Diffusion + Size (the larger "hero" knob - Shields's attack-time control). ----
     auto diffusionInner = diffusionColumn;
     diffusionInner.removeFromTop(sectionPaddingTop);
     diffusionInner.removeFromLeft(sectionPaddingSide);
@@ -391,7 +391,7 @@ void BloomAudioProcessorEditor::resized()
     positionKnob(toneRow.removeFromLeft(toneHalfWidth), defaultKnobSize, bandwidthSlider, bandwidthLabel);
     positionKnob(toneRow, defaultKnobSize, bitDepthSlider, bitDepthLabel);
 
-    // ---- Motion: a single Wobble knob (see BloomFDNEngine::setWobble()'s comment) - off/0 by
+    // ---- Motion: a single Wobble knob (see ShieldsFDNEngine::setWobble()'s comment) - off/0 by
     // default, the one optional-modulation control from the original build order. ----
     auto motionInner = motionColumn;
     motionInner.removeFromTop(sectionPaddingTop);

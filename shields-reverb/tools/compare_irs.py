@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compares a rendered Bloom impulse response against a reference Midiverb II capture.
+"""Compares a rendered Shields impulse response against a reference Midiverb II capture.
 
 Usage:
     python3 compare_irs.py <rendered.wav> <reference.wav> [--out report.png] [--window-ms 50]
@@ -12,7 +12,7 @@ a one-off script - it prints a small set of numbers to track across iterations a
   2. Echo-density-over-time overlay - count of resolvable peaks per time window, which per the
      Bloom spec is the actual signature of the buildup, not the loudness contour above (a network
      can have a fairly flat or falling envelope while its echo density still visibly increases -
-     see BloomFDNEngineTests.cpp for the same measurement done as a C++ regression check).
+     see ShieldsFDNEngineTests.cpp for the same measurement done as a C++ regression check).
   3. Spectrogram comparison - tonal/bandwidth matching over TIME (rendered and reference side by
      side).
   4. Averaged spectrum overlay + spectral difference curve - tonal/bandwidth matching averaged over
@@ -79,7 +79,7 @@ def windowed_rms(data, windowSize):
 
 def windowed_echo_density(data, windowSize, relativeThreshold=0.2):
     """Count of resolvable local-maxima peaks per window, thresholded relative to that window's own
-    peak - the same normalisation BloomFDNEngineTests.cpp uses, so density (not loudness) is what's
+    peak - the same normalisation ShieldsFDNEngineTests.cpp uses, so density (not loudness) is what's
     being measured. Deliberately per-window relative, not a single global threshold, since a
     diffuse tail's absolute level keeps falling even while its structural density keeps rising."""
     numWindows = len(data) // windowSize
@@ -158,7 +158,7 @@ def log_spectral_distance(freqDbA, freqDbB):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("rendered", help="Bloom's own rendered IR (from BloomRenderIR)")
+    parser.add_argument("rendered", help="Shields's own rendered IR (from ShieldsRenderIR)")
     parser.add_argument("reference", help="Captured reference IR (reference-irs/*.wav)")
     parser.add_argument("--out", default=None, help="Path to save the comparison PNG (default: alongside the rendered file)")
     parser.add_argument("--no-plot", action="store_true", help="Skip saving the PNG, just print the metrics")
@@ -228,14 +228,14 @@ def main():
 
     timeRendered = np.arange(len(rmsRendered)) * args.window_ms / 1000.0
     timeReference = np.arange(len(rmsReference)) * args.window_ms / 1000.0
-    axes[0].plot(timeRendered, rmsRendered, label="Rendered (Bloom)")
+    axes[0].plot(timeRendered, rmsRendered, label="Rendered (Shields)")
     axes[0].plot(timeReference, rmsReference, label="Reference (Midiverb)")
     axes[0].set_title("RMS energy envelope")
     axes[0].set_xlabel("Time (s)")
     axes[0].set_ylabel("RMS")
     axes[0].legend()
 
-    axes[1].plot(timeRendered, densityRendered, label="Rendered (Bloom)")
+    axes[1].plot(timeRendered, densityRendered, label="Rendered (Shields)")
     axes[1].plot(timeReference, densityReference, label="Reference (Midiverb)")
     axes[1].set_title("Echo density (peaks per window) - the actual buildup signature")
     axes[1].set_xlabel("Time (s)")
@@ -245,7 +245,7 @@ def main():
     nperseg = min(1024, max(64, windowSize))
     fRendered, tRendered, sxxRendered = spectrogram(renderedData, fs=targetRate, nperseg=nperseg)
     axes[2].pcolormesh(tRendered, fRendered, 10 * np.log10(sxxRendered + 1.0e-12), shading="gouraud")
-    axes[2].set_title("Rendered (Bloom) spectrogram")
+    axes[2].set_title("Rendered (Shields) spectrogram")
     axes[2].set_xlabel("Time (s)")
     axes[2].set_ylabel("Frequency (Hz)")
 
@@ -257,7 +257,7 @@ def main():
 
     # Averaged-over-the-whole-signal spectrum, frequency-resolved - the log-spectral-distance score
     # printed above is just the mean |gap| between these two curves, collapsed to one number.
-    axes[4].semilogx(spectrumFreqs, spectrumDbRendered, label="Rendered (Bloom)")
+    axes[4].semilogx(spectrumFreqs, spectrumDbRendered, label="Rendered (Shields)")
     axes[4].semilogx(spectrumFreqs, spectrumDbReference, label="Reference (Midiverb)")
     axes[4].set_title("Averaged spectrum (Welch PSD, 1/3-octave smoothed)")
     axes[4].set_xlabel("Frequency (Hz)")
