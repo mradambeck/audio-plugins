@@ -82,6 +82,95 @@ float BloomFDNEngine::BurstCombLine::processSample(float x)
     return y;
 }
 
+void BloomFDNEngine::Biquad::setLowShelf(float freqHz, float gainDb, double sampleRateHzIn)
+{
+    // Standard RBJ Audio EQ Cookbook low-shelf, shelf slope S=1 (the "as steep as possible without
+    // overshoot" case - there's no reason to want resonance/overshoot for a broadband tonal-balance
+    // correction like this one).
+    const auto A = std::pow(10.0f, gainDb / 40.0f);
+    const auto w0 = 2.0f * pi * freqHz / (float) sampleRateHzIn;
+    const auto cosw0 = std::cos(w0);
+    const auto sinw0 = std::sin(w0);
+    constexpr float shelfSlope = 1.0f;
+    const auto alpha = sinw0 * 0.5f * std::sqrt((A + 1.0f / A) * (1.0f / shelfSlope - 1.0f) + 2.0f);
+    const auto twoSqrtAAlpha = 2.0f * std::sqrt(A) * alpha;
+
+    const auto rawB0 =        A * ((A + 1.0f) - (A - 1.0f) * cosw0 + twoSqrtAAlpha);
+    const auto rawB1 = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cosw0);
+    const auto rawB2 =        A * ((A + 1.0f) - (A - 1.0f) * cosw0 - twoSqrtAAlpha);
+    const auto rawA0 =            (A + 1.0f) + (A - 1.0f) * cosw0 + twoSqrtAAlpha;
+    const auto rawA1 =    -2.0f * ((A - 1.0f) + (A + 1.0f) * cosw0);
+    const auto rawA2 =            (A + 1.0f) + (A - 1.0f) * cosw0 - twoSqrtAAlpha;
+
+    b0 = rawB0 / rawA0;
+    b1 = rawB1 / rawA0;
+    b2 = rawB2 / rawA0;
+    a1 = rawA1 / rawA0;
+    a2 = rawA2 / rawA0;
+}
+
+void BloomFDNEngine::Biquad::setHighShelf(float freqHz, float gainDb, double sampleRateHzIn)
+{
+    // RBJ Audio EQ Cookbook high-shelf, same S=1 slope rationale as setLowShelf().
+    const auto A = std::pow(10.0f, gainDb / 40.0f);
+    const auto w0 = 2.0f * pi * freqHz / (float) sampleRateHzIn;
+    const auto cosw0 = std::cos(w0);
+    const auto sinw0 = std::sin(w0);
+    constexpr float shelfSlope = 1.0f;
+    const auto alpha = sinw0 * 0.5f * std::sqrt((A + 1.0f / A) * (1.0f / shelfSlope - 1.0f) + 2.0f);
+    const auto twoSqrtAAlpha = 2.0f * std::sqrt(A) * alpha;
+
+    const auto rawB0 =         A * ((A + 1.0f) + (A - 1.0f) * cosw0 + twoSqrtAAlpha);
+    const auto rawB1 = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cosw0);
+    const auto rawB2 =         A * ((A + 1.0f) + (A - 1.0f) * cosw0 - twoSqrtAAlpha);
+    const auto rawA0 =             (A + 1.0f) - (A - 1.0f) * cosw0 + twoSqrtAAlpha;
+    const auto rawA1 =     2.0f * ((A - 1.0f) - (A + 1.0f) * cosw0);
+    const auto rawA2 =             (A + 1.0f) - (A - 1.0f) * cosw0 - twoSqrtAAlpha;
+
+    b0 = rawB0 / rawA0;
+    b1 = rawB1 / rawA0;
+    b2 = rawB2 / rawA0;
+    a1 = rawA1 / rawA0;
+    a2 = rawA2 / rawA0;
+}
+
+void BloomFDNEngine::Biquad::setPeak(float freqHz, float gainDb, float q, double sampleRateHzIn)
+{
+    // RBJ Audio EQ Cookbook peaking EQ (bell).
+    const auto A = std::pow(10.0f, gainDb / 40.0f);
+    const auto w0 = 2.0f * pi * freqHz / (float) sampleRateHzIn;
+    const auto cosw0 = std::cos(w0);
+    const auto alpha = std::sin(w0) / (2.0f * q);
+
+    const auto rawB0 = 1.0f + alpha * A;
+    const auto rawB1 = -2.0f * cosw0;
+    const auto rawB2 = 1.0f - alpha * A;
+    const auto rawA0 = 1.0f + alpha / A;
+    const auto rawA1 = -2.0f * cosw0;
+    const auto rawA2 = 1.0f - alpha / A;
+
+    b0 = rawB0 / rawA0;
+    b1 = rawB1 / rawA0;
+    b2 = rawB2 / rawA0;
+    a1 = rawA1 / rawA0;
+    a2 = rawA2 / rawA0;
+}
+
+void BloomFDNEngine::Biquad::reset()
+{
+    x1 = x2 = y1 = y2 = 0.0f;
+}
+
+float BloomFDNEngine::Biquad::processSample(float x)
+{
+    const auto y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = x;
+    y2 = y1;
+    y1 = y;
+    return y;
+}
+
 void BloomFDNEngine::prepare(double sampleRate)
 {
     sampleRateHz = sampleRate;
@@ -109,6 +198,12 @@ void BloomFDNEngine::prepare(double sampleRate)
     updateLineLengths();
     updateBurstLines();
     setBandwidthHz(15000.0f);
+    lowShelfL.setLowShelf(lowShelfFreqHz, lowShelfGainDb, sampleRateHz);
+    lowShelfR.setLowShelf(lowShelfFreqHz, lowShelfGainDb, sampleRateHz);
+    highShelfL.setHighShelf(highShelfFreqHz, highShelfGainDb, sampleRateHz);
+    highShelfR.setHighShelf(highShelfFreqHz, highShelfGainDb, sampleRateHz);
+    midPeakL.setPeak(midPeakFreqHz, midPeakGainDb, midPeakQ, sampleRateHz);
+    midPeakR.setPeak(midPeakFreqHz, midPeakGainDb, midPeakQ, sampleRateHz);
     reset();
 }
 
@@ -126,8 +221,15 @@ void BloomFDNEngine::reset()
     for (auto& line : burstL) line.reset();
     for (auto& line : burstR) line.reset();
 
-    bandwidthStateL = 0.0f;
-    bandwidthStateR = 0.0f;
+    bandwidthStateL.fill(0.0f);
+    bandwidthStateR.fill(0.0f);
+
+    lowShelfL.reset();
+    lowShelfR.reset();
+    highShelfL.reset();
+    highShelfR.reset();
+    midPeakL.reset();
+    midPeakR.reset();
 }
 
 void BloomFDNEngine::setDiffusion(float diffusion)
@@ -216,6 +318,14 @@ void BloomFDNEngine::setDamping(float damping01)
 void BloomFDNEngine::setBandwidthHz(float hz)
 {
     const auto clampedHz = std::max(200.0f, std::min((float) (sampleRateHz * 0.45), hz));
+
+    // Each of the numBandwidthStages cascaded stages uses this SAME coefficient (computed directly
+    // from the requested Hz, no compensation for the cascade's own -3dB shift): cascading N
+    // identical one-poles pulls the cascade's overall -3dB point below any individual stage's own
+    // -3dB point, which is exactly what's wanted here (a first attempt at compensating for that
+    // shift pushed the per-stage cutoff for a typical ~19kHz Bandwidth setting past Nyquist,
+    // collapsing the coefficient toward zero - effectively no filtering at all, confirmed against
+    // the reference IRs' spectral-difference plot making the high end WORSE, not better).
     bandwidthCoefficient = std::exp(-2.0f * pi * clampedHz / (float) sampleRateHz);
 }
 
@@ -300,15 +410,32 @@ void BloomFDNEngine::processStereo(float* left, float* right, int numSamples)
         wetL *= outputTapGain;
         wetR *= outputTapGain;
 
-        bandwidthStateL += (1.0f - bandwidthCoefficient) * (wetL - bandwidthStateL);
-        bandwidthStateR += (1.0f - bandwidthCoefficient) * (wetR - bandwidthStateR);
+        // Fixed shelving pair first (see the member comment), then the bandwidth-limiting cascade,
+        // then quantization last - shape the tone before reducing its precision.
+        wetL = lowShelfL.processSample(wetL);
+        wetR = lowShelfR.processSample(wetR);
+        wetL = highShelfL.processSample(wetL);
+        wetR = highShelfR.processSample(wetR);
+        wetL = midPeakL.processSample(wetL);
+        wetR = midPeakR.processSample(wetR);
+
+        for (auto& state : bandwidthStateL)
+        {
+            state += (1.0f - bandwidthCoefficient) * (wetL - state);
+            wetL = state;
+        }
+        for (auto& state : bandwidthStateR)
+        {
+            state += (1.0f - bandwidthCoefficient) * (wetR - state);
+            wetR = state;
+        }
 
         const auto quantize = [levels = bitDepthLevels](float x)
         {
             return std::round(x * levels) / levels;
         };
 
-        left[n] = quantize(bandwidthStateL);
-        right[n] = quantize(bandwidthStateR);
+        left[n] = quantize(wetL);
+        right[n] = quantize(wetR);
     }
 }

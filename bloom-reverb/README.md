@@ -116,6 +116,21 @@ notably, both reference captures scored *worse* under heavier damping/narrower b
 spec's "~15kHz, fairly damped" assumption suggested; a little bit-depth grain (not none) did help.
 See `PluginProcessor.cpp`'s `createParameterLayout()` for the per-parameter notes.
 
+**Fixed output EQ:** a low-shelf (350Hz, +7dB) and high-shelf (7kHz, -5dB), always active and not
+user-exposed, correcting a broadband tonal gap between this topology's raw output and the real
+hardware - found by extending `compare_irs.py` with a frequency-resolved spectral-difference plot
+(see that script's own comments). Two things had to happen before this correction meant anything:
+first, matching overall level between the two signals before comparing tone at all (an unmatched
+level offset otherwise shows up as a uniform shift across every band, masking whatever the real
+shape difference is); second, comparing 1/3-octave-*smoothed* energy rather than raw FFT bins - two
+different delay-network topologies have resonant peaks at different exact frequencies, so a raw
+bin-by-bin comparison is dominated by peak-vs-null misalignment noise (confirmed empirically: the
+raw per-bin difference curve was spiky +-20-40dB bin to bin) rather than genuine broadband colour.
+Once smoothed, the actual gap was clear and much smaller than the raw comparison suggested: light
+in the bass below ~400Hz, roughly balanced through the mids, excessive above ~6-8kHz - exactly what
+the shelf pair targets. Not exposed as parameters since they're compensating for an inherent
+character gap between this topology and the real unit, not something a player would want to sweep.
+
 The UI is currently a stock `GenericAudioProcessorEditor` (auto-built sliders, one per parameter) -
 per the build order, the hardware-panel UI (see the `juce-hardware-panel-ui` skill; accent colour
 `#D74377`) comes only after the core algorithm is validated against the reference IRs.

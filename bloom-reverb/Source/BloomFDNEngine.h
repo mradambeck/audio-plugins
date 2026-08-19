@@ -124,6 +124,20 @@ private:
     // purely by the scalar feedback gain and the damping coefficient rather than by the matrix.
     static const std::array<std::array<float, numLines>, numLines> hadamard;
 
+    // Standard RBJ Audio EQ Cookbook biquad (direct form 1). Used for the fixed output low-shelf
+    // below - see that member's comment for why it exists.
+    struct Biquad
+    {
+        float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
+        float x1 = 0.0f, x2 = 0.0f, y1 = 0.0f, y2 = 0.0f;
+
+        void setLowShelf(float freqHz, float gainDb, double sampleRateHz);
+        void setHighShelf(float freqHz, float gainDb, double sampleRateHz);
+        void setPeak(float freqHz, float gainDb, float q, double sampleRateHz);
+        void reset();
+        float processSample(float x);
+    };
+
     double sampleRateHz = 44100.0;
 
     std::array<std::vector<float>, numLines> lineBuffers;
@@ -163,9 +177,48 @@ private:
     float dampingCoefficient = 0.35f;
     float diffusionCoefficient = 0.5f;
 
-    // One-pole state for the output bandwidth limiter, per channel.
-    float bandwidthStateL = 0.0f, bandwidthStateR = 0.0f;
-    float bandwidthCoefficient = 0.0f; // recomputed by setBandwidthHz()
+    // Cascaded one-pole stages for the output bandwidth limiter, per channel. A single one-pole is
+    // only 6dB/octave - comparison against the reference IRs (tools/compare_irs.py's frequency-
+    // resolved spectral-difference plot) showed the real hardware's high end falls off much more
+    // sharply than that lets a single stage reproduce, so this cascades numBandwidthStages of them.
+    // Each stage uses the SAME coefficient (they're identical), but that coefficient is computed
+    // for a HIGHER per-stage cutoff than the requested Bandwidth Hz - cascading N identical
+    // one-poles pulls the cascade's overall -3dB point below any individual stage's own -3dB point,
+    // so setBandwidthHz() compensates for that shift (see its implementation).
+    static constexpr int numBandwidthStages = 4;
+    std::array<float, numBandwidthStages> bandwidthStateL {}, bandwidthStateR {};
+    float bandwidthCoefficient = 0.0f; // recomputed by setBandwidthHz() - same value for every stage
+
+    // Fixed (not user-exposed) output shelving pair, always active - corrects a broadband tonal
+    // gap found by comparing against the reference IRs. The raw tank+burst output measured ~8dB
+    // LIGHT in BOTH the 20-500Hz and 500-4000Hz bands relative to the real hardware, but ~4-5dB
+    // EXCESS above 4kHz - i.e. not really a "missing bass" problem specifically, more a broad tilt
+    // where everything below ~2-3kHz is relatively too quiet and everything above is relatively too
+    // loud. A high-shelf CUT does most of that correction in one stage (pulling the excess top end
+    // down brings the rest up in relative terms); the low-shelf boost on top of it targets the
+    // extra sub-100Hz-specific dip the spectral-difference plot showed beyond that broader tilt.
+    // Neither is exposed as its own parameter since both compensate for an inherent character gap
+    // between this topology and the real unit, not something a player would want to sweep - same
+    // rationale as the fixed Hadamard matrix or the allpass diffuser delays.
+    static constexpr float lowShelfFreqHz = 350.0f;
+    static constexpr float lowShelfGainDb = 7.0f;
+    static constexpr float highShelfFreqHz = 7000.0f;
+    static constexpr float highShelfGainDb = -5.0f;
+
+    // No mid-band correction needed: once the spectral comparison was fixed to compare 1/3-octave-
+    // smoothed energy (see tools/compare_irs.py's smooth_to_fractional_octave()) instead of raw FFT
+    // bins, the apparent ~10dB mid-band gap mostly turned out to be comb-filtering/resonance
+    // misalignment noise between this topology's and the real hardware's differently-spaced modes,
+    // not a genuine colour difference - the smoothed comparison put it at ~3dB, close enough to
+    // leave alone. Kept as a stage (at 0dB, i.e. inactive) rather than deleted, in case future
+    // reference IRs reveal a real mid-band gap worth addressing this way.
+    static constexpr float midPeakFreqHz = 1200.0f;
+    static constexpr float midPeakGainDb = 0.0f;
+    static constexpr float midPeakQ = 0.7f;
+
+    Biquad lowShelfL, lowShelfR;
+    Biquad highShelfL, highShelfR;
+    Biquad midPeakL, midPeakR;
 
     float bitDepthLevels = 32768.0f; // recomputed by setBitDepth() - matches setBitDepth(16.0f)
 
