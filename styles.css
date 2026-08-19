@@ -218,6 +218,8 @@ header p.sub {
   display: flex;
   align-items: baseline;
   gap: 10px;
+  row-gap: 6px;
+  flex-wrap: wrap;
   margin-bottom: 4px;
 }
 
@@ -235,6 +237,40 @@ header p.sub {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-dim);
+}
+
+.card .version {
+  font-family: "Oswald", sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  background: rgba(230, 236, 230, 0.08);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+}
+
+.card .badge {
+  font-family: "Oswald", sans-serif;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.card .badge-prerelease {
+  color: #d9c98a;
+  background: rgba(217, 201, 138, 0.14);
+  border: 1px solid rgba(217, 201, 138, 0.35);
+}
+
+.card .badge-beta {
+  color: #8ab8d9;
+  background: rgba(138, 184, 217, 0.14);
+  border: 1px solid rgba(138, 184, 217, 0.35);
 }
 
 .card p.desc {
