@@ -19,6 +19,8 @@
   --alloy-muted: #4e7691;
   --gradient: #f0a177;
   --gradient-muted: #ce7954;
+  --bloom: #d74377;
+  --bloom-muted: #a74467;
 }
 
 * {
@@ -338,6 +340,13 @@ header p.sub {
 .card[data-plugin="gradient"] .btn-accent {
   background: var(--gradient);
   color: #241209;
+}
+.card[data-plugin="bloom"] h3 {
+  color: var(--bloom);
+}
+.card[data-plugin="bloom"] .btn-accent {
+  background: var(--bloom);
+  color: #2f0e1a;
 }
 
 /* Notes */
