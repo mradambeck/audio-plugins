@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(Caverns VERSION 0.1.0)
+set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

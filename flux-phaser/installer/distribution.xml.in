@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.flux.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.flux.au.pkg" version="0.1.0" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.flux.vst3.pkg" version="0.1.0" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.flux.standalone.pkg" version="0.1.0" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.au.pkg" version="__VERSION__" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.vst3.pkg" version="__VERSION__" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.standalone.pkg" version="__VERSION__" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

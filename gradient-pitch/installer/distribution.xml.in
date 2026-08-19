@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.gradient.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.gradient.au.pkg" version="0.1.0" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="0.1.0" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="0.1.0" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.au.pkg" version="__VERSION__" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="__VERSION__" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="__VERSION__" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

@@ -27,7 +27,7 @@ BUILD_DIR="$ROOT_DIR/build"
 STAGE_DIR="$INSTALLER_DIR/stage"
 OUT_DIR="$INSTALLER_DIR/output"
 
-VERSION="$(grep -m1 'project(' "$ROOT_DIR/CMakeLists.txt" | sed -E 's/.*VERSION ([0-9.]+).*/\1/')"
+VERSION="$("$ROOT_DIR/../scripts/plugin-version.sh" "$ROOT_DIR" version)"
 
 COMPONENT_ONLY=false
 if [[ "${1:-}" == "--component-only" ]]; then
@@ -77,8 +77,11 @@ if [[ "$COMPONENT_ONLY" == true ]]; then
 fi
 
 echo "==> Building standalone installer"
+echo "==> Generating distribution.xml from template"
+sed "s/__VERSION__/$VERSION/g" "$INSTALLER_DIR/distribution.xml.in" > "$OUT_DIR/distribution.xml"
+
 productbuild \
-    --distribution "$INSTALLER_DIR/distribution.xml" \
+    --distribution "$OUT_DIR/distribution.xml" \
     --resources "$INSTALLER_DIR/Resources" \
     --package-path "$OUT_DIR" \
     "$OUT_DIR/${PLUGIN_NAME}-Installer.pkg"

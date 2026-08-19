@@ -47,3 +47,57 @@ jobs:
 
       - name: Run ${{ matrix.name }}Tests
         run: ${{ matrix.dir }}/build/${{ matrix.name }}Tests_artefacts/Release/${{ matrix.name }}Tests
+
+  # Mechanical safety net for the wildjag-plugin-version-bump skill (see AGENTS.md > Versioning):
+  # fails a PR if a plugin's Source/ or CMakeLists.txt changed but its project(...VERSION...)
+  # didn't move, catching the case where the skill was skipped rather than judging *how much* to
+  # bump (that's the skill's job, not CI's -- this only checks that *something* changed).
+  version-guardrail:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: caverns-delay
+          - dir: damage-fuzz
+          - dir: corrosion-drive
+          - dir: flux-phaser
+          - dir: alloy-bass
+          - dir: gradient-pitch
+          - dir: bloom-reverb
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check ${{ matrix.dir }} version bump
+        run: |
+          set -euo pipefail
+          DIR="${{ matrix.dir }}"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED="$(git diff --name-only "$BASE" "$HEAD" -- "$DIR/Source" "$DIR/CMakeLists.txt")"
+          if [[ -z "$CHANGED" ]]; then
+            echo "No version-relevant changes in $DIR."
+            exit 0
+          fi
+
+          get_version() {
+            git show "$1:$DIR/CMakeLists.txt" 2>/dev/null \
+              | grep -m1 'project(' | sed -E 's/.*VERSION ([0-9.]+).*/\1/' || true
+          }
+          BASE_V="$(get_version "$BASE")"
+          HEAD_V="$(get_version "$HEAD")"
+
+          echo "Changed:"
+          echo "$CHANGED"
+          echo "base=$BASE_V head=$HEAD_V"
+
+          if [[ "$BASE_V" == "$HEAD_V" ]]; then
+            echo "::error::$DIR's Source/ or CMakeLists.txt changed but its project(...VERSION...) string didn't ($BASE_V). Bump the version (see AGENTS.md > Versioning) before merging."
+            exit 1
+          fi
+          echo "OK: $BASE_V -> $HEAD_V"

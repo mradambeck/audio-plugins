@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.bloom.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.bloom.au.pkg" version="0.1.0" onConclusion="none">Bloom-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.bloom.vst3.pkg" version="0.1.0" onConclusion="none">Bloom-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.bloom.standalone.pkg" version="0.1.0" onConclusion="none">Bloom-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.au.pkg" version="__VERSION__" onConclusion="none">Bloom-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.vst3.pkg" version="__VERSION__" onConclusion="none">Bloom-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.bloom.standalone.pkg" version="__VERSION__" onConclusion="none">Bloom-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>
