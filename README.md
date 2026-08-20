@@ -1,5 +1,7 @@
 # Wild Jag Audio Plugins
 
+[https://mradambeck.github.io/audio-plugins/](https://mradambeck.github.io/audio-plugins/)
+
 A monorepo of macOS audio plugins (AU / VST3 / Standalone) built with [JUCE](https://juce.com)
 and CMake, styled with a shared "hardware panel" visual language (see
 [`.claude/skills/juce-hardware-panel-ui/`](.claude/skills/juce-hardware-panel-ui/SKILL.md)).
