@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.caverns.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.caverns.au.pkg" version="0.1.0" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="0.1.0" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="0.1.0" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.au.pkg" version="__VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

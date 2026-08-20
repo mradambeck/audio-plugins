@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.shields.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.shields.au.pkg" version="0.1.0" onConclusion="none">Shields-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.shields.vst3.pkg" version="0.1.0" onConclusion="none">Shields-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.shields.standalone.pkg" version="0.1.0" onConclusion="none">Shields-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.au.pkg" version="__VERSION__" onConclusion="none">Shields-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.vst3.pkg" version="__VERSION__" onConclusion="none">Shields-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.standalone.pkg" version="__VERSION__" onConclusion="none">Shields-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

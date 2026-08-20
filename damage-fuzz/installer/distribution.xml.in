@@ -24,7 +24,7 @@
         <pkg-ref id="com.wildjag.damage.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.damage.au.pkg" version="0.1.0" onConclusion="none">Damage-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.damage.vst3.pkg" version="0.1.0" onConclusion="none">Damage-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.damage.standalone.pkg" version="0.1.0" onConclusion="none">Damage-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.au.pkg" version="__VERSION__" onConclusion="none">Damage-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.vst3.pkg" version="__VERSION__" onConclusion="none">Damage-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.standalone.pkg" version="__VERSION__" onConclusion="none">Damage-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

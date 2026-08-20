@@ -49,7 +49,7 @@ Copy from `caverns-delay/installer/` into the new plugin repo:
 ```
 <new-plugin-repo>/installer/
   build.sh
-  distribution.xml
+  distribution.xml.in
   Resources/
     welcome.html
     license.txt
@@ -63,16 +63,20 @@ across all three existing plugins, don't restructure it):
 | Placeholder | Where | Example (Corrosion / loss-drive repo) |
 |---|---|---|
 | `PLUGIN_NAME` | `build.sh` | The CMake target name from `juce_add_plugin(...)` in the plugin's `CMakeLists.txt` — **not** the repo folder name. `corrosion-drive`'s target is `Corrosion`. |
-| `BUNDLE_ID` | `build.sh`, `distribution.xml` (`pkg-ref id`, suffixed `.au`/`.vst3`/`.standalone`) | `com.wildjag.<lowercase-plugin-name>` — matches `BUNDLE_ID` already set in the plugin's own `CMakeLists.txt` `juce_add_plugin(... BUNDLE_ID ...)`. Each format gets its own pkg identifier: `com.wildjag.corrosion.au.pkg`, `.vst3.pkg`, `.standalone.pkg`. |
-| Component pkg filenames | `distribution.xml`'s three `<pkg-ref>` bodies | `Corrosion-AU-Component.pkg`, `Corrosion-VST3-Component.pkg`, `Corrosion-Standalone-Component.pkg` |
-| `<title>`, three `<choice id>`/`title` | `distribution.xml` | Plugin display name + "Audio Unit (AU)" / "VST3" / "Standalone App" |
+| `BUNDLE_ID` | `build.sh`, `distribution.xml.in` (`pkg-ref id`, suffixed `.au`/`.vst3`/`.standalone`) | `com.wildjag.<lowercase-plugin-name>` — matches `BUNDLE_ID` already set in the plugin's own `CMakeLists.txt` `juce_add_plugin(... BUNDLE_ID ...)`. Each format gets its own pkg identifier: `com.wildjag.corrosion.au.pkg`, `.vst3.pkg`, `.standalone.pkg`. |
+| Component pkg filenames | `distribution.xml.in`'s three `<pkg-ref>` bodies | `Corrosion-AU-Component.pkg`, `Corrosion-VST3-Component.pkg`, `Corrosion-Standalone-Component.pkg` |
+| `<title>`, three `<choice id>`/`title` | `distribution.xml.in` | Plugin display name + "Audio Unit (AU)" / "VST3" / "Standalone App" |
 | Plugin description / paths | `Resources/welcome.html`, `conclusion.html` | Swap the plugin name and one-line description throughout |
 | License text | `Resources/license.txt` | Just the plugin name in the header line — boilerplate body is identical |
 
-`build.sh` reads `VERSION` straight out of the plugin's own `CMakeLists.txt`
-(`project(<Name> VERSION x.y.z)`) via grep/sed, so it never needs manual
-updating when the plugin's version bumps — don't hardcode a version anywhere
-else.
+**Never hand-write a version number in `distribution.xml.in`.** Its three
+`<pkg-ref>` `version` attributes must be the literal token `__VERSION__`, not
+`0.1.0` or any other literal — `build.sh` reads the real `VERSION` out of the
+plugin's own `CMakeLists.txt` (`project(<Name> VERSION x.y.z)`) via
+`scripts/plugin-version.sh` and generates the real `installer/output/distribution.xml`
+from this template at build time (see `AGENTS.md` > Versioning). This is why
+the file is named `distribution.xml.in` and not `distribution.xml` — the
+`.in` marks it as a template, never consumed directly by `productbuild`.
 
 After copying, `chmod +x installer/build.sh`.
 
@@ -121,14 +125,16 @@ installer/output/
 
 ## Step 3 — register the plugin in the group installer
 
-Edit three files under `~/code/audio-plugins/installers/` (**not** inside the
+Edit four files under `~/code/audio-plugins/installers/` (**not** inside the
 plugin's own repo):
 
 1. **`build-all.sh`** — add `"<plugin-repo>:<Name>"` to the `for entry in
-   ...` list. The loop already builds `--component-only` and copies all three
-   format packages for each entry — no per-plugin script duplication needed.
+   ...` list. The loop already builds `--component-only`, copies all three
+   format packages, and extracts that plugin's version (via
+   `scripts/plugin-version.sh`) into the `sed_args` array consumed by the next
+   two files — no per-plugin script duplication needed.
 
-2. **`distribution.xml`** — this is a two-level tree: one group `<line
+2. **`distribution.xml.in`** — this is a two-level tree: one group `<line
    choice="choice_<name>">` (containing three nested `<line>`s for
    `choice_<name>_au`/`_vst3`/`_standalone`) in `<choices-outline>`, plus four
    `<choice>` elements (the group one has **no** `<pkg-ref>` child — it's a
@@ -136,9 +142,18 @@ plugin's own repo):
    leaf choices each reference one `<pkg-ref>`), plus three `<pkg-ref>`
    entries at the bottom referencing the three `-Component.pkg` filenames.
    Copy an existing plugin's whole block (group choice + 3 leaf choices + 3
-   pkg-refs, ~15 lines) and rename every `caverns`/`Caverns` occurrence.
+   pkg-refs, ~15 lines) and rename every `caverns`/`Caverns` occurrence — **and**
+   change each `<pkg-ref>`'s `version="0.1.0"`-shaped literal to
+   `version="__<NAME_UPPER>_VERSION__"` (e.g. `__CORROSION_VERSION__`),
+   matching the token `build-all.sh`'s `sed_args` array will generate for this
+   plugin. Like the per-plugin `distribution.xml.in`, this file is a
+   template — never hand-write a real version number into it.
 
-3. **`README.md`** — add a row to the plugin table.
+3. **`Resources/welcome.html.in`** — add one `<li>` to the plugin list using
+   the same `__<NAME_UPPER>_VERSION__` token, e.g.
+   `<li><b>Corrosion</b> v__CORROSION_VERSION__ - lo-fi drive</li>`.
+
+4. **`README.md`** — add a row to the plugin table.
 
 Then rebuild and verify the combined installer still produces the right
 choice count and every component is relocatable:

@@ -23,7 +23,7 @@ scripts and by the skills below.
 
 ## Project skills
 
-Two project-scoped Claude Code skills live in `.claude/skills/` and encode this catalog's
+Three project-scoped Claude Code skills live in `.claude/skills/` and encode this catalog's
 conventions — use them rather than re-deriving the patterns from scratch:
 
 - **`juce-hardware-panel-ui`** — the shared visual language (chassis texture, sectioned/badged
@@ -39,6 +39,34 @@ conventions — use them rather than re-deriving the patterns from scratch:
   in the group installer at `installers/`. A new plugin isn't done until both the per-plugin
   installer and the group-installer registration exist; the skill calls out exactly what silently
   breaks if the registration step is skipped.
+- **`wildjag-plugin-version-bump`** — bumps a plugin's version and updates its site badge. Use
+  proactively (don't wait to be asked) whenever finalizing a commit/PR that touches a plugin's
+  `Source/` or `CMakeLists.txt`. See `## Versioning` below for the rubric it follows.
+
+## Versioning
+
+Each plugin's version lives in exactly one place — `project(<Name> VERSION X.Y.Z)` in
+`<plugin>/CMakeLists.txt` — everything else (installer XML, the site's version badges) is
+generated from it at build time; don't hardcode a version number anywhere else. A sibling
+`set(WILDJAG_RELEASE_CHANNEL "stable")` line (`stable` | `beta`) is a separate, optional maturity
+flag for explicitly marking a build as an early beta test — it's a manual, human decision, not
+something to infer from a diff.
+
+All plugins are pre-1.0 (`0.y.z`). Bug fixes / UI-only / installer-only changes bump the patch
+digit; everything else — new parameters, changed defaults, and anything that would normally be a
+breaking major change (renamed/removed parameters, `BUNDLE_ID`/`PLUGIN_CODE` changes, incompatible
+preset format) — bumps the minor digit instead, per semver's own `0.y.z` convention. An actual
+`1.0.0` only happens as a deliberate manual decision, never an automatic bump.
+
+Use the `wildjag-plugin-version-bump` skill proactively whenever finalizing a commit/PR that
+touches a plugin's `Source/` or `CMakeLists.txt` — it also updates that plugin's version badge on
+the marketing site (`~/code/audio-plugins-site`, a separate worktree/branch checked out to
+`gh-pages`). `build-and-test.yml`'s `version-guardrail` job is a CI backstop for when the skill is
+skipped, not a substitute for using it.
+
+The combined `WildJagPlugins-Installer.pkg` has no version of its own by design — its welcome
+screen lists each bundled plugin's real version (generated from the same CMakeLists.txt values)
+rather than inventing a meaningless aggregate number.
 
 ## Conventions to preserve
 

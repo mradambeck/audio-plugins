@@ -19,7 +19,12 @@ STAGE_DIR="$INSTALLERS_DIR/stage"
 
 mkdir -p "$OUT_DIR"
 rm -rf "$STAGE_DIR"
-mkdir -p "$STAGE_DIR"
+mkdir -p "$STAGE_DIR/Resources"
+
+# Accumulates one -e "s/__<NAME>_VERSION__/<version>/g" per plugin, applied below to both
+# distribution.xml.in and Resources/welcome.html.in so there's a single substitution pass/token
+# convention for both files instead of two.
+sed_args=()
 
 for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient" "shields-reverb:Shields"; do
     repo="${entry%%:*}"
@@ -29,12 +34,21 @@ for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corro
     cp "$ROOT_DIR/$repo/installer/output/${name}-AU-Component.pkg" "$STAGE_DIR/"
     cp "$ROOT_DIR/$repo/installer/output/${name}-VST3-Component.pkg" "$STAGE_DIR/"
     cp "$ROOT_DIR/$repo/installer/output/${name}-Standalone-Component.pkg" "$STAGE_DIR/"
+
+    version="$("$ROOT_DIR/scripts/plugin-version.sh" "$ROOT_DIR/$repo" version)"
+    name_upper="$(echo "$name" | tr '[:lower:]' '[:upper:]')"
+    sed_args+=(-e "s/__${name_upper}_VERSION__/$version/g")
 done
+
+echo "==> Generating distribution.xml and welcome.html from templates"
+sed "${sed_args[@]}" "$INSTALLERS_DIR/distribution.xml.in" > "$STAGE_DIR/distribution.xml"
+sed "${sed_args[@]}" "$INSTALLERS_DIR/Resources/welcome.html.in" > "$STAGE_DIR/Resources/welcome.html"
+cp "$INSTALLERS_DIR/Resources/license.txt" "$INSTALLERS_DIR/Resources/conclusion.html" "$STAGE_DIR/Resources/"
 
 echo "==> Building combined installer"
 productbuild \
-    --distribution "$INSTALLERS_DIR/distribution.xml" \
-    --resources "$INSTALLERS_DIR/Resources" \
+    --distribution "$STAGE_DIR/distribution.xml" \
+    --resources "$STAGE_DIR/Resources" \
     --package-path "$STAGE_DIR" \
     "$OUT_DIR/WildJagPlugins-Installer.pkg"
 

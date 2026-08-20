@@ -123,31 +123,31 @@
         <pkg-ref id="com.wildjag.shields.standalone.pkg"/>
     </choice>
 
-    <pkg-ref id="com.wildjag.caverns.au.pkg" version="0.1.0" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="0.1.0" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="0.1.0" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.damage.au.pkg" version="0.1.0" onConclusion="none">Damage-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.damage.vst3.pkg" version="0.1.0" onConclusion="none">Damage-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.damage.standalone.pkg" version="0.1.0" onConclusion="none">Damage-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.au.pkg" version="__DAMAGE_VERSION__" onConclusion="none">Damage-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.vst3.pkg" version="__DAMAGE_VERSION__" onConclusion="none">Damage-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.damage.standalone.pkg" version="__DAMAGE_VERSION__" onConclusion="none">Damage-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.corrosion.au.pkg" version="0.1.0" onConclusion="none">Corrosion-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.corrosion.vst3.pkg" version="0.1.0" onConclusion="none">Corrosion-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.corrosion.standalone.pkg" version="0.1.0" onConclusion="none">Corrosion-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.corrosion.au.pkg" version="__CORROSION_VERSION__" onConclusion="none">Corrosion-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.corrosion.vst3.pkg" version="__CORROSION_VERSION__" onConclusion="none">Corrosion-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.corrosion.standalone.pkg" version="__CORROSION_VERSION__" onConclusion="none">Corrosion-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.flux.au.pkg" version="0.1.0" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.flux.vst3.pkg" version="0.1.0" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.flux.standalone.pkg" version="0.1.0" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.au.pkg" version="__FLUX_VERSION__" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.vst3.pkg" version="__FLUX_VERSION__" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.flux.standalone.pkg" version="__FLUX_VERSION__" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.alloy.au.pkg" version="0.1.0" onConclusion="none">Alloy-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.alloy.vst3.pkg" version="0.1.0" onConclusion="none">Alloy-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.alloy.standalone.pkg" version="0.1.0" onConclusion="none">Alloy-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.alloy.au.pkg" version="__ALLOY_VERSION__" onConclusion="none">Alloy-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.alloy.vst3.pkg" version="__ALLOY_VERSION__" onConclusion="none">Alloy-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.alloy.standalone.pkg" version="__ALLOY_VERSION__" onConclusion="none">Alloy-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.gradient.au.pkg" version="0.1.0" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="0.1.0" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="0.1.0" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.au.pkg" version="__GRADIENT_VERSION__" onConclusion="none">Gradient-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.vst3.pkg" version="__GRADIENT_VERSION__" onConclusion="none">Gradient-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.gradient.standalone.pkg" version="__GRADIENT_VERSION__" onConclusion="none">Gradient-Standalone-Component.pkg</pkg-ref>
 
-    <pkg-ref id="com.wildjag.shields.au.pkg" version="0.1.0" onConclusion="none">Shields-AU-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.shields.vst3.pkg" version="0.1.0" onConclusion="none">Shields-VST3-Component.pkg</pkg-ref>
-    <pkg-ref id="com.wildjag.shields.standalone.pkg" version="0.1.0" onConclusion="none">Shields-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.au.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.vst3.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.shields.standalone.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>
