@@ -90,7 +90,7 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     titleLabel.setColour(juce::Label::textColourId, juce::Colour(0xffEC6594));
     addAndMakeVisible(titleLabel);
 
-    tagLabel.setText(juce::String("Swell Reverb").toUpperCase(), juce::dontSendNotification);
+    tagLabel.setText(juce::String("Diffuse Reverb").toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
     tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));

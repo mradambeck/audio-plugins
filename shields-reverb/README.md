@@ -1,6 +1,6 @@
 # Shields
 
-*Swell Reverb.* (Highlight colour: `#D74377`.)
+*Diffuse Reverb.* (Highlight colour: `#D74377`.)
 
 A diffuse algorithmic reverb (AU / VST3 / Standalone) emulating the Alesis Midiverb II "Bloom"
 algorithm (presets 45 and 49): energy density builds slowly before decaying, rather than a

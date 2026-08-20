@@ -112,7 +112,7 @@
         <pkg-ref id="com.wildjag.gradient.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_shields" title="Shields" description="Shields - swell reverb."/>
+    <choice id="choice_shields" title="Shields" description="Shields - diffuse reverb."/>
     <choice id="choice_shields_au" title="Audio Unit (AU)" description="Installs Shields.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.shields.au.pkg"/>
     </choice>
