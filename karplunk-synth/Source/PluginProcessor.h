@@ -1,17 +1,18 @@
 #pragma once
 
+#include <array>
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "KarplunkExcitation.h"
 #include "KarplunkLoopFilter.h"
 #include "KarplunkVoice.h"
+#include "KarplunkVoiceAllocator.h"
 
-// Extended Karplus-Strong string synth. Single-voice for this base scaffold (see README.md's
-// roadmap note - polyphony is the very next task, added before any of the four experimental
-// areas are swapped). This class owns parameter state and MIDI dispatch only; all DSP lives in
-// the four standalone classes composed by Voice (KarplunkExcitation.h, KarplunkLoopFilter.h,
-// KarplunkStringLine.h, KarplunkVoice.h) - see those files for the actual algorithm and the swap
-// seams.
+// Extended Karplus-Strong string synth. This class owns parameter state, the voice pool, and
+// MIDI dispatch only; all DSP lives in the four standalone classes composed by Voice
+// (KarplunkExcitation.h, KarplunkLoopFilter.h, KarplunkStringLine.h, KarplunkVoice.h) - see those
+// files for the actual algorithm and the swap seams. Voice-to-note allocation/stealing is its own
+// standalone, testable class (KarplunkVoiceAllocator.h) - see that file for why it's separate.
 class KarplunkAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -59,12 +60,19 @@ private:
     std::atomic<float>* brightnessParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseBurstExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
-    Voice voice;
 
-    // -1 = no note currently sounding. Only a Note Off matching this note number stops the voice
-    // - a stray Note Off for a different/already-released note is ignored, matching standard MIDI
-    // handling for a monophonic instrument.
-    int currentMidiNote = -1;
+    // 8 voices, basic oldest-voice-stealing (see KarplunkVoiceAllocator.h) - each Voice composes
+    // its three area-components by value, so this pool needed zero changes to any of the four
+    // experimental-area classes, exactly as the base scaffold's architecture was designed for.
+    static constexpr int numVoices = 8;
+    std::array<Voice, numVoices> voices;
+    KarplunkVoiceAllocator<numVoices> voiceAllocator;
+
+    // Fixed headroom applied to the summed voice output before Output Level, so a full chord at
+    // max velocity doesn't clip harder than a single note did in the mono scaffold. A constant
+    // (not activity-dependent) scale, so it doesn't itself introduce level pumping as voices
+    // come and go.
+    static constexpr float polyHeadroomGain = 0.35355339f; // 1 / sqrt(numVoices)
 
     juce::SmoothedValue<float> dampingSmoothed;
     juce::SmoothedValue<float> outputLevelSmoothed;

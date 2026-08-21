@@ -51,7 +51,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
 
 void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
 {
-    voice.prepare(sampleRate);
+    for (auto& v : voices)
+        v.prepare(sampleRate);
+    voiceAllocator.reset();
 
     dampingSmoothed.reset(sampleRate, smoothingRampSeconds);
     dampingSmoothed.setCurrentAndTargetValue(dampingParam->load());
@@ -59,8 +61,6 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     outputLevelSmoothed.reset(sampleRate, smoothingRampSeconds);
     outputLevelSmoothed.setCurrentAndTargetValue(
         juce::Decibels::decibelsToGain(outputLevelParam->load()));
-
-    currentMidiNote = -1;
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -75,22 +75,27 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
 {
     if (message.isNoteOn())
     {
-        currentMidiNote = message.getNoteNumber();
-        voice.setBrightness(brightnessParam->load());
-        voice.noteOn(currentMidiNote, message.getFloatVelocity());
+        std::array<bool, numVoices> isActive{};
+        for (int i = 0; i < numVoices; ++i)
+            isActive[(size_t) i] = voices[(size_t) i].isActive();
+
+        const auto note = message.getNoteNumber();
+        const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, isActive);
+
+        voices[(size_t) voiceIndex].setBrightness(brightnessParam->load());
+        voices[(size_t) voiceIndex].noteOn(note, message.getFloatVelocity());
     }
     else if (message.isNoteOff())
     {
-        if (message.getNoteNumber() == currentMidiNote)
-        {
-            voice.noteOff();
-            currentMidiNote = -1;
-        }
+        const auto voiceIndex = voiceAllocator.findVoiceForNoteOff(message.getNoteNumber());
+        if (voiceIndex >= 0)
+            voices[(size_t) voiceIndex].noteOff();
     }
     else if (message.isAllNotesOff() || message.isAllSoundOff())
     {
-        voice.reset();
-        currentMidiNote = -1;
+        for (auto& v : voices)
+            v.reset();
+        voiceAllocator.reset();
     }
 }
 
@@ -115,9 +120,16 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             ++midiIterator;
         }
 
-        voice.setDamping(dampingSmoothed.getNextValue());
+        const auto damping = dampingSmoothed.getNextValue();
 
-        const auto out = voice.renderNextSample() * outputLevelSmoothed.getNextValue();
+        float mixedSample = 0.0f;
+        for (auto& v : voices)
+        {
+            v.setDamping(damping);
+            mixedSample += v.renderNextSample();
+        }
+
+        const auto out = mixedSample * polyHeadroomGain * outputLevelSmoothed.getNextValue();
         for (int channel = 0; channel < numChannels; ++channel)
             buffer.setSample(channel, sample, out);
     }

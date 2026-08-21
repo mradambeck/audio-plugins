@@ -1,7 +1,7 @@
 # Karplunk
 
 An extended Karplus-Strong physical-modeling string synth (AU / VST3 / Standalone). This is a
-**base scaffold, not a finished instrument**: a correct, stable, single-voice implementation built
+**base scaffold, not a finished instrument**: a correct, stable, 8-voice implementation built
 around four clean experimentation seams (excitation source, loop filter, delay-line tuning, and
 feedback topology) so each can be swapped later without touching the other three. See "Future
 swap-in points" below before extending any of them.
@@ -9,10 +9,9 @@ swap-in points" below before extending any of them.
 See the [root README](../README.md) for shared build requirements, the exFAT/apostrophe build
 gotchas, and running tests across all plugins at once.
 
-**Roadmap**: this scaffold is single-voice only. The next task, before any of the four
-experimental areas are swapped, is extending to simple polyphony (a fixed voice pool + basic
-voice-stealing at `PluginProcessor` level) - see the swap-in table's last row for why that's
-purely additive and doesn't touch any of the four seam classes.
+**Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`) is
+done. No installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all
+explicitly out of scope until asked for.
 
 ## Building
 
@@ -61,6 +60,13 @@ each subsequent sample reads the delay line, runs it through the loop filter, an
 result back in - `read -> process -> write`, the same order already used in this catalog's own
 `caverns-delay/Source/PluginProcessor.cpp`.
 
+`PluginProcessor` owns a fixed pool of 8 `Voice`s and a `KarplunkVoiceAllocator` (its own small,
+framework-free, independently-tested class - see `Source/KarplunkVoiceAllocator.h`) that decides
+which voice a new note-on should use: any voice not currently sounding first, or the
+oldest-triggered voice if all 8 are busy (basic oldest-voice-stealing, not release-aware). The
+summed output of all 8 voices is scaled by a fixed `1/sqrt(8)` headroom factor before Output Level,
+so a full chord at max velocity doesn't clip harder than a single note did.
+
 **Four swappable areas**, each isolated so the others never need to change:
 
 1. **Excitation** (`KarplunkExcitation.h`) - "generate N samples to seed the delay line." Base
@@ -91,21 +97,21 @@ wrapping a JUCE class as originally planned.
 
 ## Future swap-in points
 
-| Area | What changes | Real-time implication |
-|---|---|---|
-| Excitation | Noise -> filtered noise / sample burst | None if bounded to the preallocated seed length; a longer/continuous burst needs its own `prepare()`-sized scratch buffer. |
-| Loop Filter | Two-point average -> one-pole/comb/resonant/asymmetric | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is. |
-| Delay Tuning | Linear -> higher-order (Lagrange-style) -> future Jaffe/Smith stretched-allpass | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. A true stretched-allpass needs its own *persistent* state between calls (unlike this seam's current pure-function shape) and would need its own hybrid delay/filter class - still real-time safe as long as new state is sized in `prepare()`. |
-| Feedback Topology | Single loop -> dual cross-coupled lines -> nonlinear waveshaping in the loop | Dual cross-coupled = a **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix. Waveshaping in the loop adds only per-sample math, no new buffering. |
-| Polyphony (next task) | Mono `Voice` -> `std::array<Voice, N>` + allocator | Zero changes to any of the four area classes - purely additive at `PluginProcessor`. |
+| Area                                        | What changes                                                                                 | Real-time implication                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Excitation                                  | Noise -> filtered noise / sample burst                                                       | None if bounded to the preallocated seed length; a longer/continuous burst needs its own `prepare()`-sized scratch buffer.                                                                                                                                                                                                                                 |
+| Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
+| Delay Tuning                                | Linear -> higher-order (Lagrange-style) -> future Jaffe/Smith stretched-allpass              | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. A true stretched-allpass needs its own _persistent_ state between calls (unlike this seam's current pure-function shape) and would need its own hybrid delay/filter class - still real-time safe as long as new state is sized in `prepare()`.             |
+| Feedback Topology                           | Single loop -> dual cross-coupled lines -> nonlinear waveshaping in the loop                 | Dual cross-coupled = a **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix. Waveshaping in the loop adds only per-sample math, no new buffering.                             |
+| More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
 ## Parameters
 
-| Parameter | Range | Default | Description |
-|---|---|---|---|
-| Decay | 0 - 100% | 60% | Loop gain - controls sustain length. Decay time is pitch-dependent at a fixed setting (higher notes decay faster in real time) - see `TwoPointAverageLoopFilter::processSample()`'s comment. |
-| Output Level | -60 to +6 dB | -6 dB | Post-voice output gain |
-| Pluck Brightness | 0 - 100% | 100% | Excitation tone - 0 is heavily lowpassed noise, 100% is raw white noise. Only takes effect on the next pluck. |
+| Parameter        | Range        | Default | Description                                                                                                                                                                                  |
+| ---------------- | ------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decay            | 0 - 100%     | 60%     | Loop gain - controls sustain length. Decay time is pitch-dependent at a fixed setting (higher notes decay faster in real time) - see `TwoPointAverageLoopFilter::processSample()`'s comment. |
+| Output Level     | -60 to +6 dB | -6 dB   | Post-voice output gain                                                                                                                                                                       |
+| Pluck Brightness | 0 - 100%     | 100%    | Excitation tone - 0 is heavily lowpassed noise, 100% is raw white noise. Only takes effect on the next pluck.                                                                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section). No Glide (every note-on is a fresh pluck, not a
@@ -121,7 +127,8 @@ karplunk-synth/
 │   ├── KarplunkLoopFilter.h/.cpp   # Loop Filter seam: TwoPointAverageLoopFilter
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
 │   ├── KarplunkVoice.h             # Feedback Topology (base case): SingleLineKarplunkVoice
-│   ├── PluginProcessor.h/.cpp      # Parameter state, MIDI dispatch, owns one Voice
+│   ├── KarplunkVoiceAllocator.h    # Voice-to-note allocation/oldest-voice-stealing for the pool
+│   ├── PluginProcessor.h/.cpp      # Parameter state, MIDI dispatch, owns the 8-voice pool
 │   ├── PluginEditor.h/.cpp         # Minimal functional UI (no hardware-panel mockup pass yet)
 │   ├── KarplunkLookAndFeel.h/.cpp  # Thin subclass of the shared HardwarePanelLookAndFeel (theme only)
 │   └── Tests/                      # KarplunkTests: headless UnitTest console app (DSP seams only)
