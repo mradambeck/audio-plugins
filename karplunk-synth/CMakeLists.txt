@@ -73,6 +73,7 @@ target_sources(KarplunkTests
         Source/KarplunkLoopFilter.cpp
         Source/Tests/KarplunkExcitationTests.cpp
         Source/Tests/KarplunkLoopFilterTests.cpp
+        Source/Tests/KarplunkWaveshaperTests.cpp
         Source/Tests/KarplunkStringLineTests.cpp
         Source/Tests/KarplunkVoiceTests.cpp
         Source/Tests/KarplunkVoiceAllocatorTests.cpp

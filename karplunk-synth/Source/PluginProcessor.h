@@ -56,6 +56,7 @@ public:
     static constexpr auto positionParamID = "position";
     static constexpr auto monoParamID = "mono";
     static constexpr auto glideTimeParamID = "glideTime";
+    static constexpr auto waveshapeParamID = "waveshape";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -69,6 +70,7 @@ private:
     std::atomic<float>* positionParam = nullptr;
     std::atomic<float>* monoParam = nullptr;
     std::atomic<float>* glideTimeParam = nullptr;
+    std::atomic<float>* waveshapeParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
@@ -112,6 +114,10 @@ private:
     // both are meant to be swept while a note rings, not just set before plucking.
     juce::SmoothedValue<float> structureSmoothed;
     juce::SmoothedValue<float> positionSmoothed;
+
+    // Also live/every-sample, same convention - a Waveshape sweep should be audible in real time
+    // while a note rings, not just latched at the next pluck.
+    juce::SmoothedValue<float> waveshapeSmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

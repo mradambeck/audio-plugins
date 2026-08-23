@@ -11,9 +11,9 @@ gotchas, and running tests across all plugins at once.
 
 **Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`), a
 Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
-controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), and Mono Glide/portamento are done. No
-installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all explicitly out
-of scope until asked for.
+controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), Mono Glide/portamento, and a wavefolding
+Waveshaper (`KarplunkWaveshaper.h`) are done. No installer, UI polish (mockup-first hardware-panel
+pass), or preset system yet - all explicitly out of scope until asked for.
 
 ## Building
 
@@ -275,7 +275,69 @@ measured 268.9Hz / 306.2Hz / 386.8Hz at 10ms / 150ms / 1.5s in, matching the clo
 trajectory almost exactly. Defaults to 0ms (off) - preserves Mono's exact instant-retrigger
 behavior until explicitly dialed in.
 
-**Four swappable areas**, each isolated so the others never need to change:
+**Waveshape**: nonlinear wavefolding (`KarplunkWaveFolder`) inside the feedback loop itself, not
+applied to the output afterward - the whole point is that the distortion becomes part of what the
+string is actually resonating with, compounding every pass around the loop rather than a one-shot
+effect. Chosen over soft saturation or hard/asymmetric clipping (the other two options discussed)
+specifically because folding reflects the signal back on itself past a threshold rather than
+compressing/flattening it, producing denser, often inharmonic-sounding overtones - the most
+dramatic timbral departure from a physically-plausible plucked string of the three. Implemented as
+a closed-form triangle-wave fold (`threshold * (2/pi) * asin(sin(driven * pi/(2*threshold)))`, no
+iterative "reflect until in range" loop), which makes the output *unconditionally* bounded to
+`+-threshold` for any input magnitude - the loop's own recirculating energy cannot blow up through
+this stage, however hard it's driven. 0% is a bit-exact no-op (the waveshaper is never even called
+at that setting).
+
+**Went through two full measure-and-fix rounds before landing here, neither guessable from the
+formula alone.** First: at high drive, any signal quiet enough to never actually reach the fold
+point still passes through a genuine linear gain boost baked into the pre-fold scaling - sitting
+inside the loop, that extra gain compounded every pass, measured making a sustained note ~4x
+louder at Waveshape=100% than at 0% (at maximum Decay/Bow) rather than just differently colored.
+Fixed by dividing the folded result back down by the same drive factor before writing it back into
+the loop - quiet/never-folded content returns to near-unity gain (the two effects cancel).
+
+Second, after the user asked for the fold to be pushed much further (measured how far it was
+actually reaching first: a typical bowed note peaks around 0.3-1.6 before waveshaping, and the
+original `maxDrive=8` only pushes that into the first reflection or two - a decaying pluck's quiet
+tail, around 0.01-0.07, barely reaches the fold point at all) - `maxDrive` was raised 8->32 for a
+much denser fold across a much wider range of playing dynamics, and the SAME `/drive` compensation
+that fixed the loop-safety bug turned out to crush the *audible* fold almost to silence at this
+higher drive (a different problem from the first one, not the same bug returning). The fix
+separates the two concerns explicitly rather than re-tuning one shared number: the signal written
+back into the loop still gets FULL drive compensation (`driveCompensation=1` - this is what
+actually needs to stay safe against loop-gain runaway), while the signal used for the audible
+output gets none (`driveCompensation=0` - output is never fed back, so there's no runaway risk to
+guard against, only "does it sound right," and full compensation there was measured crushing the
+effect specifically). Both calls share the identical fold curve/character - only how much of a
+loud, genuinely-folding signal's loudness is handed back to the listener differs. Verified this
+didn't reintroduce the original runaway bug: the worst case (max Decay, full Bow) now measures
+~3x louder at Waveshape=100%, not ~4x-and-compounding - a real, accepted, bounded loudness increase
+at the most extreme setting, not the unbounded-feeling kind the first fix eliminated.
+
+**Third: the user reported, correctly, that Waveshape sounded like it was only coloring the
+initial pluck/bow trigger, not the ongoing resonance** - confirmed by measuring the settled decay
+tail in isolation (a plucked note, well after its own excitation burst has died away) and finding
+its harmonic content essentially unaffected by Waveshape. The cause: a decaying Karplus-Strong
+note spends nearly all its life at an amplitude far below any FIXED drive's fold threshold once
+the initial excitation has died away (measured ~0.0004 mid-decay vs. 0.3-1.6 at the loud initial
+transient) - a static `maxDrive`, however high, can only ever fold whatever's currently louder
+than roughly `threshold/drive`, so in practice only the loud initial hit was ever genuinely folded.
+Built and measured a fix for this (envelope-following drive normalization - a one-pole follower
+tracking the note's own recent level, boosting quiet moments back toward the fold threshold before
+folding, the classic "VCA/envelope into a wavefolder" West Coast synthesis patch) and confirmed it
+worked exactly as intended (verified via the settled tail's harmonic BALANCE, not just magnitude,
+actually shifting) - then reverted it at the user's explicit request: they found the plain,
+fixed-drive character (fold strongest at the loud initial hit, cleaner as the note settles) more
+musically usable than "folds throughout the whole decay." Kept as a documented, working, available
+option (see `KarplunkWaveFolder`'s own header comment and git history) rather than discarded - a
+deliberate creative call, not a bug fix that didn't pan out.
+
+Built as its own swappable seam (a 5th `SingleLineKarplunkVoice` template parameter, defaulting to
+`KarplunkWaveFolder`) specifically so soft saturation and hard/asymmetric clipping - explicitly
+discussed as likely future additions - can be dropped in later as alternate implementations of the
+same `process(x, amount01, driveCompensation)` contract, not a rewrite; see the swap-in table.
+
+**Five swappable areas**, each isolated so the others never need to change:
 
 1. **Excitation** (`KarplunkExcitation.h`) - "generate one sample of excitation per tick, shaped by
    a live ADSR envelope." Base implementation: `NoiseExcitation`, a brightness-controllable
@@ -295,11 +357,16 @@ behavior until explicitly dialed in.
    makes Position's alternate string tap and Structure's shortened main-tap read possible without
    disturbing the delay length that sets the note's pitch.
 4. **Feedback Topology** (`KarplunkVoice.h`) - signal routing. The base scaffold is
-   `SingleLineKarplunkVoice`, a single delay line in a loop. Unlike the other three areas, a new
+   `SingleLineKarplunkVoice`, a single delay line in a loop. Unlike the other four areas, a new
    topology (e.g. dual cross-coupled lines) is a **new class**, not a template parameter, since it
    changes member layout, not just behaviour - see the swap table.
+5. **Waveshaper** (`KarplunkWaveshaper.h`) - "nonlinearly reshape one sample of the loop's own
+   recirculating signal before it's written back." Base implementation: `KarplunkWaveFolder` (see
+   above). `process(x, amount01, driveCompensation)` is stateless per-call, matching `KarplunkDispersionFilter`'s
+   shape rather than the Loop Filter's setter-then-process split - Structure's live, every-sample
+   control is the closer precedent here than Damping's set-once-per-block one.
 
-No polymorphism (no `virtual`, no `std::function`-as-strategy) is used anywhere - all three
+No polymorphism (no `virtual`, no `std::function`-as-strategy) is used anywhere - all four
 per-sample seams are compile-time template parameters on `SingleLineKarplunkVoice`, matching this
 catalog's established DSP style: small, concrete, framework-free classes composed by value (see
 `gradient-pitch/Source/GradientDelayBuffer.h` / `GradientPitchShiftEngine.h`), which is also why
@@ -313,7 +380,8 @@ wrapping a JUCE class as originally planned.
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
 | Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
 | Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
-| Feedback Topology                           | Single loop -> dual cross-coupled lines -> nonlinear waveshaping in the loop                 | Dual cross-coupled = a **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix. Waveshaping in the loop adds only per-sample math, no new buffering.                             |
+| Waveshaper                                  | Wavefolding (`KarplunkWaveFolder`, built) -> soft saturation (tanh) -> hard/asymmetric clipping | A 5th `SingleLineKarplunkVoice` template parameter (`KarplunkWaveshaper.h`), matching Excitation/Loop Filter/Delay Tuning's own compile-time swap-point convention rather than a runtime type selector. `process(x, amount01, driveCompensation)` is stateless per-call (matching `KarplunkDispersionFilter`'s shape, not the Loop Filter's setter-then-process split) - a future variant needing internal state (e.g. asymmetric clipping's usual DC-blocker) just adds fixed-size members, same as any other seam. |
+| Feedback Topology                           | Single loop -> dual cross-coupled lines                                                      | A **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix.                             |
 | More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
 ## Parameters
@@ -328,6 +396,7 @@ wrapping a JUCE class as originally planned.
 | Position         | 0 - 100%     | 50%     | Where the string is excited/listened to - 50% (the midpoint) is a hollower, more harmonic character; the ends are fuller. No neutral/bypass value - every setting changes the output. Live-adjustable. See "How it works" above.                                                                                |
 | Mono             | Off / On     | Off     | Off (Poly) is the original 8-voice-pool behaviour. On (Mono) drives a single voice with classic last-note-priority: holding two notes sounds only the most recent, and releasing it retriggers whichever earlier note is still held, rather than leaving it silently ringing or cutting to silence. See `KarplunkMonoNoteStack.h`. |
 | Glide Time       | 0 - 500ms    | 0ms     | Mono-only. A legato retrigger between two held notes still fires a fresh pluck, but its pitch approaches the new note smoothly over this time instead of jumping instantly. 0ms preserves Mono's original instant-retrigger behaviour. See "How it works" above.                                |
+| Waveshape        | 0 - 100%     | 0%      | Nonlinear wavefolding inside the feedback loop - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. 0% is a bit-exact no-op. Live-adjustable. See "How it works" above.                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section).
@@ -343,6 +412,7 @@ karplunk-synth/
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
 │   ├── KarplunkVoice.h             # Feedback Topology (base case): SingleLineKarplunkVoice,
 │   │                                 # + KarplunkDispersionFilter (Structure's allpass primitive)
+│   ├── KarplunkWaveshaper.h        # Waveshaper seam: KarplunkWaveFolder (Waveshape control)
 │   ├── KarplunkVoiceAllocator.h    # Voice-to-note allocation/oldest-voice-stealing for the pool (Poly)
 │   ├── KarplunkMonoNoteStack.h     # Last-note-priority/retrigger note tracking for Mono mode
 │   ├── PluginProcessor.h/.cpp      # Parameter state, MIDI dispatch, owns the 8-voice pool

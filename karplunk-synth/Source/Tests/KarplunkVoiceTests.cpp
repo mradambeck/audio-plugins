@@ -395,6 +395,141 @@ public:
             }
         }
 
+        beginTest("Waveshape = 0 is bit-identical to today's baseline (waveshaper never called)");
+        {
+            // waveshapeAmount defaults to 0.0f - confirms renderNextSample()'s
+            // `if (waveshapeAmount > 0.0f)` guard means the waveshaper is never even invoked at
+            // 0%, not just algebraically transparent at drive=minDrive.
+            for (int note : { Voice::kLowestSupportedMidiNote, 60, Voice::kHighestSupportedMidiNote })
+            {
+                Voice withWaveshape;
+                withWaveshape.prepare(44100.0);
+                withWaveshape.setDamping(0.6f);
+                withWaveshape.setBowAmount(1.0f); // continuous excitation - most likely to expose any difference
+                withWaveshape.setWaveshapeAmount(0.0f);
+                withWaveshape.noteOn(note, 1.0f);
+
+                Voice withoutWaveshape;
+                withoutWaveshape.prepare(44100.0);
+                withoutWaveshape.setDamping(0.6f);
+                withoutWaveshape.setBowAmount(1.0f);
+                withoutWaveshape.noteOn(note, 1.0f);
+
+                for (int i = 0; i < 4410; ++i)
+                    expectWithinAbsoluteError(withWaveshape.renderNextSample(), withoutWaveshape.renderNextSample(), 1.0e-6f);
+            }
+        }
+
+        beginTest("Waveshape = 100% stays finite and bounded at the worst-case combination (max Decay, full Bow)");
+        {
+            // The worst case for a nonlinearity living INSIDE the feedback loop: maximum loop
+            // gain (longest sustain) plus continuous excitation (Bow) plus maximum fold amount -
+            // if drive/loop-gain were going to interact badly (runaway growth, NaN, etc.), this
+            // combination held for a long render is where it would show up. Also confirms
+            // KarplunkWaveFolder's own unconditional +-1 output bound survives being embedded in
+            // the actual loop, not just in isolation (see KarplunkWaveshaperTests.cpp).
+            Voice voice;
+            voice.prepare(44100.0);
+            voice.setDamping(1.0f);
+            voice.setBowAmount(1.0f);
+            voice.setWaveshapeAmount(1.0f);
+            voice.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 4 * 44100; ++i)
+            {
+                const auto sample = voice.renderNextSample();
+                expect(std::isfinite(sample), "output must stay finite with Waveshape at 100% under sustained worst-case drive");
+                expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as the other worst-case tests");
+            }
+        }
+
+        beginTest("Waveshape=100% measurably changes the output vs Waveshape=0%, at otherwise identical settings");
+        {
+            Voice withWaveshape;
+            withWaveshape.prepare(44100.0);
+            withWaveshape.setDamping(0.9f);
+            withWaveshape.setBowAmount(1.0f);
+            withWaveshape.setWaveshapeAmount(1.0f);
+            withWaveshape.noteOn(60, 1.0f);
+
+            Voice withoutWaveshape;
+            withoutWaveshape.prepare(44100.0);
+            withoutWaveshape.setDamping(0.9f);
+            withoutWaveshape.setBowAmount(1.0f);
+            withoutWaveshape.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 22050; ++i) // settle past attack/decay-to-sustain
+            {
+                withWaveshape.renderNextSample();
+                withoutWaveshape.renderNextSample();
+            }
+
+            double sumSquaredDiff = 0.0;
+            double sumSquaredBaseline = 0.0;
+            constexpr int measureSamples = 8192;
+            for (int i = 0; i < measureSamples; ++i)
+            {
+                const auto a = withWaveshape.renderNextSample();
+                const auto b = withoutWaveshape.renderNextSample();
+                sumSquaredDiff += (double) (a - b) * (double) (a - b);
+                sumSquaredBaseline += (double) b * (double) b;
+            }
+            const auto diffRms = std::sqrt(sumSquaredDiff / measureSamples);
+            const auto baselineRms = std::sqrt(sumSquaredBaseline / measureSamples);
+
+            expect(diffRms > baselineRms * 0.1, "Waveshape=100% should produce a clearly audible difference from Waveshape=0%");
+        }
+
+        beginTest("Waveshape loudness parity: bowed (genuinely-folding) conditions don't get crushed or run away");
+        {
+            // This test exists because of a real, measured, two-sided bug: the first version of
+            // KarplunkWaveFolder's loudness fix (full `/drive` compensation applied to BOTH the
+            // recirculating and the audible signal) was safe for the loop but, at the drive levels
+            // needed for a genuinely dramatic fold, crushed the audible output to as little as
+            // ~0.01x the unshaped loudness - the opposite problem from the original ~4x-louder
+            // runaway bug this class's own header comment describes. Fixed by splitting the two
+            // concerns (see renderNextSample()'s two separate waveshaper() calls) - this guards
+            // the OUTPUT-only path specifically, with loose bounds (not tight parity - folding is
+            // inherently a dynamics-compressing effect, so different playing conditions
+            // legitimately converge toward different loudness relative to their own baseline; see
+            // git history for the actual measured numbers across several conditions).
+            auto measure = [&](float damping, float bowAmount, float waveshapeAmount) {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(damping);
+                voice.setBowAmount(bowAmount);
+                voice.setWaveshapeAmount(waveshapeAmount);
+                voice.noteOn(60, 1.0f);
+
+                for (int i = 0; i < 22050; ++i)
+                    voice.renderNextSample();
+
+                double sumSquares = 0.0;
+                constexpr int window = 8192;
+                for (int i = 0; i < window; ++i)
+                {
+                    const auto s = voice.renderNextSample();
+                    sumSquares += (double) s * (double) s;
+                }
+                return (float) std::sqrt(sumSquares / window);
+            };
+
+            for (auto [damping, bow, label] : { std::make_tuple(0.6f, 1.0f, "bow default-decay"),
+                                                 std::make_tuple(0.9f, 1.0f, "bow long-decay"),
+                                                 std::make_tuple(1.0f, 1.0f, "bow max-decay (worst case)") })
+            {
+                const auto rmsOff = measure(damping, bow, 0.0f);
+                const auto rmsOn = measure(damping, bow, 1.0f);
+                const auto ratio = rmsOn / std::max(rmsOff, 1.0e-6f);
+
+                logMessage(juce::String(label) + "  rms off=" + juce::String(rmsOff, 5) + " on=" + juce::String(rmsOn, 5)
+                           + "  ratio=" + juce::String(ratio, 3));
+
+                expect(ratio > 0.3f, "Waveshape shouldn't crush a genuinely-folding signal's loudness");
+                expect(ratio < 6.0f, "Waveshape shouldn't make a genuinely-folding signal run away in loudness");
+            }
+        }
+
         beginTest("Abruptly changing structure mid-note keeps output continuous, no discontinuity spike");
         {
             Voice voice;

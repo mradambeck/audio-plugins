@@ -59,5 +59,9 @@ private:
     juce::Label glideTimeLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> glideTimeAttachment;
 
+    juce::Slider waveshapeSlider;
+    juce::Label waveshapeLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> waveshapeAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

@@ -19,6 +19,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     positionParam = apvts.getRawParameterValue(positionParamID);
     monoParam = apvts.getRawParameterValue(monoParamID);
     glideTimeParam = apvts.getRawParameterValue(glideTimeParamID);
+    waveshapeParam = apvts.getRawParameterValue(waveshapeParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -96,6 +97,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         0.0f,
         juce::AudioParameterFloatAttributes().withLabel("ms")));
 
+    // The Waveshaper seam (see KarplunkWaveshaper.h) - defaults to 0% (bit-exact no-op, the
+    // Waveshaper is never even called at this value - see SingleLineKarplunkVoice::
+    // renderNextSample()), matching every other new-control convention in this project.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{waveshapeParamID, 1},
+        "Waveshape",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
     return { params.begin(), params.end() };
 }
 
@@ -122,6 +134,9 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
 
     positionSmoothed.reset(sampleRate, smoothingRampSeconds);
     positionSmoothed.setCurrentAndTargetValue(positionParam->load());
+
+    waveshapeSmoothed.reset(sampleRate, smoothingRampSeconds);
+    waveshapeSmoothed.setCurrentAndTargetValue(waveshapeParam->load());
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -208,6 +223,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     bowAmountSmoothed.setTargetValue(bowAmountParam->load());
     structureSmoothed.setTargetValue(structureParam->load());
     positionSmoothed.setTargetValue(positionParam->load());
+    waveshapeSmoothed.setTargetValue(waveshapeParam->load());
 
     // Poly/Mono is a discrete mode switch, not a live-sweepable control - deliberately not
     // smoothed, and checked once per block rather than every sample. Toggling it while notes are
@@ -246,6 +262,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         const auto bowAmount = bowAmountSmoothed.getNextValue();
         const auto structure = structureSmoothed.getNextValue();
         const auto position = positionSmoothed.getNextValue();
+        const auto waveshape = waveshapeSmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
@@ -254,6 +271,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setBowAmount(bowAmount);
             v.setStructure(structure);
             v.setPosition(position);
+            v.setWaveshapeAmount(waveshape);
             mixedSample += v.renderNextSample();
         }
 

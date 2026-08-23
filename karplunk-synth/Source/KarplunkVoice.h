@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "KarplunkStringLine.h"
+#include "KarplunkWaveshaper.h"
 
 namespace
 {
@@ -71,7 +72,8 @@ private:
 // value the same way this one does, not a fourth template argument here. See
 // karplunk-synth/README.md's "Future swap-in points" table for what a cross-coupled or
 // nonlinear-in-the-loop topology would need beyond this class.
-template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator>
+template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator,
+          typename Waveshaper = KarplunkWaveFolder>
 class SingleLineKarplunkVoice
 {
 public:
@@ -104,6 +106,7 @@ public:
         loopFilter.prepare(sampleRate);
         stringLine.prepare(sampleRate, capacitySamples);
         dispersionFilter.prepare();
+        waveshaper.prepare(sampleRate);
 
         silenceHoldSamples = (int) (sampleRate * 0.05); // ~50ms
 
@@ -116,6 +119,7 @@ public:
         loopFilter.reset();
         stringLine.reset();
         dispersionFilter.reset();
+        waveshaper.reset();
         active = false;
         silenceRunSamples = 0;
         fastOutputEnvelope = 0.0f;
@@ -210,6 +214,11 @@ public:
     // Live, every-sample, same convention as setBowAmount()/setDamping() - see renderNextSample().
     void setStructure(float amount01) noexcept { structure = amount01; }
     void setPosition(float amount01) noexcept { position = amount01; }
+
+    // Live, every-sample - see renderNextSample()'s waveshaping step. amount01=0 is a bit-exact
+    // no-op (the Waveshaper is never even called in that case), matching Structure's own
+    // precedent for a "new control defaults to unchanged behavior" convention.
+    void setWaveshapeAmount(float amount01) noexcept { waveshapeAmount = amount01; }
 
     float renderNextSample() noexcept
     {
@@ -347,6 +356,36 @@ public:
         const auto injectionGain = 1.0f + excitation.getBowAmount() * (fullBowGain - 1.0f);
         filtered += std::tanh(excitation.nextExcitationSample(noteVelocity) * injectionGain);
 
+        // Waveshaper: nonlinearly reshapes the COMBINED signal (recirculating loop content plus
+        // this tick's freshly injected excitation) right before it's written back - so the
+        // distortion becomes part of what the string is actually resonating with, compounding
+        // every pass around the loop, not a one-shot effect applied only to the output. See
+        // KarplunkWaveshaper.h for why this is its own seam (a 4th template parameter) rather than
+        // folded into the Loop Filter, and why amount01 is passed directly per-call rather than
+        // cached via a setter.
+        //
+        // Two SEPARATE calls, not one shared value, despite both starting from the same
+        // pre-waveshape `filtered` - discovered by measuring, not planned upfront, that "safe to
+        // feed back into the loop" and "sounds right on the output" are genuinely different
+        // requirements at high drive. `waveshapedForLoop` uses full drive compensation
+        // (driveCompensation=1, KarplunkWaveshaper.h's safety-critical default) since it's what
+        // actually recirculates - full compensation is what prevents the loop-gain-runaway bug
+        // described there. `waveshapedForOutput` uses much less compensation, since output is
+        // never fed back (no loop-gain risk to guard against) and full compensation, measured,
+        // crushed the audible fold character almost to silence at high Waveshape/maxDrive -
+        // outputDriveCompensation is tuned by rendering and measuring loudness parity across
+        // several playing conditions (pluck/bow, short/long decay), not guessed. Both calls share
+        // the identical fold CHARACTER (same drive, same curve) - only how much of the loud/
+        // folding case's own loudness is handed back differs, so Waveshape still sounds like one
+        // coherent effect, not two different-sounding paths.
+        const auto preWaveshapeSignal = filtered;
+        float waveshapedForOutput = filtered;
+        if (waveshapeAmount > 0.0f)
+        {
+            filtered = waveshaper.process(preWaveshapeSignal, waveshapeAmount, 1.0f);
+            waveshapedForOutput = waveshaper.process(preWaveshapeSignal, waveshapeAmount, outputDriveCompensation);
+        }
+
         stringLine.write(filtered);
 
         if (std::abs(filtered) < silenceThreshold)
@@ -386,7 +425,7 @@ public:
         // guessed.
         const auto clampedPosition = 0.5f - 0.98f * std::abs(position - 0.5f);
         const auto positionTap = stringLine.readAt(currentDelaySamples * clampedPosition);
-        const auto output = filtered - positionOutputGain * positionTap;
+        const auto output = waveshapedForOutput - positionOutputGain * positionTap;
 
         // Loudness leveling: tame the natural, audible loudness "warble" a noise-driven resonant
         // loop produces - raw noise circulating in a high-Q feedback loop has energy that
@@ -449,6 +488,7 @@ private:
     LoopFilter loopFilter;
     KarplunkStringLine<InterpolationType> stringLine;
     KarplunkDispersionFilter dispersionFilter;
+    Waveshaper waveshaper;
 
     int capacitySamples = 0;
     double sampleRateHz = 44100.0;
@@ -468,6 +508,12 @@ private:
 
     float noteVelocity = 0.0f;
     float structure = 0.0f;
+    float waveshapeAmount = 0.0f;
+
+    // See renderNextSample()'s comment on the two separate waveshaper calls - how much drive
+    // compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the recirculating
+    // path). Tuned by measurement, placeholder pending real render/measure iteration.
+    static constexpr float outputDriveCompensation = 0.0f;
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with

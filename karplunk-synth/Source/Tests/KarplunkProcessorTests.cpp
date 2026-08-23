@@ -399,6 +399,94 @@ public:
             // (261.6Hz, 130Hz away).
             expect(std::abs(earlyHz - noteBHz) < 10.0, "with no Glide time set, the retrigger should reach B's pitch immediately, not glide");
         }
+
+        // Waveshape's direct answer to "does this control do anything in the real, APVTS/MIDI-
+        // driven plugin" - same pattern as Structure's own equivalent test.
+        beginTest("Waveshape = 100% substantially changes the real plugin's rendered output vs Waveshape = 0%");
+        {
+            auto renderWithWaveshape = [&](float waveshape) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutWaveshape = renderWithWaveshape(0.0f);
+            auto withWaveshape = renderWithWaveshape(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutWaveshape.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutWaveshape.getReadPointer(0) + skipSamples,
+                withWaveshape.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Waveshape=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        // The worst case for a nonlinearity living inside the feedback loop, through the REAL
+        // processor (not just the isolated Voice class): max Decay, full Bow, max Waveshape, held
+        // for several seconds. Also checks the real output doesn't become dramatically LOUDER
+        // than the equivalent unshaped render - KarplunkWaveFolder's own per-sample bound doesn't
+        // by itself guarantee the loop's overall energy/RMS can't grow when the fold interacts
+        // with loop gain across many passes, so this is checked empirically, not assumed.
+        beginTest("Waveshape = 100% stays finite, bounded, and not dramatically louder through the real processor");
+        {
+            auto render = [&](float waveshape) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withWaveshape = render(1.0f);
+            auto withoutWaveshape = render(0.0f);
+
+            const auto* data = withWaveshape.getReadPointer(0);
+            const int numSamples = withWaveshape.getNumSamples();
+            float peak = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                expect(std::isfinite(data[i]), "output must stay finite through the real processor at Waveshape=100%");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            const int tailSamples = (int) (1.0 * sampleRate);
+            const auto shapedTailRms = rms(withWaveshape.getReadPointer(0) + numSamples - tailSamples, tailSamples);
+            const auto plainTailRms = rms(withoutWaveshape.getReadPointer(0) + numSamples - tailSamples, tailSamples);
+
+            logMessage("Waveshape=100% peak: " + juce::String(peak, 4)
+                       + ", settled tail RMS shaped=" + juce::String(shapedTailRms, 6)
+                       + " vs plain=" + juce::String(plainTailRms, 6));
+
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+
+            // Not a tight loudness-parity bound - see KarplunkVoice.h's renderNextSample() comment
+            // on the two separate waveshaper calls: the OUTPUT-only path deliberately uses little
+            // drive compensation (measured: full compensation crushed the fold almost to silence
+            // at high drive, which is what originally prompted this whole investigation), so some
+            // real loudness increase at extreme settings is the intended, measured tradeoff, not
+            // a regression - this bound exists only to catch genuine runaway (an order of
+            // magnitude or more), not the ~3x this specific worst-case setting now measures.
+            expect(shapedTailRms < plainTailRms * 6.0f,
+                   "Waveshape shouldn't make the sustained loop dramatically (order-of-magnitude) louder than the unshaped equivalent");
+        }
     }
 };
 

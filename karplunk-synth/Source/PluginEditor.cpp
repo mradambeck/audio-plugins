@@ -10,7 +10,7 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int editorWidth = 810;
+    constexpr int editorWidth = 920;
     constexpr int editorHeight = 260;
     constexpr int sliderSize = 100;
     constexpr int labelHeight = 20;
@@ -67,6 +67,10 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     glideTimeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::glideTimeParamID, glideTimeSlider);
 
+    setupSlider(waveshapeSlider, waveshapeLabel, "Waveshape");
+    waveshapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::waveshapeParamID, waveshapeSlider);
+
     setSize(editorWidth, editorHeight);
 }
 
@@ -103,7 +107,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 7;
+    const auto sliderCount = 8;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -118,5 +122,6 @@ void KarplunkAudioProcessorEditor::resized()
     layoutColumn(bounds.removeFromLeft(columnWidth), bowAmountLabel, bowAmountSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
-    layoutColumn(bounds, glideTimeLabel, glideTimeSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), glideTimeLabel, glideTimeSlider);
+    layoutColumn(bounds, waveshapeLabel, waveshapeSlider);
 }
