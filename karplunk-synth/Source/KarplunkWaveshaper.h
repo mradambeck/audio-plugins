@@ -199,3 +199,73 @@ private:
     float filterState1 = 0.0f;
     float filterState2 = 0.0f;
 };
+
+// KarplunkSaturator: gentle, SYMMETRIC tanh soft saturation - the third and last option from the
+// original three-way discussion that led to KarplunkWaveFolder and KarplunkFuzz (soft saturation,
+// hard/asymmetric clipping, folding). Unlike KarplunkFuzz, both half-cycles get the identical
+// curve (a real odd function, same as KarplunkWaveFolder) - no even harmonics, just tanh's own
+// smooth rounding of a signal's peaks. `maxDrive` is deliberately much lower than KarplunkFuzz's
+// 50 - the point of this class is a mild, "warm/rounded" character, not a heavy clip; pushing this
+// curve as hard as Fuzz would just make it a slower, symmetric version of the same effect rather
+// than a genuinely different, milder option on the dropdown. A starting value, to be confirmed (or
+// retuned) by actually rendering and listening, matching every other waveshaper constant in this
+// file.
+//
+// Shares the same real-time-safety property (unconditionally bounded to +-1) and the same
+// `driveCompensation` split (see KarplunkWaveFolder's own comment for the full reasoning) as both
+// siblings.
+//
+// Post-clip lowpass, added proactively (before any user listened to it) once measurement showed
+// it was actually needed, not assumed just because Fuzz needed one: a first render at full drive
+// (Bow engaged, the same condition that first surfaced Fuzz's hiss) measured only 29% of the
+// UNSHAPED baseline's own settled-tail energy sitting above 6kHz (Bow's own continuous noise
+// injection already has real high-frequency content, lowpass or not) - but Saturate=100% pushed
+// that to 72%, a real, substantial, measured increase from the saturation stage itself, not just
+// inherent to Bow. So despite being a much gentler curve than Fuzz's heavy asymmetric clip, this
+// needed the identical fix: cascading two one-pole stages (-12dB/octave, see updateFilter()) at
+// the same 3kHz cutoff Fuzz uses - re-measured afterward (see git history/PR discussion for the
+// exact number) rather than assumed to transfer directly just because the mechanism looked the
+// same. Shares KarplunkFuzz's exact "updateFilter() once per sample, read via process()" shape and
+// the same reasoning for it (dividing by a scalar afterward doesn't change frequency content, so
+// the filter only needs to run once regardless of how many differently-scaled consumers read the
+// result afterward).
+class KarplunkSaturator
+{
+public:
+    void prepare(double sampleRate) noexcept
+    {
+        lowpassCoeff = 1.0f - std::exp(-2.0f * karplunkWaveshaperPi * cutoffHz / (float) sampleRate);
+        reset();
+    }
+
+    void reset() noexcept
+    {
+        filterState1 = 0.0f;
+        filterState2 = 0.0f;
+    }
+
+    // Call exactly once per sample tick, before any process() calls for that tick.
+    void updateFilter(float x, float amount01) noexcept
+    {
+        const auto drive = minDrive + amount01 * (maxDrive - minDrive);
+        const auto shaped = std::tanh(x * drive);
+        filterState1 += lowpassCoeff * (shaped - filterState1);
+        filterState2 += lowpassCoeff * (filterState1 - filterState2); // 2nd cascaded stage: -12dB/octave
+    }
+
+    float process(float amount01, float driveCompensation = 1.0f) const noexcept
+    {
+        const auto drive = minDrive + amount01 * (maxDrive - minDrive);
+        const auto divisor = 1.0f + driveCompensation * (drive - 1.0f);
+        return filterState2 / divisor;
+    }
+
+private:
+    static constexpr float minDrive = 1.0f;
+    static constexpr float maxDrive = 10.0f;
+    static constexpr float cutoffHz = 3000.0f;
+
+    float lowpassCoeff = 0.0f;
+    float filterState1 = 0.0f;
+    float filterState2 = 0.0f;
+};

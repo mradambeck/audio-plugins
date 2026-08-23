@@ -332,11 +332,12 @@ musically usable than "folds throughout the whole decay." Kept as a documented, 
 option (see `KarplunkWaveFolder`'s own header comment and git history) rather than discarded - a
 deliberate creative call, not a bug fix that didn't pan out.
 
-**Waveshaper Type**: a runtime dropdown (Fold / Fuzz), not a rebuild-to-change compile-time swap
-like the other three seams - the user asked for a live selector, so `SingleLineKarplunkVoice` owns
-both concrete classes by value and branches on the choice each sample (no virtual dispatch/
-`std::function`, matching this project's zero-polymorphism convention - see `KarplunkWaveshaper.h`'s
-own comment). `KarplunkFuzz` is the "hard/asymmetric clipping" option from the original three-way
+**Waveshaper Type**: a runtime dropdown (Fold / Fuzz / Saturate), not a rebuild-to-change
+compile-time swap like the other three seams - the user asked for a live selector, so
+`SingleLineKarplunkVoice` owns all three concrete classes by value and branches on the choice each
+sample (no virtual dispatch/`std::function`, matching this project's zero-polymorphism convention -
+see `KarplunkWaveshaper.h`'s own comment). `KarplunkFuzz` is the "hard/asymmetric clipping" option
+from the original three-way
 discussion (soft saturation, hard/asymmetric clipping, folding) that led to `KarplunkWaveFolder` -
 heavy, asymmetric tanh clipping, the classic transistor-fuzz-pedal (Fuzz Face/Big Muff family)
 character: dense odd harmonics from the saturation itself, plus even harmonics from clipping the
@@ -368,9 +369,24 @@ recirculating and output calls (dividing by a scalar afterward doesn't change fr
 matching the same "shared per-sample state, separate scaled accessor" shape the since-reverted
 Fold envelope-following used, for the identical reason: `process()` is called twice per sample.
 
-Both classes share the identical `process(x, amount01, driveCompensation)` contract specifically so
-a third type (soft saturation was the remaining option from the original discussion) could be added
-to the dropdown later without touching the selection mechanism; see the swap-in table.
+All three classes share the identical `process(amount01, driveCompensation)` contract (Fold's is
+`process(x, amount01, driveCompensation)` - it's stateless, no per-sample filter to update)
+specifically so a new type can be added to the dropdown later without touching the selection
+mechanism.
+
+`KarplunkSaturator` is the third and last option from the original discussion: soft saturation, a
+plain SYMMETRIC tanh curve (unlike Fuzz's deliberate asymmetry - both half-cycles get identical
+treatment, a real odd function like Fold) with a much lower `maxDrive` than Fuzz's 50 - the point is
+a mild, warm/rounded character, not a heavy clip. Despite being gentler in overall gain, a render at
+the same worst-case condition that first surfaced Fuzz's hiss (full Bow) showed it needed the
+IDENTICAL fix, not by assumption but by measurement: the unshaped baseline's own settled-tail energy
+(Bow's continuous noise injection already has real high-frequency content on its own) sat 29% above
+6kHz, but Saturate=100% pushed that to 72% - a real, substantial increase from the saturation stage
+itself. Fixed with the same cascaded two-stage one-pole lowpass at 3kHz Fuzz uses (re-measured
+afterward rather than assumed to transfer just because the mechanism looked the same) - down to
+~5% above 6kHz, actually below the unshaped baseline's own high-band content. Lesson: "this curve
+is gentler than Fuzz" was true of its gain/drive, but not of whether it needed the same tone-shaping
+fix - the two questions turned out to be independent, and only measuring settled it.
 
 **Five swappable areas**, each isolated so the others never need to change:
 
@@ -417,7 +433,7 @@ wrapping a JUCE class as originally planned.
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
 | Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
 | Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
-| Waveshaper                                  | Wavefolding (`KarplunkWaveFolder`) and heavy asymmetric-clip fuzz (`KarplunkFuzz`) are built, selectable live via the Waveshaper Type dropdown - soft saturation (tanh, symmetric) is the remaining option from the original three-way discussion | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `SingleLineKarplunkVoice` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). Both concrete classes are owned by value and selected via a plain branch (no virtual dispatch). `process(x, amount01, driveCompensation)` is stateless per-call (matching `KarplunkDispersionFilter`'s shape, not the Loop Filter's setter-then-process split) - a future variant needing internal state (e.g. asymmetric clipping's usual DC-blocker) just adds fixed-size members, same as any other seam. |
+| Waveshaper                                  | All three options from the original discussion are built and selectable live via the Waveshaper Type dropdown: wavefolding (`KarplunkWaveFolder`), heavy asymmetric-clip fuzz (`KarplunkFuzz`), and symmetric tanh soft saturation (`KarplunkSaturator`) | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `SingleLineKarplunkVoice` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). All three concrete classes are owned by value and selected via a plain branch (no virtual dispatch). Fold is stateless per-call (`process(x, amount01, driveCompensation)`); Fuzz and Saturator both need a per-sample post-clip lowpass (measured necessary for both, despite Saturator's much gentler drive), so they use `updateFilter(x, amount01)` once per sample plus a stateless `process(amount01, driveCompensation)` accessor instead - a future variant needing its own internal state follows whichever shape fits. |
 | Feedback Topology                           | Single loop -> dual cross-coupled lines                                                      | A **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix.                             |
 | More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
@@ -434,7 +450,7 @@ wrapping a JUCE class as originally planned.
 | Mono             | Off / On     | Off     | Off (Poly) is the original 8-voice-pool behaviour. On (Mono) drives a single voice with classic last-note-priority: holding two notes sounds only the most recent, and releasing it retriggers whichever earlier note is still held, rather than leaving it silently ringing or cutting to silence. See `KarplunkMonoNoteStack.h`. |
 | Glide Time       | 0 - 500ms    | 0ms     | Mono-only. A legato retrigger between two held notes still fires a fresh pluck, but its pitch approaches the new note smoothly over this time instead of jumping instantly. 0ms preserves Mono's original instant-retrigger behaviour. See "How it works" above.                                |
 | Waveshape        | 0 - 100%     | 0%      | Amount of whichever Waveshaper Type is selected, applied inside the feedback loop. 0% is a bit-exact no-op. Live-adjustable. See "How it works" above.                                |
-| Waveshaper Type  | Fold / Fuzz  | Fold    | Fold: wavefolding - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. Fuzz: heavy asymmetric-clip distortion - a transistor-fuzz-pedal character (dense odd harmonics, plus even harmonics from the asymmetry). See "How it works" above.                                |
+| Waveshaper Type  | Fold / Fuzz / Saturate  | Fold    | Fold: wavefolding - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. Fuzz: heavy asymmetric-clip distortion - a transistor-fuzz-pedal character (dense odd harmonics, plus even harmonics from the asymmetry). Saturate: gentle symmetric tanh soft saturation - a mild, warm/rounded character. See "How it works" above.                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section).

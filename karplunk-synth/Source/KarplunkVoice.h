@@ -107,6 +107,7 @@ public:
         dispersionFilter.prepare();
         waveFolder.prepare(sampleRate);
         fuzz.prepare(sampleRate);
+        saturator.prepare(sampleRate);
 
         silenceHoldSamples = (int) (sampleRate * 0.05); // ~50ms
 
@@ -121,6 +122,7 @@ public:
         dispersionFilter.reset();
         waveFolder.reset();
         fuzz.reset();
+        saturator.reset();
         active = false;
         silenceRunSamples = 0;
         fastOutputEnvelope = 0.0f;
@@ -221,8 +223,8 @@ public:
     // precedent for a "new control defaults to unchanged behavior" convention.
     void setWaveshapeAmount(float amount01) noexcept { waveshapeAmount = amount01; }
 
-    // Runtime selector between the two concrete waveshapers (0 = Fold, 1 = Fuzz) - see
-    // KarplunkWaveshaper.h's own comment for why this seam is a runtime choice rather than a
+    // Runtime selector between the three concrete waveshapers (0 = Fold, 1 = Fuzz, 2 = Saturate) -
+    // see KarplunkWaveshaper.h's own comment for why this seam is a runtime choice rather than a
     // compile-time template parameter like the other three.
     void setWaveshaperType(int type) noexcept { waveshaperType = type; }
 
@@ -389,7 +391,7 @@ public:
                 filtered = waveFolder.process(preWaveshapeSignal, waveshapeAmount, 1.0f);
                 waveshapedForOutput = waveFolder.process(preWaveshapeSignal, waveshapeAmount, foldOutputDriveCompensation);
             }
-            else
+            else if (waveshaperType == 1)
             {
                 // updateFilter() computes and lowpasses the shaped value once (shared by both
                 // calls below) - see KarplunkFuzz's own comment for why this differs from
@@ -397,6 +399,12 @@ public:
                 fuzz.updateFilter(preWaveshapeSignal, waveshapeAmount);
                 filtered = fuzz.process(waveshapeAmount, 1.0f);
                 waveshapedForOutput = fuzz.process(waveshapeAmount, fuzzOutputDriveCompensation);
+            }
+            else
+            {
+                saturator.updateFilter(preWaveshapeSignal, waveshapeAmount);
+                filtered = saturator.process(waveshapeAmount, 1.0f);
+                waveshapedForOutput = saturator.process(waveshapeAmount, saturatorOutputDriveCompensation);
             }
         }
 
@@ -508,6 +516,7 @@ private:
     // `waveshaperType` in renderNextSample().
     KarplunkWaveFolder waveFolder;
     KarplunkFuzz fuzz;
+    KarplunkSaturator saturator;
 
     int capacitySamples = 0;
     double sampleRateHz = 44100.0;
@@ -528,15 +537,16 @@ private:
     float noteVelocity = 0.0f;
     float structure = 0.0f;
     float waveshapeAmount = 0.0f;
-    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz - see setWaveshaperType()
+    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz, 2 = Saturate - see setWaveshaperType()
 
     // See renderNextSample()'s comment on the two separate waveshaper calls per type - how much
     // drive compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the
     // recirculating path). Tuned by measurement, per waveshaper (they saturate differently, so
     // there's no reason to expect the same number would suit both) - placeholder pending real
-    // render/measure iteration for KarplunkFuzz specifically.
+    // render/measure iteration for KarplunkFuzz and KarplunkSaturator specifically.
     static constexpr float foldOutputDriveCompensation = 0.0f;
     static constexpr float fuzzOutputDriveCompensation = 0.0f;
+    static constexpr float saturatorOutputDriveCompensation = 0.0f;
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with

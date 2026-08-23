@@ -600,6 +600,103 @@ public:
             logMessage("Fuzz=100% worst-case peak: " + juce::String(peak, 4));
             expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
         }
+
+        beginTest("Waveshaper Type = Saturate substantially changes the real plugin's rendered output vs Waveshape = 0%");
+        {
+            auto renderWithSaturate = [&](float waveshape) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 2.0f); // Saturate
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutSaturate = renderWithSaturate(0.0f);
+            auto withSaturate = renderWithSaturate(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutSaturate.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutSaturate.getReadPointer(0) + skipSamples,
+                withSaturate.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Saturate=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Fold, Fuzz, and Saturate each produce measurably DIFFERENT output at the same Waveshape amount");
+        {
+            auto renderWithType = [&](float type) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, type);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto foldOutput = renderWithType(0.0f);
+            auto fuzzOutput = renderWithType(1.0f);
+            auto saturateOutput = renderWithType(2.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diffFoldSaturate = rmsOfDifference(
+                foldOutput.getReadPointer(0) + skipSamples,
+                saturateOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+            const auto diffFuzzSaturate = rmsOfDifference(
+                fuzzOutput.getReadPointer(0) + skipSamples,
+                saturateOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Fold vs Saturate diff RMS: " + juce::String(diffFoldSaturate, 6)
+                       + ", Fuzz vs Saturate diff RMS: " + juce::String(diffFuzzSaturate, 6));
+
+            expect(diffFoldSaturate > foldRms * 0.1f, "Fold and Saturate should sound clearly different at the same Waveshape amount");
+            expect(diffFuzzSaturate > foldRms * 0.1f, "Fuzz and Saturate should sound clearly different at the same Waveshape amount");
+        }
+
+        beginTest("Waveshaper Type = Saturate stays finite and bounded at the worst-case combination (max Decay, full Bow)");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 2.0f); // Saturate
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                expect(std::isfinite(data[i]), "output must stay finite through the real processor at Saturate=100%");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            logMessage("Saturate=100% worst-case peak: " + juce::String(peak, 4));
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+        }
     }
 };
 

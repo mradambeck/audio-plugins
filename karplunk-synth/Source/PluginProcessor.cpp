@@ -109,14 +109,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
-    // Runtime choice between the Waveshaper seam's two concrete implementations (see
+    // Runtime choice between the Waveshaper seam's three concrete implementations (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime dropdown rather than
     // a compile-time template parameter like the other three) - defaults to Fold (index 0),
     // matching every build/listening session so far.
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{waveshaperTypeParamID, 1},
         "Waveshaper Type",
-        juce::StringArray{"Fold", "Fuzz"},
+        juce::StringArray{"Fold", "Fuzz", "Saturate"},
         0));
 
     return { params.begin(), params.end() };

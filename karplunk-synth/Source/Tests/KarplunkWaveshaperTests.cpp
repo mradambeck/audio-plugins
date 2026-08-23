@@ -232,3 +232,118 @@ public:
 };
 
 static KarplunkFuzzTests karplunkFuzzTests;
+
+namespace
+{
+    // Same rationale as settledFuzzOutput() above - KarplunkSaturator has real per-sample filter
+    // state (unlike KarplunkWaveFolder), so tests need to drive it to a settled steady state
+    // before checking process()'s output.
+    float settledSaturatorOutput(KarplunkSaturator& saturator, float x, float amount, float driveCompensation = 1.0f)
+    {
+        for (int i = 0; i < 200; ++i)
+            saturator.updateFilter(x, amount);
+        return saturator.process(amount, driveCompensation);
+    }
+}
+
+class KarplunkSaturatorTests : public juce::UnitTest
+{
+public:
+    KarplunkSaturatorTests() : juce::UnitTest("KarplunkSaturator", "Karplunk") {}
+
+    void runTest() override
+    {
+        beginTest("Zero input always saturates to exactly zero, at any amount");
+        {
+            KarplunkSaturator saturator;
+            saturator.prepare(44100.0);
+            for (float amount : { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f })
+                expectWithinAbsoluteError(settledSaturatorOutput(saturator, 0.0f, amount), 0.0f, 1.0e-6f);
+        }
+
+        beginTest("Output is unconditionally bounded to +-1, regardless of input magnitude or amount");
+        {
+            KarplunkSaturator saturator;
+            saturator.prepare(44100.0);
+            for (float amount : { 0.0f, 0.5f, 1.0f })
+                for (float x : { 0.0f, 0.5f, 1.0f, 2.0f, 5.0f, 50.0f, 1000.0f, -1000.0f })
+                {
+                    const auto y = settledSaturatorOutput(saturator, x, amount);
+                    expect(std::abs(y) <= 1.0f + 1.0e-5f,
+                           "saturator output must never exceed +-1, at any drive/input combination");
+                }
+        }
+
+        beginTest("Symmetric: saturating -x gives exactly -(saturating x), at any amount");
+        {
+            // Unlike KarplunkFuzz's deliberate asymmetry, this is a plain tanh with no per-polarity
+            // difference - both half-cycles should get the identical curve. Fresh instances per
+            // measurement, matching KarplunkFuzzTests' own asymmetry test, so each settles to its
+            // own steady state rather than inheriting the other input's filter history.
+            for (float amount : { 0.0f, 0.3f, 0.7f, 1.0f })
+                for (float x : { 0.1f, 0.5f, 1.3f, 3.7f })
+                {
+                    KarplunkSaturator saturatorPos;
+                    saturatorPos.prepare(44100.0);
+                    const auto yPos = settledSaturatorOutput(saturatorPos, x, amount);
+
+                    KarplunkSaturator saturatorNeg;
+                    saturatorNeg.prepare(44100.0);
+                    const auto yNeg = settledSaturatorOutput(saturatorNeg, -x, amount);
+
+                    expectWithinAbsoluteError(yNeg, -yPos, 1.0e-5f, "a symmetric saturation curve should be an odd function");
+                }
+        }
+
+        beginTest("At amount=0 (minimum drive), a small input passes through nearly unchanged");
+        {
+            // Once the lowpass has settled - at a steady input, a one-pole lowpass converges to
+            // unity gain, so this doesn't test the filter, just the curve (same caveat
+            // KarplunkFuzzTests' own equivalent test notes).
+            KarplunkSaturator saturator;
+            saturator.prepare(44100.0);
+            const auto y = settledSaturatorOutput(saturator, 0.1f, 0.0f);
+            expectWithinAbsoluteError(y, 0.1f, 0.01f);
+        }
+
+        beginTest("At full drive, output stays monotonic (clips/flattens) - it does NOT fold like KarplunkWaveFolder");
+        {
+            // Same "genuinely a different KIND of nonlinearity" check KarplunkFuzz's own tests use
+            // - a one-pole lowpass of a monotonically non-decreasing sequence is itself guaranteed
+            // non-decreasing, so this survives the added filter with only one updateFilter() call
+            // per swept x, matching how a real, continuously-changing signal would drive it.
+            KarplunkSaturator saturator;
+            saturator.prepare(44100.0);
+            constexpr float amount = 1.0f;
+
+            float previous = 0.0f;
+            bool everDecreased = false;
+            for (int i = 1; i <= 200; ++i)
+            {
+                const auto x = (float) i * 0.02f; // sweeps 0.02 up to 4.0
+                saturator.updateFilter(x, amount);
+                const auto y = saturator.process(amount);
+                if (i > 1 && y < previous - 1.0e-4f)
+                    everDecreased = true;
+                previous = y;
+            }
+
+            expect(!everDecreased, "a saturator's output should never decrease as a positive input keeps increasing");
+        }
+
+        beginTest("prepare()/reset() don't crash, and reset() clears filter history back to zero");
+        {
+            KarplunkSaturator saturator;
+            saturator.prepare(44100.0);
+            for (int i = 0; i < 200; ++i)
+                saturator.updateFilter(0.8f, 1.0f); // settle to a loud, non-zero steady state
+            saturator.reset();
+
+            saturator.updateFilter(0.0f, 1.0f); // one tick of silence right after reset
+            expectWithinAbsoluteError(saturator.process(1.0f), 0.0f, 1.0e-6f,
+                                       "reset() should clear filter history, not leave the previous loud state behind");
+        }
+    }
+};
+
+static KarplunkSaturatorTests karplunkSaturatorTests;

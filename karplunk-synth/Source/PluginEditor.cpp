@@ -71,13 +71,15 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     waveshapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshapeParamID, waveshapeSlider);
 
-    // The runtime dropdown for the Waveshaper seam's two concrete types (see
+    // The runtime dropdown for the Waveshaper seam's three concrete types (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime choice rather than a
     // compile-time template parameter like the other three). Item IDs are 1-based (JUCE
     // ComboBox convention) and map to AudioParameterChoice's 0-based indices in order - "Fold" is
-    // index 0, "Fuzz" is index 1, matching createParameterLayout()'s own choice list.
+    // index 0, "Fuzz" is index 1, "Saturate" is index 2, matching createParameterLayout()'s own
+    // choice list.
     waveshaperTypeBox.addItem("Fold", 1);
     waveshaperTypeBox.addItem("Fuzz", 2);
+    waveshaperTypeBox.addItem("Saturate", 3);
     addAndMakeVisible(waveshaperTypeBox);
     waveshaperTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperTypeBox);
