@@ -34,10 +34,9 @@ namespace
     // Autocorrelation-based period estimate over a short window, same technique
     // KarplunkVoiceTests.cpp uses on the isolated Voice class - here applied to the real
     // processor's rendered output to identify WHICH note is actually sounding at a given moment.
-    float estimateFrequencyHz(const float* data, int windowSize, double sampleRate, float expectedHz)
+    float estimateFrequencyHz(const float* data, int windowSize, double sampleRate, float expectedHz, int searchRadius = 15)
     {
         const auto expectedDelay = (float) (sampleRate / expectedHz);
-        const int searchRadius = 15;
         const int centerLag = (int) std::lround(expectedDelay);
         const int lagLo = std::max(1, centerLag - searchRadius);
         const int lagHi = centerLag + searchRadius;
@@ -299,6 +298,106 @@ public:
 
             const auto diff = rmsOfDifference(withoutTouchingMono.getReadPointer(0), buffer.getReadPointer(0), numSamples);
             expectEquals(diff, 0.0f, "explicitly setting Mono=off should render bit-identical to never touching it at all");
+        }
+
+        // Glide's whole point: a legato retrigger should audibly SLIDE through intermediate
+        // pitches over Glide Time, not jump instantly - measured at three points within a single
+        // continuous render (right at the retrigger, partway through the glide, and well past it)
+        // to directly prove a real, gradual pitch sweep is happening, not just "eventually arrives
+        // at the right note" (which an instant jump would also satisfy).
+        beginTest("Mono + Glide: pitch actually slides between notes over time, not jumping instantly");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::glideTimeParamID, 300.0f); // 300ms
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f); // continuous tone
+
+            const auto noteAHz = 440.0 * std::pow(2.0, (60.0 - 69.0) / 12.0); // C4
+            const auto noteBHz = 440.0 * std::pow(2.0, (67.0 - 69.0) / 12.0); // G4
+
+            const int settleSamples = (int) (0.2 * sampleRate);
+            juce::AudioBuffer<float> bufferA(2, settleSamples);
+            auto midiA = noteOnBuffer(60, 100);
+            processor.processBlock(bufferA, midiA); // hold A, let it settle
+
+            // One continuous render spanning the whole glide (and beyond), so all three
+            // measurements come from the same unbroken buffer - retriggering B at sample 0.
+            const int glideRenderSamples = (int) (1.6 * sampleRate);
+            juce::AudioBuffer<float> bufferGlide(2, glideRenderSamples);
+            auto midiB = noteOnBuffer(67, 100);
+            processor.processBlock(bufferGlide, midiB);
+
+            const int windowSize = 1024; // short - needs to resolve pitch AT a moment in time, not
+                                          // average across the whole glide
+
+            // The search must be centered wide enough to find EITHER endpoint's period, not just
+            // A's - a search centered/radius-limited around A's own period (as a plain "is this
+            // note being played" check would use) can lock onto the wrong autocorrelation peak
+            // once the true period has moved well outside that window, which looks exactly like
+            // "broken glide" (implausible, non-monotonic frequency readings) but is actually just
+            // a search-window bug in the measurement, not the DSP - caught by cross-checking
+            // against the closed-form expected trajectory before trusting the numbers.
+            const auto periodA = sampleRate / noteAHz;
+            const auto periodB = sampleRate / noteBHz;
+            const auto searchCenterHz = sampleRate / ((periodA + periodB) / 2.0);
+            const auto searchRadius = (int) std::ceil(std::abs(periodA - periodB) / 2.0) + 10;
+
+            auto measureAt = [&](double seconds) {
+                const int start = (int) (seconds * sampleRate);
+                return estimateFrequencyHz(bufferGlide.getReadPointer(0) + start, windowSize, sampleRate,
+                                            (float) searchCenterHz, searchRadius);
+            };
+
+            const auto earlyHz = measureAt(0.01);  // ~10ms in - glide has barely started
+            const auto midHz = measureAt(0.15);    // ~150ms in - 0.5 time constants, ~39% of the way
+            const auto lateHz = measureAt(1.5);    // ~1.5s in - 5 time constants (300ms glide), ~99.3% arrived
+
+            logMessage("Glide sweep - early: " + juce::String(earlyHz, 1) + "Hz, mid: " + juce::String(midHz, 1)
+                       + "Hz, late: " + juce::String(lateHz, 1) + "Hz (A=" + juce::String(noteAHz, 1)
+                       + "Hz, B=" + juce::String(noteBHz, 1) + "Hz)");
+
+            expect(std::abs(earlyHz - noteAHz) < 10.0, "glide should start at A's pitch, not jump to B immediately");
+            expect(std::abs(lateHz - noteBHz) < 10.0, "glide should have reached B's pitch well after the glide time");
+            expect(midHz > earlyHz + 5.0 && midHz < lateHz - 5.0,
+                   "midway through the glide, pitch should be clearly BETWEEN A and B, not already at either endpoint");
+        }
+
+        // Control: with Glide Time at its default (0ms, off), a legato retrigger still jumps
+        // instantly - Glide must be an opt-in behavior change, not something that alters Mono's
+        // existing retrigger character unless explicitly dialed in.
+        beginTest("Mono + Glide=0 (default): legato retrigger still jumps instantly, exactly as before Glide existed");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
+            // glideTimeParamID left untouched - confirms the default (0ms) preserves old behavior.
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+
+            const auto noteBHz = 440.0 * std::pow(2.0, (67.0 - 69.0) / 12.0);
+
+            const int settleSamples = (int) (0.2 * sampleRate);
+            juce::AudioBuffer<float> bufferA(2, settleSamples);
+            auto midiA = noteOnBuffer(60, 100);
+            processor.processBlock(bufferA, midiA);
+
+            juce::AudioBuffer<float> bufferB(2, settleSamples);
+            auto midiB = noteOnBuffer(67, 100);
+            processor.processBlock(bufferB, midiB);
+
+            const int windowSize = 1024;
+            const auto earlyHz = estimateFrequencyHz(bufferB.getReadPointer(0), windowSize, sampleRate, (float) noteBHz);
+
+            logMessage("Glide=0 early measurement: " + juce::String(earlyHz, 1) + "Hz (expected B=" + juce::String(noteBHz, 1) + "Hz immediately)");
+
+            // A generous tolerance (not 5Hz) - the estimator itself only searches over INTEGER
+            // sample lags with no sub-sample refinement, which alone is worth a few Hz of
+            // quantization error at this frequency (measured ~386.8Hz vs 392.0Hz expected before
+            // this was widened) - still comfortably distinguishes "reached B" from "still at A"
+            // (261.6Hz, 130Hz away).
+            expect(std::abs(earlyHz - noteBHz) < 10.0, "with no Glide time set, the retrigger should reach B's pitch immediately, not glide");
         }
     }
 };

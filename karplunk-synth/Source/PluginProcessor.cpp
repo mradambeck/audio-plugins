@@ -18,6 +18,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     structureParam = apvts.getRawParameterValue(structureParamID);
     positionParam = apvts.getRawParameterValue(positionParamID);
     monoParam = apvts.getRawParameterValue(monoParamID);
+    glideTimeParam = apvts.getRawParameterValue(glideTimeParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -84,6 +85,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{monoParamID, 1}, "Mono", false));
 
+    // Mono-only (see handleMidiMessage()'s mono branch) - a legato retrigger between two held
+    // notes glides the pitch over this time instead of jumping instantly; a fresh note struck
+    // from silence is unaffected regardless of this setting (nothing to glide from). Defaults to
+    // 0ms (off) - preserves the exact instant-retrigger behavior Mono already shipped with.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{glideTimeParamID, 1},
+        "Glide Time",
+        juce::NormalisableRange<float>(0.0f, 500.0f, 1.0f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
+
     return { params.begin(), params.end() };
 }
 
@@ -131,9 +143,11 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
         {
             // Mono always retriggers with whatever note the stack says should now sound - on a
             // plain note-on that's just this note itself (see KarplunkMonoNoteStack::noteOn()).
+            // Glide only actually engages if this is a legato retrigger (Voice::noteOn() checks
+            // isActive() itself) - a fresh note from silence always snaps straight to pitch.
             const auto event = monoNoteStack.noteOn(note, velocity);
             voices[0].setBrightness(brightnessParam->load());
-            voices[0].noteOn(event.note, event.velocity01);
+            voices[0].noteOn(event.note, event.velocity01, glideTimeParam->load() * 0.001f);
         }
         else
         {
@@ -159,7 +173,7 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
             if (result.stillHeld)
             {
                 voices[0].setBrightness(brightnessParam->load());
-                voices[0].noteOn(result.event.note, result.event.velocity01);
+                voices[0].noteOn(result.event.note, result.event.velocity01, glideTimeParam->load() * 0.001f);
             }
             else
             {

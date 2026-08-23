@@ -55,6 +55,7 @@ public:
     static constexpr auto structureParamID = "structure";
     static constexpr auto positionParamID = "position";
     static constexpr auto monoParamID = "mono";
+    static constexpr auto glideTimeParamID = "glideTime";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -67,6 +68,7 @@ private:
     std::atomic<float>* structureParam = nullptr;
     std::atomic<float>* positionParam = nullptr;
     std::atomic<float>* monoParam = nullptr;
+    std::atomic<float>* glideTimeParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 

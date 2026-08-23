@@ -55,5 +55,9 @@ private:
     juce::ToggleButton monoButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> monoAttachment;
 
+    juce::Slider glideTimeSlider;
+    juce::Label glideTimeLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> glideTimeAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

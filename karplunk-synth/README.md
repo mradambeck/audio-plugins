@@ -11,9 +11,9 @@ gotchas, and running tests across all plugins at once.
 
 **Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`), a
 Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
-controls, and a Poly/Mono switch (`KarplunkMonoNoteStack.h`) are done. Glide/portamento for Mono is
-next. No installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all
-explicitly out of scope until asked for.
+controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), and Mono Glide/portamento are done. No
+installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all explicitly out
+of scope until asked for.
 
 ## Building
 
@@ -260,6 +260,21 @@ reconcile Poly's voice-allocator state with Mono's note stack. Mono also skips t
 headroom reduction entirely (only one voice ever sounds), so a Mono note isn't quieter than the
 same note played in Poly for no reason.
 
+**Glide** (Mono-only): a legato retrigger between two held notes still fires a fresh pluck (the
+chosen design - not a true "no re-pluck" legato glide), but the PITCH approaches its new target
+smoothly over Glide Time rather than jumping instantly, so the fresh pluck's own attack transient
+audibly bends in pitch. A fresh note struck from silence is unaffected regardless of Glide Time -
+there's nothing to glide from, matching standard "auto-glide" convention on hardware mono synths
+(`SingleLineKarplunkVoice::noteOn()` checks `isActive()` itself to tell the two cases apart).
+Smoothed in PITCH space (a one-pole toward the target MIDI note, converted to delay samples every
+tick), not delay-samples space directly - delay length and pitch aren't linearly related, so a
+one-pole on delay samples wouldn't give the familiar decelerating-as-it-approaches-the-target
+portamento character a real analog circuit (an RC-smoothed 1V/oct control voltage) produces; a
+one-pole in pitch space does. Verified through the real processor: a 300ms glide from C4 to G4
+measured 268.9Hz / 306.2Hz / 386.8Hz at 10ms / 150ms / 1.5s in, matching the closed-form one-pole
+trajectory almost exactly. Defaults to 0ms (off) - preserves Mono's exact instant-retrigger
+behavior until explicitly dialed in.
+
 **Four swappable areas**, each isolated so the others never need to change:
 
 1. **Excitation** (`KarplunkExcitation.h`) - "generate one sample of excitation per tick, shaped by
@@ -312,10 +327,10 @@ wrapping a JUCE class as originally planned.
 | Structure        | 0 - 100%     | 0%      | Inharmonicity/dispersion - 0% is a bit-exact no-op (pure harmonic partials), 100% is maximally stretched/metallic. Live-adjustable. See "How it works" above.                                                                                |
 | Position         | 0 - 100%     | 50%     | Where the string is excited/listened to - 50% (the midpoint) is a hollower, more harmonic character; the ends are fuller. No neutral/bypass value - every setting changes the output. Live-adjustable. See "How it works" above.                                                                                |
 | Mono             | Off / On     | Off     | Off (Poly) is the original 8-voice-pool behaviour. On (Mono) drives a single voice with classic last-note-priority: holding two notes sounds only the most recent, and releasing it retriggers whichever earlier note is still held, rather than leaving it silently ringing or cutting to silence. See `KarplunkMonoNoteStack.h`. |
+| Glide Time       | 0 - 500ms    | 0ms     | Mono-only. A legato retrigger between two held notes still fires a fresh pluck, but its pitch approaches the new note smoothly over this time instead of jumping instantly. 0ms preserves Mono's original instant-retrigger behaviour. See "How it works" above.                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
-against yet - see the "How it works" section). No Glide yet (every note-on/retrigger is a fresh
-pluck, not a pitch to glide toward - a natural next addition specifically for Mono, not yet built).
+against yet - see the "How it works" section).
 
 ## Project structure
 

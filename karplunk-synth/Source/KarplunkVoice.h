@@ -123,16 +123,41 @@ public:
         dispersionNoise = 0.0f; // dispersionRngState deliberately NOT reset - see its own comment
     }
 
-    // Always retriggers - each MIDI note-on is physically a fresh pluck (or bow stroke), not a
-    // pitch to glide toward, so there's no held-note/legato-repitch logic here (unlike
-    // alloy-bass's continuous VCO voice).
-    void noteOn(int midiNoteNumber, float velocity01) noexcept
+    // Always retriggers - each MIDI note-on is physically a fresh pluck (or bow stroke): the
+    // excitation/loop filter/dispersion filter/string content are always fully reset below, no
+    // exceptions. `glideTimeSeconds` (0 by default, matching every existing call site - Poly mode
+    // and every isolated-Voice test never touch it) affects ONLY the PITCH's approach to its new
+    // target, not whether a fresh pluck happens - see the class comment above renderNextSample()'s
+    // glide step for why glide-the-pitch-but-still-repluck (not a true legato "no new attack"
+    // glide) was the chosen design for Mono. Only actually glides if this voice was already
+    // active right before this call (a legato retrigger - there's a previous pitch to glide
+    // from); a fresh note struck from silence always snaps straight to its own pitch, matching
+    // standard "auto-glide" convention on hardware mono synths.
+    void noteOn(int midiNoteNumber, float velocity01, float glideTimeSeconds = 0.0f) noexcept
     {
+        const auto wasActive = active; // captured before reset() clears it
+
         reset();
 
-        const auto delaySamples = midiNoteToDelaySamples(midiNoteNumber);
-        stringLine.setDelaySamples(delaySamples);
-        currentDelaySamples = delaySamples;
+        const auto clampedNote = std::clamp(midiNoteNumber, kLowestSupportedMidiNote, kHighestSupportedMidiNote);
+        targetPitchMidi = (float) clampedNote;
+
+        if (wasActive && glideTimeSeconds > 0.0f)
+        {
+            // currentPitchMidi deliberately keeps its PRE-reset value here (not touched by
+            // reset() - same convention as currentDelaySamples always following the same rule)
+            // as the glide's starting point; renderNextSample()'s glide step carries it toward
+            // targetPitchMidi over glideTimeSeconds from here.
+            glideCoeff = 1.0f - std::exp(-1.0f / (glideTimeSeconds * (float) sampleRateHz));
+        }
+        else
+        {
+            currentPitchMidi = targetPitchMidi; // nothing to glide from, or glide time is 0
+            glideCoeff = 1.0f;                  // reaches target on the very next glide step
+        }
+
+        currentDelaySamples = delaySamplesForPitch(currentPitchMidi);
+        stringLine.setDelaySamples(currentDelaySamples);
 
         // No bulk-priming loop any more - the per-tick enveloped excitation (see
         // renderNextSample()) provides its own energy from t=0. This is mechanically equivalent
@@ -140,8 +165,10 @@ public:
         // exactly 0 until the first injected sample has looped all the way around once, so the
         // loop filter sees silence and the injected signal reaches the string raw/unfiltered
         // either way - the classic Karplus-Strong "excitation only gets filtered once it's looped
-        // around" property is preserved by construction, not by coincidence.
-        excitation.setBaseDuration((int) delaySamples);
+        // around" property is preserved by construction, not by coincidence. Keyed to the note's
+        // own TARGET duration, not the (possibly still-gliding) current one - a glide shouldn't
+        // make the excitation's own decay-to-sustain timing itself uncertain.
+        excitation.setBaseDuration((int) delaySamplesForPitch(targetPitchMidi));
 
         active = true;
         noteVelocity = velocity01;
@@ -186,6 +213,19 @@ public:
 
     float renderNextSample() noexcept
     {
+        // Glide: smoothed in PITCH (MIDI-note/log-frequency) space, not delay-samples space
+        // directly - a one-pole approach toward targetPitchMidi is what a real analog portamento
+        // circuit does (an RC-smoothed 1V/oct control voltage), giving the familiar
+        // decelerating-as-it-approaches-the-target character, which a one-pole smoothing of
+        // delaySamples itself would NOT reproduce (delay length and pitch aren't linearly
+        // related, so equal steps in delay-space are not equal steps in pitch-space). Runs
+        // unconditionally every tick - at glideCoeff=1.0 (set whenever noteOn() didn't actually
+        // glide) this converges to targetPitchMidi in a single step and stays there, so there's
+        // no separate "am I gliding right now" branch needed here.
+        currentPitchMidi += glideCoeff * (targetPitchMidi - currentPitchMidi);
+        currentDelaySamples = delaySamplesForPitch(currentPitchMidi);
+        stringLine.setDelaySamples(currentDelaySamples);
+
         // Structure: a cascade of first-order allpass stages stretches upper partials sharp
         // relative to the fundamental (the classic Jaffe/Smith dispersion technique - see
         // KarplunkDispersionFilter's own comment for why a cascade of small stages replaced the
@@ -391,10 +431,13 @@ private:
         return (float) dispersionRngState / (float) UINT32_MAX * 2.0f - 1.0f;
     }
 
-    float midiNoteToDelaySamples(int midiNoteNumber) const noexcept
+    // Takes a FRACTIONAL MIDI note so Glide's per-sample pitch value (which spends most of its
+    // life between two integer notes while gliding) can be converted every tick, not just at
+    // noteOn() - the note-on path clamps to a real MIDI note first (see noteOn()), so this itself
+    // doesn't re-clamp the input, only the output (the interpolation-quality floor below).
+    float delaySamplesForPitch(float midiNoteFloat) const noexcept
     {
-        const auto clampedNote = std::clamp(midiNoteNumber, kLowestSupportedMidiNote, kHighestSupportedMidiNote);
-        const auto frequencyHz = 440.0 * std::pow(2.0, (clampedNote - 69) / 12.0);
+        const auto frequencyHz = 440.0 * std::pow(2.0, ((double) midiNoteFloat - 69.0) / 12.0);
         const auto delaySamples = (float) (sampleRateHz / frequencyHz);
 
         // Clamps interpolation-quality floor above kHighestSupportedMidiNote - not a
@@ -410,6 +453,13 @@ private:
     int capacitySamples = 0;
     double sampleRateHz = 44100.0;
     float currentDelaySamples = 0.0f;
+
+    // Glide state (see noteOn()'s and renderNextSample()'s own comments) - none of these are
+    // touched by reset(), same convention as currentDelaySamples always following: a legato
+    // retrigger needs the PRE-reset pitch to survive the reset as the glide's starting point.
+    float currentPitchMidi = 0.0f;
+    float targetPitchMidi = 0.0f;
+    float glideCoeff = 1.0f;
 
     bool active = false;
     int silenceRunSamples = 0;

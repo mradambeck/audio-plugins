@@ -63,6 +63,10 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     monoAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::monoParamID, monoButton);
 
+    setupSlider(glideTimeSlider, glideTimeLabel, "Glide Time");
+    glideTimeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::glideTimeParamID, glideTimeSlider);
+
     setSize(editorWidth, editorHeight);
 }
 
@@ -99,7 +103,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 6;
+    const auto sliderCount = 7;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -113,5 +117,6 @@ void KarplunkAudioProcessorEditor::resized()
     layoutColumn(bounds.removeFromLeft(columnWidth), brightnessLabel, brightnessSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), bowAmountLabel, bowAmountSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
-    layoutColumn(bounds, positionLabel, positionSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
+    layoutColumn(bounds, glideTimeLabel, glideTimeSlider);
 }
