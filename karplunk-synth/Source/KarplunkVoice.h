@@ -72,8 +72,7 @@ private:
 // value the same way this one does, not a fourth template argument here. See
 // karplunk-synth/README.md's "Future swap-in points" table for what a cross-coupled or
 // nonlinear-in-the-loop topology would need beyond this class.
-template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator,
-          typename Waveshaper = KarplunkWaveFolder>
+template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator>
 class SingleLineKarplunkVoice
 {
 public:
@@ -106,7 +105,8 @@ public:
         loopFilter.prepare(sampleRate);
         stringLine.prepare(sampleRate, capacitySamples);
         dispersionFilter.prepare();
-        waveshaper.prepare(sampleRate);
+        waveFolder.prepare(sampleRate);
+        fuzz.prepare(sampleRate);
 
         silenceHoldSamples = (int) (sampleRate * 0.05); // ~50ms
 
@@ -119,7 +119,8 @@ public:
         loopFilter.reset();
         stringLine.reset();
         dispersionFilter.reset();
-        waveshaper.reset();
+        waveFolder.reset();
+        fuzz.reset();
         active = false;
         silenceRunSamples = 0;
         fastOutputEnvelope = 0.0f;
@@ -216,9 +217,14 @@ public:
     void setPosition(float amount01) noexcept { position = amount01; }
 
     // Live, every-sample - see renderNextSample()'s waveshaping step. amount01=0 is a bit-exact
-    // no-op (the Waveshaper is never even called in that case), matching Structure's own
+    // no-op (neither waveshaper is ever even called in that case), matching Structure's own
     // precedent for a "new control defaults to unchanged behavior" convention.
     void setWaveshapeAmount(float amount01) noexcept { waveshapeAmount = amount01; }
+
+    // Runtime selector between the two concrete waveshapers (0 = Fold, 1 = Fuzz) - see
+    // KarplunkWaveshaper.h's own comment for why this seam is a runtime choice rather than a
+    // compile-time template parameter like the other three.
+    void setWaveshaperType(int type) noexcept { waveshaperType = type; }
 
     float renderNextSample() noexcept
     {
@@ -360,30 +366,38 @@ public:
         // this tick's freshly injected excitation) right before it's written back - so the
         // distortion becomes part of what the string is actually resonating with, compounding
         // every pass around the loop, not a one-shot effect applied only to the output. See
-        // KarplunkWaveshaper.h for why this is its own seam (a 4th template parameter) rather than
-        // folded into the Loop Filter, and why amount01 is passed directly per-call rather than
-        // cached via a setter.
+        // KarplunkWaveshaper.h for why this is a runtime choice between two concrete classes
+        // (waveFolder/fuzz) rather than a template parameter like the other three seams, and why
+        // amount01 is passed directly per-call rather than cached via a setter.
         //
-        // Two SEPARATE calls, not one shared value, despite both starting from the same
-        // pre-waveshape `filtered` - discovered by measuring, not planned upfront, that "safe to
-        // feed back into the loop" and "sounds right on the output" are genuinely different
-        // requirements at high drive. `waveshapedForLoop` uses full drive compensation
-        // (driveCompensation=1, KarplunkWaveshaper.h's safety-critical default) since it's what
-        // actually recirculates - full compensation is what prevents the loop-gain-runaway bug
-        // described there. `waveshapedForOutput` uses much less compensation, since output is
-        // never fed back (no loop-gain risk to guard against) and full compensation, measured,
-        // crushed the audible fold character almost to silence at high Waveshape/maxDrive -
-        // outputDriveCompensation is tuned by rendering and measuring loudness parity across
-        // several playing conditions (pluck/bow, short/long decay), not guessed. Both calls share
-        // the identical fold CHARACTER (same drive, same curve) - only how much of the loud/
-        // folding case's own loudness is handed back differs, so Waveshape still sounds like one
-        // coherent effect, not two different-sounding paths.
+        // Two SEPARATE calls per waveshaper, not one shared value, despite both starting from the
+        // same pre-waveshape `filtered` - discovered by measuring, not planned upfront, that "safe
+        // to feed back into the loop" and "sounds right on the output" are genuinely different
+        // requirements at high drive (see KarplunkWaveFolder's own comment for the full story).
+        // The write-back call always uses full drive compensation (driveCompensation=1, the
+        // safety-critical default) since it's what actually recirculates; the output call uses
+        // much less, tuned per-waveshaper (foldOutputDriveCompensation/fuzzOutputDriveCompensation)
+        // by rendering and measuring loudness parity, since output is never fed back and full
+        // compensation was measured crushing the fold's own audible character almost to silence at
+        // high drive.
         const auto preWaveshapeSignal = filtered;
         float waveshapedForOutput = filtered;
         if (waveshapeAmount > 0.0f)
         {
-            filtered = waveshaper.process(preWaveshapeSignal, waveshapeAmount, 1.0f);
-            waveshapedForOutput = waveshaper.process(preWaveshapeSignal, waveshapeAmount, outputDriveCompensation);
+            if (waveshaperType == 0)
+            {
+                filtered = waveFolder.process(preWaveshapeSignal, waveshapeAmount, 1.0f);
+                waveshapedForOutput = waveFolder.process(preWaveshapeSignal, waveshapeAmount, foldOutputDriveCompensation);
+            }
+            else
+            {
+                // updateFilter() computes and lowpasses the shaped value once (shared by both
+                // calls below) - see KarplunkFuzz's own comment for why this differs from
+                // KarplunkWaveFolder's shape (Fuzz has real per-sample filter state; Fold doesn't).
+                fuzz.updateFilter(preWaveshapeSignal, waveshapeAmount);
+                filtered = fuzz.process(waveshapeAmount, 1.0f);
+                waveshapedForOutput = fuzz.process(waveshapeAmount, fuzzOutputDriveCompensation);
+            }
         }
 
         stringLine.write(filtered);
@@ -488,7 +502,12 @@ private:
     LoopFilter loopFilter;
     KarplunkStringLine<InterpolationType> stringLine;
     KarplunkDispersionFilter dispersionFilter;
-    Waveshaper waveshaper;
+    // Runtime-selectable, not a template parameter - see KarplunkWaveshaper.h's own comment for
+    // why this one seam works differently from Excitation/Loop Filter/Delay Tuning. Both concrete
+    // types live here unconditionally (no polymorphism/vtable), selected per-sample by
+    // `waveshaperType` in renderNextSample().
+    KarplunkWaveFolder waveFolder;
+    KarplunkFuzz fuzz;
 
     int capacitySamples = 0;
     double sampleRateHz = 44100.0;
@@ -509,11 +528,15 @@ private:
     float noteVelocity = 0.0f;
     float structure = 0.0f;
     float waveshapeAmount = 0.0f;
+    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz - see setWaveshaperType()
 
-    // See renderNextSample()'s comment on the two separate waveshaper calls - how much drive
-    // compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the recirculating
-    // path). Tuned by measurement, placeholder pending real render/measure iteration.
-    static constexpr float outputDriveCompensation = 0.0f;
+    // See renderNextSample()'s comment on the two separate waveshaper calls per type - how much
+    // drive compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the
+    // recirculating path). Tuned by measurement, per waveshaper (they saturate differently, so
+    // there's no reason to expect the same number would suit both) - placeholder pending real
+    // render/measure iteration for KarplunkFuzz specifically.
+    static constexpr float foldOutputDriveCompensation = 0.0f;
+    static constexpr float fuzzOutputDriveCompensation = 0.0f;
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with

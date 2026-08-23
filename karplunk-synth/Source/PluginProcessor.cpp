@@ -20,6 +20,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     monoParam = apvts.getRawParameterValue(monoParamID);
     glideTimeParam = apvts.getRawParameterValue(glideTimeParamID);
     waveshapeParam = apvts.getRawParameterValue(waveshapeParamID);
+    waveshaperTypeParam = apvts.getRawParameterValue(waveshaperTypeParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -107,6 +108,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         0.0f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Runtime choice between the Waveshaper seam's two concrete implementations (see
+    // KarplunkWaveshaper.h's own comment for why this one seam is a runtime dropdown rather than
+    // a compile-time template parameter like the other three) - defaults to Fold (index 0),
+    // matching every build/listening session so far.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{waveshaperTypeParamID, 1},
+        "Waveshaper Type",
+        juce::StringArray{"Fold", "Fuzz"},
+        0));
 
     return { params.begin(), params.end() };
 }
@@ -247,6 +258,12 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // to a single Mono voice would just make Mono sound quieter than Poly for no reason.
     const auto headroomGain = mono ? 1.0f : polyHeadroomGain;
 
+    // Waveshaper Type is a discrete choice like Mono, but - unlike Mono - has no cross-referencing
+    // bookkeeping (voiceAllocator/monoNoteStack) that could go stale on a mid-note switch; both
+    // concrete waveshapers are stateless, so reading this fresh every block and letting it change
+    // mid-note is completely safe.
+    const auto waveshaperType = (int) waveshaperTypeParam->load();
+
     auto midiIterator = midiMessages.cbegin();
     const auto midiEnd = midiMessages.cend();
 
@@ -272,6 +289,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setStructure(structure);
             v.setPosition(position);
             v.setWaveshapeAmount(waveshape);
+            v.setWaveshaperType(waveshaperType);
             mixedSample += v.renderNextSample();
         }
 

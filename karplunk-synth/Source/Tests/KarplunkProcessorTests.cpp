@@ -487,6 +487,119 @@ public:
             expect(shapedTailRms < plainTailRms * 6.0f,
                    "Waveshape shouldn't make the sustained loop dramatically (order-of-magnitude) louder than the unshaped equivalent");
         }
+
+        // Waveshaper Type defaults to Fold (index 0) - preserves every existing Waveshape test's
+        // behavior exactly, matching every other new-control convention in this project (Mono,
+        // Glide Time).
+        beginTest("Waveshaper Type defaults to Fold - explicitly setting it to Fold is bit-identical to never touching it");
+        {
+            const int numSamples = (int) (2.0 * sampleRate);
+            auto withoutTouchingType = renderBowedNote(60, 0.0f, 0.5f, sampleRate, numSamples);
+
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 0.0f); // explicit Fold
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::structureParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::positionParamID, 0.5f);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(withoutTouchingType.getReadPointer(0), buffer.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly selecting Fold should render bit-identical to never touching Waveshaper Type at all");
+        }
+
+        beginTest("Waveshaper Type = Fuzz substantially changes the real plugin's rendered output vs Waveshape = 0%");
+        {
+            auto renderWithFuzz = [&](float waveshape) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // Fuzz
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutFuzz = renderWithFuzz(0.0f);
+            auto withFuzz = renderWithFuzz(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutFuzz.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutFuzz.getReadPointer(0) + skipSamples,
+                withFuzz.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Fuzz=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Fold and Fuzz produce measurably DIFFERENT output at the same Waveshape amount - the selector actually changes character");
+        {
+            auto renderWithType = [&](float type) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, type);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto foldOutput = renderWithType(0.0f);
+            auto fuzzOutput = renderWithType(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                foldOutput.getReadPointer(0) + skipSamples,
+                fuzzOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Fold vs Fuzz at Waveshape=100% - Fold tail RMS: " + juce::String(foldRms, 6)
+                       + ", diff RMS: " + juce::String(diff, 6));
+
+            expect(diff > foldRms * 0.1f, "Fold and Fuzz should sound clearly different at the same Waveshape amount, not coincidentally similar");
+        }
+
+        beginTest("Waveshaper Type = Fuzz stays finite and bounded at the worst-case combination (max Decay, full Bow)");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // Fuzz
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                expect(std::isfinite(data[i]), "output must stay finite through the real processor at Fuzz=100%");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            logMessage("Fuzz=100% worst-case peak: " + juce::String(peak, 4));
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+        }
     }
 };
 

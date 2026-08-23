@@ -11,8 +11,8 @@ gotchas, and running tests across all plugins at once.
 
 **Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`), a
 Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
-controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), Mono Glide/portamento, and a wavefolding
-Waveshaper (`KarplunkWaveshaper.h`) are done. No installer, UI polish (mockup-first hardware-panel
+controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), Mono Glide/portamento, and a Waveshaper
+(`KarplunkWaveshaper.h`, Fold/Fuzz via a runtime dropdown) are done. No installer, UI polish (mockup-first hardware-panel
 pass), or preset system yet - all explicitly out of scope until asked for.
 
 ## Building
@@ -332,10 +332,45 @@ musically usable than "folds throughout the whole decay." Kept as a documented, 
 option (see `KarplunkWaveFolder`'s own header comment and git history) rather than discarded - a
 deliberate creative call, not a bug fix that didn't pan out.
 
-Built as its own swappable seam (a 5th `SingleLineKarplunkVoice` template parameter, defaulting to
-`KarplunkWaveFolder`) specifically so soft saturation and hard/asymmetric clipping - explicitly
-discussed as likely future additions - can be dropped in later as alternate implementations of the
-same `process(x, amount01, driveCompensation)` contract, not a rewrite; see the swap-in table.
+**Waveshaper Type**: a runtime dropdown (Fold / Fuzz), not a rebuild-to-change compile-time swap
+like the other three seams - the user asked for a live selector, so `SingleLineKarplunkVoice` owns
+both concrete classes by value and branches on the choice each sample (no virtual dispatch/
+`std::function`, matching this project's zero-polymorphism convention - see `KarplunkWaveshaper.h`'s
+own comment). `KarplunkFuzz` is the "hard/asymmetric clipping" option from the original three-way
+discussion (soft saturation, hard/asymmetric clipping, folding) that led to `KarplunkWaveFolder` -
+heavy, asymmetric tanh clipping, the classic transistor-fuzz-pedal (Fuzz Face/Big Muff family)
+character: dense odd harmonics from the saturation itself, plus even harmonics from clipping the
+positive and negative half-cycles at different effective gains (a real single-ended transistor
+stage doesn't treat both polarities identically, and Karplunk's asymmetry deliberately mimics
+that). Genuinely different in KIND from folding, not just degree - clipping compresses/flattens
+toward a ceiling (monotonic), where folding reflects back down past its own threshold - confirmed
+directly via a permanent test rather than assumed from the two formulas looking different. Built
+the driveCompensation split into `KarplunkFuzz` from the start (full compensation for what
+recirculates, little for what's heard) rather than waiting to rediscover the same loudness bug
+`KarplunkWaveFolder` needed two rounds to fix - tanh's own smooth saturation is unconditionally
+bounded to +-1 the same way the fold's asin/sin curve is, so the same safety argument applies
+without modification.
+
+**The first version of Fuzz was, per the user, "very hissy"** - a real, expected consequence of
+heavy clipping applied to a noise-EXCITED string (Karplunk's excitation is filtered white noise,
+not a pure tone): clipping generates dense harmonic/intermodulation energy all the way up toward
+Nyquist, and a plain tanh clip has nothing to tame that. Real fuzz pedals almost universally follow
+their clip stage with a tone-shaping capacitor for exactly this reason - this wasn't a workaround,
+it was the missing other half of a standard fuzz circuit. A single one-pole lowpass at 6kHz was
+tried first and MEASURED (a raw-WAV DFT read back independently in Python, not just reasoning about
+the coefficient) to still leave ~51% of the settled tail's spectral energy above 6kHz - a one-pole's
+-6dB/octave rolloff is too gentle against how much a hard clip dumps near Nyquist, even though
+"6kHz lowpass" sounds like it should obviously fix hiss. Fixed by cascading two identical one-pole
+stages (-12dB/octave) at a lower 3kHz cutoff (`KarplunkFuzz::updateFilter()`) - re-measured at
+~93%/7% low/high energy split, a real, verified fix rather than a plausible-sounding one. The
+filter operates on the shaped (post-clip, pre-divide) value once per sample, shared by both the
+recirculating and output calls (dividing by a scalar afterward doesn't change frequency content),
+matching the same "shared per-sample state, separate scaled accessor" shape the since-reverted
+Fold envelope-following used, for the identical reason: `process()` is called twice per sample.
+
+Both classes share the identical `process(x, amount01, driveCompensation)` contract specifically so
+a third type (soft saturation was the remaining option from the original discussion) could be added
+to the dropdown later without touching the selection mechanism; see the swap-in table.
 
 **Five swappable areas**, each isolated so the others never need to change:
 
@@ -361,10 +396,12 @@ same `process(x, amount01, driveCompensation)` contract, not a rewrite; see the 
    topology (e.g. dual cross-coupled lines) is a **new class**, not a template parameter, since it
    changes member layout, not just behaviour - see the swap table.
 5. **Waveshaper** (`KarplunkWaveshaper.h`) - "nonlinearly reshape one sample of the loop's own
-   recirculating signal before it's written back." Base implementation: `KarplunkWaveFolder` (see
-   above). `process(x, amount01, driveCompensation)` is stateless per-call, matching `KarplunkDispersionFilter`'s
-   shape rather than the Loop Filter's setter-then-process split - Structure's live, every-sample
-   control is the closer precedent here than Damping's set-once-per-block one.
+   recirculating signal before it's written back." Two implementations, both always present and
+   selected at RUNTIME (see above for why this seam differs from the other four): `KarplunkWaveFolder`
+   and `KarplunkFuzz`. `process(x, amount01, driveCompensation)` is stateless per-call, matching
+   `KarplunkDispersionFilter`'s shape rather than the Loop Filter's setter-then-process split -
+   Structure's live, every-sample control is the closer precedent here than Damping's
+   set-once-per-block one.
 
 No polymorphism (no `virtual`, no `std::function`-as-strategy) is used anywhere - all four
 per-sample seams are compile-time template parameters on `SingleLineKarplunkVoice`, matching this
@@ -380,7 +417,7 @@ wrapping a JUCE class as originally planned.
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
 | Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
 | Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
-| Waveshaper                                  | Wavefolding (`KarplunkWaveFolder`, built) -> soft saturation (tanh) -> hard/asymmetric clipping | A 5th `SingleLineKarplunkVoice` template parameter (`KarplunkWaveshaper.h`), matching Excitation/Loop Filter/Delay Tuning's own compile-time swap-point convention rather than a runtime type selector. `process(x, amount01, driveCompensation)` is stateless per-call (matching `KarplunkDispersionFilter`'s shape, not the Loop Filter's setter-then-process split) - a future variant needing internal state (e.g. asymmetric clipping's usual DC-blocker) just adds fixed-size members, same as any other seam. |
+| Waveshaper                                  | Wavefolding (`KarplunkWaveFolder`) and heavy asymmetric-clip fuzz (`KarplunkFuzz`) are built, selectable live via the Waveshaper Type dropdown - soft saturation (tanh, symmetric) is the remaining option from the original three-way discussion | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `SingleLineKarplunkVoice` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). Both concrete classes are owned by value and selected via a plain branch (no virtual dispatch). `process(x, amount01, driveCompensation)` is stateless per-call (matching `KarplunkDispersionFilter`'s shape, not the Loop Filter's setter-then-process split) - a future variant needing internal state (e.g. asymmetric clipping's usual DC-blocker) just adds fixed-size members, same as any other seam. |
 | Feedback Topology                           | Single loop -> dual cross-coupled lines                                                      | A **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix.                             |
 | More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
@@ -396,7 +433,8 @@ wrapping a JUCE class as originally planned.
 | Position         | 0 - 100%     | 50%     | Where the string is excited/listened to - 50% (the midpoint) is a hollower, more harmonic character; the ends are fuller. No neutral/bypass value - every setting changes the output. Live-adjustable. See "How it works" above.                                                                                |
 | Mono             | Off / On     | Off     | Off (Poly) is the original 8-voice-pool behaviour. On (Mono) drives a single voice with classic last-note-priority: holding two notes sounds only the most recent, and releasing it retriggers whichever earlier note is still held, rather than leaving it silently ringing or cutting to silence. See `KarplunkMonoNoteStack.h`. |
 | Glide Time       | 0 - 500ms    | 0ms     | Mono-only. A legato retrigger between two held notes still fires a fresh pluck, but its pitch approaches the new note smoothly over this time instead of jumping instantly. 0ms preserves Mono's original instant-retrigger behaviour. See "How it works" above.                                |
-| Waveshape        | 0 - 100%     | 0%      | Nonlinear wavefolding inside the feedback loop - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. 0% is a bit-exact no-op. Live-adjustable. See "How it works" above.                                |
+| Waveshape        | 0 - 100%     | 0%      | Amount of whichever Waveshaper Type is selected, applied inside the feedback loop. 0% is a bit-exact no-op. Live-adjustable. See "How it works" above.                                |
+| Waveshaper Type  | Fold / Fuzz  | Fold    | Fold: wavefolding - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. Fuzz: heavy asymmetric-clip distortion - a transistor-fuzz-pedal character (dense odd harmonics, plus even harmonics from the asymmetry). See "How it works" above.                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section).
@@ -412,7 +450,7 @@ karplunk-synth/
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
 │   ├── KarplunkVoice.h             # Feedback Topology (base case): SingleLineKarplunkVoice,
 │   │                                 # + KarplunkDispersionFilter (Structure's allpass primitive)
-│   ├── KarplunkWaveshaper.h        # Waveshaper seam: KarplunkWaveFolder (Waveshape control)
+│   ├── KarplunkWaveshaper.h        # Waveshaper seam: KarplunkWaveFolder + KarplunkFuzz, runtime dropdown
 │   ├── KarplunkVoiceAllocator.h    # Voice-to-note allocation/oldest-voice-stealing for the pool (Poly)
 │   ├── KarplunkMonoNoteStack.h     # Last-note-priority/retrigger note tracking for Mono mode
 │   ├── PluginProcessor.h/.cpp      # Parameter state, MIDI dispatch, owns the 8-voice pool

@@ -57,6 +57,7 @@ public:
     static constexpr auto monoParamID = "mono";
     static constexpr auto glideTimeParamID = "glideTime";
     static constexpr auto waveshapeParamID = "waveshape";
+    static constexpr auto waveshaperTypeParamID = "waveshaperType";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -71,6 +72,7 @@ private:
     std::atomic<float>* monoParam = nullptr;
     std::atomic<float>* glideTimeParam = nullptr;
     std::atomic<float>* waveshapeParam = nullptr;
+    std::atomic<float>* waveshaperTypeParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
