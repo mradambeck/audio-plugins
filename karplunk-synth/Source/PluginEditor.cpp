@@ -58,6 +58,11 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     positionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::positionParamID, positionSlider);
 
+    monoButton.setButtonText("Mono");
+    addAndMakeVisible(monoButton);
+    monoAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::monoParamID, monoButton);
+
     setSize(editorWidth, editorHeight);
 }
 
@@ -89,7 +94,9 @@ void KarplunkAudioProcessorEditor::resized()
 
     auto bounds = getLocalBounds().reduced(16);
 
-    titleLabel.setBounds(bounds.removeFromTop(32));
+    auto titleRow = bounds.removeFromTop(32);
+    monoButton.setBounds(titleRow.removeFromRight(90));
+    titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
     const auto sliderCount = 6;

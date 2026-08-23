@@ -76,6 +76,7 @@ target_sources(KarplunkTests
         Source/Tests/KarplunkStringLineTests.cpp
         Source/Tests/KarplunkVoiceTests.cpp
         Source/Tests/KarplunkVoiceAllocatorTests.cpp
+        Source/Tests/KarplunkMonoNoteStackTests.cpp
         Source/Tests/TestRunner.cpp
 )
 

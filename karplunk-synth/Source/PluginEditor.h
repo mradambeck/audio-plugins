@@ -52,5 +52,8 @@ private:
     juce::Label positionLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
 
+    juce::ToggleButton monoButton;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> monoAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

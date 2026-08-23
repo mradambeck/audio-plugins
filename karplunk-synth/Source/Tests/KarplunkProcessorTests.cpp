@@ -24,6 +24,35 @@ namespace
         return midi;
     }
 
+    juce::MidiBuffer noteOffBuffer(int note)
+    {
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::noteOff(1, note), 0);
+        return midi;
+    }
+
+    // Autocorrelation-based period estimate over a short window, same technique
+    // KarplunkVoiceTests.cpp uses on the isolated Voice class - here applied to the real
+    // processor's rendered output to identify WHICH note is actually sounding at a given moment.
+    float estimateFrequencyHz(const float* data, int windowSize, double sampleRate, float expectedHz)
+    {
+        const auto expectedDelay = (float) (sampleRate / expectedHz);
+        const int searchRadius = 15;
+        const int centerLag = (int) std::lround(expectedDelay);
+        const int lagLo = std::max(1, centerLag - searchRadius);
+        const int lagHi = centerLag + searchRadius;
+        int bestLag = centerLag;
+        double bestCorr = -1e18;
+        for (int lag = lagLo; lag <= lagHi; ++lag)
+        {
+            double corr = 0.0;
+            for (int i = 0; i + lag < windowSize; ++i)
+                corr += (double) data[i] * (double) data[i + lag];
+            if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+        }
+        return (float) (sampleRate / (double) bestLag);
+    }
+
     float rms(const float* data, int numSamples)
     {
         double sum = 0.0;
@@ -173,6 +202,103 @@ public:
             // measurement point depending on the note/harmonic, so only the MAGNITUDE of change is
             // asserted here, not a specific direction.
             expect(std::abs(magnitudeWith - magnitudeWithout) > magnitudeWithout * 0.1f);
+        }
+
+        // The core Mono behavior end-to-end, through the real APVTS/MIDI-driven processor, not
+        // just KarplunkMonoNoteStack in isolation: hold A, hold B (both physically held, no
+        // note-off yet) - only B should be audible (true mono, not a quiet second voice), proven
+        // by frequency estimation on the real rendered output.
+        beginTest("Mono mode: only the most recently pressed note sounds while multiple are held");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f); // continuous tone - easiest to measure
+
+            const auto noteAHz = 440.0 * std::pow(2.0, (60.0 - 69.0) / 12.0); // C4
+            const auto noteBHz = 440.0 * std::pow(2.0, (67.0 - 69.0) / 12.0); // G4
+
+            const int settleSamples = (int) (0.2 * sampleRate);
+
+            juce::AudioBuffer<float> bufferA(2, settleSamples);
+            auto midiA = noteOnBuffer(60, 100);
+            processor.processBlock(bufferA, midiA); // A held
+
+            juce::AudioBuffer<float> bufferB(2, settleSamples);
+            auto midiB = noteOnBuffer(67, 100);
+            processor.processBlock(bufferB, midiB); // B pressed too, A still physically held
+
+            const int windowSize = 2048;
+            const auto measuredHz = estimateFrequencyHz(
+                bufferB.getReadPointer(0) + settleSamples - windowSize, windowSize, sampleRate, (float) noteBHz);
+
+            logMessage("Measured Hz after B pressed (A still held): " + juce::String(measuredHz, 1)
+                       + " (expected B=" + juce::String(noteBHz, 1) + ", not A=" + juce::String(noteAHz, 1) + ")");
+
+            expect(std::abs(measuredHz - noteBHz) < std::abs(measuredHz - noteAHz),
+                   "should be sounding B (most recently pressed), not A");
+        }
+
+        // The behavior this whole feature exists for: releasing the currently-sounding note while
+        // an earlier one is still held RETRIGGERS that earlier note, rather than leaving it silent
+        // or just cutting to nothing. Since Mono only ever drives ONE shared voice, A's frequency
+        // reappearing after releasing B is unambiguous proof of a real retrigger - that voice was
+        // fully repurposed to B's pitch while B was held (see the test above), so there is no
+        // other way A's pitch could reappear.
+        beginTest("Mono mode: releasing the top note retriggers the still-held note beneath it");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+
+            const auto noteAHz = 440.0 * std::pow(2.0, (60.0 - 69.0) / 12.0); // C4
+
+            const int settleSamples = (int) (0.2 * sampleRate);
+
+            juce::AudioBuffer<float> bufferA(2, settleSamples);
+            auto midiA = noteOnBuffer(60, 100);
+            processor.processBlock(bufferA, midiA); // hold A
+
+            juce::AudioBuffer<float> bufferB(2, settleSamples);
+            auto midiB = noteOnBuffer(67, 100);
+            processor.processBlock(bufferB, midiB); // hold B too (A still physically held)
+
+            juce::AudioBuffer<float> bufferRelease(2, settleSamples);
+            auto midiOffB = noteOffBuffer(67);
+            processor.processBlock(bufferRelease, midiOffB); // release B - A should retrigger
+
+            const int windowSize = 2048;
+            const auto measuredHz = estimateFrequencyHz(
+                bufferRelease.getReadPointer(0) + settleSamples - windowSize, windowSize, sampleRate, (float) noteAHz);
+
+            logMessage("Measured Hz after releasing B (A still held): " + juce::String(measuredHz, 1)
+                       + " (expected A=" + juce::String(noteAHz, 1) + ")");
+
+            expect(std::abs(measuredHz - noteAHz) < 5.0f, "A should have retriggered and be sounding again");
+        }
+
+        // Poly mode (the default) must stay exactly as it was before this feature existed -
+        // toggling Mono off (or never touching it) shouldn't change anything about note handling.
+        beginTest("Mono defaults to off - Poly behavior is unaffected by the new parameter existing");
+        {
+            const int numSamples = 44100;
+            auto withoutTouchingMono = renderBowedNote(60, 0.0f, 0.5f, sampleRate, numSamples);
+
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::monoParamID, 0.0f); // explicit off
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::structureParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::positionParamID, 0.5f);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(withoutTouchingMono.getReadPointer(0), buffer.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly setting Mono=off should render bit-identical to never touching it at all");
         }
     }
 };

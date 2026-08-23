@@ -5,6 +5,7 @@
 
 #include "KarplunkExcitation.h"
 #include "KarplunkLoopFilter.h"
+#include "KarplunkMonoNoteStack.h"
 #include "KarplunkVoice.h"
 #include "KarplunkVoiceAllocator.h"
 
@@ -53,6 +54,7 @@ public:
     static constexpr auto bowAmountParamID = "bowAmount";
     static constexpr auto structureParamID = "structure";
     static constexpr auto positionParamID = "position";
+    static constexpr auto monoParamID = "mono";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -64,6 +66,7 @@ private:
     std::atomic<float>* bowAmountParam = nullptr;
     std::atomic<float>* structureParam = nullptr;
     std::atomic<float>* positionParam = nullptr;
+    std::atomic<float>* monoParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
@@ -74,10 +77,25 @@ private:
     std::array<Voice, numVoices> voices;
     KarplunkVoiceAllocator<numVoices> voiceAllocator;
 
+    // Mono mode always uses voices[0] exclusively and drives it through this note stack instead
+    // of voiceAllocator - see KarplunkMonoNoteStack.h for the last-note-priority/retrigger
+    // behavior this exists for. 16 held notes is generous headroom for a human's ten fingers;
+    // never allocates either way.
+    KarplunkMonoNoteStack<16> monoNoteStack;
+
+    // Read once per block (not smoothed - a Poly/Mono switch is a discrete mode change, not a
+    // live-sweepable control) so a mid-note toggle can be detected and treated as an implicit
+    // all-notes-off (see processBlock()) - flipping the mode while notes are held would otherwise
+    // leave voiceAllocator's tags or monoNoteStack's held notes stale/inconsistent with whichever
+    // mechanism is now in charge.
+    bool previousMonoMode = false;
+
     // Fixed headroom applied to the summed voice output before Output Level, so a full chord at
     // max velocity doesn't clip harder than a single note did in the mono scaffold. A constant
     // (not activity-dependent) scale, so it doesn't itself introduce level pumping as voices
-    // come and go.
+    // come and go. Mono mode only ever sounds one voice, so it uses no headroom reduction at all
+    // (1.0) - applying the 8-voice headroom to a single mono voice would make mono notes sound
+    // noticeably quieter than the same note played in Poly for no reason.
     static constexpr float polyHeadroomGain = 0.35355339f; // 1 / sqrt(numVoices)
 
     juce::SmoothedValue<float> dampingSmoothed;

@@ -10,9 +10,10 @@ See the [root README](../README.md) for shared build requirements, the exFAT/apo
 gotchas, and running tests across all plugins at once.
 
 **Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`), a
-Pluck/Bow excitation morph control, and Mutable Instruments Rings-style Structure/Position timbre
-controls are done. No installer, UI polish (mockup-first hardware-panel pass), or preset system
-yet - all explicitly out of scope until asked for.
+Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
+controls, and a Poly/Mono switch (`KarplunkMonoNoteStack.h`) are done. Glide/portamento for Mono is
+next. No installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all
+explicitly out of scope until asked for.
 
 ## Building
 
@@ -226,10 +227,38 @@ stay strong, matching the documented "hollow" behavior. Position still has **no 
 setting** - every value changes the output to some degree - and the default (50%, the string's
 midpoint) is a deliberate musical choice, not a "no effect" one.
 
+**Even the tuned gain=0.5 allpass cascade turned out to be a real DSP effect that still wasn't
+perceptible.** Rendered real audio through the actual `KarplunkAudioProcessor` (not just the
+isolated Voice class - see `KarplunkProcessorTests`) and had the user listen to a same-note,
+Structure-only A/B: tonally indistinguishable. The allpass cascade genuinely does what it claims
+(measured, verified two independent ways), but a few cents of harmonic stretch on a decaying pluck
+is simply too subtle a cue for a human ear to reliably pick out. Re-reading Rings' `string.cc`
+directly with that specific question in mind revealed the answer: **real Rings does not try to
+keep the fundamental locked as dispersion increases.** Above 75% dispersion, it deliberately FMs
+the delay length itself with lowpassed noise (`delay_fm`) - genuine, intentional pitch instability
+is the actual audible "unstable/breaking up" character real hardware relies on at high Structure,
+layered on top of (not instead of) the allpass stretch. Ported that mechanism directly (same
+formula: `noiseAmount = (4*(structure-0.75))^2 * 0.025`), using a fixed noise-lowpass coefficient
+(0.25) rather than coupling it to Karplunk's own Brightness knob, a different, independent control.
+Verified this produces a genuine *time-varying* pitch wobble (not just a bigger static shift, which
+a single long measurement window could mask) via short consecutive-window pitch tracking within
+one held note - confirmed working by the user by ear afterward. Below 75%, Structure is completely
+unaffected by this - it's additive, not a retuning of the existing cascade.
+
 Real Rings' Structure range also spans negative "dispersion" (a nonlinear bridge-curving
-distortion, sitar-like buzz) and adds delay-modulation noise at extreme positive settings - both
-**out of scope for this pass**; only the core positive-dispersion cascade is built here (see the
-swap-in table for a possible future extension).
+distortion, sitar-like buzz) - **out of scope for this pass**, since Structure's 0-100% range only
+ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either
+(see the swap-in table for a possible future extension).
+
+**Poly / Mono**: an 8-voice pool (Poly, the default) is the original base-scaffold behaviour.
+Mono drives a single voice through `KarplunkMonoNoteStack` - classic last-note-priority: the most
+recently pressed held note always sounds, and releasing it retriggers whichever earlier note is
+still held (hold A, hold B, release B -> A re-plucks) rather than leaving it silently ringing or
+cutting to nothing. Toggling the mode mid-performance is treated as an implicit all-notes-off
+(`PluginProcessor::processBlock()` detects the change once per block) rather than trying to
+reconcile Poly's voice-allocator state with Mono's note stack. Mono also skips the 8-voice
+headroom reduction entirely (only one voice ever sounds), so a Mono note isn't quieter than the
+same note played in Poly for no reason.
 
 **Four swappable areas**, each isolated so the others never need to change:
 
@@ -268,7 +297,7 @@ wrapping a JUCE class as originally planned.
 | ------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
 | Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
-| Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion) and delay-modulation noise at extreme positive settings, both present in Rings but out of scope here. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
+| Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
 | Feedback Topology                           | Single loop -> dual cross-coupled lines -> nonlinear waveshaping in the loop                 | Dual cross-coupled = a **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix. Waveshaping in the loop adds only per-sample math, no new buffering.                             |
 | More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
@@ -282,10 +311,11 @@ wrapping a JUCE class as originally planned.
 | Pluck / Bow      | 0 - 100%     | 0%      | 0% is a pure pluck (the original base-scaffold behaviour). 100% is a pure bow - continuous excitation sustains the note for as long as it's held, decaying only after release. Live-adjustable, unlike Brightness. See "How it works" above.                                                                                |
 | Structure        | 0 - 100%     | 0%      | Inharmonicity/dispersion - 0% is a bit-exact no-op (pure harmonic partials), 100% is maximally stretched/metallic. Live-adjustable. See "How it works" above.                                                                                |
 | Position         | 0 - 100%     | 50%     | Where the string is excited/listened to - 50% (the midpoint) is a hollower, more harmonic character; the ends are fuller. No neutral/bypass value - every setting changes the output. Live-adjustable. See "How it works" above.                                                                                |
+| Mono             | Off / On     | Off     | Off (Poly) is the original 8-voice-pool behaviour. On (Mono) drives a single voice with classic last-note-priority: holding two notes sounds only the most recent, and releasing it retriggers whichever earlier note is still held, rather than leaving it silently ringing or cutting to silence. See `KarplunkMonoNoteStack.h`. |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
-against yet - see the "How it works" section). No Glide (every note-on is a fresh pluck, not a
-pitch to glide toward).
+against yet - see the "How it works" section). No Glide yet (every note-on/retrigger is a fresh
+pluck, not a pitch to glide toward - a natural next addition specifically for Mono, not yet built).
 
 ## Project structure
 
@@ -298,11 +328,16 @@ karplunk-synth/
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
 │   ├── KarplunkVoice.h             # Feedback Topology (base case): SingleLineKarplunkVoice,
 │   │                                 # + KarplunkDispersionFilter (Structure's allpass primitive)
-│   ├── KarplunkVoiceAllocator.h    # Voice-to-note allocation/oldest-voice-stealing for the pool
+│   ├── KarplunkVoiceAllocator.h    # Voice-to-note allocation/oldest-voice-stealing for the pool (Poly)
+│   ├── KarplunkMonoNoteStack.h     # Last-note-priority/retrigger note tracking for Mono mode
 │   ├── PluginProcessor.h/.cpp      # Parameter state, MIDI dispatch, owns the 8-voice pool
 │   ├── PluginEditor.h/.cpp         # Minimal functional UI (no hardware-panel mockup pass yet)
 │   ├── KarplunkLookAndFeel.h/.cpp  # Thin subclass of the shared HardwarePanelLookAndFeel (theme only)
-│   └── Tests/                      # KarplunkTests: headless UnitTest console app (DSP seams only)
+│   ├── KarplunkBuildNumber.h       # Incrementing marker shown in the editor, so a stale/cached
+│   │                                 # plugin build is visible from the UI itself
+│   └── Tests/                      # KarplunkTests: headless UnitTest console app (DSP seams only);
+│                                     # KarplunkProcessorTests: drives the real KarplunkAudioProcessor
+│                                     # end-to-end (APVTS/MIDI/processBlock), not just the DSP seams
 ```
 
 ## License
