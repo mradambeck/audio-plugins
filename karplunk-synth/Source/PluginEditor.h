@@ -89,5 +89,16 @@ private:
     juce::Label detuneLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> detuneAttachment;
 
+    juce::ComboBox loopFilterTypeBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> loopFilterTypeAttachment;
+
+    juce::Slider resonanceSlider;
+    juce::Label resonanceLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAttachment;
+
+    juce::Slider formantFrequencySlider;
+    juce::Label formantFrequencyLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> formantFrequencyAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

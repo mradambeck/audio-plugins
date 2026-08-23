@@ -1158,6 +1158,141 @@ public:
                 expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
             }
         }
+
+        beginTest("Loop Filter Type defaults to Two-Point Average - explicitly setting it is bit-identical to never touching it");
+        {
+            const int numSamples = (int) (2.0 * sampleRate);
+            auto withoutTouchingType = renderBowedNote(60, 0.0f, 0.5f, sampleRate, numSamples);
+
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::loopFilterTypeParamID, 0.0f); // explicit Two-Point Average
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::structureParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::positionParamID, 0.5f);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(withoutTouchingType.getReadPointer(0), buffer.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly selecting Two-Point Average should render bit-identical to never touching Loop Filter Type at all");
+        }
+
+        beginTest("Resonance defaults to 0% - explicitly setting it to 0 is bit-identical to never touching it");
+        {
+            auto renderWithResonance = [&](bool touchIt) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::loopFilterTypeParamID, 1.0f); // Resonant
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                if (touchIt)
+                    setRaw(processor, KarplunkAudioProcessor::resonanceParamID, 0.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto neverTouched = renderWithResonance(false);
+            auto explicitZero = renderWithResonance(true);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const auto diff = rmsOfDifference(neverTouched.getReadPointer(0), explicitZero.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly setting Resonance to 0% should render bit-identical to never touching it at all");
+        }
+
+        beginTest("Loop Filter Type=Resonant + Resonance=100% substantially changes the real plugin's rendered output vs Two-Point Average");
+        {
+            auto renderWithType = [&](float type) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::loopFilterTypeParamID, type);
+                setRaw(processor, KarplunkAudioProcessor::resonanceParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto twoPoint = renderWithType(0.0f);
+            auto resonant = renderWithType(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(twoPoint.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                twoPoint.getReadPointer(0) + skipSamples,
+                resonant.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Two-Point Average tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Loop Filter Type=Resonant, Resonance=100%, Decay=100%, Bow=100% stays finite and bounded, held note over several seconds");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::loopFilterTypeParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::resonanceParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                expect(std::isfinite(data[i]), "output must stay finite with Loop Filter Type=Resonant at max Resonance/Decay/Bow");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            logMessage("Resonant loop filter worst-case peak: " + juce::String(peak, 4));
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+        }
+
+        beginTest("Loop Filter Type=Resonant + Topology=Dual + Cross-Couple + each Waveshaper Type + Ring Mod stays finite and bounded");
+        {
+            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::loopFilterTypeParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::resonanceParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::detuneParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperType);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModFrequencyParamID, 5000.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    expect(std::isfinite(data[i]),
+                           "output must stay finite with Resonant loop filter + Dual topology + Waveshaper Type " + juce::String(waveshaperType) + " + Ring Mod all at worst-case settings");
+                    peak = std::max(peak, std::abs(data[i]));
+                }
+
+                logMessage("Resonant + Dual + Waveshaper Type=" + juce::String(waveshaperType) + " + Ring Mod worst-case peak: " + juce::String(peak, 4));
+                expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
     }
 };
 

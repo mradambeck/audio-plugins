@@ -10,7 +10,7 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int editorWidth = 1590;
+    constexpr int editorWidth = 1920;
     constexpr int editorHeight = 260;
     constexpr int sliderSize = 100;
     constexpr int labelHeight = 20;
@@ -113,6 +113,23 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     detuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::detuneParamID, detuneSlider);
 
+    // The Loop Filter seam's runtime dropdown (see KarplunkLoopFilter.h's own comment) -
+    // "Two-Point Average" is index 0, "Resonant" is index 1, matching createParameterLayout()'s
+    // own choice list.
+    loopFilterTypeBox.addItem("Two-Point Average", 1);
+    loopFilterTypeBox.addItem("Resonant", 2);
+    addAndMakeVisible(loopFilterTypeBox);
+    loopFilterTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::loopFilterTypeParamID, loopFilterTypeBox);
+
+    setupSlider(resonanceSlider, resonanceLabel, "Resonance");
+    resonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::resonanceParamID, resonanceSlider);
+
+    setupSlider(formantFrequencySlider, formantFrequencyLabel, "Formant Freq");
+    formantFrequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::formantFrequencyParamID, formantFrequencySlider);
+
     setSize(editorWidth, editorHeight);
 }
 
@@ -149,7 +166,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 14;
+    const auto sliderCount = 17;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -178,5 +195,11 @@ void KarplunkAudioProcessorEditor::resized()
 
     layoutColumn(bounds.removeFromLeft(columnWidth), crossCoupleLabel, crossCoupleSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), coupleDelayLabel, coupleDelaySlider);
-    layoutColumn(bounds, detuneLabel, detuneSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), detuneLabel, detuneSlider);
+
+    auto loopFilterTypeColumn = bounds.removeFromLeft(columnWidth);
+    loopFilterTypeBox.setBounds(loopFilterTypeColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
+
+    layoutColumn(bounds.removeFromLeft(columnWidth), resonanceLabel, resonanceSlider);
+    layoutColumn(bounds, formantFrequencyLabel, formantFrequencySlider);
 }

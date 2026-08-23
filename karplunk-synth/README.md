@@ -13,9 +13,10 @@ gotchas, and running tests across all plugins at once.
 Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
 controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), Mono Glide/portamento, a Waveshaper
 (`KarplunkWaveshaper.h`, Fold/Fuzz/Saturate/BitCrush via a runtime dropdown), an in-loop Ring
-Modulator (`KarplunkRingModulator.h`), and a Dual Cross-Coupled Feedback Topology (a live "Single/
-Dual" dropdown alongside Cross-Couple, Couple Delay, and Detune controls - see `KarplunkVoice.h`)
-are done. No
+Modulator (`KarplunkRingModulator.h`), a Dual Cross-Coupled Feedback Topology (a live "Single/
+Dual" dropdown alongside Cross-Couple, Couple Delay, and Detune controls - see `KarplunkVoice.h`),
+and a Resonant Loop Filter (a live "Loop Filter Type" dropdown alongside Resonance and Formant
+Freq controls - see `KarplunkLoopFilter.h`) are done. No
 installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all explicitly out
 of scope until asked for.
 
@@ -516,15 +517,62 @@ zero delay - the exact same bound as the undelayed proof, shown to hold regardle
 ceiling needed here either - the same "already at its provably-safe maximum" property Cross-Couple
 itself has.
 
+**Resonant Loop Filter** (`KarplunkLoopFilter.h`) - the Loop Filter seam's second live-switchable
+option (a "Loop Filter Type" dropdown, Two-Point Average / Resonant, at the user's explicit
+request - the same migration Waveshaper Type/Feedback Topology already made from a compile-time
+template parameter to a runtime choice). This is the single most safety-critical addition to this
+codebase: a resonant filter sits INSIDE the Karplus-Strong feedback loop, so if its own gain at its
+resonant peak ever exceeded 1, that frequency's energy would grow without bound every pass - real,
+audible runaway, not a subtle bug. Researched directly (not guessed) from Jaffe & Smith 1983
+("Extensions of the Karplus-Strong Plucked-String Algorithm") and Julius O. Smith's PASP treatment
+of the Extended KS loop filter, which states the requirement plainly - `|H_d(e^jwT)| <= 1` - and
+confirmed every canonical EKS loop filter in that literature is a damping/lowpass design, never a
+resonant boost; also cross-checked against Mutable Instruments Rings' own `string.cc` (already this
+codebase's reference for Structure/Position), whose own "extra resonance" trick is applied to a
+non-recirculating OUTPUT tap, not injected as gain inside the loop - independent confirmation that
+resonant colouring's risk surface is normally kept outside (or provably bounded within) the
+recirculating path.
+
+`KarplunkResonantLoopFilter` cascades the existing `TwoPointAverageLoopFilter` (keeps the
+physically-correct "brightness fades as decay progresses" character exactly as before) with a new
+`KarplunkResonantPeakFilter` (an RBJ-cookbook constant-0dB-peak-gain resonant bandpass), mixed in by
+Resonance (0% = bit-exact bypass; also drives Q, 0.7-10, for a single "more resonance = narrower/
+ringier peak" knob) at a Formant Frequency (an absolute Hz value, 80Hz-8kHz, NOT tracking the
+note's own pitch - see below for why that's a musical choice, not a stability one).
+
+Derived, not assumed: at its own design frequency, the peak filter's magnitude is EXACTLY 1
+(the transposed-direct-form-II biquad's numerator and denominator reduce to the identical complex
+factor at that frequency - re-derived directly rather than trusted from the cookbook formula alone,
+given how load-bearing this is), and its DC/Nyquist gain is exactly 0 in both cases - the standard
+"single resonant maximum of exactly 1, nowhere higher" property of this filter family, verified by a
+dense numeric frequency sweep in the test suite, not just trusted from the derivation (the same
+"measured, not just reasoned" discipline this codebase applies even to already-provable properties).
+The Resonance mix itself is a convex combination - `(1-r) + r*H_peak(w)` - bounded to magnitude 1 by
+the triangle inequality for every frequency/r/Q/Formant Frequency, the identical algebraic pattern
+Cross-Couple and Couple Delay already use. Combined with the existing filter's own proven `|H(w)|
+<= 0.9995`, the total per-pass loop gain never exceeds 0.9995 at ANY frequency, ANY Damping,
+Resonance, or Formant Frequency - no tuned ceiling needed on either new control, the same
+"already at its provably-safe maximum" category Cross-Couple/Couple Delay occupy. This bound never
+references note pitch or delay length at all, so it holds identically from A0 to C8 - which is
+exactly why Formant Frequency can be a pure musical choice (absolute Hz) rather than something that
+needs to track the note being played.
+
+`getLoopGain()` (Bow's loudness-compensation formula depends on it) is redefined as this filter's
+own DC gain - `g*(1-r)`, since the resonant peak has an exact DC zero regardless of Resonance/
+Formant/Q - confirmed to keep `sqrt(1-loopGain)` well-behaved (always positive, never NaN) at every
+control combination, and reduces to today's exact behavior at Resonance=0%.
+
 **Six swappable areas**, each isolated so the others never need to change:
 
 1. **Excitation** (`KarplunkExcitation.h`) - "generate one sample of excitation per tick, shaped by
    a live ADSR envelope." Base implementation: `NoiseExcitation`, a brightness-controllable
    lowpassed white-noise generator with a live Pluck/Bow envelope morph (see above).
-2. **Loop Filter** (`KarplunkLoopFilter.h`) - "process one sample through the feedback path." Base
-   implementation: `TwoPointAverageLoopFilter`, the classic `y[n] = g * 0.5*(x[n] + x[n-1])`
-   one-zero averager - brightness-dependent decay is real Karplus-Strong physics here, not a bug
-   (see the class's own comment).
+2. **Loop Filter** (`KarplunkLoopFilter.h`) - "process one sample through the feedback path." Two
+   implementations, selected at RUNTIME (a live "Loop Filter Type" dropdown - see above for why
+   this seam migrated from a compile-time template parameter): `TwoPointAverageLoopFilter`, the
+   classic `y[n] = g * 0.5*(x[n] + x[n-1])` one-zero averager (brightness-dependent decay is real
+   Karplus-Strong physics here, not a bug - see the class's own comment), and
+   `KarplunkResonantLoopFilter`, which cascades that same filter with a resonant peak.
 3. **Delay Tuning** (`KarplunkStringLine.h`) - fractional-delay interpolation, isolated behind an
    `Interpolator` template parameter. Base implementation: `LinearInterpolator`. This is a
    hand-rolled ring buffer (`std::vector<float>` + a non-consuming `read()`), **not** a wrapper
@@ -558,8 +606,8 @@ itself has.
 
 No polymorphism (no `virtual`, no `std::function`-as-strategy) is used anywhere - every per-sample
 seam is either a compile-time template parameter on `KarplunkStringLineChannel` or, for Waveshaper/
-Ring Modulator/Feedback Topology specifically, a runtime choice among concrete types/paths owned by
-value with a plain branch - matching this
+Ring Modulator/Feedback Topology/Loop Filter specifically, a runtime choice among concrete types/
+paths owned by value with a plain branch - matching this
 catalog's established DSP style: small, concrete, framework-free classes composed by value (see
 `gradient-pitch/Source/GradientDelayBuffer.h` / `GradientPitchShiftEngine.h`), which is also why
 `KarplunkStringLine` ended up hand-rolled the same way `GradientDelayBuffer` is, rather than
@@ -570,7 +618,7 @@ wrapping a JUCE class as originally planned.
 | Area                                        | What changes                                                                                 | Real-time implication                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
-| Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
+| Loop Filter                                 | Two-point average -> resonant is built and live-switchable; a future third type (e.g. asymmetric, or a second internal comb/allpass creating non-harmonic peaks) needs its own closed-form stability argument, not assumed to inherit the resonant filter's | Both filters always present, fixed bounded state (a few extra floats) - size in `prepare()`. A future variant needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is - and, since this seam lives inside the feedback loop, needs its own proof that its own worst-case gain can't push the combined per-pass loop gain above 1 at any frequency (see "How it works" above for how the resonant filter's own proof works).                                                                                                                                                                               |
 | Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `KarplunkStringLineChannel`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
 | Waveshaper                                  | All four Waveshaper Types are built (Fold, Fuzz, Saturate, BitCrush) - a fifth would need its own driveCompensation/loop-safety story worked out, same as each of these did | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `KarplunkStringLineChannel` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). All four concrete classes are owned by value and selected via a plain branch (no virtual dispatch). Fold is stateless per-call (`process(x, amount01, driveCompensation)`); Fuzz and Saturator both need a per-sample post-clip lowpass (measured necessary for both, despite Saturator's much gentler drive), so they use `updateFilter(x, amount01)` once per sample plus a stateless `process(amount01, driveCompensation)` accessor instead; BitCrush needs updateFilter()/process() too (real sample-and-hold state) but no driveCompensation parameter at all (see "How it works" above) - a future variant follows whichever shape fits its own safety story. |
 | Ring Modulator                              | Currently a fixed sine oscillator - a future variant could offer other waveforms (triangle/square for a buzzier, more harmonically-dense modulator), note-pitch tracking (a toggle to make it a harmonic effect rather than an inharmonic one), or a shared cross-voice oscillator instead of one per voice (trading the current per-voice independence for phase-locked chords) | `KarplunkRingModulator.h`'s `updateOscillator()`/`process()` split isolates "what the oscillator IS" from "how it's applied" - a different waveform only touches `updateOscillator()`. A shared oscillator would need `PluginProcessor::processBlock()` to compute it once per sample and pass the value into every voice, a bigger structural change than any other feature in this file. |
@@ -597,6 +645,9 @@ wrapping a JUCE class as originally planned.
 | Cross-Couple     | 0 - 100%     | 0%      | Dual-topology only (no effect at Topology=Single). How much of each line's write-back value comes from the OTHER line. 0% is a bit-exact no-op for line A alone (line B still rings independently and sums in). Provably safe across the FULL range - no ceiling needed, see "How it works" above. Live-adjustable.                                |
 | Couple Delay     | 0 - 10ms     | 0ms     | Dual-topology only. A short delay inserted into the cross-coupling path itself (each direction independently) - turns the coupling from flat/broadband into harmonic-dependent, since a delay is a phase shift and different harmonics interfere differently depending on delay length vs. their own period. 0ms is a bit-exact match for the original undelayed coupling. Also provably safe across its full range - see "How it works" above. Live-adjustable.                                |
 | Detune           | 0 - 100%     | 0%      | Dual-topology only. Offsets line B's pitch from line A's by up to ~50 cents at 100% (raised from an initial ~20 cent starting point once the user heard it and wanted more range - unlike Cross-Couple, Detune has no stability ceiling, so this is a pure "does it sound good" call). Latched at noteOn (not live), same convention as Brightness - real unison detuning isn't a performance gesture. 0% keeps both lines at the identical pitch (the primary, physically-grounded coupled-unison design - see "How it works" above).                                |
+| Loop Filter Type | Two-Point Average / Resonant | Two-Point Average | Two-Point Average: the classic one-zero averager. Resonant: cascades that same filter with a resonant peak - see "How it works" above for its own closed-form safety proof. Live-switchable; a mid-note switch just leaves the unselected filter's own history momentarily stale until reselected (same accepted tradeoff Waveshaper Type has), no implicit all-notes-off needed.                                |
+| Resonance        | 0 - 100%     | 0%      | Resonant-loop-filter-only (no effect at Loop Filter Type=Two-Point Average). How much of the resonant peak is mixed in (also drives Q, 0.7-10 - narrower/ringier at higher settings). Provably safe across the FULL range - no ceiling needed, see "How it works" above. Live-adjustable.                                |
+| Formant Freq     | 80Hz - 8kHz  | 1000Hz  | Resonant-loop-filter-only. The resonant peak's own frequency - an absolute Hz value, deliberately NOT tracking the note's own pitch (the stability proof never references it, so this is a purely musical choice - see "How it works" above). Skewed range, live-adjustable.                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section).
@@ -608,7 +659,7 @@ karplunk-synth/
 ├── CMakeLists.txt
 ├── Source/
 │   ├── KarplunkExcitation.h/.cpp   # Excitation seam: NoiseExcitation (pluck burst + bow morph)
-│   ├── KarplunkLoopFilter.h/.cpp   # Loop Filter seam: TwoPointAverageLoopFilter
+│   ├── KarplunkLoopFilter.h/.cpp   # Loop Filter seam: Two-Point Average / Resonant, runtime dropdown
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
 │   ├── KarplunkVoice.h             # Feedback Topology seam: KarplunkStringLineChannel (per-string)
 │   │                                 # + KarplunkVoice (orchestrator, Single/Dual cross-coupled)

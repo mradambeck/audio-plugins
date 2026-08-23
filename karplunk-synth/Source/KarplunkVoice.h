@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "KarplunkLoopFilter.h"
 #include "KarplunkRingModulator.h"
 #include "KarplunkStringLine.h"
 #include "KarplunkWaveshaper.h"
@@ -119,7 +120,7 @@ private:
 // "written back" (that interception point is exactly where cross-coupling happens - see
 // `KarplunkVoice::renderNextSample()`). Same operations, same order, same formulas - Single
 // topology's output is bit-exact with what this whole file produced before this split existed.
-template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator>
+template <typename Excitation, typename InterpolationType = LinearInterpolator>
 class KarplunkStringLineChannel
 {
 public:
@@ -150,7 +151,8 @@ public:
         capacitySamples = requiredCapacitySamples(sampleRate);
 
         excitation.prepare(sampleRate);
-        loopFilter.prepare(sampleRate);
+        loopFilterTwoPoint.prepare(sampleRate);
+        loopFilterResonant.prepare(sampleRate);
         stringLine.prepare(sampleRate, capacitySamples);
         dispersionFilter.prepare();
         waveFolder.prepare(sampleRate);
@@ -167,7 +169,8 @@ public:
     void reset() noexcept
     {
         excitation.reset();
-        loopFilter.reset();
+        loopFilterTwoPoint.reset();
+        loopFilterResonant.reset();
         stringLine.reset();
         dispersionFilter.reset();
         waveFolder.reset();
@@ -259,10 +262,26 @@ public:
     // real-time-safety implication (pure arithmetic state change, no allocation).
     void noteOff() noexcept { excitation.noteOff(); }
 
+    // Fans out to BOTH concrete loop filters unconditionally (cheap scalar stores either way) -
+    // matches Waveshaper's own "always keep every concrete instance current" convention, so
+    // whichever type is selected next (via setLoopFilterType()) is already up to date for a live
+    // mid-note switch.
     void setDamping(float amount01) noexcept
     {
-        loopFilter.setDamping(amount01);
+        loopFilterTwoPoint.setDamping(amount01);
+        loopFilterResonant.setDamping(amount01);
     }
+
+    // Runtime selector between the two concrete loop filters (0 = Two-Point Average, 1 =
+    // Resonant) - see KarplunkLoopFilter.h's own comment for why this seam migrated to a runtime
+    // choice, mirroring Waveshaper Type exactly.
+    void setLoopFilterType(int type) noexcept { loopFilterType = type; }
+
+    // Resonant-loop-filter-only (has no effect at Loop Filter Type = Two-Point Average) - live,
+    // every-sample, same convention as Waveshape/Structure. See KarplunkResonantLoopFilter's own
+    // comment for the closed-form argument that this needs no ceiling either.
+    void setResonance(float amount01) noexcept { loopFilterResonant.setResonance(amount01); }
+    void setFormantFrequency(float hz) noexcept { loopFilterResonant.setFormantFrequency(hz); }
 
     // Since the unified-envelope redesign, nextExcitationSample() reads brightness every tick, the
     // same way it reads bowAmount - so this class itself has no "only at noteOn" restriction any
@@ -418,7 +437,13 @@ public:
             delayed = stringLine.read();
         }
 
-        auto filtered = loopFilter.processSample(delayed);
+        // Loop Filter Type: runtime choice between the two concrete filters (see
+        // KarplunkLoopFilter.h's own comment for why this seam migrated to a runtime dropdown,
+        // mirroring Waveshaper Type). Both getLoopGain() below and processSample() here branch on
+        // the same `loopFilterType`, so whichever filter is selected drives both the recirculating
+        // signal AND the Bow loudness-compensation math consistently.
+        auto filtered = loopFilterType == 0 ? loopFilterTwoPoint.processSample(delayed)
+                                             : loopFilterResonant.processSample(delayed);
 
         // Unified excitation injection: unconditional, every tick (no more `held` gate) - an idle
         // (never-triggered) or fully-released excitation just returns ~0 on its own, see
@@ -448,7 +473,8 @@ public:
         // bowed voices sum in PluginProcessor. At bowAmount=0 this only engages for the (rare)
         // near-full-velocity noise sample that would already be near +-1 anyway - a light, always-
         // on safety softening at the very top of the range, not a structural change from before.
-        const auto fullBowGain = continuousLevelAnalog * std::sqrt(1.0f - loopFilter.getLoopGain());
+        const auto activeLoopGain = loopFilterType == 0 ? loopFilterTwoPoint.getLoopGain() : loopFilterResonant.getLoopGain();
+        const auto fullBowGain = continuousLevelAnalog * std::sqrt(1.0f - activeLoopGain);
         const auto injectionGain = 1.0f + excitation.getBowAmount() * (fullBowGain - 1.0f);
         filtered += std::tanh(excitation.nextExcitationSample(noteVelocity) * injectionGain);
 
@@ -622,11 +648,16 @@ private:
     }
 
     Excitation excitation;
-    LoopFilter loopFilter;
+    // Runtime-selectable, not a template parameter (see KarplunkLoopFilter.h's own comment) -
+    // both concrete filters always present, branched on by loopFilterType. Damping is fanned out
+    // to both via setDamping() so whichever is active is always current.
+    TwoPointAverageLoopFilter loopFilterTwoPoint;
+    KarplunkResonantLoopFilter loopFilterResonant;
+    int loopFilterType = 0; // 0 = Two-Point Average, 1 = Resonant - see setLoopFilterType()
     KarplunkStringLine<InterpolationType> stringLine;
     KarplunkDispersionFilter dispersionFilter;
     // Runtime-selectable, not a template parameter - see KarplunkWaveshaper.h's own comment for
-    // why this one seam works differently from Excitation/Loop Filter/Delay Tuning. All four
+    // why this one seam works differently from Excitation/Delay Tuning. All four
     // concrete types live here unconditionally (no polymorphism/vtable), selected per-sample by
     // `waveshaperType` in renderChannelSample().
     KarplunkWaveFolder waveFolder;
@@ -738,11 +769,11 @@ private:
 // audible "double decay"/beating character is the coupling ACTING ON two genuinely independent
 // strings, not a mistuning trick. `setNoiseSeed()` (see KarplunkStringLineChannel's own comment)
 // is how this class gives lineB that independence, at prepare() time.
-template <typename Excitation, typename LoopFilter, typename InterpolationType = LinearInterpolator>
+template <typename Excitation, typename InterpolationType = LinearInterpolator>
 class KarplunkVoice
 {
 public:
-    using Channel = KarplunkStringLineChannel<Excitation, LoopFilter, InterpolationType>;
+    using Channel = KarplunkStringLineChannel<Excitation, InterpolationType>;
 
     // Mirrors Channel's own constants exactly (both must stay in sync - a compile-time assertion
     // isn't practical across two independently-instantiable templates, so this is a documented
@@ -798,6 +829,14 @@ public:
     }
 
     void setDamping(float amount01) noexcept { lineA.setDamping(amount01); lineB.setDamping(amount01); }
+
+    // Runtime selector for the Loop Filter seam (0 = Two-Point Average, 1 = Resonant) - live,
+    // every-sample, same convention as Waveshaper Type. Fanned out identically to both lines, which
+    // is exactly what keeps the Dual-topology safety proof valid for either filter type - see
+    // renderNextSample()'s own coupling-safety comment.
+    void setLoopFilterType(int type) noexcept { lineA.setLoopFilterType(type); lineB.setLoopFilterType(type); }
+    void setResonance(float amount01) noexcept { lineA.setResonance(amount01); lineB.setResonance(amount01); }
+    void setFormantFrequency(float hz) noexcept { lineA.setFormantFrequency(hz); lineB.setFormantFrequency(hz); }
     void setBrightness(float amount01) noexcept { lineA.setBrightness(amount01); lineB.setBrightness(amount01); }
     void setBowAmount(float amount01) noexcept { lineA.setBowAmount(amount01); lineB.setBowAmount(amount01); }
     void setStructure(float amount01) noexcept { lineA.setStructure(amount01); lineB.setStructure(amount01); }
@@ -866,16 +905,20 @@ public:
         //     m=(A+B)/2 and differential mode d=(A-B)/2. Algebraically, writeBackA+writeBackB =
         //     filteredA+filteredB (common mode UNCHANGED by coupling), while writeBackA-writeBackB
         //     = (1-2c)*(filteredA-filteredB) (differential mode scaled by (1-2c) each pass). Both
-        //     lines get the IDENTICAL setDamping() call every sample (see setDamping() above), so
-        //     their loop gains g are EXACTLY equal, always - not approximately. Common-mode
-        //     round-trip gain per pass is exactly g (unaffected by coupling, already proven safe by
-        //     every existing Single-topology test); differential-mode gain is g*(1-2c), and since
-        //     (1-2c) in [-1,1] for c in [0,1], |g*(1-2c)| <= g always. TwoPointAverageLoopFilter
-        //     hard-clamps g to [0.90, 0.9995] (see KarplunkLoopFilter.h), so BOTH modes stay
-        //     strictly contractive (< 1) for every Damping setting and the ENTIRE Cross-Couple
-        //     range - a strictly stronger guarantee than Structure needed, since cross-coupling is
-        //     incapable, by construction, of raising either mode's gain above what an uncoupled
-        //     line already safely has.
+        //     lines get IDENTICAL setDamping()/setLoopFilterType()/setResonance()/
+        //     setFormantFrequency() calls every sample (see those setters above), so their ACTIVE
+        //     loop filter's magnitude response H(w) is EXACTLY equal at every frequency, always -
+        //     not approximately, and regardless of which Loop Filter Type is selected. Common-mode
+        //     round-trip gain per pass is exactly H(w) (unaffected by coupling, already proven safe
+        //     by every existing Single-topology test, for either filter type - see
+        //     KarplunkLoopFilter.h's own comment for why |H(w)| <= 0.9995 holds for BOTH
+        //     TwoPointAverageLoopFilter and KarplunkResonantLoopFilter, at every frequency); the
+        //     differential-mode gain is H(w)*(1-2c), and since (1-2c) in [-1,1] for c in [0,1],
+        //     |H(w)*(1-2c)| <= |H(w)| <= 0.9995 always. So BOTH modes stay strictly contractive
+        //     (< 1) for every Damping/Resonance/Formant setting, EITHER Loop Filter Type, and the
+        //     ENTIRE Cross-Couple range - a strictly stronger guarantee than Structure needed,
+        //     since cross-coupling is incapable, by construction, of raising either mode's gain
+        //     above what an uncoupled line already safely has.
         //
         // Couple Delay inserts a short, fixed integer-sample delay into EACH direction of the
         // coupling path (KarplunkShortDelay - a plain ring buffer, no fractional interpolation

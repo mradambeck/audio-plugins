@@ -17,7 +17,7 @@
 class KarplunkVoiceTests : public juce::UnitTest
 {
 public:
-    using Voice = KarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
+    using Voice = KarplunkVoice<NoiseExcitation, LinearInterpolator>;
 
     KarplunkVoiceTests() : juce::UnitTest("KarplunkVoice", "Karplunk") {}
 
@@ -1315,6 +1315,166 @@ public:
                 expect(std::isfinite(sample), "output must stay finite through an abrupt Couple Delay step");
                 expect(std::abs(sample - previous) <= 1.0f, "an abrupt Couple Delay change should not produce a large sample-to-sample discontinuity");
                 previous = sample;
+            }
+        }
+
+        beginTest("Loop Filter Type defaults to Two-Point Average - explicitly setting it is bit-identical to never touching it");
+        {
+            Voice withType;
+            withType.prepare(44100.0);
+            withType.setDamping(0.6f);
+            withType.setLoopFilterType(0);
+            withType.noteOn(60, 1.0f);
+
+            Voice withoutTouchingType;
+            withoutTouchingType.prepare(44100.0);
+            withoutTouchingType.setDamping(0.6f);
+            withoutTouchingType.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 4410; ++i)
+                expectWithinAbsoluteError(withType.renderNextSample(), withoutTouchingType.renderNextSample(), 1.0e-6f);
+        }
+
+        beginTest("Loop Filter Type=Resonant + Resonance=0 renders bit-identical to Loop Filter Type=Two-Point-Average");
+        {
+            // Confirms the internal bypass fires even when the TYPE is switched but the AMOUNT is
+            // 0 - not just when the type is left untouched (the test above).
+            Voice resonantAtZero;
+            resonantAtZero.prepare(44100.0);
+            resonantAtZero.setDamping(0.6f);
+            resonantAtZero.setLoopFilterType(1);
+            resonantAtZero.setResonance(0.0f);
+            resonantAtZero.noteOn(60, 1.0f);
+
+            Voice twoPoint;
+            twoPoint.prepare(44100.0);
+            twoPoint.setDamping(0.6f);
+            twoPoint.setLoopFilterType(0);
+            twoPoint.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 4410; ++i)
+                expectWithinAbsoluteError(resonantAtZero.renderNextSample(), twoPoint.renderNextSample(), 1.0e-6f);
+        }
+
+        beginTest("Loop Filter Type=Resonant at max Resonance/Damping produces bounded, decaying output across the full note range");
+        {
+            for (int note : { Voice::kLowestSupportedMidiNote, 60, Voice::kHighestSupportedMidiNote })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(1.0f);
+                voice.setLoopFilterType(1);
+                voice.setResonance(1.0f);
+                voice.setFormantFrequency(1000.0f);
+                voice.noteOn(note, 1.0f);
+
+                constexpr int maxSamples = 44100 * 10;
+                int samples = 0;
+                for (; samples < maxSamples && voice.isActive(); ++samples)
+                {
+                    const auto sample = voice.renderNextSample();
+                    expect(std::isfinite(sample), "output must stay finite at max Resonance across the note range");
+                    expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as every other note-range test");
+                }
+
+                expect(samples < maxSamples, "every supported note should still decay to silence within 10 seconds at max Resonance");
+            }
+        }
+
+        beginTest("Loop Filter Type=Resonant worst-case stability: max Resonance/Damping/Bow, held for several seconds, Formant Frequency sweep");
+        {
+            for (float formantHz : { 80.0f, 1000.0f, 8000.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(1.0f);
+                voice.setBowAmount(1.0f);
+                voice.setLoopFilterType(1);
+                voice.setResonance(1.0f);
+                voice.setFormantFrequency(formantHz);
+                voice.noteOn(60, 1.0f);
+                // Deliberately never calling noteOff() - held bow, the worst case for sustained energy.
+
+                constexpr int numSamples = 44100 * 5;
+                float peakAbs = 0.0f;
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    const auto sample = voice.renderNextSample();
+                    expect(std::isfinite(sample), "held bow injection through the resonant loop filter must stay finite");
+                    peakAbs = std::max(peakAbs, std::abs(sample));
+                }
+                // Same bound the existing held-bow worst-case test uses.
+                expect(peakAbs <= 5.5f, "held bow injection through the resonant loop filter must stay bounded");
+            }
+        }
+
+        beginTest("Resonance measurably changes spectral content near the Formant Frequency vs Resonance=0%");
+        {
+            auto goertzelMagnitude = [](const std::vector<float>& buf, double omega) -> double
+            {
+                double real = 0.0, imag = 0.0;
+                for (size_t n = 0; n < buf.size(); ++n)
+                {
+                    real += (double) buf[n] * std::cos(omega * (double) n);
+                    imag -= (double) buf[n] * std::sin(omega * (double) n);
+                }
+                return std::sqrt(real * real + imag * imag);
+            };
+
+            constexpr float formantHz = 1200.0f;
+            constexpr double sampleRate = 44100.0;
+            const auto formantOmega = 2.0 * 3.14159265358979323846 * formantHz / sampleRate;
+
+            auto measureNearFormant = [&](float resonance) -> double
+            {
+                Voice voice;
+                voice.prepare(sampleRate);
+                voice.setDamping(0.9f);
+                voice.setBowAmount(1.0f); // continuous excitation - broadband content to shape
+                voice.setLoopFilterType(1);
+                voice.setResonance(resonance);
+                voice.setFormantFrequency(formantHz);
+                voice.noteOn(48, 1.0f); // a low note, so the formant sits well above the fundamental
+
+                for (int i = 0; i < 22050; ++i)
+                    voice.renderNextSample();
+
+                constexpr int windowSize = 4096;
+                std::vector<float> buf((size_t) windowSize);
+                for (auto& s : buf)
+                    s = voice.renderNextSample();
+
+                return goertzelMagnitude(buf, formantOmega);
+            };
+
+            const auto magnitudeOff = measureNearFormant(0.0f);
+            const auto magnitudeOn = measureNearFormant(1.0f);
+
+            logMessage("Resonance=0 magnitude near Formant Freq: " + juce::String(magnitudeOff, 3)
+                       + ", Resonance=100%: " + juce::String(magnitudeOn, 3));
+
+            expect(magnitudeOn > magnitudeOff * 1.5, "Resonance should measurably boost spectral content near the Formant Frequency");
+        }
+
+        beginTest("Dual Topology + Loop Filter Type=Resonant at max Resonance/Cross-Couple/Bow stays bounded");
+        {
+            Voice voice;
+            voice.prepare(44100.0);
+            voice.setDamping(1.0f);
+            voice.setBowAmount(1.0f);
+            voice.setTopology(1);
+            voice.setCrossCoupleAmount(1.0f);
+            voice.setLoopFilterType(1);
+            voice.setResonance(1.0f);
+            voice.setFormantFrequency(1000.0f);
+            voice.noteOn(60, 1.0f);
+
+            constexpr int numSamples = 44100 * 4;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const auto sample = voice.renderNextSample();
+                expect(std::isfinite(sample), "output must stay finite with Dual Topology + Resonant loop filter both at their worst-case settings");
+                expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as every other worst-case test");
             }
         }
     }

@@ -64,6 +64,9 @@ public:
     static constexpr auto crossCoupleParamID = "crossCouple";
     static constexpr auto coupleDelayParamID = "coupleDelay";
     static constexpr auto detuneParamID = "detune";
+    static constexpr auto loopFilterTypeParamID = "loopFilterType";
+    static constexpr auto resonanceParamID = "resonance";
+    static constexpr auto formantFrequencyParamID = "formantFrequency";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -85,8 +88,11 @@ private:
     std::atomic<float>* crossCoupleParam = nullptr;
     std::atomic<float>* coupleDelayParam = nullptr;
     std::atomic<float>* detuneParam = nullptr;
+    std::atomic<float>* loopFilterTypeParam = nullptr;
+    std::atomic<float>* resonanceParam = nullptr;
+    std::atomic<float>* formantFrequencyParam = nullptr;
 
-    using Voice = KarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
+    using Voice = KarplunkVoice<NoiseExcitation, LinearInterpolator>;
 
     // 8 voices, basic oldest-voice-stealing (see KarplunkVoiceAllocator.h) - each Voice composes
     // its three area-components by value, so this pool needed zero changes to any of the four
@@ -155,6 +161,13 @@ private:
     // Couple Delay is also live/every-sample, same convention as Cross-Couple (see
     // KarplunkVoice.h's own safety argument for why this needs no ceiling either).
     juce::SmoothedValue<float> coupleDelaySmoothed;
+
+    // Resonance/Formant Frequency are also live/every-sample, same convention as Waveshape/
+    // Structure - see KarplunkLoopFilter.h's own safety argument for why Resonance needs no
+    // ceiling either. Loop Filter Type itself is a discrete choice, read once per block like
+    // Waveshaper Type - see processBlock().
+    juce::SmoothedValue<float> resonanceSmoothed;
+    juce::SmoothedValue<float> formantFrequencySmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

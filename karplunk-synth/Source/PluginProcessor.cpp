@@ -27,6 +27,9 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     crossCoupleParam = apvts.getRawParameterValue(crossCoupleParamID);
     coupleDelayParam = apvts.getRawParameterValue(coupleDelayParamID);
     detuneParam = apvts.getRawParameterValue(detuneParamID);
+    loopFilterTypeParam = apvts.getRawParameterValue(loopFilterTypeParamID);
+    resonanceParam = apvts.getRawParameterValue(resonanceParamID);
+    formantFrequencyParam = apvts.getRawParameterValue(formantFrequencyParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -200,6 +203,42 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
+    // The Loop Filter seam (see KarplunkLoopFilter.h) - a runtime dropdown like Waveshaper Type,
+    // at the user's explicit request, so Two-Point Average and Resonant can be A/B'd live.
+    // Defaults to Two-Point Average (index 0) - preserves every existing preset/test's behavior
+    // exactly.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{loopFilterTypeParamID, 1},
+        "Loop Filter Type",
+        juce::StringArray{"Two-Point Average", "Resonant"},
+        0));
+
+    // Resonant-loop-filter-only (no effect at Loop Filter Type=Two-Point Average) - live/every-
+    // sample, provably safe across the full 0-100% range with no ceiling needed (a resonant peak
+    // mixed in via a convex combination can't push the loop's combined gain above what the
+    // existing Two-Point Average stage already safely caps it to) - see KarplunkLoopFilter.h's own
+    // closed-form argument.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{resonanceParamID, 1},
+        "Resonance",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // 80Hz-8kHz, skewed toward a vowel-ish/formant-relevant range - a reasoned starting range, not
+    // measured against Karplunk's own loop, to be confirmed by listening. The stability proof is
+    // completely independent of this value (see KarplunkLoopFilter.h), so this is a purely musical
+    // choice - an absolute Hz value, not tracking the note's own pitch.
+    juce::NormalisableRange<float> formantFrequencyRange(80.0f, 8000.0f);
+    formantFrequencyRange.setSkewForCentre(800.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{formantFrequencyParamID, 1},
+        "Formant Freq",
+        formantFrequencyRange,
+        1000.0f,
+        juce::AudioParameterFloatAttributes().withLabel("Hz")));
+
     return { params.begin(), params.end() };
 }
 
@@ -242,6 +281,12 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
 
     coupleDelaySmoothed.reset(sampleRate, smoothingRampSeconds);
     coupleDelaySmoothed.setCurrentAndTargetValue(coupleDelayParam->load());
+
+    resonanceSmoothed.reset(sampleRate, smoothingRampSeconds);
+    resonanceSmoothed.setCurrentAndTargetValue(resonanceParam->load());
+
+    formantFrequencySmoothed.reset(sampleRate, smoothingRampSeconds);
+    formantFrequencySmoothed.setCurrentAndTargetValue(formantFrequencyParam->load());
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -336,6 +381,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     ringModFrequencySmoothed.setTargetValue(ringModFrequencyParam->load());
     crossCoupleSmoothed.setTargetValue(crossCoupleParam->load());
     coupleDelaySmoothed.setTargetValue(coupleDelayParam->load());
+    resonanceSmoothed.setTargetValue(resonanceParam->load());
+    formantFrequencySmoothed.setTargetValue(formantFrequencyParam->load());
 
     // Poly/Mono is a discrete mode switch, not a live-sweepable control - deliberately not
     // smoothed, and checked once per block rather than every sample. Toggling it while notes are
@@ -381,6 +428,13 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // mid-note is completely safe.
     const auto waveshaperType = (int) waveshaperTypeParam->load();
 
+    // Loop Filter Type is the same kind of discrete choice as Waveshaper Type, for the same reason:
+    // both concrete filters are always constructed/prepared/kept current (via setDamping()'s own
+    // fan-out - see KarplunkVoice.h), so a mid-note switch just leaves the UNSELECTED filter's own
+    // history momentarily stale until reselected - no implicit all-notes-off needed, unlike Mono/
+    // Topology, which have real cross-referencing bookkeeping that would otherwise go stale.
+    const auto loopFilterType = (int) loopFilterTypeParam->load();
+
     auto midiIterator = midiMessages.cbegin();
     const auto midiEnd = midiMessages.cend();
 
@@ -401,6 +455,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         const auto ringModFrequency = ringModFrequencySmoothed.getNextValue();
         const auto crossCouple = crossCoupleSmoothed.getNextValue();
         const auto coupleDelay = coupleDelaySmoothed.getNextValue();
+        const auto resonance = resonanceSmoothed.getNextValue();
+        const auto formantFrequency = formantFrequencySmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
@@ -416,6 +472,9 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setTopology(topology);
             v.setCoupleDelay(coupleDelay);
             v.setCrossCoupleAmount(crossCouple);
+            v.setLoopFilterType(loopFilterType);
+            v.setResonance(resonance);
+            v.setFormantFrequency(formantFrequency);
             mixedSample += v.renderNextSample();
         }
 
