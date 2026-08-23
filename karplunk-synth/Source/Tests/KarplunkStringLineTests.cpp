@@ -87,6 +87,25 @@ public:
             expectWithinAbsoluteError((float) (longTick - shortTick), 10.0f, 1.0f);
         }
 
+        beginTest("readAt() is a pure alternate-tap read that never mutates the stored delay");
+        {
+            KarplunkStringLine<> line;
+            line.prepare(44100.0, 64);
+            line.setDelaySamples(16.0f);
+
+            for (int i = 0; i < 32; ++i)
+                line.write((float) i);
+
+            const auto baseline = line.read();
+            const auto alternate = line.readAt(4.0f);
+
+            expect(std::abs(alternate - baseline) > 1.0e-3f, "readAt() at a different delay should return a different sample than read()");
+
+            // Confirm readAt() didn't perturb the delay read() uses - it should return the exact
+            // same value as before, unaffected by the readAt() call in between.
+            expectWithinAbsoluteError(line.read(), baseline, 1.0e-6f);
+        }
+
         beginTest("reset() clears history to silence");
         {
             KarplunkStringLine<> line;

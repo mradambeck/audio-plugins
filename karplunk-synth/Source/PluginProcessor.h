@@ -50,6 +50,9 @@ public:
     static constexpr auto dampingParamID = "damping";
     static constexpr auto outputLevelParamID = "outputLevel";
     static constexpr auto brightnessParamID = "brightness";
+    static constexpr auto bowAmountParamID = "bowAmount";
+    static constexpr auto structureParamID = "structure";
+    static constexpr auto positionParamID = "position";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -58,8 +61,11 @@ private:
     std::atomic<float>* dampingParam = nullptr;
     std::atomic<float>* outputLevelParam = nullptr;
     std::atomic<float>* brightnessParam = nullptr;
+    std::atomic<float>* bowAmountParam = nullptr;
+    std::atomic<float>* structureParam = nullptr;
+    std::atomic<float>* positionParam = nullptr;
 
-    using Voice = SingleLineKarplunkVoice<NoiseBurstExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
+    using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
     // 8 voices, basic oldest-voice-stealing (see KarplunkVoiceAllocator.h) - each Voice composes
     // its three area-components by value, so this pool needed zero changes to any of the four
@@ -76,6 +82,16 @@ private:
 
     juce::SmoothedValue<float> dampingSmoothed;
     juce::SmoothedValue<float> outputLevelSmoothed;
+
+    // Unlike Brightness (latched once at noteOn), Bow Amount is smoothed and applied to every
+    // voice every sample, same pattern as Decay - bowing is a sustained, live gesture, so a
+    // performer should hear the knob change in real time while a note rings.
+    juce::SmoothedValue<float> bowAmountSmoothed;
+
+    // Structure and Position are also live/every-sample, same convention as Bow Amount/Decay -
+    // both are meant to be swept while a note rings, not just set before plucking.
+    juce::SmoothedValue<float> structureSmoothed;
+    juce::SmoothedValue<float> positionSmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

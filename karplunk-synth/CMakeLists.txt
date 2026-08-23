@@ -61,8 +61,8 @@ target_link_libraries(Karplunk
 # Headless UnitTest runner for the four standalone DSP-seam classes (Excitation, Loop Filter,
 # Delay Tuning/StringLine, and the composed Voice) - deliberately excludes plugin/JUCE-format
 # machinery entirely, so it builds and runs fast on its own (matches gradient-pitch's GradientTests
-# pattern; alloy-bass's PluginProcessor-in-Tests pattern doesn't apply here since Karplunk's DSP
-# lives in standalone classes, not inline in PluginProcessor).
+# pattern). This only ever exercises the isolated Voice class, not the real PluginProcessor
+# (parameter wiring, APVTS, smoothing, MIDI dispatch) - see KarplunkProcessorTests below for that.
 juce_add_console_app(KarplunkTests
     PRODUCT_NAME "KarplunkTests"
 )
@@ -82,6 +82,40 @@ target_sources(KarplunkTests
 target_link_libraries(KarplunkTests
     PRIVATE
         juce::juce_core
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Headless UnitTest runner that drives the real KarplunkAudioProcessor directly (APVTS parameters,
+# smoothing, MIDI dispatch, processBlock) - the exact class the plugin ships, not the isolated
+# Voice DSP class KarplunkTests exercises above. Mirrors alloy-bass's AlloyTests split: createEditor()
+# lives in PluginEditor.cpp specifically so PluginProcessor.cpp has no GUI dependency and this
+# target stays small and fast, excluding plugin/JUCE-format machinery and the editor/LookAndFeel/
+# font code entirely.
+juce_add_console_app(KarplunkProcessorTests
+    PRODUCT_NAME "KarplunkProcessorTests"
+)
+
+target_sources(KarplunkProcessorTests
+    PRIVATE
+        Source/KarplunkExcitation.cpp
+        Source/KarplunkLoopFilter.cpp
+        Source/PluginProcessor.cpp
+        Source/Tests/TestCreateEditorStub.cpp
+        Source/Tests/KarplunkProcessorTests.cpp
+        Source/Tests/TestRunner.cpp
+)
+
+target_compile_definitions(KarplunkProcessorTests
+    PRIVATE
+        JucePlugin_Name="Karplunk"
+)
+
+target_link_libraries(KarplunkProcessorTests
+    PRIVATE
+        juce::juce_audio_processors
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "KarplunkBuildNumber.h"
 #include "KarplunkLookAndFeel.h"
 #include "PluginProcessor.h"
 
@@ -25,6 +26,7 @@ private:
     KarplunkLookAndFeel lookAndFeel;
 
     juce::Label titleLabel;
+    juce::Label buildNumberLabel;
 
     juce::Slider dampingSlider;
     juce::Label dampingLabel;
@@ -37,6 +39,18 @@ private:
     juce::Slider brightnessSlider;
     juce::Label brightnessLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> brightnessAttachment;
+
+    juce::Slider bowAmountSlider;
+    juce::Label bowAmountLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowAmountAttachment;
+
+    juce::Slider structureSlider;
+    juce::Label structureLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> structureAttachment;
+
+    juce::Slider positionSlider;
+    juce::Label positionLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

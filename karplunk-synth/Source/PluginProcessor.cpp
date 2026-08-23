@@ -1,5 +1,4 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
 
 namespace
 {
@@ -15,6 +14,9 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     dampingParam = apvts.getRawParameterValue(dampingParamID);
     outputLevelParam = apvts.getRawParameterValue(outputLevelParamID);
     brightnessParam = apvts.getRawParameterValue(brightnessParamID);
+    bowAmountParam = apvts.getRawParameterValue(bowAmountParamID);
+    structureParam = apvts.getRawParameterValue(structureParamID);
+    positionParam = apvts.getRawParameterValue(positionParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -46,6 +48,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{bowAmountParamID, 1},
+        "Pluck / Bow",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Defaults to 0% - a bit-exact passthrough (no dispersion/inharmonicity applied), matching
+    // this project's established convention for non-breaking parameter defaults.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{structureParamID, 1},
+        "Structure",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Defaults to 50% (the string's midpoint) - unlike Structure, Position has no neutral/bypass
+    // value (every setting mixes an alternate string tap into the output - see KarplunkVoice.h's
+    // renderNextSample()), so 50% was chosen as a deliberate, musically reasonable default rather
+    // than a "no effect" one.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{positionParamID, 1},
+        "Position",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.5f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
     return { params.begin(), params.end() };
 }
 
@@ -61,6 +93,15 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     outputLevelSmoothed.reset(sampleRate, smoothingRampSeconds);
     outputLevelSmoothed.setCurrentAndTargetValue(
         juce::Decibels::decibelsToGain(outputLevelParam->load()));
+
+    bowAmountSmoothed.reset(sampleRate, smoothingRampSeconds);
+    bowAmountSmoothed.setCurrentAndTargetValue(bowAmountParam->load());
+
+    structureSmoothed.reset(sampleRate, smoothingRampSeconds);
+    structureSmoothed.setCurrentAndTargetValue(structureParam->load());
+
+    positionSmoothed.reset(sampleRate, smoothingRampSeconds);
+    positionSmoothed.setCurrentAndTargetValue(positionParam->load());
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -108,6 +149,9 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
 
     dampingSmoothed.setTargetValue(dampingParam->load());
     outputLevelSmoothed.setTargetValue(juce::Decibels::decibelsToGain(outputLevelParam->load()));
+    bowAmountSmoothed.setTargetValue(bowAmountParam->load());
+    structureSmoothed.setTargetValue(structureParam->load());
+    positionSmoothed.setTargetValue(positionParam->load());
 
     auto midiIterator = midiMessages.cbegin();
     const auto midiEnd = midiMessages.cend();
@@ -121,11 +165,17 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         }
 
         const auto damping = dampingSmoothed.getNextValue();
+        const auto bowAmount = bowAmountSmoothed.getNextValue();
+        const auto structure = structureSmoothed.getNextValue();
+        const auto position = positionSmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
         {
             v.setDamping(damping);
+            v.setBowAmount(bowAmount);
+            v.setStructure(structure);
+            v.setPosition(position);
             mixedSample += v.renderNextSample();
         }
 
@@ -133,11 +183,6 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         for (int channel = 0; channel < numChannels; ++channel)
             buffer.setSample(channel, sample, out);
     }
-}
-
-juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
-{
-    return new KarplunkAudioProcessorEditor(*this);
 }
 
 bool KarplunkAudioProcessor::hasEditor() const { return true; }

@@ -1,8 +1,16 @@
 #include "PluginEditor.h"
 
+// Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - a new
+// PluginProcessor-driven test target can link only juce_audio_processors, no editor/LookAndFeel/
+// fonts, matching alloy-bass's KarplunkTests/AlloyTests split (see CMakeLists.txt).
+juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
+{
+    return new KarplunkAudioProcessorEditor(*this);
+}
+
 namespace
 {
-    constexpr int editorWidth = 420;
+    constexpr int editorWidth = 810;
     constexpr int editorHeight = 260;
     constexpr int sliderSize = 100;
     constexpr int labelHeight = 20;
@@ -18,6 +26,14 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     titleLabel.setFont(juce::Font(juce::FontOptions(24.0f, juce::Font::bold)));
     addAndMakeVisible(titleLabel);
 
+    // Temporary build-verification marker (see KarplunkBuildNumber.h) - lets a build be confirmed
+    // as actually loaded rather than a stale cached instance, without needing to reason about it.
+    buildNumberLabel.setText("build " + juce::String(karplunkBuildNumber), juce::dontSendNotification);
+    buildNumberLabel.setJustificationType(juce::Justification::bottomRight);
+    buildNumberLabel.setFont(juce::Font(juce::FontOptions(12.0f)));
+    buildNumberLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible(buildNumberLabel);
+
     setupSlider(dampingSlider, dampingLabel, "Decay");
     dampingAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::dampingParamID, dampingSlider);
@@ -29,6 +45,18 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     setupSlider(brightnessSlider, brightnessLabel, "Pluck Brightness");
     brightnessAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::brightnessParamID, brightnessSlider);
+
+    setupSlider(bowAmountSlider, bowAmountLabel, "Pluck / Bow");
+    bowAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::bowAmountParamID, bowAmountSlider);
+
+    setupSlider(structureSlider, structureLabel, "Structure");
+    structureAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::structureParamID, structureSlider);
+
+    setupSlider(positionSlider, positionLabel, "Position");
+    positionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::positionParamID, positionSlider);
 
     setSize(editorWidth, editorHeight);
 }
@@ -57,12 +85,14 @@ void KarplunkAudioProcessorEditor::paint(juce::Graphics& g)
 
 void KarplunkAudioProcessorEditor::resized()
 {
+    buildNumberLabel.setBounds(getLocalBounds().removeFromBottom(16).removeFromRight(72).reduced(4, 0));
+
     auto bounds = getLocalBounds().reduced(16);
 
     titleLabel.setBounds(bounds.removeFromTop(32));
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 3;
+    const auto sliderCount = 6;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -73,5 +103,8 @@ void KarplunkAudioProcessorEditor::resized()
 
     layoutColumn(bounds.removeFromLeft(columnWidth), dampingLabel, dampingSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), outputLevelLabel, outputLevelSlider);
-    layoutColumn(bounds, brightnessLabel, brightnessSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), brightnessLabel, brightnessSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), bowAmountLabel, bowAmountSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
+    layoutColumn(bounds, positionLabel, positionSlider);
 }
