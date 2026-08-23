@@ -16,9 +16,9 @@ namespace
 // own internal state (e.g. a DC blocker for a different asymmetric curve) that has nothing to do
 // with decay/brightness shaping.
 //
-// Unlike Excitation/Loop Filter/Delay Tuning (each a compile-time SingleLineKarplunkVoice template
+// Unlike Excitation/Loop Filter/Delay Tuning (each a compile-time KarplunkStringLineChannel template
 // parameter - pick one implementation, rebuild to change it), this seam is a RUNTIME choice: the
-// user asked for a dropdown to swap character live, not a rebuild. SingleLineKarplunkVoice owns
+// user asked for a dropdown to swap character live, not a rebuild. KarplunkStringLineChannel owns
 // BOTH concrete classes below by value and branches on a `waveshaperType` index each sample - no
 // virtual dispatch or std::function, matching this project's zero-polymorphism convention, just an
 // explicit selection between a small, fixed set of concrete types (see its own comment for the
@@ -51,7 +51,7 @@ namespace
 // usable than the "folds throughout the whole decay" character envelope-following produced. Not
 // a bug - a deliberate creative call. If revisited, see git history for the working
 // implementation (KarplunkWaveFolder::updateEnvelope(), called once per sample from
-// SingleLineKarplunkVoice::renderNextSample()) rather than rebuilding it from scratch.
+// KarplunkStringLineChannel::renderChannelSample()) rather than rebuilding it from scratch.
 class KarplunkWaveFolder
 {
 public:

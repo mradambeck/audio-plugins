@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-// Every other Karplunk test (KarplunkTests) drives the isolated SingleLineKarplunkVoice DSP class
+// Every other Karplunk test (KarplunkTests) drives the isolated KarplunkVoice DSP class
 // directly - setStructure()/setPosition() called by hand, never through the real APVTS parameter
 // object, MIDI dispatch, or per-sample smoothing that the actual shipped plugin uses. These tests
 // instead construct and drive the real KarplunkAudioProcessor - the exact class Logic loads -
@@ -917,6 +917,244 @@ public:
                 }
 
                 logMessage("Ring Mod=100% + Waveshaper Type=" + juce::String(waveshaperType) + " worst-case peak: " + juce::String(peak, 4));
+                expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
+
+        beginTest("Topology defaults to Single - explicitly setting it to Single is bit-identical to never touching it");
+        {
+            const int numSamples = (int) (2.0 * sampleRate);
+            auto withoutTouchingTopology = renderBowedNote(60, 0.0f, 0.5f, sampleRate, numSamples);
+
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::topologyParamID, 0.0f); // explicit Single
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::structureParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::positionParamID, 0.5f);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(withoutTouchingTopology.getReadPointer(0), buffer.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly selecting Single topology should render bit-identical to never touching Topology at all");
+        }
+
+        beginTest("Topology=Dual substantially changes the real plugin's rendered output vs Topology=Single");
+        {
+            auto renderWithTopology = [&](float topology) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, topology);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 0.5f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto single = renderWithTopology(0.0f);
+            auto dual = renderWithTopology(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(single.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                single.getReadPointer(0) + skipSamples,
+                dual.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Topology=Single tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Switching Topology mid-performance while a note is held triggers an implicit all-notes-off");
+        {
+            // Mirrors the real, established Mono/Poly precedent exactly (see processBlock()'s own
+            // comment): a mid-note Topology change resets every voice rather than trying to
+            // reconcile Single's one-line state with Dual's two-line state. The held note goes
+            // silent - it does NOT continue on stale state, and it is NOT retriggered (matching
+            // Mono/Poly's own reset(), which never retriggers a still-physically-held key either).
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::topologyParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f); // held bow - would
+                                                                                // never decay on its
+                                                                                // own otherwise
+
+            const int preSwitchSamples = (int) (0.5 * sampleRate);
+            juce::AudioBuffer<float> preSwitchBuffer(2, preSwitchSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(preSwitchBuffer, midi); // note-on lands, note held throughout
+
+            const auto preSwitchRms = rms(preSwitchBuffer.getReadPointer(0), preSwitchSamples);
+            expect(preSwitchRms > 0.01f, "the held bow note should be clearly audible before the switch");
+
+            setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f); // flip mid-performance,
+                                                                               // no note-off/note-on
+
+            const int postSwitchSamples = (int) (1.0 * sampleRate);
+            juce::AudioBuffer<float> postSwitchBuffer(2, postSwitchSamples);
+            juce::MidiBuffer noMidi;
+            processor.processBlock(postSwitchBuffer, noMidi);
+
+            const auto postSwitchRms = rms(postSwitchBuffer.getReadPointer(0), postSwitchSamples);
+            expect(postSwitchRms < preSwitchRms * 0.01f,
+                   "a mid-performance Topology switch should silence the held note (implicit all-notes-off), not continue it on stale state or retrigger it");
+        }
+
+        beginTest("8 simultaneously held voices at Topology=Dual, max Cross-Couple, full Bow stay bounded");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+
+            juce::MidiBuffer midi;
+            const int notes[8] = { 48, 52, 55, 60, 64, 67, 72, 76 };
+            for (int note : notes)
+                midi.addEvent(juce::MidiMessage::noteOn(1, note, (juce::uint8) 100), 0);
+
+            const int numSamples = (int) (3.0 * sampleRate);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                expect(std::isfinite(data[i]), "8-voice Dual-topology bowed chord must stay finite");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            logMessage("8-voice Dual/Cross-Couple=100% worst-case peak: " + juce::String(peak, 4));
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+        }
+
+        beginTest("Topology=Dual combined with each Waveshaper Type and Ring Mod stays finite and bounded at the worst-case combination");
+        {
+            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::detuneParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperType);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModFrequencyParamID, 5000.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    expect(std::isfinite(data[i]),
+                           "output must stay finite with Topology=Dual + Waveshaper Type " + juce::String(waveshaperType) + " + Ring Mod all at worst-case settings");
+                    peak = std::max(peak, std::abs(data[i]));
+                }
+
+                logMessage("Dual + Waveshaper Type=" + juce::String(waveshaperType) + " + Ring Mod worst-case peak: " + juce::String(peak, 4));
+                expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
+
+        beginTest("Couple Delay defaults to 0ms - explicitly setting it to 0 is bit-identical to never touching it");
+        {
+            auto renderWithDelay = [&](bool touchIt) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 0.7f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                if (touchIt)
+                    setRaw(processor, KarplunkAudioProcessor::coupleDelayParamID, 0.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto neverTouched = renderWithDelay(false);
+            auto explicitZero = renderWithDelay(true);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const auto diff = rmsOfDifference(neverTouched.getReadPointer(0), explicitZero.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly setting Couple Delay to 0ms should render bit-identical to never touching it at all");
+        }
+
+        beginTest("Couple Delay substantially changes the real plugin's rendered output vs 0ms, at the same Cross-Couple");
+        {
+            auto renderWithDelay = [&](float delayMs) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 0.7f);
+                setRaw(processor, KarplunkAudioProcessor::coupleDelayParamID, delayMs);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutDelay = renderWithDelay(0.0f);
+            auto withDelay = renderWithDelay(5.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutDelay.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutDelay.getReadPointer(0) + skipSamples,
+                withDelay.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Couple Delay=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Couple Delay stays finite and bounded at the worst-case combination (max Decay, full Bow, max Cross-Couple)");
+        {
+            for (float delayMs : { 0.0f, 5.0f, 10.0f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::coupleDelayParamID, delayMs);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    expect(std::isfinite(data[i]), "output must stay finite with Couple Delay=" + juce::String(delayMs) + "ms at worst-case settings");
+                    peak = std::max(peak, std::abs(data[i]));
+                }
+
+                logMessage("Couple Delay=" + juce::String(delayMs) + "ms worst-case peak: " + juce::String(peak, 4));
                 expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
             }
         }

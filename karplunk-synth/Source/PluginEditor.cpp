@@ -10,7 +10,7 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int editorWidth = 1150;
+    constexpr int editorWidth = 1590;
     constexpr int editorHeight = 260;
     constexpr int sliderSize = 100;
     constexpr int labelHeight = 20;
@@ -93,6 +93,26 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     ringModFrequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::ringModFrequencyParamID, ringModFrequencySlider);
 
+    // The Feedback Topology seam's runtime dropdown (see KarplunkVoice.h's own comment) - "Single"
+    // is index 0, "Dual" is index 1, matching createParameterLayout()'s own choice list.
+    topologyBox.addItem("Single", 1);
+    topologyBox.addItem("Dual", 2);
+    addAndMakeVisible(topologyBox);
+    topologyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::topologyParamID, topologyBox);
+
+    setupSlider(crossCoupleSlider, crossCoupleLabel, "Cross-Couple");
+    crossCoupleAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::crossCoupleParamID, crossCoupleSlider);
+
+    setupSlider(coupleDelaySlider, coupleDelayLabel, "Couple Delay");
+    coupleDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::coupleDelayParamID, coupleDelaySlider);
+
+    setupSlider(detuneSlider, detuneLabel, "Detune");
+    detuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::detuneParamID, detuneSlider);
+
     setSize(editorWidth, editorHeight);
 }
 
@@ -129,7 +149,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 10;
+    const auto sliderCount = 14;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -151,5 +171,12 @@ void KarplunkAudioProcessorEditor::resized()
     layoutColumn(waveshapeColumn, waveshapeLabel, waveshapeSlider);
 
     layoutColumn(bounds.removeFromLeft(columnWidth), ringModAmountLabel, ringModAmountSlider);
-    layoutColumn(bounds, ringModFrequencyLabel, ringModFrequencySlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), ringModFrequencyLabel, ringModFrequencySlider);
+
+    auto topologyColumn = bounds.removeFromLeft(columnWidth);
+    topologyBox.setBounds(topologyColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
+
+    layoutColumn(bounds.removeFromLeft(columnWidth), crossCoupleLabel, crossCoupleSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), coupleDelayLabel, coupleDelaySlider);
+    layoutColumn(bounds, detuneLabel, detuneSlider);
 }

@@ -25,7 +25,7 @@ public:
     bool empty() const noexcept { return size == 0; }
 
     // Always the note+velocity the caller should (re)trigger - a mono voice retriggers on every
-    // noteOn() no differently than a poly voice does (see SingleLineKarplunkVoice::noteOn()'s own
+    // noteOn() no differently than a poly voice does (see KarplunkVoice::noteOn()'s own
     // comment: "each MIDI note-on is physically a fresh pluck"). If this note is already held
     // (a duplicate note-on with no intervening note-off), it moves to the top instead of
     // duplicating - there's still only ever one held instance of a given note number.

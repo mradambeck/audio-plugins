@@ -68,9 +68,9 @@ template <typename Interpolator = LinearInterpolator>
 class KarplunkStringLine
 {
 public:
-    // Allocates - only ever call this from SingleLineKarplunkVoice::prepare(), never from the
+    // Allocates - only ever call this from KarplunkStringLineChannel::prepare(), never from the
     // audio thread. maxDelaySamples should come from
-    // SingleLineKarplunkVoice::requiredCapacitySamples() - never resized after this call.
+    // KarplunkStringLineChannel::requiredCapacitySamples() - never resized after this call.
     void prepare(double, int maxDelaySamples) noexcept
     {
         buffer.assign((size_t) std::max(maxDelaySamples, 1), 0.0f);

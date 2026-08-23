@@ -23,6 +23,10 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     waveshaperTypeParam = apvts.getRawParameterValue(waveshaperTypeParamID);
     ringModAmountParam = apvts.getRawParameterValue(ringModAmountParamID);
     ringModFrequencyParam = apvts.getRawParameterValue(ringModFrequencyParamID);
+    topologyParam = apvts.getRawParameterValue(topologyParamID);
+    crossCoupleParam = apvts.getRawParameterValue(crossCoupleParamID);
+    coupleDelayParam = apvts.getRawParameterValue(coupleDelayParamID);
+    detuneParam = apvts.getRawParameterValue(detuneParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -101,8 +105,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withLabel("ms")));
 
     // The Waveshaper seam (see KarplunkWaveshaper.h) - defaults to 0% (bit-exact no-op, the
-    // Waveshaper is never even called at this value - see SingleLineKarplunkVoice::
-    // renderNextSample()), matching every other new-control convention in this project.
+    // Waveshaper is never even called at this value - see KarplunkStringLineChannel::
+    // renderChannelSample()), matching every other new-control convention in this project.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{waveshapeParamID, 1},
         "Waveshape",
@@ -123,7 +127,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
 
     // Ring Modulator (see KarplunkRingModulator.h) - its own area, not a Waveshaper Type, since it
     // needs its own Frequency control and runs alongside whichever Waveshaper Type is selected
-    // (applied in-loop, after the Waveshaper - see SingleLineKarplunkVoice::renderNextSample()).
+    // (applied in-loop, after the Waveshaper - see KarplunkStringLineChannel::renderChannelSample()).
     // Amount defaults to 0% (bit-exact no-op, the oscillator isn't even advanced at this value),
     // matching every other new-control convention in this project.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -147,6 +151,55 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         200.0f,
         juce::AudioParameterFloatAttributes().withLabel("Hz")));
 
+    // The Feedback Topology seam (see KarplunkVoice.h) - a runtime dropdown like Waveshaper Type,
+    // at the user's explicit request, so Single and Dual can be A/B'd live. Defaults to Single
+    // (index 0) - preserves every existing preset/test's behavior exactly.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{topologyParamID, 1},
+        "Topology",
+        juce::StringArray{"Single", "Dual"},
+        0));
+
+    // Dual-topology only (has no effect at Topology=Single, since KarplunkVoice::renderNextSample()
+    // never reads it in that branch) - how much of each line's write-back value comes from the
+    // OTHER line, live/every-sample. Provably safe across the entire 0-100% range with no ceiling
+    // needed - see KarplunkVoice.h's own two-part safety argument (per-sample boundedness via
+    // convex combination, plus a closed-form steady-state loop-gain analysis) - unlike every
+    // Waveshaper curve's maxDrive, this isn't a "how far can we safely push this" tuning question.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{crossCoupleParamID, 1},
+        "Cross-Couple",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Dual-topology only - a short delay inserted into the cross-coupling path itself (each
+    // direction independently), live/every-sample like Cross-Couple. 0ms is a bit-exact match for
+    // the original (undelayed, same-instant) coupling formula. Turns the coupling from a flat,
+    // broadband effect into a harmonic-dependent one - see KarplunkVoice.h's own comment for why
+    // this needs no new safety ceiling either (a pure delay only rotates phase, never adds gain).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{coupleDelayParamID, 1},
+        "Couple Delay",
+        juce::NormalisableRange<float>(0.0f, 10.0f, 0.01f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
+
+    // Dual-topology only - latched at noteOn (not live), same convention as Brightness, since real
+    // unison detuning isn't a performance gesture the way Cross-Couple sweeping might be. 0% = both
+    // lines at the identical target pitch (the primary, physically-grounded design - real coupled
+    // piano unisons are nominally same-pitch strings, see KarplunkVoice.h's own header comment);
+    // 100% offsets line B by KarplunkVoice::maxDetuneSemitones (~50 cents, raised from an initial
+    // ~20 cent starting point once the user heard it and wanted more range).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{detuneParamID, 1},
+        "Detune",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
     return { params.begin(), params.end() };
 }
 
@@ -157,6 +210,7 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     voiceAllocator.reset();
     monoNoteStack.reset();
     previousMonoMode = monoParam->load() >= 0.5f;
+    previousTopology = (int) topologyParam->load();
 
     dampingSmoothed.reset(sampleRate, smoothingRampSeconds);
     dampingSmoothed.setCurrentAndTargetValue(dampingParam->load());
@@ -182,6 +236,12 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
 
     ringModFrequencySmoothed.reset(sampleRate, smoothingRampSeconds);
     ringModFrequencySmoothed.setCurrentAndTargetValue(ringModFrequencyParam->load());
+
+    crossCoupleSmoothed.reset(sampleRate, smoothingRampSeconds);
+    crossCoupleSmoothed.setCurrentAndTargetValue(crossCoupleParam->load());
+
+    coupleDelaySmoothed.reset(sampleRate, smoothingRampSeconds);
+    coupleDelaySmoothed.setCurrentAndTargetValue(coupleDelayParam->load());
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -207,6 +267,7 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
             // isActive() itself) - a fresh note from silence always snaps straight to pitch.
             const auto event = monoNoteStack.noteOn(note, velocity);
             voices[0].setBrightness(brightnessParam->load());
+            voices[0].setDetuneAmount(detuneParam->load());
             voices[0].noteOn(event.note, event.velocity01, glideTimeParam->load() * 0.001f);
         }
         else
@@ -218,6 +279,7 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
             const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, isActive);
 
             voices[(size_t) voiceIndex].setBrightness(brightnessParam->load());
+            voices[(size_t) voiceIndex].setDetuneAmount(detuneParam->load());
             voices[(size_t) voiceIndex].noteOn(note, velocity);
         }
     }
@@ -233,6 +295,7 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
             if (result.stillHeld)
             {
                 voices[0].setBrightness(brightnessParam->load());
+                voices[0].setDetuneAmount(detuneParam->load());
                 voices[0].noteOn(result.event.note, result.event.velocity01, glideTimeParam->load() * 0.001f);
             }
             else
@@ -271,6 +334,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     waveshapeSmoothed.setTargetValue(waveshapeParam->load());
     ringModAmountSmoothed.setTargetValue(ringModAmountParam->load());
     ringModFrequencySmoothed.setTargetValue(ringModFrequencyParam->load());
+    crossCoupleSmoothed.setTargetValue(crossCoupleParam->load());
+    coupleDelaySmoothed.setTargetValue(coupleDelayParam->load());
 
     // Poly/Mono is a discrete mode switch, not a live-sweepable control - deliberately not
     // smoothed, and checked once per block rather than every sample. Toggling it while notes are
@@ -287,6 +352,22 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         voiceAllocator.reset();
         monoNoteStack.reset();
         previousMonoMode = mono;
+    }
+
+    // Same treatment as the Mono/Poly switch above, for the same reason: Topology changes which
+    // internal state each Voice's two lines hold (Single never renders lineB at all; Dual reads
+    // and writes both), so a mid-note switch can't be reconciled - it's treated as an implicit
+    // all-notes-off instead. Kept as its own separate check (not folded into the Mono check above)
+    // since the two are fully orthogonal axes - Mono mode still just drives voices[0] exclusively,
+    // which internally may run 1 or 2 lines regardless of Poly/Mono.
+    const auto topology = (int) topologyParam->load();
+    if (topology != previousTopology)
+    {
+        for (auto& v : voices)
+            v.reset();
+        voiceAllocator.reset();
+        monoNoteStack.reset();
+        previousTopology = topology;
     }
 
     // Mono only ever sounds one voice, so it gets no headroom reduction - the 8-voice headroom
@@ -318,6 +399,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         const auto waveshape = waveshapeSmoothed.getNextValue();
         const auto ringModAmount = ringModAmountSmoothed.getNextValue();
         const auto ringModFrequency = ringModFrequencySmoothed.getNextValue();
+        const auto crossCouple = crossCoupleSmoothed.getNextValue();
+        const auto coupleDelay = coupleDelaySmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
@@ -330,6 +413,9 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setWaveshaperType(waveshaperType);
             v.setRingModAmount(ringModAmount);
             v.setRingModFrequency(ringModFrequency);
+            v.setTopology(topology);
+            v.setCoupleDelay(coupleDelay);
+            v.setCrossCoupleAmount(crossCouple);
             mixedSample += v.renderNextSample();
         }
 

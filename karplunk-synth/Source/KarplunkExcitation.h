@@ -26,9 +26,12 @@
 //
 // To add a new excitation variant (filtered noise with a different colour, a sample-based burst,
 // etc.), write a new class matching this same method set (prepare/reset/setBrightness/
-// setBowAmount/getBowAmount/setBaseDuration/noteOff/nextExcitationSample) and swap the template
-// argument in KarplunkVoice.h's SingleLineKarplunkVoice instantiation - nothing in
-// KarplunkLoopFilter.h, KarplunkStringLine.h, or KarplunkVoice.h needs to change.
+// setBowAmount/getBowAmount/setBaseDuration/noteOff/nextExcitationSample/setSeed) and swap the
+// template argument in KarplunkVoice.h's KarplunkStringLineChannel instantiation - nothing in
+// KarplunkLoopFilter.h, KarplunkStringLine.h, or KarplunkVoice.h needs to change. setSeed() (see
+// its own comment) joined this set only once the Feedback Topology seam grew a second option
+// that needs two independently-noisy Excitation instances - every Excitation variant needs it now,
+// not just NoiseExcitation.
 class NoiseExcitation
 {
 public:
@@ -46,6 +49,15 @@ public:
     void setBowAmount(float amount01) noexcept;
     float getBowAmount() const noexcept { return bowAmount; }
 
+    // Sets the RNG seed directly - not part of every Excitation variant's normal per-note
+    // lifecycle (Structure/Position/etc. never call this); used by KarplunkVoice's dual-topology
+    // orchestrator to give its second line's Excitation a genuinely different noise sequence from
+    // the first, called once at prepare() time. Without this, two identically-constructed,
+    // identically-driven Excitation instances would produce bit-identical noise, making
+    // cross-coupling and detune both silently inaudible - see KarplunkVoice.h's own comment.
+    // xorshift32 is degenerate at seed 0, so 0 is remapped to 1 (matching this class's own default).
+    void setSeed(uint32_t seed) noexcept { rngState = seed != 0 ? seed : 1; }
+
     // Starts a fresh Attack stage for a new note, and tells this excitation what "one period"
     // means for the note currently ringing (so bowAmount=0's decay time scales with pitch the way
     // the original one-shot burst's fixed delaySamples-length window did). Called once per
@@ -58,7 +70,7 @@ public:
     void noteOff() noexcept;
 
     // Called once per render tick, from the very first sample after noteOn, unconditionally -
-    // SingleLineKarplunkVoice no longer gates this by a `held` flag. An idle (never-triggered)
+    // KarplunkStringLineChannel no longer gates this by a `held` flag. An idle (never-triggered)
     // excitation returns exactly 0; a fully-released one converges to (very close to) 0 on its
     // own and just stays there. Never allocates.
     float nextExcitationSample(float velocity01) noexcept;

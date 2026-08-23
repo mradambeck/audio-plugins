@@ -6,14 +6,14 @@
 //
 // To add a new loop-filter variant (one-pole lowpass, comb, resonant, asymmetric, etc.), write a
 // new class matching this same method set (prepare/reset/setDamping/processSample/getLoopGain)
-// and swap the template argument in KarplunkVoice.h's SingleLineKarplunkVoice instantiation -
+// and swap the template argument in KarplunkVoice.h's KarplunkStringLineChannel instantiation -
 // nothing in KarplunkExcitation.h, KarplunkStringLine.h, or KarplunkVoice.h needs to change. A
 // filter needing more internal state (e.g. a resonant filter's own delay tap) just adds more
 // fixed-size members here, sized in prepare() - still real-time safe as long as nothing is sized
 // in processSample(). getLoopGain() is part of the required method set alongside the other four:
-// SingleLineKarplunkVoice's continuous (bow) excitation injection needs *some* notion of the
+// KarplunkStringLineChannel's continuous (bow) excitation injection needs *some* notion of the
 // filter's own DC/loop gain to compensate injected loudness across the Decay range - see that
-// class's renderNextSample() for why.
+// class's renderChannelSample() for why.
 class TwoPointAverageLoopFilter
 {
 public:

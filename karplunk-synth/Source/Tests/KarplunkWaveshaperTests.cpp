@@ -52,7 +52,7 @@ public:
             // minDrive=1 and threshold=1 means small inputs stay well under the fold point even
             // with zero amount - asin(sin(t)) ~ t for small t, so this should be close to a
             // transparent passthrough, not an already-folded signal. (The real bypass at exactly
-            // amount=0 lives in SingleLineKarplunkVoice, which never calls process() at all in
+            // amount=0 lives in KarplunkStringLineChannel, which never calls process() at all in
             // that case - this test is about the class's OWN behavior in isolation.)
             KarplunkWaveFolder folder;
             const auto y = folder.process(0.1f, 0.0f);
@@ -104,7 +104,7 @@ namespace
     // KarplunkFuzz has real per-sample filter state (unlike KarplunkWaveFolder) - process() reads
     // whatever updateFilter() last computed, so tests need to drive the filter to a settled
     // steady state for a given (x, amount) before checking process()'s output, matching how
-    // SingleLineKarplunkVoice actually uses it (updateFilter() every sample, not once).
+    // KarplunkStringLineChannel actually uses it (updateFilter() every sample, not once).
     float settledFuzzOutput(KarplunkFuzz& fuzz, float x, float amount, float driveCompensation = 1.0f)
     {
         for (int i = 0; i < 200; ++i) // far more than enough for a 6kHz one-pole at 44.1kHz to settle
@@ -181,7 +181,7 @@ public:
             // zero amount - tanh(t) ~ t for small t, so this should be close to a transparent
             // passthrough (once the lowpass has settled - at DC/a steady input, a one-pole
             // lowpass converges to unity gain, so this doesn't test the filter, just the curve).
-            // (The real bypass at exactly amount=0 lives in SingleLineKarplunkVoice, which never
+            // (The real bypass at exactly amount=0 lives in KarplunkStringLineChannel, which never
             // calls process() at all in that case - this test is about the class's OWN behavior.)
             KarplunkFuzz fuzz;
             fuzz.prepare(44100.0);

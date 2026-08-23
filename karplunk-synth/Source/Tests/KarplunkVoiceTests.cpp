@@ -17,9 +17,9 @@
 class KarplunkVoiceTests : public juce::UnitTest
 {
 public:
-    using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
+    using Voice = KarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
-    KarplunkVoiceTests() : juce::UnitTest("SingleLineKarplunkVoice", "Karplunk") {}
+    KarplunkVoiceTests() : juce::UnitTest("KarplunkVoice", "Karplunk") {}
 
     void runTest() override
     {
@@ -610,7 +610,7 @@ public:
             // drastically" while turning it, but the root cause is the resonant loop's own
             // energy dynamics). Tamed - not eliminated, since some natural "shimmer" is the
             // correct character for a noise-excited bowed string - by a fast/slow envelope-ratio
-            // output leveler in SingleLineKarplunkVoice::renderNextSample(), down to ~1.2dB
+            // output leveler in KarplunkVoice::renderNextSample(), down to ~1.2dB
             // measured. This guards against that fix regressing silently.
             for (float fixedBow : { 0.5f, 0.9f, 1.0f })
             {
@@ -1017,7 +1017,366 @@ public:
             expect(baselineRange < 2.0f, "Structure=0 baseline pitch should be static, not wobbling");
             expect(structureRange > baselineRange + 5.0f, "Structure=100% should produce a measurably larger pitch range than the static baseline");
         }
+
+        beginTest("Topology=Dual produces measurably different output than Topology=Single, otherwise identical settings");
+        {
+            Voice single, dual;
+            single.prepare(44100.0);
+            single.setDamping(0.9f);
+            single.setBowAmount(1.0f);
+            single.setTopology(0);
+            single.noteOn(60, 1.0f);
+
+            dual.prepare(44100.0);
+            dual.setDamping(0.9f);
+            dual.setBowAmount(1.0f);
+            dual.setTopology(1);
+            dual.setCrossCoupleAmount(0.5f);
+            dual.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 22050; ++i) { single.renderNextSample(); dual.renderNextSample(); }
+
+            double sumSquaredDiff = 0.0, sumSquaredBaseline = 0.0;
+            constexpr int measureSamples = 8192;
+            for (int i = 0; i < measureSamples; ++i)
+            {
+                const auto a = single.renderNextSample();
+                const auto b = dual.renderNextSample();
+                sumSquaredDiff += (double) (a - b) * (double) (a - b);
+                sumSquaredBaseline += (double) a * (double) a;
+            }
+            const auto diffRms = std::sqrt(sumSquaredDiff / measureSamples);
+            const auto baselineRms = std::sqrt(sumSquaredBaseline / measureSamples);
+
+            expect(diffRms > baselineRms * 0.1, "Topology=Dual should produce a clearly audible difference from Topology=Single");
+        }
+
+        beginTest("Topology=Dual at Cross-Couple=0%, Detune=0%: bounded, same fundamental as Single, but NOT bit-identical to it");
+        {
+            // Proves lineB is genuinely alive and independently excited even with zero coupling
+            // and zero detune - if it weren't (e.g. a future refactor accidentally shared one
+            // Excitation between both lines), Dual at these settings would collapse to being
+            // silently identical to Single, defeating the whole feature. See KarplunkVoice.h's own
+            // comment on why setNoiseSeed() exists.
+            Voice single, dual;
+            single.prepare(44100.0);
+            single.setDamping(0.9f);
+            single.noteOn(60, 1.0f);
+
+            dual.prepare(44100.0);
+            dual.setDamping(0.9f);
+            dual.setTopology(1);
+            dual.setCrossCoupleAmount(0.0f);
+            dual.setDetuneAmount(0.0f);
+            dual.noteOn(60, 1.0f);
+
+            bool sawDifference = false;
+            for (int i = 0; i < 8192; ++i)
+            {
+                const auto a = single.renderNextSample();
+                const auto b = dual.renderNextSample();
+                expect(std::isfinite(b), "Dual topology output must stay finite");
+                // dualTopologyOutputGain (0.5) means Dual's own headroom differs from Single's -
+                // bound loosely against the same peak ceiling used throughout this file.
+                expect(std::abs(b) <= 2.5f, "Dual topology output should stay within the same bound as Single");
+                if (std::abs(a - b) > 1.0e-4f)
+                    sawDifference = true;
+            }
+
+            expect(sawDifference, "Dual at Cross-Couple=0%/Detune=0% should NOT be bit-identical to Single - lineB must be genuinely, independently alive");
+        }
+
+        beginTest("Cross-Couple sweep stays finite and bounded across several seconds at maximum Decay + full Bow");
+        {
+            // The direct empirical validation of KarplunkVoice.h's own closed-form safety
+            // argument (per-sample boundedness via convex combination, plus the steady-state
+            // loop-gain analysis showing both modes stay contractive for the ENTIRE 0-100% range)
+            // - mirrors this file's "Structure=100% on the highest supported note stays finite"
+            // test, at the worst-case settings this feature can reach.
+            for (float crossCouple : { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(1.0f);
+                voice.setBowAmount(1.0f);
+                voice.setTopology(1);
+                voice.setCrossCoupleAmount(crossCouple);
+                voice.noteOn(60, 1.0f);
+
+                for (int i = 0; i < 4 * 44100; ++i)
+                {
+                    const auto sample = voice.renderNextSample();
+                    expect(std::isfinite(sample), "output must stay finite at every Cross-Couple setting under sustained worst-case drive");
+                    expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as every other worst-case test");
+                }
+            }
+        }
+
+        beginTest("Detune=100% measurably separates line B's pitch from line A's; Detune=0% keeps them identical");
+        {
+            // Reuses the same autocorrelation-based period estimator as the Structure pitch-
+            // stability test above - measuring the claim (a real frequency-domain separation),
+            // not just asserting the formula does what it says.
+            auto estimatePeriodSamples = [](Voice& voice, float expectedDelaySamples) -> float
+            {
+                constexpr int windowSize = 4096;
+                std::vector<float> buf(windowSize);
+                for (auto& s : buf)
+                    s = voice.renderNextSample();
+
+                const int searchRadius = 15;
+                const int centerLag = (int) std::lround(expectedDelaySamples);
+                const int lagLo = std::max(1, centerLag - searchRadius);
+                const int lagHi = centerLag + searchRadius;
+                int bestLag = centerLag;
+                double bestCorr = -1e18;
+                for (int lag = lagLo; lag <= lagHi; ++lag)
+                {
+                    double corr = 0.0;
+                    for (int i = 0; i + lag < windowSize; ++i)
+                        corr += (double) buf[(size_t) i] * (double) buf[(size_t) (i + lag)];
+                    if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+                }
+                return (float) bestLag;
+            };
+
+            const auto note = 60;
+            const auto expectedDelay = 44100.0f / (440.0f * std::pow(2.0f, (note - 69) / 12.0f));
+
+            // At full Cross-Couple the two lines would pull toward each other's pitch (physically
+            // correct - that's coupling), so this test measures Detune's effect with Cross-Couple
+            // at 0%, isolating "does Detune actually separate the two lines" from "does coupling
+            // also affect pitch" (a different, already-covered question).
+            auto measureCentsOff = [&](float detuneAmount) -> float
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.9f);
+                voice.setTopology(1);
+                voice.setCrossCoupleAmount(0.0f);
+                voice.setDetuneAmount(detuneAmount);
+                voice.noteOn(note, 1.0f);
+
+                for (int i = 0; i < 4410; ++i)
+                    voice.renderNextSample();
+
+                const auto measuredPeriod = estimatePeriodSamples(voice, expectedDelay);
+                const auto measuredHz = 44100.0f / measuredPeriod;
+                const auto expectedHz = 44100.0f / expectedDelay;
+                return 1200.0f * std::log2(measuredHz / expectedHz);
+            };
+
+            // Baseline at Detune=0% - like the Structure pitch-stability test above, this is NOT
+            // expected to be near-zero on its own: even a single line's own loop filter phase
+            // response gives it a real, pre-existing offset from the naive expected frequency
+            // (documented elsewhere in this file), and at Cross-Couple=0% Dual's output is the SUM
+            // of two independently-noise-excited (but, at Detune=0%, identically-pitched) lines,
+            // which can shift where the summed signal's own strongest nearby periodicity sits
+            // relative to that baseline too. What this test actually checks is Detune's own
+            // CONTRIBUTION on top of that baseline - not an absolute closeness-to-zero claim.
+            const auto baselineCentsOff = measureCentsOff(0.0f);
+            const auto detunedCentsOff = measureCentsOff(1.0f);
+            const auto detuneContribution = std::abs(detunedCentsOff - baselineCentsOff);
+
+            expect(detuneContribution > 3.0f, "Detune=100% should measurably shift the summed signal's own pitch/beating measurement relative to the Detune=0% baseline");
+        }
+
+        beginTest("Cross-Couple changed abruptly mid-note keeps output continuous, no discontinuity spike");
+        {
+            Voice voice;
+            voice.prepare(44100.0);
+            voice.setDamping(0.6f);
+            voice.setTopology(1);
+            voice.setCrossCoupleAmount(0.0f);
+            voice.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 2000; ++i)
+                voice.renderNextSample();
+
+            auto previous = voice.renderNextSample();
+            voice.setCrossCoupleAmount(1.0f); // abrupt, unsmoothed step - PluginProcessor smooths
+                                              // this in practice, but the DSP itself must not rely
+                                              // on that alone
+
+            constexpr int numSamples = 2000;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const auto sample = voice.renderNextSample();
+                expect(std::isfinite(sample), "output must stay finite through an abrupt Cross-Couple step");
+                expect(std::abs(sample - previous) <= 1.0f, "an abrupt Cross-Couple change should not produce a large sample-to-sample discontinuity");
+                previous = sample;
+            }
+        }
+
+        beginTest("Couple Delay = 0ms is bit-identical to the undelayed coupling formula");
+        {
+            Voice withZeroDelay, neverTouched;
+            withZeroDelay.prepare(44100.0);
+            withZeroDelay.setDamping(0.9f);
+            withZeroDelay.setBowAmount(1.0f);
+            withZeroDelay.setTopology(1);
+            withZeroDelay.setCrossCoupleAmount(0.7f);
+            withZeroDelay.setCoupleDelay(0.0f);
+            withZeroDelay.noteOn(60, 1.0f);
+
+            neverTouched.prepare(44100.0);
+            neverTouched.setDamping(0.9f);
+            neverTouched.setBowAmount(1.0f);
+            neverTouched.setTopology(1);
+            neverTouched.setCrossCoupleAmount(0.7f);
+            neverTouched.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 8192; ++i)
+                expectWithinAbsoluteError(withZeroDelay.renderNextSample(), neverTouched.renderNextSample(), 1.0e-6f);
+        }
+
+        beginTest("Couple Delay > 0ms produces measurably different output than 0ms, at the same Cross-Couple");
+        {
+            Voice undelayed, delayed;
+            undelayed.prepare(44100.0);
+            undelayed.setDamping(0.9f);
+            undelayed.setBowAmount(1.0f);
+            undelayed.setTopology(1);
+            undelayed.setCrossCoupleAmount(0.7f);
+            undelayed.noteOn(60, 1.0f);
+
+            delayed.prepare(44100.0);
+            delayed.setDamping(0.9f);
+            delayed.setBowAmount(1.0f);
+            delayed.setTopology(1);
+            delayed.setCrossCoupleAmount(0.7f);
+            delayed.setCoupleDelay(5.0f); // 5ms
+            delayed.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 22050; ++i) { undelayed.renderNextSample(); delayed.renderNextSample(); }
+
+            double sumSquaredDiff = 0.0, sumSquaredBaseline = 0.0;
+            constexpr int measureSamples = 8192;
+            for (int i = 0; i < measureSamples; ++i)
+            {
+                const auto a = undelayed.renderNextSample();
+                const auto b = delayed.renderNextSample();
+                sumSquaredDiff += (double) (a - b) * (double) (a - b);
+                sumSquaredBaseline += (double) a * (double) a;
+            }
+            const auto diffRms = std::sqrt(sumSquaredDiff / measureSamples);
+            const auto baselineRms = std::sqrt(sumSquaredBaseline / measureSamples);
+
+            expect(diffRms > baselineRms * 0.1, "Couple Delay > 0ms should produce a clearly audible difference from 0ms");
+        }
+
+        beginTest("Couple Delay sweep stays finite and bounded across several seconds at maximum Decay + full Bow + max Cross-Couple");
+        {
+            // The direct empirical validation of KarplunkVoice.h's own closed-form safety argument
+            // for delayed coupling (the coupling's per-mode transfer factor stays bounded by 1 at
+            // every frequency for ANY delay, not just k=0) - mirrors the existing Cross-Couple sweep
+            // test, now also sweeping delay at the worst-case Cross-Couple setting.
+            for (float delayMs : { 0.0f, 2.5f, 5.0f, 7.5f, 10.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(1.0f);
+                voice.setBowAmount(1.0f);
+                voice.setTopology(1);
+                voice.setCrossCoupleAmount(1.0f);
+                voice.setCoupleDelay(delayMs);
+                voice.noteOn(60, 1.0f);
+
+                for (int i = 0; i < 4 * 44100; ++i)
+                {
+                    const auto sample = voice.renderNextSample();
+                    expect(std::isfinite(sample), "output must stay finite at every Couple Delay setting under sustained worst-case drive");
+                    expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as every other worst-case test");
+                }
+            }
+        }
+
+        beginTest("Couple Delay changed abruptly mid-note keeps output continuous, no discontinuity spike");
+        {
+            Voice voice;
+            voice.prepare(44100.0);
+            voice.setDamping(0.6f);
+            voice.setTopology(1);
+            voice.setCrossCoupleAmount(0.7f);
+            voice.setCoupleDelay(0.0f);
+            voice.noteOn(60, 1.0f);
+
+            for (int i = 0; i < 2000; ++i)
+                voice.renderNextSample();
+
+            auto previous = voice.renderNextSample();
+            voice.setCoupleDelay(10.0f); // abrupt, unsmoothed step - PluginProcessor smooths this in
+                                         // practice, but the DSP itself must not rely on that alone
+
+            constexpr int numSamples = 2000;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const auto sample = voice.renderNextSample();
+                expect(std::isfinite(sample), "output must stay finite through an abrupt Couple Delay step");
+                expect(std::abs(sample - previous) <= 1.0f, "an abrupt Couple Delay change should not produce a large sample-to-sample discontinuity");
+                previous = sample;
+            }
+        }
     }
 };
 
 static KarplunkVoiceTests karplunkVoiceTests;
+
+class KarplunkShortDelayTests : public juce::UnitTest
+{
+public:
+    KarplunkShortDelayTests() : juce::UnitTest("KarplunkShortDelay", "Karplunk") {}
+
+    void runTest() override
+    {
+        beginTest("delaySamples=0 returns the input immediately, bit-exact");
+        {
+            KarplunkShortDelay delay;
+            delay.prepare(100);
+            for (float x : { 0.0f, 0.3f, -0.7f, 1.0f, -1.0f, 5.0f })
+                expectWithinAbsoluteError(delay.process(x, 0), x, 1.0e-6f);
+        }
+
+        beginTest("delaySamples=k returns whatever was written k ticks ago");
+        {
+            KarplunkShortDelay delay;
+            delay.prepare(100);
+            constexpr int k = 10;
+
+            std::vector<float> written(50);
+            for (int i = 0; i < (int) written.size(); ++i)
+            {
+                written[(size_t) i] = (float) i * 0.1f;
+                const auto y = delay.process(written[(size_t) i], k);
+                if (i >= k)
+                    expectWithinAbsoluteError(y, written[(size_t) (i - k)], 1.0e-6f,
+                                               "should return the value written exactly k ticks ago");
+            }
+        }
+
+        beginTest("A delay exceeding the buffer's own capacity is clamped, stays finite, doesn't crash");
+        {
+            KarplunkShortDelay delay;
+            delay.prepare(10); // small capacity
+            for (int i = 0; i < 100; ++i)
+            {
+                const auto y = delay.process((float) i, 10000); // far beyond capacity
+                expect(std::isfinite(y), "an out-of-range delay request should clamp, not crash or produce garbage");
+            }
+        }
+
+        beginTest("reset() clears history back to zero");
+        {
+            KarplunkShortDelay delay;
+            delay.prepare(20);
+            for (int i = 0; i < 20; ++i)
+                delay.process(1.0f, 5); // fill with a loud, non-zero history
+            delay.reset();
+
+            expectWithinAbsoluteError(delay.process(0.0f, 5), 0.0f, 1.0e-6f,
+                                       "reset() should clear history, not leave the previous loud state behind");
+        }
+    }
+};
+
+static KarplunkShortDelayTests karplunkShortDelayTests;

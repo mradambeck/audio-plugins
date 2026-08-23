@@ -74,5 +74,20 @@ private:
     juce::Label ringModFrequencyLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ringModFrequencyAttachment;
 
+    juce::ComboBox topologyBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> topologyAttachment;
+
+    juce::Slider crossCoupleSlider;
+    juce::Label crossCoupleLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> crossCoupleAttachment;
+
+    juce::Slider coupleDelaySlider;
+    juce::Label coupleDelayLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> coupleDelayAttachment;
+
+    juce::Slider detuneSlider;
+    juce::Label detuneLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> detuneAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

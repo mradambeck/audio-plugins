@@ -15,7 +15,7 @@ public:
         {
             // gain = 1 + 0*(oscValue-1) = 1 regardless of oscValue, so this should hold even for a
             // freshly-constructed instance whose oscillator has never been advanced - matching how
-            // SingleLineKarplunkVoice::renderNextSample() skips calling updateOscillator() entirely
+            // KarplunkStringLineChannel::renderChannelSample() skips calling updateOscillator() entirely
             // when ringModAmount is 0.
             KarplunkRingModulator ringMod;
             ringMod.prepare(44100.0);

@@ -12,9 +12,12 @@ gotchas, and running tests across all plugins at once.
 **Roadmap**: polyphony (8 voices, basic oldest-voice-stealing - see `KarplunkVoiceAllocator.h`), a
 Pluck/Bow excitation morph control, Mutable Instruments Rings-style Structure/Position timbre
 controls, a Poly/Mono switch (`KarplunkMonoNoteStack.h`), Mono Glide/portamento, a Waveshaper
-(`KarplunkWaveshaper.h`, Fold/Fuzz/Saturate/BitCrush via a runtime dropdown), and an in-loop Ring
-Modulator (`KarplunkRingModulator.h`) are done. No installer, UI polish (mockup-first hardware-panel
-pass), or preset system yet - all explicitly out of scope until asked for.
+(`KarplunkWaveshaper.h`, Fold/Fuzz/Saturate/BitCrush via a runtime dropdown), an in-loop Ring
+Modulator (`KarplunkRingModulator.h`), and a Dual Cross-Coupled Feedback Topology (a live "Single/
+Dual" dropdown alongside Cross-Couple, Couple Delay, and Detune controls - see `KarplunkVoice.h`)
+are done. No
+installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all explicitly out
+of scope until asked for.
 
 ## Building
 
@@ -54,7 +57,8 @@ Note the AU type is `aumu` (music device/synth), not `aufx` - Karplunk is `IS_SY
 
 ## How it works
 
-The core algorithm (`Source/KarplunkVoice.h`'s `SingleLineKarplunkVoice`) is the classic Karplus-
+The core algorithm (`Source/KarplunkVoice.h`'s `KarplunkStringLineChannel`, one per string - see
+below for how `KarplunkVoice` composes one or two of these) is the classic Karplus-
 Strong loop: a delay line seeded with an excitation burst, feeding back through a loop filter that
 shapes decay and timbre. Each MIDI note-on computes a delay length from the note's frequency
 (`sampleRate / frequencyHz`, no Jaffe/Smith tuning correction yet - see the swap table), primes the
@@ -123,7 +127,8 @@ boundedness/stability rather than the actual loudness curve:
    (~3.4dB) swings with nothing moving at all. Turning the knob wasn't introducing or worsening
    this; it was just making an always-present characteristic audible. Tamed (not eliminated - some
    natural "shimmer" is the correct character for a noise-excited bowed string) with a fast/slow
-   envelope-ratio output leveler in `SingleLineKarplunkVoice::renderNextSample()` - it operates on
+   envelope-ratio output leveler in `KarplunkVoice::renderNextSample()` (voice-level, not per-string,
+   since a voice only ever has one audible output stream) - it operates on
    a copy of the final output only, never feeding back into the string, so it can't alter the
    loop's own decay/stability/character. Down to ~1.2-1.6dB measured, verified by a permanent
    regression test.
@@ -266,7 +271,7 @@ chosen design - not a true "no re-pluck" legato glide), but the PITCH approaches
 smoothly over Glide Time rather than jumping instantly, so the fresh pluck's own attack transient
 audibly bends in pitch. A fresh note struck from silence is unaffected regardless of Glide Time -
 there's nothing to glide from, matching standard "auto-glide" convention on hardware mono synths
-(`SingleLineKarplunkVoice::noteOn()` checks `isActive()` itself to tell the two cases apart).
+(`KarplunkVoice::noteOn()` checks `isActive()` itself to tell the two cases apart).
 Smoothed in PITCH space (a one-pole toward the target MIDI note, converted to delay samples every
 tick), not delay-samples space directly - delay length and pitch aren't linearly related, so a
 one-pole on delay samples wouldn't give the familiar decelerating-as-it-approaches-the-target
@@ -333,9 +338,9 @@ musically usable than "folds throughout the whole decay." Kept as a documented, 
 option (see `KarplunkWaveFolder`'s own header comment and git history) rather than discarded - a
 deliberate creative call, not a bug fix that didn't pan out.
 
-**Waveshaper Type**: a runtime dropdown (Fold / Fuzz / Saturate), not a rebuild-to-change
+**Waveshaper Type**: a runtime dropdown (Fold / Fuzz / Saturate / BitCrush), not a rebuild-to-change
 compile-time swap like the other three seams - the user asked for a live selector, so
-`SingleLineKarplunkVoice` owns all three concrete classes by value and branches on the choice each
+`KarplunkStringLineChannel` owns all four concrete classes by value and branches on the choice each
 sample (no virtual dispatch/`std::function`, matching this project's zero-polymorphism convention -
 see `KarplunkWaveshaper.h`'s own comment). `KarplunkFuzz` is the "hard/asymmetric clipping" option
 from the original three-way
@@ -433,6 +438,84 @@ The oscillator's phase deliberately resets to 0 on every `noteOn()` (matching th
 "always retriggers, everything reset" policy) rather than free-running across notes, for
 determinism/testability - not an attempt at realism (a real analog oscillator wouldn't reset either).
 
+**Dual Cross-Coupled Feedback Topology** (`KarplunkVoice.h`) - the base scaffold's original single
+delay line in a loop is now one of TWO live-switchable topologies (a "Topology" dropdown, Single/
+Dual, at the user's explicit request so both can be A/B'd by ear the same way Waveshaper Type is) -
+a runtime choice, unlike Excitation/Loop Filter/Delay Tuning, for the same reason Waveshaper/Ring
+Modulator are: it needs to be compared live, not rebuilt to switch. This required a real refactor:
+`SingleLineKarplunkVoice` split into `KarplunkStringLineChannel` (everything genuinely PER-STRING -
+one delay line, one loop filter, one excitation, one dispersion filter, a full set of Waveshapers,
+one Ring Modulator) and `KarplunkVoice` (the orchestrator, owning one or two channels and deciding
+how they're wired together). The split is bit-exact for Single topology - `renderChannelSample()`
+is the old `renderNextSample()`'s body unchanged, just with `stringLine.write()` pulled out into a
+separate `writeBack()` call so the orchestrator can intercept the value in between, which is exactly
+where cross-coupling happens.
+
+Grounded in real coupled-string physics, not an invented formula: Gabriel Weinreich's "Coupled Piano
+Strings" (JASA 62(6), 1977) measured that piano unison strings - nominally the SAME pitch - coupled
+through a shared bridge decompose into common and differential vibration modes with genuinely
+different decay rates, producing the audible "double decay"/beating a single string can't produce;
+Julius O. Smith's "Physical Audio Signal Processing" (Appendix C.13, "Two Coupled Strings",
+ccrma.stanford.edu/~jos/pasp/) formalizes this for digital waveguides as coupling at the point where
+each string's own fully-processed outgoing wave meets a shared bridge junction - which is why
+cross-coupling reads from `filtered` (post-Waveshaper, post-Ring-Mod, pre-write-back), not the raw
+delayed read, and only ever needs ONE Cross-Couple knob, not a per-effect one:
+
+```
+writeBackA = (1-c)*filteredA + c*filteredB
+writeBackB = (1-c)*filteredB + c*filteredA
+```
+
+Two genuinely independent lines are semantically required, not incidental - coupling two identical
+signals does nothing (the formula above reduces to a no-op if filteredA==filteredB). Each channel's
+Excitation and dispersion-noise RNG gets its own seed (`KarplunkStringLineChannel::setNoiseSeed()`,
+called once on line B at `prepare()` time) specifically so the two lines have something genuinely
+different to exchange, even at Detune=0% - real coupled unisons are nominally same-pitch strings
+(Weinreich), so Detune (0-100%, latched at noteOn like Brightness, ~50 cents max) is a secondary,
+optional knob layered on top of coupling, not the primary mechanism.
+
+Safety, unusually, needed NO tuned ceiling at all (unlike every Waveshaper's `maxDrive` or
+Structure's `maxDispersionGain`) - two independent closed-form arguments, both holding for the
+ENTIRE 0-100% Cross-Couple range: (1) `writeBackA`/`writeBackB` are exact convex combinations, which
+can never exceed the larger of their two inputs in magnitude - since `filteredA`/`filteredB` are
+each already unconditionally bounded before coupling ever runs, coupling cannot introduce a new way
+to blow up; (2) decomposing into common mode `(A+B)/2` and differential mode `(A-B)/2`, coupling
+leaves the common mode's round-trip gain completely unchanged and scales the differential mode's
+gain by exactly `(1-2c)` - since both lines always get the identical Damping value (same loop gain
+`g`, exactly, every sample) and `TwoPointAverageLoopFilter` hard-clamps `g` to `[0.90, 0.9995]`,
+both modes stay strictly contractive for every Damping setting and the whole Cross-Couple range.
+Confirmed empirically too, not just algebraically: at max Cross-Couple on the same worst-case
+settings used throughout this file, output stayed well within the same peak bound every other
+feature is held to.
+
+**Cross-Couple's 0-100% range turned out to already BE the true mathematical maximum, not an
+arbitrary conservative cap** (the user asked whether it could go further): the differential-mode
+gain `g*(1-2c)` has `|1-2c|=1` at both endpoints (c=0 and c=1) - pushing `c` outside `[0,1]` makes
+`|1-2c|>1`, which can push the differential mode's own gain above 1 (real instability). Unlike
+every other tuned constant in this file (Waveshape's drive, Structure's dispersion gain), which
+were reined in well short of an actual instability boundary, Cross-Couple's full knob range already
+uses the entire span the closed-form proof covers - there's no headroom left to give it.
+
+**Couple Delay** inserts a short (0-10ms), independent integer-sample delay into EACH direction of
+the cross-coupling path (`KarplunkShortDelay` - a plain ring buffer, no fractional interpolation,
+since this shapes the coupling's own frequency response rather than a note's pitch), turning the
+coupling from a flat, broadband effect into a genuinely HARMONIC-DEPENDENT one: a pure delay is a
+phase shift, so different harmonics arrive at the coupling point at different relative phases,
+reinforcing or partially cancelling depending on how the delay compares to each harmonic's own
+period - the same phase-interference mechanism Position's own tap already uses, applied to the
+coupling path instead of a listening tap. 0ms is a bit-exact match for the original (undelayed,
+same-instant) coupling formula.
+
+The safety argument extends cleanly to any delay amount, with the IDENTICAL bound, not a new one: a
+k-sample delay is a pure phase rotation (`z^-k`) at any given frequency - it can't change
+magnitude, only phase. The common/differential-mode transfer factors become `(1-c) + c*z^-k` and
+`(1-c) - c*z^-k` instead of the plain real `(1-2c)` the undelayed case reduces to - but both are
+still 2-tap FIR filters whose coefficient magnitudes sum to exactly `(1-c)+c=1`, so by the triangle
+inequality both stay bounded to magnitude 1 at EVERY frequency and EVERY delay amount, not just
+zero delay - the exact same bound as the undelayed proof, shown to hold regardless of delay. No new
+ceiling needed here either - the same "already at its provably-safe maximum" property Cross-Couple
+itself has.
+
 **Six swappable areas**, each isolated so the others never need to change:
 
 1. **Excitation** (`KarplunkExcitation.h`) - "generate one sample of excitation per tick, shaped by
@@ -452,10 +535,13 @@ determinism/testability - not an attempt at realism (a real analog oscillator wo
    header). Also offers `readAt()`, a second, stateless read at any explicit delay length - what
    makes Position's alternate string tap and Structure's shortened main-tap read possible without
    disturbing the delay length that sets the note's pitch.
-4. **Feedback Topology** (`KarplunkVoice.h`) - signal routing. The base scaffold is
-   `SingleLineKarplunkVoice`, a single delay line in a loop. Unlike the other four areas, a new
-   topology (e.g. dual cross-coupled lines) is a **new class**, not a template parameter, since it
-   changes member layout, not just behaviour - see the swap table.
+4. **Feedback Topology** (`KarplunkVoice.h`) - signal routing. Two implementations now exist,
+   selected at RUNTIME (a live "Topology" dropdown, at the user's request - see above): Single (one
+   `KarplunkStringLineChannel` in a loop, the original base scaffold) and Dual (two channels,
+   cross-coupled at their write-back point). `KarplunkVoice` is the orchestrator that owns one or
+   two `KarplunkStringLineChannel`s and decides how they're wired - unlike Excitation/Loop Filter/
+   Delay Tuning, a new topology changes member LAYOUT, not just behaviour, which is why this seam
+   needed a real class split (see above) rather than a template parameter or a simple branch.
 5. **Waveshaper** (`KarplunkWaveshaper.h`) - "nonlinearly reshape one sample of the loop's own
    recirculating signal before it's written back." Four implementations, all always present and
    selected at RUNTIME (see above for why this seam differs from the other four): `KarplunkWaveFolder`,
@@ -471,9 +557,9 @@ determinism/testability - not an attempt at realism (a real analog oscillator wo
    after the Waveshaper (see above).
 
 No polymorphism (no `virtual`, no `std::function`-as-strategy) is used anywhere - every per-sample
-seam is either a compile-time template parameter on `SingleLineKarplunkVoice` or, for Waveshaper/
-Ring Modulator specifically, a runtime choice among concrete types owned by value with a plain
-branch - matching this
+seam is either a compile-time template parameter on `KarplunkStringLineChannel` or, for Waveshaper/
+Ring Modulator/Feedback Topology specifically, a runtime choice among concrete types/paths owned by
+value with a plain branch - matching this
 catalog's established DSP style: small, concrete, framework-free classes composed by value (see
 `gradient-pitch/Source/GradientDelayBuffer.h` / `GradientPitchShiftEngine.h`), which is also why
 `KarplunkStringLine` ended up hand-rolled the same way `GradientDelayBuffer` is, rather than
@@ -485,10 +571,10 @@ wrapping a JUCE class as originally planned.
 | ------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Excitation                                  | Noise -> filtered noise / sample burst; also, a held bow note's loudness could gain a `/ sqrt(delaySamples)` term to flatten the still-unaddressed pitch-dependent sustained-loudness gap | None - `nextExcitationSample()` is a bounded per-tick call with fixed-size state, no scratch buffer needed even for a variant with a longer/continuous shape.                                                                                                                                                                                              |
 | Loop Filter                                 | Two-point average -> one-pole/comb/resonant/asymmetric                                       | Fixed bounded state (a few extra floats) - size in `prepare()`. A comb/resonant filter needing its own tap needs that tap preallocated the same way `KarplunkStringLine` is.                                                                                                                                                                               |
-| Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `SingleLineKarplunkVoice`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
-| Waveshaper                                  | All four Waveshaper Types are built (Fold, Fuzz, Saturate, BitCrush) - a fifth would need its own driveCompensation/loop-safety story worked out, same as each of these did | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `SingleLineKarplunkVoice` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). All four concrete classes are owned by value and selected via a plain branch (no virtual dispatch). Fold is stateless per-call (`process(x, amount01, driveCompensation)`); Fuzz and Saturator both need a per-sample post-clip lowpass (measured necessary for both, despite Saturator's much gentler drive), so they use `updateFilter(x, amount01)` once per sample plus a stateless `process(amount01, driveCompensation)` accessor instead; BitCrush needs updateFilter()/process() too (real sample-and-hold state) but no driveCompensation parameter at all (see "How it works" above) - a future variant follows whichever shape fits its own safety story. |
+| Delay Tuning                                | Linear -> higher-order (Lagrange-style) interpolation. The Jaffe/Smith dispersion technique originally anticipated here is now built (`KarplunkDispersionFilter`, driving the Structure control - a cascade of small allpass stages, not `KarplunkStringLine`-backed at all any more), plus Rings-accurate noise-driven delay-length FM above Structure=75% (see "How it works" below) - not as an `Interpolator` swap, but as a separate class composed by value in `KarplunkStringLineChannel`, closer in shape to a Feedback Topology addition. A future extension: Structure's negative-dispersion range (nonlinear "bridge curving" distortion, present in Rings for negative dispersion values only) - out of scope here since Structure's 0-100% range only ever corresponds to Rings' *positive* dispersion range, where bridge curving never engages either. | A pure-function interpolator (Linear, Lagrange) is a free template-argument swap, no new state. `KarplunkDispersionFilter`'s per-stage state is a handful of fixed-size floats - no delay line/ring buffer at all, real-time safe by construction. |
+| Waveshaper                                  | All four Waveshaper Types are built (Fold, Fuzz, Saturate, BitCrush) - a fifth would need its own driveCompensation/loop-safety story worked out, same as each of these did | Unlike the other three seams, this is a RUNTIME choice, not a compile-time `KarplunkStringLineChannel` template parameter - `KarplunkWaveshaper.h` explains why (the user asked for a live dropdown, not a rebuild). All four concrete classes are owned by value and selected via a plain branch (no virtual dispatch). Fold is stateless per-call (`process(x, amount01, driveCompensation)`); Fuzz and Saturator both need a per-sample post-clip lowpass (measured necessary for both, despite Saturator's much gentler drive), so they use `updateFilter(x, amount01)` once per sample plus a stateless `process(amount01, driveCompensation)` accessor instead; BitCrush needs updateFilter()/process() too (real sample-and-hold state) but no driveCompensation parameter at all (see "How it works" above) - a future variant follows whichever shape fits its own safety story. |
 | Ring Modulator                              | Currently a fixed sine oscillator - a future variant could offer other waveforms (triangle/square for a buzzier, more harmonically-dense modulator), note-pitch tracking (a toggle to make it a harmonic effect rather than an inharmonic one), or a shared cross-voice oscillator instead of one per voice (trading the current per-voice independence for phase-locked chords) | `KarplunkRingModulator.h`'s `updateOscillator()`/`process()` split isolates "what the oscillator IS" from "how it's applied" - a different waveform only touches `updateOscillator()`. A shared oscillator would need `PluginProcessor::processBlock()` to compute it once per sample and pass the value into every voice, a bigger structural change than any other feature in this file. |
-| Feedback Topology                           | Single loop -> dual cross-coupled lines                                                      | A **new class** reusing the same three area-components by value, ~2x buffer footprint (still trivial - see `SingleLineKarplunkVoice::requiredCapacitySamples()`'s sizing table in its own comment) + a small fixed cross-mix matrix.                             |
+| Feedback Topology                           | Single -> Dual cross-coupled is built and live-switchable; a future third topology (e.g. more than two lines) would need its own branch in `KarplunkVoice::renderNextSample()` and its own safety argument, not assumed to inherit Dual's | `KarplunkVoice` owns up to two `KarplunkStringLineChannel`s by value, ~2x buffer footprint (still trivial - see `KarplunkStringLineChannel::requiredCapacitySamples()`'s sizing table in its own comment). A third topology would likely want its own orchestrator class rather than a third branch inside this one, once the branching itself gets unwieldy. |
 | More voices / a different stealing strategy | `numVoices` constant -> a larger pool; basic oldest-voice-stealing -> release-aware stealing | `KarplunkVoiceAllocator<N>`'s array members grow with `N`, still fixed-size and stack/member-allocated, no runtime allocation. Release-aware stealing (prefer stealing an already-released note over one still held) would need `KarplunkVoiceAllocator` to also track release state, not just age - a real but bounded change confined to that one class. |
 
 ## Parameters
@@ -507,6 +593,10 @@ wrapping a JUCE class as originally planned.
 | Waveshaper Type  | Fold / Fuzz / Saturate / BitCrush  | Fold    | Fold: wavefolding - past a threshold the signal reflects back on itself instead of clipping, adding dense, often inharmonic overtones. Fuzz: heavy asymmetric-clip distortion - a transistor-fuzz-pedal character (dense odd harmonics, plus even harmonics from the asymmetry). Saturate: gentle symmetric tanh soft saturation - a mild, warm/rounded character. BitCrush: sample-and-hold rate reduction + bit-depth quantization - the classic "lo-fi" character. See "How it works" above.                                |
 | Ring Mod         | 0 - 100%     | 0%      | Depth of the in-loop ring modulator (see "How it works" above) - multiplies the loop signal by a sine oscillator at Ring Mod Freq. 0% is a bit-exact no-op. Live-adjustable. Runs alongside whichever Waveshaper Type is selected, applied after it.                                |
 | Ring Mod Freq    | 20Hz - 5kHz  | 200Hz   | Frequency of the ring modulator's own oscillator - deliberately NOT tracking the note's pitch (that's what produces ring mod's characteristic inharmonic sum/difference sidebands rather than a harmonic effect). Skewed range - most of the knob's travel sits in the lower/mid frequencies. Live-adjustable, audible mid-note.                                |
+| Topology         | Single / Dual | Single | The Feedback Topology seam (see "How it works" above) - Single is the original one-line scaffold; Dual cross-couples two independently-excited lines. Live-switchable; changing it mid-performance is treated as an implicit all-notes-off (same mechanism as the Mono/Poly switch), since the two topologies hold genuinely different internal state.                                |
+| Cross-Couple     | 0 - 100%     | 0%      | Dual-topology only (no effect at Topology=Single). How much of each line's write-back value comes from the OTHER line. 0% is a bit-exact no-op for line A alone (line B still rings independently and sums in). Provably safe across the FULL range - no ceiling needed, see "How it works" above. Live-adjustable.                                |
+| Couple Delay     | 0 - 10ms     | 0ms     | Dual-topology only. A short delay inserted into the cross-coupling path itself (each direction independently) - turns the coupling from flat/broadband into harmonic-dependent, since a delay is a phase shift and different harmonics interfere differently depending on delay length vs. their own period. 0ms is a bit-exact match for the original undelayed coupling. Also provably safe across its full range - see "How it works" above. Live-adjustable.                                |
+| Detune           | 0 - 100%     | 0%      | Dual-topology only. Offsets line B's pitch from line A's by up to ~50 cents at 100% (raised from an initial ~20 cent starting point once the user heard it and wanted more range - unlike Cross-Couple, Detune has no stability ceiling, so this is a pure "does it sound good" call). Latched at noteOn (not live), same convention as Brightness - real unison detuning isn't a performance gesture. 0% keeps both lines at the identical pitch (the primary, physically-grounded coupled-unison design - see "How it works" above).                                |
 
 Pitch is MIDI-driven, not a knob. No dry/wet (a self-generating voice has no dry signal to blend
 against yet - see the "How it works" section).
@@ -520,7 +610,8 @@ karplunk-synth/
 │   ├── KarplunkExcitation.h/.cpp   # Excitation seam: NoiseExcitation (pluck burst + bow morph)
 │   ├── KarplunkLoopFilter.h/.cpp   # Loop Filter seam: TwoPointAverageLoopFilter
 │   ├── KarplunkStringLine.h        # Delay Tuning seam: hand-rolled ring buffer, template Interpolator
-│   ├── KarplunkVoice.h             # Feedback Topology (base case): SingleLineKarplunkVoice,
+│   ├── KarplunkVoice.h             # Feedback Topology seam: KarplunkStringLineChannel (per-string)
+│   │                                 # + KarplunkVoice (orchestrator, Single/Dual cross-coupled)
 │   │                                 # + KarplunkDispersionFilter (Structure's allpass primitive)
 │   ├── KarplunkWaveshaper.h        # Waveshaper seam: Fold/Fuzz/Saturate/BitCrush, runtime dropdown
 │   ├── KarplunkRingModulator.h     # In-loop ring modulator (own area, not a Waveshaper Type)

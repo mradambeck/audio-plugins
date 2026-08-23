@@ -60,6 +60,10 @@ public:
     static constexpr auto waveshaperTypeParamID = "waveshaperType";
     static constexpr auto ringModAmountParamID = "ringModAmount";
     static constexpr auto ringModFrequencyParamID = "ringModFrequency";
+    static constexpr auto topologyParamID = "topology";
+    static constexpr auto crossCoupleParamID = "crossCouple";
+    static constexpr auto coupleDelayParamID = "coupleDelay";
+    static constexpr auto detuneParamID = "detune";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -77,8 +81,12 @@ private:
     std::atomic<float>* waveshaperTypeParam = nullptr;
     std::atomic<float>* ringModAmountParam = nullptr;
     std::atomic<float>* ringModFrequencyParam = nullptr;
+    std::atomic<float>* topologyParam = nullptr;
+    std::atomic<float>* crossCoupleParam = nullptr;
+    std::atomic<float>* coupleDelayParam = nullptr;
+    std::atomic<float>* detuneParam = nullptr;
 
-    using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
+    using Voice = KarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
     // 8 voices, basic oldest-voice-stealing (see KarplunkVoiceAllocator.h) - each Voice composes
     // its three area-components by value, so this pool needed zero changes to any of the four
@@ -99,6 +107,13 @@ private:
     // leave voiceAllocator's tags or monoNoteStack's held notes stale/inconsistent with whichever
     // mechanism is now in charge.
     bool previousMonoMode = false;
+
+    // Same discrete-mode-switch treatment as previousMonoMode above, for the same reason: Topology
+    // (Single/Dual) changes which internal state each Voice's two lines hold, and a mid-note switch
+    // can't be reconciled - see processBlock(). AudioParameterChoice's raw value is its 0-based
+    // index as a float (confirmed by the existing waveshaperType/mono read pattern), not a
+    // normalized 0-1 value, so this is an int, not a bool.
+    int previousTopology = 0;
 
     // Fixed headroom applied to the summed voice output before Output Level, so a full chord at
     // max velocity doesn't clip harder than a single note did in the mono scaffold. A constant
@@ -130,6 +145,16 @@ private:
     // of ring modulation's usual character).
     juce::SmoothedValue<float> ringModAmountSmoothed;
     juce::SmoothedValue<float> ringModFrequencySmoothed;
+
+    // Cross-Couple is live/every-sample, same convention as Waveshape/Structure/Position - see
+    // KarplunkVoice.h's own safety argument for why the full range is sweepable with no risk.
+    // Detune is latched at noteOn instead (no smoothing needed), same convention as Brightness -
+    // see KarplunkVoice::noteOn()'s own comment for why real unison detuning isn't a live gesture.
+    juce::SmoothedValue<float> crossCoupleSmoothed;
+
+    // Couple Delay is also live/every-sample, same convention as Cross-Couple (see
+    // KarplunkVoice.h's own safety argument for why this needs no ceiling either).
+    juce::SmoothedValue<float> coupleDelaySmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

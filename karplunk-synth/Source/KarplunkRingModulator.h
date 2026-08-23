@@ -9,7 +9,7 @@ namespace
 
 // KarplunkRingModulator: multiplies a signal by a free-running sine oscillator - the classic ring
 // modulation effect (sum/difference sideband frequencies, not harmonically related to the input),
-// applied IN-LOOP (see SingleLineKarplunkVoice::renderNextSample()) rather than only to the final
+// applied IN-LOOP (see KarplunkStringLineChannel::renderChannelSample()) rather than only to the final
 // output, at the user's explicit choice: multiplying the loop's own recirculating signal makes the
 // modulation part of what's actually resonating, compounding every pass, for a much more extreme/
 // metallic/inharmonic character than a bolted-on post-effect would give.
