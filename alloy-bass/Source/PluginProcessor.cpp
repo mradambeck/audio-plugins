@@ -903,6 +903,7 @@ void AlloyAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     arpStepSampleCounter = 0;
     arpStepIndex = 0;
     arpGateIsOpen = false;
+    arpSyncedStepValid = false;
 
     ageDriftState = 0.0f;
     ageWarbleState = 0.0f;
@@ -1187,6 +1188,31 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const auto arpGateAmount = arpGateParam->load() * 0.01f;
     const auto arpGateCloseSamples = juce::jlimit(1, arpStepLengthSamples, (int) (arpStepLengthSamples * arpGateAmount));
 
+    // Sync locks step boundaries to the host's PPQ position (quarter notes since the timeline's
+    // start) rather than to a free-running sample count, so steps land exactly on the beat grid
+    // no matter when playback started or the arp was (re)triggered.
+    bool arpUseHostSync = false;
+    double arpHostPpqPosition = 0.0;
+    double arpPpqIncrementPerSample = 0.0;
+    double arpStepPpqLength = 1.0;
+    if (arpSyncParam->load() > 0.5f)
+    {
+        if (auto* playHead = getPlayHead())
+        {
+            if (auto position = playHead->getPosition())
+            {
+                if (auto ppq = position->getPpqPosition())
+                {
+                    const auto index = juce::jlimit(0, (int) std::size(arpSubdivisions) - 1, (int) arpDivisionParam->load());
+                    arpStepPpqLength = (double) arpSubdivisions[(size_t) index].quarterNoteMultiple;
+                    arpHostPpqPosition = *ppq;
+                    arpPpqIncrementPerSample = (getCurrentBpm() / 60.0) / sampleRateHz;
+                    arpUseHostSync = true;
+                }
+            }
+        }
+    }
+
     const auto mixDriveAmount = mixDriveParam->load() * 0.01f;
     const auto mixDriveK = mixDriveAmount * mixDriveMaxK;
     const auto mixDriveMakeup = 1.0f + mixDriveAmount * mixDriveMakeupRange;
@@ -1250,26 +1276,49 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
         if (arpOn)
         {
-            if (arpStepSampleCounter == 0)
+            if (arpUseHostSync)
             {
-                advanceArpStep();
-                arpGateIsOpen = true;
-            }
-            else if (arpGateIsOpen && arpStepSampleCounter >= arpGateCloseSamples)
-            {
-                triggerVoiceNoteOff();
-                arpGateIsOpen = false;
-            }
+                const auto currentPpq = arpHostPpqPosition + (double) sample * arpPpqIncrementPerSample;
+                const auto stepNumber = (juce::int64) std::floor(currentPpq / arpStepPpqLength);
+                const auto phaseFraction = (currentPpq - (double) stepNumber * arpStepPpqLength) / arpStepPpqLength;
 
-            if (++arpStepSampleCounter >= arpStepLengthSamples)
-                arpStepSampleCounter = 0;
+                if (!arpSyncedStepValid || stepNumber != arpSyncedStepNumber)
+                {
+                    arpSyncedStepNumber = stepNumber;
+                    arpSyncedStepValid = true;
+                    advanceArpStep();
+                    arpGateIsOpen = true;
+                }
+                else if (arpGateIsOpen && phaseFraction >= (double) arpGateAmount)
+                {
+                    triggerVoiceNoteOff();
+                    arpGateIsOpen = false;
+                }
+            }
+            else
+            {
+                if (arpStepSampleCounter == 0)
+                {
+                    advanceArpStep();
+                    arpGateIsOpen = true;
+                }
+                else if (arpGateIsOpen && arpStepSampleCounter >= arpGateCloseSamples)
+                {
+                    triggerVoiceNoteOff();
+                    arpGateIsOpen = false;
+                }
+
+                if (++arpStepSampleCounter >= arpStepLengthSamples)
+                    arpStepSampleCounter = 0;
+            }
         }
         else
         {
             // So turning the arp back on later always starts on a fresh step immediately,
-            // rather than resuming mid-way through wherever the counter last was.
+            // rather than resuming mid-way through wherever the counter (or synced step) last was.
             arpStepSampleCounter = 0;
             arpGateIsOpen = false;
+            arpSyncedStepValid = false;
         }
 
         currentSemitone += (glideTargetSemitone - currentSemitone) * glideCoeff;

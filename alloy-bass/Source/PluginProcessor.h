@@ -275,6 +275,13 @@ private:
     int arpStepIndex = 0;
     bool arpGateIsOpen = false;
 
+    // When Sync is on and the host provides a PPQ position, step timing is derived from that
+    // position each block instead of from arpStepSampleCounter - phase-locks steps to the host's
+    // beat grid (arpStepSampleCounter alone only matches tempo, not where "beat 1" actually is,
+    // since it free-runs from whenever prepareToPlay/arp-enable happened to occur).
+    juce::int64 arpSyncedStepNumber = 0;
+    bool arpSyncedStepValid = false;
+
     std::atomic<bool> panicRequested { false };
 
     // Glide smooths in semitone space (not Hz directly) so the pitch ramp sounds musically
