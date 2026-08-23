@@ -386,25 +386,36 @@ public:
         float waveshapedForOutput = filtered;
         if (waveshapeAmount > 0.0f)
         {
+            // Per-type knob range compression: the user found the full 0-100% Waveshape turn
+            // pushed each waveshaper past a musically usable point well before reaching 100%, at
+            // different rates per type. The knob's displayed 0-100% is unchanged (still what
+            // PluginProcessor reads/smooths/shows) - only how far that maps into each
+            // waveshaper's own amount01 range is rescaled, per type, so the full physical turn
+            // stays useful across its whole travel instead of the musically relevant part being
+            // crammed into the first fraction of it. amount01=0 is unaffected either way (this
+            // whole block is already skipped above at waveshapeAmount=0).
             if (waveshaperType == 0)
             {
-                filtered = waveFolder.process(preWaveshapeSignal, waveshapeAmount, 1.0f);
-                waveshapedForOutput = waveFolder.process(preWaveshapeSignal, waveshapeAmount, foldOutputDriveCompensation);
+                const auto effectiveAmount = waveshapeAmount * foldMaxAmountFraction;
+                filtered = waveFolder.process(preWaveshapeSignal, effectiveAmount, 1.0f);
+                waveshapedForOutput = waveFolder.process(preWaveshapeSignal, effectiveAmount, foldOutputDriveCompensation);
             }
             else if (waveshaperType == 1)
             {
                 // updateFilter() computes and lowpasses the shaped value once (shared by both
                 // calls below) - see KarplunkFuzz's own comment for why this differs from
                 // KarplunkWaveFolder's shape (Fuzz has real per-sample filter state; Fold doesn't).
-                fuzz.updateFilter(preWaveshapeSignal, waveshapeAmount);
-                filtered = fuzz.process(waveshapeAmount, 1.0f);
-                waveshapedForOutput = fuzz.process(waveshapeAmount, fuzzOutputDriveCompensation);
+                const auto effectiveAmount = waveshapeAmount * fuzzMaxAmountFraction;
+                fuzz.updateFilter(preWaveshapeSignal, effectiveAmount);
+                filtered = fuzz.process(effectiveAmount, 1.0f);
+                waveshapedForOutput = fuzz.process(effectiveAmount, fuzzOutputDriveCompensation);
             }
             else
             {
-                saturator.updateFilter(preWaveshapeSignal, waveshapeAmount);
-                filtered = saturator.process(waveshapeAmount, 1.0f);
-                waveshapedForOutput = saturator.process(waveshapeAmount, saturatorOutputDriveCompensation);
+                const auto effectiveAmount = waveshapeAmount * saturatorMaxAmountFraction;
+                saturator.updateFilter(preWaveshapeSignal, effectiveAmount);
+                filtered = saturator.process(effectiveAmount, 1.0f);
+                waveshapedForOutput = saturator.process(effectiveAmount, saturatorOutputDriveCompensation);
             }
         }
 
@@ -547,6 +558,13 @@ private:
     static constexpr float foldOutputDriveCompensation = 0.0f;
     static constexpr float fuzzOutputDriveCompensation = 0.0f;
     static constexpr float saturatorOutputDriveCompensation = 0.0f;
+
+    // Waveshape knob range compression - see renderNextSample()'s own comment. Tuned directly by
+    // the user (not measured/derived), one per waveshaper type since each one reaches "too much"
+    // at a different point on the knob's travel.
+    static constexpr float foldMaxAmountFraction = 0.59f;
+    static constexpr float fuzzMaxAmountFraction = 0.20f;
+    static constexpr float saturatorMaxAmountFraction = 0.30f;
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with
