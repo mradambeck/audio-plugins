@@ -21,6 +21,8 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     glideTimeParam = apvts.getRawParameterValue(glideTimeParamID);
     waveshapeParam = apvts.getRawParameterValue(waveshapeParamID);
     waveshaperTypeParam = apvts.getRawParameterValue(waveshaperTypeParamID);
+    ringModAmountParam = apvts.getRawParameterValue(ringModAmountParamID);
+    ringModFrequencyParam = apvts.getRawParameterValue(ringModFrequencyParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -109,15 +111,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
-    // Runtime choice between the Waveshaper seam's three concrete implementations (see
+    // Runtime choice between the Waveshaper seam's four concrete implementations (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime dropdown rather than
     // a compile-time template parameter like the other three) - defaults to Fold (index 0),
     // matching every build/listening session so far.
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{waveshaperTypeParamID, 1},
         "Waveshaper Type",
-        juce::StringArray{"Fold", "Fuzz", "Saturate"},
+        juce::StringArray{"Fold", "Fuzz", "Saturate", "BitCrush"},
         0));
+
+    // Ring Modulator (see KarplunkRingModulator.h) - its own area, not a Waveshaper Type, since it
+    // needs its own Frequency control and runs alongside whichever Waveshaper Type is selected
+    // (applied in-loop, after the Waveshaper - see SingleLineKarplunkVoice::renderNextSample()).
+    // Amount defaults to 0% (bit-exact no-op, the oscillator isn't even advanced at this value),
+    // matching every other new-control convention in this project.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ringModAmountParamID, 1},
+        "Ring Mod",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // 20Hz-5kHz, the classic ring-mod pedal range - skewed so most of the knob's travel sits in
+    // the lower/mid range where the effect reads as pitched sidebands rather than pure noise-like
+    // aliasing. Default (200Hz) picked as an audibly obvious starting point, not derived - to be
+    // confirmed by listening, same convention as every other constant in this feature.
+    juce::NormalisableRange<float> ringModFrequencyRange(20.0f, 5000.0f);
+    ringModFrequencyRange.setSkewForCentre(500.0f);
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ringModFrequencyParamID, 1},
+        "Ring Mod Freq",
+        ringModFrequencyRange,
+        200.0f,
+        juce::AudioParameterFloatAttributes().withLabel("Hz")));
 
     return { params.begin(), params.end() };
 }
@@ -148,6 +176,12 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
 
     waveshapeSmoothed.reset(sampleRate, smoothingRampSeconds);
     waveshapeSmoothed.setCurrentAndTargetValue(waveshapeParam->load());
+
+    ringModAmountSmoothed.reset(sampleRate, smoothingRampSeconds);
+    ringModAmountSmoothed.setCurrentAndTargetValue(ringModAmountParam->load());
+
+    ringModFrequencySmoothed.reset(sampleRate, smoothingRampSeconds);
+    ringModFrequencySmoothed.setCurrentAndTargetValue(ringModFrequencyParam->load());
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -235,6 +269,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     structureSmoothed.setTargetValue(structureParam->load());
     positionSmoothed.setTargetValue(positionParam->load());
     waveshapeSmoothed.setTargetValue(waveshapeParam->load());
+    ringModAmountSmoothed.setTargetValue(ringModAmountParam->load());
+    ringModFrequencySmoothed.setTargetValue(ringModFrequencyParam->load());
 
     // Poly/Mono is a discrete mode switch, not a live-sweepable control - deliberately not
     // smoothed, and checked once per block rather than every sample. Toggling it while notes are
@@ -280,6 +316,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         const auto structure = structureSmoothed.getNextValue();
         const auto position = positionSmoothed.getNextValue();
         const auto waveshape = waveshapeSmoothed.getNextValue();
+        const auto ringModAmount = ringModAmountSmoothed.getNextValue();
+        const auto ringModFrequency = ringModFrequencySmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
@@ -290,6 +328,8 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setPosition(position);
             v.setWaveshapeAmount(waveshape);
             v.setWaveshaperType(waveshaperType);
+            v.setRingModAmount(ringModAmount);
+            v.setRingModFrequency(ringModFrequency);
             mixedSample += v.renderNextSample();
         }
 

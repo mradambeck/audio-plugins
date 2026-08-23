@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -268,4 +269,63 @@ private:
     float lowpassCoeff = 0.0f;
     float filterState1 = 0.0f;
     float filterState2 = 0.0f;
+};
+
+// KarplunkBitCrush: sample-and-hold rate reduction + bit-depth quantization, combined under one
+// `amount01` (the classic "lo-fi" pair, usually offered as a single "Crush" knob) - not one of the
+// original three waveshaping-curve options, but a genuinely different KIND of degradation
+// (quantization/decimation, not a continuous nonlinear curve) that fits the same runtime-selectable
+// seam (see this file's own top comment and `KarplunkVoice.h`'s branch).
+//
+// Real-time-safety note, different from every other class in this file: quantization/sample-hold
+// cannot itself amplify a signal the way a drive-scaled curve can (there's no loop-gain-runaway
+// risk to guard against with a `driveCompensation` split - see KarplunkWaveFolder's own comment for
+// why that split exists for the other three), so this class's `process()` takes no parameters at
+// all rather than accepting an unused one just to look uniform. A held/quantized value is bounded
+// to the input's own magnitude by construction, EXCEPT quantization itself can round an
+// already-large input further from zero by up to half a step - explicitly clamped to +-1 in
+// updateFilter() to preserve the same unconditional-boundedness guarantee every other waveshaper in
+// this file provides, since this is the one place in this class an unbounded input could still
+// produce an unbounded (if rarely, in practice) output.
+//
+// `updateFilter()` must be called exactly once per sample tick (same contract as KarplunkFuzz/
+// KarplunkSaturator) - sample-and-hold has real per-sample state (`holdCounter`) that would
+// misbehave if advanced more than once per tick. Bit depth and hold length are bundled into the
+// same `amount01` rather than split into two separate knobs, since Karplunk currently only exposes
+// one shared Waveshape amount per type - `minBits`/`maxHoldSamples` are starting points, not
+// finalized, pending listening (same convention as every other constant in this file).
+class KarplunkBitCrush
+{
+public:
+    void prepare(double) noexcept { reset(); }
+    void reset() noexcept
+    {
+        heldValue = 0.0f;
+        holdCounter = 0;
+    }
+
+    // Call exactly once per sample tick, before any process() calls for that tick.
+    void updateFilter(float x, float amount01) noexcept
+    {
+        if (holdCounter <= 0)
+        {
+            const auto bits = maxBits - amount01 * (maxBits - minBits);
+            const auto levels = std::exp2(bits);
+            const auto step = 2.0f / levels; // quantization step across the [-1, 1] signal range
+            heldValue = std::clamp(std::round(x / step) * step, -1.0f, 1.0f);
+            holdCounter = 1 + (int) (amount01 * (float) (maxHoldSamples - 1));
+        }
+
+        --holdCounter;
+    }
+
+    float process() const noexcept { return heldValue; }
+
+private:
+    static constexpr float minBits = 2.0f;   // most crushed: coarse, stair-stepped quantization
+    static constexpr float maxBits = 16.0f;  // least crushed: near-transparent quantization
+    static constexpr int maxHoldSamples = 40; // most crushed: ~1.1kHz effective rate at 44.1kHz
+
+    float heldValue = 0.0f;
+    int holdCounter = 0;
 };

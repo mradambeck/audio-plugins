@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 
+#include "KarplunkRingModulator.h"
 #include "KarplunkStringLine.h"
 #include "KarplunkWaveshaper.h"
 
@@ -108,6 +109,8 @@ public:
         waveFolder.prepare(sampleRate);
         fuzz.prepare(sampleRate);
         saturator.prepare(sampleRate);
+        bitCrush.prepare(sampleRate);
+        ringMod.prepare(sampleRate);
 
         silenceHoldSamples = (int) (sampleRate * 0.05); // ~50ms
 
@@ -123,6 +126,8 @@ public:
         waveFolder.reset();
         fuzz.reset();
         saturator.reset();
+        bitCrush.reset();
+        ringMod.reset();
         active = false;
         silenceRunSamples = 0;
         fastOutputEnvelope = 0.0f;
@@ -223,10 +228,16 @@ public:
     // precedent for a "new control defaults to unchanged behavior" convention.
     void setWaveshapeAmount(float amount01) noexcept { waveshapeAmount = amount01; }
 
-    // Runtime selector between the three concrete waveshapers (0 = Fold, 1 = Fuzz, 2 = Saturate) -
-    // see KarplunkWaveshaper.h's own comment for why this seam is a runtime choice rather than a
-    // compile-time template parameter like the other three.
+    // Runtime selector between the four concrete waveshapers (0 = Fold, 1 = Fuzz, 2 = Saturate,
+    // 3 = BitCrush) - see KarplunkWaveshaper.h's own comment for why this seam is a runtime choice
+    // rather than a compile-time template parameter like the other three.
     void setWaveshaperType(int type) noexcept { waveshaperType = type; }
+
+    // Live, every-sample - see renderNextSample()'s ring modulation step (applied in-loop, after
+    // the Waveshaper). amount01=0 is a bit-exact no-op (the oscillator isn't even advanced in that
+    // case), same convention as Waveshape.
+    void setRingModAmount(float amount01) noexcept { ringModAmount = amount01; }
+    void setRingModFrequency(float hz) noexcept { ringModFrequency = hz; }
 
     float renderNextSample() noexcept
     {
@@ -410,13 +421,40 @@ public:
                 filtered = fuzz.process(effectiveAmount, 1.0f);
                 waveshapedForOutput = fuzz.process(effectiveAmount, fuzzOutputDriveCompensation);
             }
-            else
+            else if (waveshaperType == 2)
             {
                 const auto effectiveAmount = waveshapeAmount * saturatorMaxAmountFraction;
                 saturator.updateFilter(preWaveshapeSignal, effectiveAmount);
                 filtered = saturator.process(effectiveAmount, 1.0f);
                 waveshapedForOutput = saturator.process(effectiveAmount, saturatorOutputDriveCompensation);
             }
+            else
+            {
+                // KarplunkBitCrush's process() takes no amount/driveCompensation parameters at
+                // all - quantization/sample-hold can't amplify a signal, so there's no loop-safety
+                // or output-loudness split to make (see its own class comment) - the identical
+                // crushed value is used for both the recirculating and output paths.
+                const auto effectiveAmount = waveshapeAmount * bitCrushMaxAmountFraction;
+                bitCrush.updateFilter(preWaveshapeSignal, effectiveAmount);
+                filtered = bitCrush.process();
+                waveshapedForOutput = filtered;
+            }
+        }
+
+        // Ring Modulator: applied in-loop, after the Waveshaper, right before writing back - so
+        // the modulated signal itself becomes part of what's actually resonating (the user's
+        // explicit choice - see KarplunkRingModulator.h's own comment for the alternative
+        // considered, output-only, and why this needed its own area rather than being a fifth
+        // Waveshaper Type). updateOscillator() advances the shared phase exactly once per sample;
+        // both process() calls below read the SAME oscillator sample so the recirculating and
+        // audible paths stay in sync - no driveCompensation-style split needed at all (ring
+        // modulation can only ever shrink or invert a signal, never amplify it, see process()'s
+        // own comment).
+        if (ringModAmount > 0.0f)
+        {
+            ringMod.updateOscillator(ringModFrequency);
+            filtered = ringMod.process(filtered, ringModAmount);
+            waveshapedForOutput = ringMod.process(waveshapedForOutput, ringModAmount);
         }
 
         stringLine.write(filtered);
@@ -528,6 +566,10 @@ private:
     KarplunkWaveFolder waveFolder;
     KarplunkFuzz fuzz;
     KarplunkSaturator saturator;
+    KarplunkBitCrush bitCrush;
+
+    // Its own area, not a fifth Waveshaper type - see KarplunkRingModulator.h's own comment.
+    KarplunkRingModulator ringMod;
 
     int capacitySamples = 0;
     double sampleRateHz = 44100.0;
@@ -548,7 +590,9 @@ private:
     float noteVelocity = 0.0f;
     float structure = 0.0f;
     float waveshapeAmount = 0.0f;
-    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz, 2 = Saturate - see setWaveshaperType()
+    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz, 2 = Saturate, 3 = BitCrush - see setWaveshaperType()
+    float ringModAmount = 0.0f;
+    float ringModFrequency = 200.0f; // matches PluginProcessor's own default
 
     // See renderNextSample()'s comment on the two separate waveshaper calls per type - how much
     // drive compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the
@@ -565,6 +609,7 @@ private:
     static constexpr float foldMaxAmountFraction = 0.59f;
     static constexpr float fuzzMaxAmountFraction = 0.20f;
     static constexpr float saturatorMaxAmountFraction = 0.30f;
+    static constexpr float bitCrushMaxAmountFraction = 1.0f; // not yet tuned by ear - full range for now
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with

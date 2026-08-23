@@ -58,6 +58,8 @@ public:
     static constexpr auto glideTimeParamID = "glideTime";
     static constexpr auto waveshapeParamID = "waveshape";
     static constexpr auto waveshaperTypeParamID = "waveshaperType";
+    static constexpr auto ringModAmountParamID = "ringModAmount";
+    static constexpr auto ringModFrequencyParamID = "ringModFrequency";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -73,6 +75,8 @@ private:
     std::atomic<float>* glideTimeParam = nullptr;
     std::atomic<float>* waveshapeParam = nullptr;
     std::atomic<float>* waveshaperTypeParam = nullptr;
+    std::atomic<float>* ringModAmountParam = nullptr;
+    std::atomic<float>* ringModFrequencyParam = nullptr;
 
     using Voice = SingleLineKarplunkVoice<NoiseExcitation, TwoPointAverageLoopFilter, LinearInterpolator>;
 
@@ -120,6 +124,12 @@ private:
     // Also live/every-sample, same convention - a Waveshape sweep should be audible in real time
     // while a note rings, not just latched at the next pluck.
     juce::SmoothedValue<float> waveshapeSmoothed;
+
+    // Ring Mod Amount/Frequency are also live/every-sample, same convention - both are meant to be
+    // swept while a note rings (a live-performance sweep of the modulator frequency is a large part
+    // of ring modulation's usual character).
+    juce::SmoothedValue<float> ringModAmountSmoothed;
+    juce::SmoothedValue<float> ringModFrequencySmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

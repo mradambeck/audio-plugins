@@ -66,5 +66,13 @@ private:
     juce::ComboBox waveshaperTypeBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveshaperTypeAttachment;
 
+    juce::Slider ringModAmountSlider;
+    juce::Label ringModAmountLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ringModAmountAttachment;
+
+    juce::Slider ringModFrequencySlider;
+    juce::Label ringModFrequencyLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ringModFrequencyAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

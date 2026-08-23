@@ -697,6 +697,229 @@ public:
             logMessage("Saturate=100% worst-case peak: " + juce::String(peak, 4));
             expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
         }
+
+        beginTest("Waveshaper Type = BitCrush substantially changes the real plugin's rendered output vs Waveshape = 0%");
+        {
+            auto renderWithBitCrush = [&](float waveshape) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 3.0f); // BitCrush
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutBitCrush = renderWithBitCrush(0.0f);
+            auto withBitCrush = renderWithBitCrush(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutBitCrush.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutBitCrush.getReadPointer(0) + skipSamples,
+                withBitCrush.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("BitCrush=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Fold, Fuzz, Saturate, and BitCrush each produce measurably DIFFERENT output at the same Waveshape amount");
+        {
+            auto renderWithType = [&](float type) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, type);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto foldOutput = renderWithType(0.0f);
+            auto fuzzOutput = renderWithType(1.0f);
+            auto saturateOutput = renderWithType(2.0f);
+            auto bitCrushOutput = renderWithType(3.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diffFoldBitCrush = rmsOfDifference(
+                foldOutput.getReadPointer(0) + skipSamples,
+                bitCrushOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+            const auto diffFuzzBitCrush = rmsOfDifference(
+                fuzzOutput.getReadPointer(0) + skipSamples,
+                bitCrushOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+            const auto diffSaturateBitCrush = rmsOfDifference(
+                saturateOutput.getReadPointer(0) + skipSamples,
+                bitCrushOutput.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Fold vs BitCrush diff RMS: " + juce::String(diffFoldBitCrush, 6)
+                       + ", Fuzz vs BitCrush diff RMS: " + juce::String(diffFuzzBitCrush, 6)
+                       + ", Saturate vs BitCrush diff RMS: " + juce::String(diffSaturateBitCrush, 6));
+
+            expect(diffFoldBitCrush > foldRms * 0.1f, "Fold and BitCrush should sound clearly different at the same Waveshape amount");
+            expect(diffFuzzBitCrush > foldRms * 0.1f, "Fuzz and BitCrush should sound clearly different at the same Waveshape amount");
+            expect(diffSaturateBitCrush > foldRms * 0.1f, "Saturate and BitCrush should sound clearly different at the same Waveshape amount");
+        }
+
+        beginTest("Waveshaper Type = BitCrush stays finite and bounded at the worst-case combination (max Decay, full Bow)");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 3.0f); // BitCrush
+            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                expect(std::isfinite(data[i]), "output must stay finite through the real processor at BitCrush=100%");
+                peak = std::max(peak, std::abs(data[i]));
+            }
+
+            logMessage("BitCrush=100% worst-case peak: " + juce::String(peak, 4));
+            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+        }
+
+        beginTest("Ring Mod Amount defaults to 0% - explicitly setting it to 0% is bit-identical to never touching it");
+        {
+            const int numSamples = (int) (2.0 * sampleRate);
+            auto withoutTouchingRingMod = renderBowedNote(60, 0.0f, 0.5f, sampleRate, numSamples);
+
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+            setRaw(processor, KarplunkAudioProcessor::structureParamID, 0.0f);
+            setRaw(processor, KarplunkAudioProcessor::positionParamID, 0.5f);
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(withoutTouchingRingMod.getReadPointer(0), buffer.getReadPointer(0), numSamples);
+            expectEquals(diff, 0.0f, "explicitly setting Ring Mod to 0% should render bit-identical to never touching it at all");
+        }
+
+        beginTest("Ring Mod substantially changes the real plugin's rendered output vs Ring Mod = 0%");
+        {
+            auto renderWithRingMod = [&](float ringModAmount) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, ringModAmount);
+                setRaw(processor, KarplunkAudioProcessor::ringModFrequencyParamID, 200.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto withoutRingMod = renderWithRingMod(0.0f);
+            auto withRingMod = renderWithRingMod(1.0f);
+
+            const int numSamples = (int) (2.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto baseline = rms(withoutRingMod.getReadPointer(0) + skipSamples, tailSamples);
+            const auto diff = rmsOfDifference(
+                withoutRingMod.getReadPointer(0) + skipSamples,
+                withRingMod.getReadPointer(0) + skipSamples,
+                tailSamples);
+
+            logMessage("Ring Mod=0 tail RMS: " + juce::String(baseline, 6)
+                       + ", diff RMS: " + juce::String(diff, 6)
+                       + ", ratio: " + juce::String(diff / baseline, 4));
+
+            expect(diff > baseline * 0.05f);
+        }
+
+        beginTest("Ring Mod never makes the sustained loop louder than the unmodulated equivalent (can only shrink/invert, see KarplunkRingModulator's own safety argument)");
+        {
+            // Different framing from every other Waveshaper's worst-case test: ring modulation is
+            // provably bounded by the input's own magnitude (see KarplunkRingModulatorTests.cpp),
+            // so through the real processor this should show as REDUCED or equal loudness, never
+            // increased - a tighter, more specific claim than just "stays finite."
+            auto renderRingMod = [&](float ringModAmount) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, ringModAmount);
+                setRaw(processor, KarplunkAudioProcessor::ringModFrequencyParamID, 200.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto without = renderRingMod(0.0f);
+            auto with = renderRingMod(1.0f);
+
+            const int numSamples = (int) (4.0 * sampleRate);
+            const int skipSamples = (int) (0.6 * sampleRate);
+            const int tailSamples = numSamples - skipSamples;
+
+            const auto rmsWithout = rms(without.getReadPointer(0) + skipSamples, tailSamples);
+            const auto rmsWith = rms(with.getReadPointer(0) + skipSamples, tailSamples);
+
+            logMessage("Ring Mod off tail RMS: " + juce::String(rmsWithout, 6)
+                       + ", Ring Mod=100% tail RMS: " + juce::String(rmsWith, 6));
+
+            expect(rmsWith <= rmsWithout * 1.05f, // small tolerance for measurement noise, not a real allowance for growth
+                   "ring modulation should never make the sustained loop louder than the unmodulated equivalent");
+        }
+
+        beginTest("Ring Mod combined with each Waveshaper Type stays finite and bounded at the worst-case combination");
+        {
+            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperType);
+                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModAmountParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::ringModFrequencyParamID, 5000.0f); // worst-case: highest supported frequency
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    expect(std::isfinite(data[i]),
+                           "output must stay finite with Ring Mod + Waveshaper Type " + juce::String(waveshaperType) + " both at 100%");
+                    peak = std::max(peak, std::abs(data[i]));
+                }
+
+                logMessage("Ring Mod=100% + Waveshaper Type=" + juce::String(waveshaperType) + " worst-case peak: " + juce::String(peak, 4));
+                expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
     }
 };
 

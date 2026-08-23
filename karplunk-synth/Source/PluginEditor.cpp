@@ -10,7 +10,7 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int editorWidth = 920;
+    constexpr int editorWidth = 1150;
     constexpr int editorHeight = 260;
     constexpr int sliderSize = 100;
     constexpr int labelHeight = 20;
@@ -71,18 +71,27 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     waveshapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshapeParamID, waveshapeSlider);
 
-    // The runtime dropdown for the Waveshaper seam's three concrete types (see
+    // The runtime dropdown for the Waveshaper seam's four concrete types (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime choice rather than a
     // compile-time template parameter like the other three). Item IDs are 1-based (JUCE
     // ComboBox convention) and map to AudioParameterChoice's 0-based indices in order - "Fold" is
-    // index 0, "Fuzz" is index 1, "Saturate" is index 2, matching createParameterLayout()'s own
-    // choice list.
+    // index 0, "Fuzz" is index 1, "Saturate" is index 2, "BitCrush" is index 3, matching
+    // createParameterLayout()'s own choice list.
     waveshaperTypeBox.addItem("Fold", 1);
     waveshaperTypeBox.addItem("Fuzz", 2);
     waveshaperTypeBox.addItem("Saturate", 3);
+    waveshaperTypeBox.addItem("BitCrush", 4);
     addAndMakeVisible(waveshaperTypeBox);
     waveshaperTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperTypeBox);
+
+    setupSlider(ringModAmountSlider, ringModAmountLabel, "Ring Mod");
+    ringModAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::ringModAmountParamID, ringModAmountSlider);
+
+    setupSlider(ringModFrequencySlider, ringModFrequencyLabel, "Ring Mod Freq");
+    ringModFrequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::ringModFrequencyParamID, ringModFrequencySlider);
 
     setSize(editorWidth, editorHeight);
 }
@@ -120,7 +129,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 8;
+    const auto sliderCount = 10;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -137,7 +146,10 @@ void KarplunkAudioProcessorEditor::resized()
     layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), glideTimeLabel, glideTimeSlider);
 
-    auto waveshapeColumn = bounds;
+    auto waveshapeColumn = bounds.removeFromLeft(columnWidth);
     waveshaperTypeBox.setBounds(waveshapeColumn.removeFromBottom(labelHeight + 4).reduced(4, 2));
     layoutColumn(waveshapeColumn, waveshapeLabel, waveshapeSlider);
+
+    layoutColumn(bounds.removeFromLeft(columnWidth), ringModAmountLabel, ringModAmountSlider);
+    layoutColumn(bounds, ringModFrequencyLabel, ringModFrequencySlider);
 }
