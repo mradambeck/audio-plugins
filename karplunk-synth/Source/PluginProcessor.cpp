@@ -15,6 +15,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     outputLevelParam = apvts.getRawParameterValue(outputLevelParamID);
     brightnessParam = apvts.getRawParameterValue(brightnessParamID);
     bowAmountParam = apvts.getRawParameterValue(bowAmountParamID);
+    bowForceParam = apvts.getRawParameterValue(bowForceParamID);
     structureParam = apvts.getRawParameterValue(structureParamID);
     positionParam = apvts.getRawParameterValue(positionParamID);
     monoParam = apvts.getRawParameterValue(monoParamID);
@@ -66,6 +67,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Pluck / Bow",
         juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
         0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Bow-side only (no effect at Pluck/Bow=0%) - the friction bow model's own "Bow Pressure"
+    // control (see KarplunkExcitation::setBowForce()'s own comment). Defaults to 50%, STK's own
+    // literal default (frictionSlope=3.0, the midpoint of its 1.0-5.0 span) - a real,
+    // literature-anchored default, not invented.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{bowForceParamID, 1},
+        "Bow Force",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.5f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
@@ -261,6 +274,9 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     bowAmountSmoothed.reset(sampleRate, smoothingRampSeconds);
     bowAmountSmoothed.setCurrentAndTargetValue(bowAmountParam->load());
 
+    bowForceSmoothed.reset(sampleRate, smoothingRampSeconds);
+    bowForceSmoothed.setCurrentAndTargetValue(bowForceParam->load());
+
     structureSmoothed.reset(sampleRate, smoothingRampSeconds);
     structureSmoothed.setCurrentAndTargetValue(structureParam->load());
 
@@ -374,6 +390,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     dampingSmoothed.setTargetValue(dampingParam->load());
     outputLevelSmoothed.setTargetValue(juce::Decibels::decibelsToGain(outputLevelParam->load()));
     bowAmountSmoothed.setTargetValue(bowAmountParam->load());
+    bowForceSmoothed.setTargetValue(bowForceParam->load());
     structureSmoothed.setTargetValue(structureParam->load());
     positionSmoothed.setTargetValue(positionParam->load());
     waveshapeSmoothed.setTargetValue(waveshapeParam->load());
@@ -448,6 +465,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
 
         const auto damping = dampingSmoothed.getNextValue();
         const auto bowAmount = bowAmountSmoothed.getNextValue();
+        const auto bowForce = bowForceSmoothed.getNextValue();
         const auto structure = structureSmoothed.getNextValue();
         const auto position = positionSmoothed.getNextValue();
         const auto waveshape = waveshapeSmoothed.getNextValue();
@@ -463,6 +481,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         {
             v.setDamping(damping);
             v.setBowAmount(bowAmount);
+            v.setBowForce(bowForce);
             v.setStructure(structure);
             v.setPosition(position);
             v.setWaveshapeAmount(waveshape);

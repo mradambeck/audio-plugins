@@ -52,6 +52,7 @@ public:
     static constexpr auto outputLevelParamID = "outputLevel";
     static constexpr auto brightnessParamID = "brightness";
     static constexpr auto bowAmountParamID = "bowAmount";
+    static constexpr auto bowForceParamID = "bowForce";
     static constexpr auto structureParamID = "structure";
     static constexpr auto positionParamID = "position";
     static constexpr auto monoParamID = "mono";
@@ -76,6 +77,7 @@ private:
     std::atomic<float>* outputLevelParam = nullptr;
     std::atomic<float>* brightnessParam = nullptr;
     std::atomic<float>* bowAmountParam = nullptr;
+    std::atomic<float>* bowForceParam = nullptr;
     std::atomic<float>* structureParam = nullptr;
     std::atomic<float>* positionParam = nullptr;
     std::atomic<float>* monoParam = nullptr;
@@ -92,7 +94,7 @@ private:
     std::atomic<float>* resonanceParam = nullptr;
     std::atomic<float>* formantFrequencyParam = nullptr;
 
-    using Voice = KarplunkVoice<NoiseExcitation, LinearInterpolator>;
+    using Voice = KarplunkVoice<KarplunkExcitation, LinearInterpolator>;
 
     // 8 voices, basic oldest-voice-stealing (see KarplunkVoiceAllocator.h) - each Voice composes
     // its three area-components by value, so this pool needed zero changes to any of the four
@@ -136,6 +138,11 @@ private:
     // voice every sample, same pattern as Decay - bowing is a sustained, live gesture, so a
     // performer should hear the knob change in real time while a note rings.
     juce::SmoothedValue<float> bowAmountSmoothed;
+
+    // Bow-side only (no effect at bowAmount=0) - live/every-sample, same convention as Bow Amount
+    // itself. Maps to the friction curve's own slope (STK's "Bow Pressure") - see
+    // KarplunkExcitation::setBowForce()'s own comment.
+    juce::SmoothedValue<float> bowForceSmoothed;
 
     // Structure and Position are also live/every-sample, same convention as Bow Amount/Decay -
     // both are meant to be swept while a note rings, not just set before plucking.

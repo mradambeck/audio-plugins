@@ -303,6 +303,13 @@ public:
         excitation.setBowAmount(amount01);
     }
 
+    // Bow-side only (no effect at bowAmount=0) - see KarplunkExcitation::setBowForce()'s own
+    // comment. Live, every-sample, same convention as Bow Amount.
+    void setBowForce(float amount01) noexcept
+    {
+        excitation.setBowForce(amount01);
+    }
+
     // Live, every-sample, same convention as setBowAmount()/setDamping() - see renderChannelSample().
     void setStructure(float amount01) noexcept { structure = amount01; }
     void setPosition(float amount01) noexcept { position = amount01; }
@@ -476,7 +483,13 @@ public:
         const auto activeLoopGain = loopFilterType == 0 ? loopFilterTwoPoint.getLoopGain() : loopFilterResonant.getLoopGain();
         const auto fullBowGain = continuousLevelAnalog * std::sqrt(1.0f - activeLoopGain);
         const auto injectionGain = 1.0f + excitation.getBowAmount() * (fullBowGain - 1.0f);
-        filtered += std::tanh(excitation.nextExcitationSample(noteVelocity) * injectionGain);
+        // `filtered` (the string's own already-computed current content - post-Structure-
+        // dispersion, post-loop-filter) is passed in as the friction model's velocity proxy - see
+        // KarplunkExcitation.h's own comment for why this is the direct single-rail analogue of
+        // what real two-rail digital waveguide bow models read from their own rails, and why it's
+        // read BEFORE this tick's own contribution is added (the one-sample-delayed feedback real
+        // real-time friction implementations use to avoid an implicit per-sample solve).
+        filtered += std::tanh(excitation.nextExcitationSample(noteVelocity, filtered) * injectionGain);
 
         // Waveshaper: nonlinearly reshapes the COMBINED signal (recirculating loop content plus
         // this tick's freshly injected excitation) right before it's written back - so the
@@ -618,10 +631,10 @@ public:
     bool isActive() const noexcept { return active; }
 
 private:
-    // xorshift32, same technique/rationale as NoiseExcitation::nextNoiseSample() (deterministic,
+    // xorshift32, same technique/rationale as KarplunkExcitation::nextNoiseSample() (deterministic,
     // allocation-free, no JUCE dependency) - a separate RNG/state from the excitation's own noise,
     // since this drives delay-length FM (pitch), not the injected excitation signal itself. Never
-    // reset in reset()/noteOn() (matching NoiseExcitation's own convention), so consecutive notes
+    // reset in reset()/noteOn() (matching KarplunkExcitation's own convention), so consecutive notes
     // on the same voice get non-repeating noise while a freshly-constructed processor stays fully
     // deterministic - relied on by KarplunkProcessorTests' "two fresh processors render bit-
     // identical output" regression test.
@@ -839,6 +852,7 @@ public:
     void setFormantFrequency(float hz) noexcept { lineA.setFormantFrequency(hz); lineB.setFormantFrequency(hz); }
     void setBrightness(float amount01) noexcept { lineA.setBrightness(amount01); lineB.setBrightness(amount01); }
     void setBowAmount(float amount01) noexcept { lineA.setBowAmount(amount01); lineB.setBowAmount(amount01); }
+    void setBowForce(float amount01) noexcept { lineA.setBowForce(amount01); lineB.setBowForce(amount01); }
     void setStructure(float amount01) noexcept { lineA.setStructure(amount01); lineB.setStructure(amount01); }
     void setPosition(float amount01) noexcept { lineA.setPosition(amount01); lineB.setPosition(amount01); }
     void setWaveshapeAmount(float amount01) noexcept { lineA.setWaveshapeAmount(amount01); lineB.setWaveshapeAmount(amount01); }

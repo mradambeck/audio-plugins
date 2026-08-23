@@ -17,7 +17,7 @@
 class KarplunkVoiceTests : public juce::UnitTest
 {
 public:
-    using Voice = KarplunkVoice<NoiseExcitation, LinearInterpolator>;
+    using Voice = KarplunkVoice<KarplunkExcitation, LinearInterpolator>;
 
     KarplunkVoiceTests() : juce::UnitTest("KarplunkVoice", "Karplunk") {}
 
@@ -178,6 +178,8 @@ public:
                 }
                 const auto bowRms = (float) std::sqrt(sumSquares / measureWindow);
                 const auto deltaDb = toDb(pluckPeak) - toDb(bowRms);
+                logMessage("damping=" + juce::String(damping) + " pluckPeak=" + juce::String(pluckPeak, 6)
+                           + " bowRms=" + juce::String(bowRms, 6) + " deltaDb=" + juce::String(deltaDb, 2));
 
                 // Some residual damping-dependence is accepted (documented in README) - the bar
                 // here is "not dramatically quieter", not "identical".
@@ -262,7 +264,7 @@ public:
             // Guards against the exact failure mode a closed-form/elapsed-sample-counter envelope
             // would have had: bowAmount is live (PluginProcessor updates it every sample), so an
             // abrupt step must not make the envelope itself jump - only its rate of movement
-            // should change. The one-pole recurrence in NoiseExcitation is continuous by
+            // should change. The one-pole recurrence in KarplunkExcitation is continuous by
             // construction; this test is the empirical check that it actually behaves that way
             // end-to-end, not just in isolation.
             Voice voice;
@@ -525,8 +527,19 @@ public:
                 logMessage(juce::String(label) + "  rms off=" + juce::String(rmsOff, 5) + " on=" + juce::String(rmsOn, 5)
                            + "  ratio=" + juce::String(ratio, 3));
 
+                // Upper bound widened from 6 to 20 once the friction bow model gained its own
+                // bow-noise term (see KarplunkExcitation.h's own comment): the UNSHAPED ("off")
+                // reference is now more strongly damping-dependent than before (a real, measured
+                // property of the noise-driven resonant buildup, not a bug - loudest at damping=1.0
+                // was ~0.024 here, well under the shaped value), which inflates this RATIO metric at
+                // the extreme without the shaped ("on") value itself changing - it stayed ~0.36-0.44
+                // across all three conditions, confirming Waveshape's own output is exactly as
+                // bounded/consistent as before. The ratio's actual measured worst case here is
+                // ~18.4 (bowNoiseAmount/bowNoiseLowpassCoeff were retuned after the first render/
+                // listen pass judged the noise too hiss-like - see KarplunkExcitation.h) - 20 keeps
+                // meaningful margin without loosening past what's needed.
                 expect(ratio > 0.3f, "Waveshape shouldn't crush a genuinely-folding signal's loudness");
-                expect(ratio < 6.0f, "Waveshape shouldn't make a genuinely-folding signal run away in loudness");
+                expect(ratio < 20.0f, "Waveshape shouldn't make a genuinely-folding signal run away in loudness");
             }
         }
 

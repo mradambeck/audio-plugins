@@ -44,6 +44,10 @@ private:
     juce::Label bowAmountLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowAmountAttachment;
 
+    juce::Slider bowForceSlider;
+    juce::Label bowForceLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowForceAttachment;
+
     juce::Slider structureSlider;
     juce::Label structureLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> structureAttachment;

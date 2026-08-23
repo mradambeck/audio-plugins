@@ -11,43 +11,44 @@ namespace
     constexpr float minLowpassAlpha = 0.02f;
 }
 
-void NoiseExcitation::prepare(double sampleRate) noexcept
+void KarplunkExcitation::prepare(double sampleRate) noexcept
 {
     sampleRateHz = sampleRate;
     reset();
 }
 
-void NoiseExcitation::reset() noexcept
+void KarplunkExcitation::reset() noexcept
 {
     lowpassState = 0.0f;
+    bowNoiseLowpassState = 0.0f;
     stage = Stage::Idle;
     envelope = 0.0f;
 }
 
-void NoiseExcitation::setBrightness(float amount01) noexcept
+void KarplunkExcitation::setBrightness(float amount01) noexcept
 {
     brightness = amount01;
 }
 
-void NoiseExcitation::setBowAmount(float amount01) noexcept
+void KarplunkExcitation::setBowAmount(float amount01) noexcept
 {
     bowAmount = amount01;
 }
 
-void NoiseExcitation::setBaseDuration(int delaySamples) noexcept
+void KarplunkExcitation::setBaseDuration(int delaySamples) noexcept
 {
     baseDurationSamples = (float) delaySamples;
     stage = Stage::Attack;
     envelope = 0.0f;
 }
 
-void NoiseExcitation::noteOff() noexcept
+void KarplunkExcitation::noteOff() noexcept
 {
     if (stage != Stage::Idle)
         stage = Stage::Release;
 }
 
-float NoiseExcitation::nextNoiseSample() noexcept
+float KarplunkExcitation::nextNoiseSample() noexcept
 {
     // xorshift32 - fast, allocation-free, deterministic given a seed. Not juce::Random, to keep
     // this class free of any JUCE dependency (see header comment).
@@ -62,7 +63,50 @@ float NoiseExcitation::nextNoiseSample() noexcept
     return lowpassState;
 }
 
-float NoiseExcitation::nextExcitationSample(float velocity01) noexcept
+float KarplunkExcitation::nextBowNoiseSample() noexcept
+{
+    // xorshift32, same technique as nextNoiseSample() but its own independent state - see this
+    // class's own header comment for why the friction model's noise floor needs to stay independent
+    // of the Pluck side's (Brightness-shaped) noise source. Lowpassed (fixed coefficient, not tied
+    // to Brightness - see bowNoiseLowpassCoeff's own comment) - raw white noise measured, by ear, as
+    // reading like continuous hiss rather than bow character once mixed into the resonant tone.
+    bowNoiseRngState ^= bowNoiseRngState << 13;
+    bowNoiseRngState ^= bowNoiseRngState >> 17;
+    bowNoiseRngState ^= bowNoiseRngState << 5;
+    const auto whiteNoise = (float) bowNoiseRngState / (float) UINT32_MAX * 2.0f - 1.0f;
+    bowNoiseLowpassState += bowNoiseLowpassCoeff * (whiteNoise - bowNoiseLowpassState);
+    return bowNoiseLowpassState;
+}
+
+float KarplunkExcitation::nextFrictionSample(float stringSignal) noexcept
+{
+    // Bow Force -> friction-curve slope, STK's own Bow Pressure mapping/span - see this class's
+    // own header comment for the full derivation and citation.
+    const auto frictionSlope = maxFrictionSlope - bowForce * (maxFrictionSlope - minFrictionSlope);
+
+    // vBow: commanded bow velocity, ADSR-shaped by THIS class's own existing `envelope` (already
+    // computed every tick by the unchanged Attack/DecayToSustain/Release state machine in
+    // nextExcitationSample()) - reuses the same envelope driving the Pluck side rather than a
+    // second, separately-tuned one, avoiding this file's own historical bug #3 (two curves racing).
+    const auto vBow = envelope * maxBowVelocityAnalog;
+    const auto vDelta = vBow - stringSignal * stringVelocityGain;
+
+    // STK's BowTable::tick(), verbatim formula - see this class's own header comment for the
+    // unconditional-boundedness argument.
+    const auto x = std::abs(frictionSlope * vDelta + frictionOffset) + 0.75f;
+    const auto rho = std::clamp(std::pow(x, -4.0f), frictionMinOutput, frictionMaxOutput);
+
+    // bowNoiseAmount * noise, scaled by `envelope` so a fresh note's noise floor fades in with the
+    // same attack shape as the friction curve itself rather than clicking on at full amplitude on
+    // the very first tick - see this class's own header comment (nextFrictionSample's) for why this
+    // term exists at all: without it, a held bow note's delay-line content converges to uniform DC
+    // and Position's own tap cancels it to exact silence.
+    const auto bowNoise = bowNoiseAmount * envelope * nextBowNoiseSample();
+
+    return vDelta * rho + bowNoise;
+}
+
+float KarplunkExcitation::nextExcitationSample(float velocity01, float stringSignal) noexcept
 {
     if (stage == Stage::Idle)
         return 0.0f;
@@ -119,5 +163,15 @@ float NoiseExcitation::nextExcitationSample(float velocity01) noexcept
             break;
     }
 
-    return nextNoiseSample() * velocity01 * envelope;
+    const auto pluckComponent = nextNoiseSample() * velocity01 * envelope;
+
+    // Explicit gate, not reliance on 0*x=0 - matches this codebase's own established convention
+    // (Structure/Waveshape/Ring Mod all skip their respective computation entirely at amount=0
+    // rather than trusting the arithmetic to cancel out) and guarantees bowAmount=0 stays bit-exact
+    // with this class's pre-friction-model behavior, sample for sample.
+    if (bowAmount <= 0.0f)
+        return pluckComponent;
+
+    const auto frictionComponent = nextFrictionSample(stringSignal) * frictionLevelAnalog;
+    return (1.0f - bowAmount) * pluckComponent + bowAmount * frictionComponent;
 }

@@ -24,30 +24,45 @@
 // matter how its own coefficient or target moves tick-to-tick, where a closed-form re-evaluation
 // from a fixed t would not).
 //
-// To add a new excitation variant (filtered noise with a different colour, a sample-based burst,
-// etc.), write a new class matching this same method set (prepare/reset/setBrightness/
-// setBowAmount/getBowAmount/setBaseDuration/noteOff/nextExcitationSample/setSeed) and swap the
-// template argument in KarplunkVoice.h's KarplunkStringLineChannel instantiation - nothing in
-// KarplunkLoopFilter.h, KarplunkStringLine.h, or KarplunkVoice.h needs to change. setSeed() (see
-// its own comment) joined this set only once the Feedback Topology seam grew a second option
-// that needs two independently-noisy Excitation instances - every Excitation variant needs it now,
-// not just NoiseExcitation.
-class NoiseExcitation
+// Renamed from NoiseExcitation once the Bow side of the Pluck/Bow morph stopped being purely noise
+// -driven: past a certain point, "noise" no longer described this class's dominant behavior for a
+// bowed note (see nextFrictionSample()'s own comment). The Pluck side (the ADSR-enveloped burst
+// below) is completely unchanged.
+//
+// To add a new excitation variant (a sample-based burst, etc.), write a new class matching this
+// same method set (prepare/reset/setBrightness/setBowAmount/setBowForce/getBowAmount/
+// setBaseDuration/noteOff/nextExcitationSample/setSeed) and swap the template argument in
+// KarplunkVoice.h's KarplunkStringLineChannel instantiation - nothing in KarplunkLoopFilter.h,
+// KarplunkStringLine.h, or KarplunkVoice.h needs to change. setSeed() (see its own comment) joined
+// this set once the Feedback Topology seam grew a second option that needs two independently-noisy
+// Excitation instances - every Excitation variant needs it now, not just this one.
+class KarplunkExcitation
 {
 public:
     void prepare(double sampleRate) noexcept;
     void reset() noexcept;
 
     // 0 = fully darkened (one-pole lowpassed) noise, 1 = raw white noise. Applied inside
-    // nextExcitationSample(), not as a separate post-process pass.
+    // nextNoiseSample() (the Pluck side's own excitation source, unaffected by Bow Force/the
+    // friction model below).
     void setBrightness(float amount01) noexcept;
 
     // 0 = pure pluck: fast attack, decays fully away (sustain level 0) over a time tied to this
     // note's own period - see setBaseDuration(). 1 = pure bow: slow attack, settles into and holds
-    // at full-amplitude sustain indefinitely. Every stage's time constants AND the sustain level
-    // itself move with this, live, every tick - see nextExcitationSample().
+    // at full-amplitude sustain indefinitely, now driven by a real stick-slip friction model (see
+    // nextFrictionSample()) rather than continuous noise injection. Every stage's time constants
+    // AND the sustain level itself move with this, live, every tick - see nextExcitationSample().
     void setBowAmount(float amount01) noexcept;
     float getBowAmount() const noexcept { return bowAmount; }
+
+    // Bow-side only (no effect at bowAmount=0, gated the same way Resonance has no effect at
+    // Loop Filter Type=Two-Point-Average) - maps to the friction curve's own slope (STK's
+    // "Bow Pressure" control, see nextFrictionSample()'s own comment), NOT bow speed/amplitude,
+    // which stays governed by bowAmount/the existing envelope. A real bow's force/pressure and
+    // its speed are genuinely independent physical axes - this is a new, dedicated control rather
+    // than overloading bowAmount with a second meaning (see this class's own comment for why that
+    // would risk re-deriving this file's own historical bug #2).
+    void setBowForce(float amount01) noexcept { bowForce = amount01; }
 
     // Sets the RNG seed directly - not part of every Excitation variant's normal per-note
     // lifecycle (Structure/Position/etc. never call this); used by KarplunkVoice's dual-topology
@@ -56,7 +71,19 @@ public:
     // identically-driven Excitation instances would produce bit-identical noise, making
     // cross-coupling and detune both silently inaudible - see KarplunkVoice.h's own comment.
     // xorshift32 is degenerate at seed 0, so 0 is remapped to 1 (matching this class's own default).
-    void setSeed(uint32_t seed) noexcept { rngState = seed != 0 ? seed : 1; }
+    // Also reseeds bowNoiseRngState (offset by a fixed constant so it isn't just a copy of rngState's
+    // own sequence) - without this, two Excitation instances constructed identically but reseeded
+    // only via this call (as KarplunkVoice's lineB is, at prepare() time) would share the FRICTION
+    // model's noise floor bit-for-bit even though their Pluck-side noise correctly diverges, making
+    // Dual topology silently collapse toward Single at bowAmount=1 (no independent bow character -
+    // caught by KarplunkVoiceTests.cpp's own "Topology=Dual produces measurably different output"
+    // test).
+    void setSeed(uint32_t seed) noexcept
+    {
+        rngState = seed != 0 ? seed : 1;
+        const auto offsetSeed = seed + 0x9e3779b9u;
+        bowNoiseRngState = offsetSeed != 0 ? offsetSeed : 1;
+    }
 
     // Starts a fresh Attack stage for a new note, and tells this excitation what "one period"
     // means for the note currently ringing (so bowAmount=0's decay time scales with pitch the way
@@ -73,15 +100,100 @@ public:
     // KarplunkStringLineChannel no longer gates this by a `held` flag. An idle (never-triggered)
     // excitation returns exactly 0; a fully-released one converges to (very close to) 0 on its
     // own and just stays there. Never allocates.
-    float nextExcitationSample(float velocity01) noexcept;
+    //
+    // `stringSignal` is new: the string's own current content (KarplunkStringLineChannel passes
+    // `filtered` - post-Structure-dispersion, post-loop-filter, the same signal Position/Structure
+    // already treat as "the string's own current value" elsewhere in this codebase). The friction
+    // model needs this to compute relative bow/string velocity - see nextFrictionSample()'s own
+    // comment for why this is the direct single-rail analogue of what real two-rail digital
+    // waveguide bow models read from their own two rails, not an invented shortcut. The Pluck side
+    // (bowAmount=0) never reads this parameter at all - bit-exact with this class's pre-friction
+    // behavior at bowAmount=0, by explicit gate, not by algebraic coincidence.
+    float nextExcitationSample(float velocity01, float stringSignal) noexcept;
 
 private:
     float nextNoiseSample() noexcept;
+    float nextBowNoiseSample() noexcept;
+
+    // Stick-slip friction bow model - ported directly from Perry Cook & Gary Scavone's STK
+    // (Synthesis ToolKit) `BowTable`/`Bowed` classes, themselves a real-time-safe implementation of
+    // the McIntyre/Schumacher/Woodhouse friction-curve formulation described in Julius O. Smith's
+    // "Digital Waveguide Modeling of Bowed Strings" (ccrma.stanford.edu/~jos/BowedStrings/). Real
+    // bow-string friction depends on the RELATIVE velocity between bow and string at the contact
+    // point - this is a genuinely different mechanism from continuous noise injection, which is why
+    // it needs `stringSignal` (the loop's own current content) as an input the Pluck side, and every
+    // other seam in this codebase, has never needed.
+    //
+    // Real-time-safety note: the true physics has the friction force depend on the string's
+    // response to that SAME force within the same instant - a genuine algebraic loop. Real digital
+    // waveguide implementations (confirmed directly in STK's own shipped `Bowed::tick()`) sidestep
+    // this by using the PREVIOUS tick's own string signal as the velocity proxy, at the cost of a
+    // one-sample delay - exactly what happens here too, since `stringSignal` is `filtered` from
+    // THIS tick's own already-computed value, read before this contribution is added to it (see the
+    // call site in KarplunkStringLineChannel::renderChannelSample()).
+    //
+    // The friction curve itself, `rho(vDelta) = clamp((|slope*vDelta+offset|+0.75)^-4, 0.01, 0.98)`,
+    // is STK's own `BowTable::tick()` formula verbatim (not re-derived) - unconditionally bounded by
+    // construction, not merely by the explicit clamp: since `|slope*vDelta+offset| >= 0` always,
+    // the base is always `>= 0.75`, so the raw power is always in `(0, 0.75^-4]` for ANY finite
+    // vDelta/slope/offset, before the clamp even runs - the same "bounded regardless of input"
+    // property every Waveshaper curve has. The injected value `vDelta * rho(vDelta)` is NOT itself
+    // unconditionally bounded (rho is bounded but vDelta isn't, since it depends on stringSignal) -
+    // what keeps the whole system safe is the EXISTING tanh() cap at the injection site in
+    // KarplunkStringLineChannel::renderChannelSample(), which was already relied on for raw noise
+    // and transfers unchanged here (tanh doesn't care what produced its argument): any finite
+    // excitation output gets capped to a bounded per-sample contribution, and combined with the
+    // loop's own already-proven per-pass contraction (|H(w)| <= 0.9995, unaffected by what's
+    // injected), steady-state amplitude is bounded by (bounded forcing)/(1-contraction) - finite,
+    // by construction.
+    //
+    // A real, measured bug this bounded-but-deterministic property did NOT anticipate: a held bow
+    // note went to exact silence. Root cause, confirmed by a faithful offline simulation of the real
+    // delay-line/loop-filter/friction chain (not a crude single-pole approximation): with a purely
+    // deterministic friction curve and no time-varying asymmetry, vDelta*rho(vDelta) converges to a
+    // near-constant value once the envelope settles, so every new write around the delay line
+    // injects nearly the identical amount - the entire ring buffer converges toward uniform DC
+    // content. That's a real, stable fixed point (not silence on its own), but KarplunkStringLineChannel::
+    // positionOutput() reads a SECOND tap from a different point in the SAME buffer specifically to
+    // cancel periodic content - against a perfectly uniform buffer, that second tap reads the
+    // identical value, so `forOutput - positionTap` cancels EXACTLY to zero. A genuine two-rail
+    // (bidirectional-waveguide) bow model, like STK's own `Bowed` class actually is, can't degenerate
+    // this way (bow force acts on the difference of two independently-delayed traveling waves, which
+    // structurally can't collapse to a shared constant) - this single-delay-line adaptation has no
+    // such structural guard.
+    //
+    // The fix: superimpose a small amount of genuine stochastic "bow noise" (see nextBowNoiseSample())
+    // onto the deterministic friction curve - physically authentic (real bow/string contact has
+    // surface-roughness/micro-slip randomness on top of the smooth stick-slip curve, and STK's own
+    // Bowed model layers noise in for the same reason), and it breaks the buffer's uniformity so
+    // Position's tap can no longer cancel it to exact zero. Confirmed by the same offline simulation
+    // before implementing here: bowNoiseAmount=0 measured EXACTLY zero post-Position RMS at every
+    // damping tested; nonzero amounts restored a stable, non-decaying RMS scaling roughly linearly
+    // with the noise amount (already reflecting the loop's own resonant buildup, the same mechanism
+    // continuousLevelAnalog relies on elsewhere) - not a guess, a measured relationship.
+    float nextFrictionSample(float stringSignal) noexcept;
 
     uint32_t rngState = 1;
     float lowpassState = 0.0f;
+
+    // Separate, dedicated RNG state for the friction model's bow-noise term (see
+    // nextFrictionSample()'s own comment) - kept independent of rngState/lowpassState above (the
+    // Pluck side's own noise source, shaped by Brightness) so Brightness (a pluck-specific tone
+    // control) can't accidentally alter the bow's noise floor. Fixed nonzero seed, distinct from
+    // rngState's own default - xorshift32 is degenerate at 0.
+    uint32_t bowNoiseRngState = 0x9e3779b9u;
+
+    // One-pole lowpass state for the bow-noise term - see nextBowNoiseSample()'s own comment for
+    // why raw white noise measured as reading like hiss layered on the tone rather than woven-in
+    // bow character, and why filtering it (real bow surface-noise isn't flat white noise either)
+    // was the fix, confirmed by ear.
+    float bowNoiseLowpassState = 0.0f;
     float brightness = 1.0f;
     float bowAmount = 0.0f;
+
+    // STK's own "Bow Pressure" default (slope=3.0, the midpoint of its 1.0-5.0 span) - a real,
+    // literature-anchored default, not invented - see setBowForce()'s own comment.
+    float bowForce = 0.5f;
 
     double sampleRateHz = 44100.0;
     float baseDurationSamples = 100.0f;
@@ -110,4 +222,53 @@ private:
     // audible "lifting the bow off the string" tail instead of an instant cutoff.
     static constexpr float fastReleaseSeconds = 0.005f;
     static constexpr float slowReleaseSeconds = 0.1f;
+
+    // Friction model constants - ported from STK's own defaults/span where noted, otherwise
+    // reasoned starting points pending the mandatory render/measure pass this project's own
+    // established discipline requires before treating any of these as final (see git history/PR
+    // discussion for the actual measured numbers once that pass happens).
+    // vBow's own scale. NOT set to Karplunk's own signal amplitude directly (~0.3-1.6 pre-
+    // waveshape, see README) - checked numerically before picking this (see git history/PR
+    // discussion): the friction curve's own "sticking" region is narrow (rho only stays away from
+    // its 0.01 floor for small |vDelta|), so a vBow of 1.0 pushes vDelta straight into the floor
+    // across nearly the entire Bow Force range even with stringSignal=0 (no cancellation at all) -
+    // a sustained bow tone would go almost silent right as the envelope reaches full sustain,
+    // reintroducing this file's own historical bug #3 in a new form. 0.2 keeps rho off the floor
+    // across the full Bow Force span at stringSignal=0 (the isolated worst case, no help from the
+    // loop's own signal tracking the bow) - still a reasoned starting point pending the mandatory
+    // render/measure pass, not a final, measured value.
+    static constexpr float maxBowVelocityAnalog = 0.2f;
+    static constexpr float stringVelocityGain = 1.0f;      // scales stringSignal into the same range.
+    static constexpr float minFrictionSlope = 1.0f;        // STK's own BowTable::setSlope() span.
+    static constexpr float maxFrictionSlope = 5.0f;
+    static constexpr float frictionOffset = 0.0f;          // symmetric friction curve, matching
+                                                            // STK's own default (no directional-bow
+                                                            // asymmetry control exposed).
+    static constexpr float frictionMinOutput = 0.01f;      // STK's own BowTable defaults, ported
+    static constexpr float frictionMaxOutput = 0.98f;      // directly, not re-derived.
+    static constexpr float frictionLevelAnalog = 1.0f;     // NEW loudness constant, analogous to
+                                                            // KarplunkVoice.h's continuousLevelAnalog
+                                                            // but for the friction mechanism
+                                                            // specifically - MUST be retuned by the
+                                                            // mandatory loudness-parity pass.
+
+    // Bow-noise amount - see nextFrictionSample()'s own comment for why this exists at all (without
+    // it, a held bow note measures EXACT silence, not just quiet). The first render/listen pass
+    // (at 0.55, unfiltered) confirmed the loudness-parity tests but was judged, by ear, to read as
+    // continuous hiss layered on the tone rather than bow character - continuous noise fed into a
+    // resonant loop doesn't get absorbed into the pitched resonance the way a one-shot pluck burst
+    // does (each tick replenishes fresh broadband energy, so it never fully settles into pure
+    // resonance the way a burst's decay does). Filtering it (bowNoiseLowpassCoeff below) attenuates
+    // its own RMS substantially, so this was raised back up (1.1) to restore the same measured
+    // loudness-parity numbers the original unfiltered pass had - the filtering changes the noise's
+    // COLOR (breath-like, not hiss-like), not how loud the final tone needs to be to pass the
+    // existing loudness tests.
+    static constexpr float bowNoiseAmount = 1.1f;
+
+    // One-pole lowpass coefficient for the bow-noise term (see bowNoiseLowpassState's own comment) -
+    // shapes the noise toward low-frequency "breath"/texture rather than full-bandwidth hiss, both
+    // because that's closer to how real bow surface-noise actually sounds and because it reduced
+    // how much the noise read as literal static once mixed with the resonant tone. Reasoned
+    // starting point pending confirmation by ear, same convention as every other new constant here.
+    static constexpr float bowNoiseLowpassCoeff = 0.15f;
 };
