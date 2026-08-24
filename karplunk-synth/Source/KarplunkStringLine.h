@@ -29,6 +29,12 @@
 // (Thiran-style) interpolator would need to carry its own persistent state between calls (unlike
 // Linear/Lagrange, which are pure functions of the buffer content) - that's a real, flagged
 // difference from this seam's current shape, not a drop-in swap.
+//
+// Beyond the main pitch-setting read() (governed by setDelaySamples()), this class also offers
+// readAt() - a second, stateless read at any explicit delay length, reusing the same interpolator.
+// This is what makes it possible to tap the same ring buffer at an alternate position (Position)
+// or read a deliberately shortened portion of it (Structure's dispersion stage) without disturbing
+// the delay length that actually sets the note's pitch - see KarplunkVoice.h.
 struct LinearInterpolator
 {
     static float interpolate(const std::vector<float>& buffer, int writeIndex,
@@ -62,9 +68,9 @@ template <typename Interpolator = LinearInterpolator>
 class KarplunkStringLine
 {
 public:
-    // Allocates - only ever call this from SingleLineKarplunkVoice::prepare(), never from the
+    // Allocates - only ever call this from KarplunkStringLineChannel::prepare(), never from the
     // audio thread. maxDelaySamples should come from
-    // SingleLineKarplunkVoice::requiredCapacitySamples() - never resized after this call.
+    // KarplunkStringLineChannel::requiredCapacitySamples() - never resized after this call.
     void prepare(double, int maxDelaySamples) noexcept
     {
         buffer.assign((size_t) std::max(maxDelaySamples, 1), 0.0f);
@@ -96,6 +102,16 @@ public:
     float read() const noexcept
     {
         return Interpolator::interpolate(buffer, writeIndex, delayInSamples);
+    }
+
+    // A second, stateless read at an explicit delay length, independent of setDelaySamples()'s
+    // stored value - doesn't read or write delayInSamples at all, so it can't perturb the main
+    // read()'s pitch. Used for anything that needs an alternate tap on the same ring buffer: a
+    // "pickup position" readout (Position) mixed into the output only, or a shortened "main"
+    // portion of the delay ahead of a dispersion/allpass stage (Structure) - see KarplunkVoice.h.
+    float readAt(float delaySamples) const noexcept
+    {
+        return Interpolator::interpolate(buffer, writeIndex, delaySamples);
     }
 
 private:

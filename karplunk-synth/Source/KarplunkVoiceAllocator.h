@@ -5,7 +5,7 @@
 
 // Voice-to-MIDI-note bookkeeping for a fixed-size voice pool: which voice slot a new note-on
 // should use, and which slot a note-off should target. Deliberately separate from
-// SingleLineKarplunkVoice (or any of the four experimental-area classes) - this is pure
+// KarplunkVoice (or any of the four experimental-area classes) - this is pure
 // allocation policy, not signal processing, and has no notion of audio/DSP at all. Framework-free
 // (no JUCE include, just <array>/<cstdint>) so it's independently testable, matching this
 // catalog's convention for isolating non-polymorphic DSP-adjacent logic (see
