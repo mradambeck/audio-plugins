@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Caverns</title>
+    <title>Caverns - Delay</title>
     <organization>com.wildjag</organization>
     <domains enable_currentUserHome="true" enable_localSystem="true" enable_anywhere="false"/>
     <options customize="always" require-scripts="false"/>
@@ -14,13 +14,13 @@
         <line choice="choice_standalone"/>
     </choices-outline>
 
-    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Caverns.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Caverns - Delay.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.au.pkg"/>
     </choice>
-    <choice id="choice_vst3" title="VST3" description="Installs Caverns.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_vst3" title="VST3" description="Installs Caverns - Delay.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.vst3.pkg"/>
     </choice>
-    <choice id="choice_standalone" title="Standalone App" description="Installs Caverns.app into Applications." start_selected="true">
+    <choice id="choice_standalone" title="Standalone App" description="Installs Caverns - Delay.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.standalone.pkg"/>
     </choice>
 

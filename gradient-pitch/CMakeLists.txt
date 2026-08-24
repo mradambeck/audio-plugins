@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Gradient VERSION 0.1.1)
+project(Gradient VERSION 0.1.2)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -23,7 +23,7 @@ juce_add_plugin(Gradient
     PLUGIN_MANUFACTURER_CODE WJag
     PLUGIN_CODE Grad
     FORMATS AU VST3 Standalone
-    PRODUCT_NAME "Gradient"
+    PRODUCT_NAME "Gradient - Pitch Delay"
 )
 
 juce_add_binary_data(GradientBinaryData

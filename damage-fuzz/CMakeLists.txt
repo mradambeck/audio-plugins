@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Damage VERSION 0.1.1)
+project(Damage VERSION 0.1.2)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -23,7 +23,7 @@ juce_add_plugin(Damage
     PLUGIN_MANUFACTURER_CODE WJag
     PLUGIN_CODE Dmge
     FORMATS AU VST3 Standalone
-    PRODUCT_NAME "Damage"
+    PRODUCT_NAME "Damage - Fuzz"
 )
 
 juce_add_binary_data(DamageBinaryData

@@ -46,47 +46,47 @@
         </line>
     </choices-outline>
 
-    <choice id="choice_caverns" title="Caverns" description="Caverns - reverb/delay plugin."/>
-    <choice id="choice_caverns_au" title="Audio Unit (AU)" description="Installs Caverns.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
+    <choice id="choice_caverns_au" title="Audio Unit (AU)" description="Installs Caverns - Delay.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.au.pkg"/>
     </choice>
-    <choice id="choice_caverns_vst3" title="VST3" description="Installs Caverns.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_caverns_vst3" title="VST3" description="Installs Caverns - Delay.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.vst3.pkg"/>
     </choice>
-    <choice id="choice_caverns_standalone" title="Standalone App" description="Installs Caverns.app into Applications." start_selected="true">
+    <choice id="choice_caverns_standalone" title="Standalone App" description="Installs Caverns - Delay.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.caverns.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_damage" title="Damage" description="Damage - fuzz/distortion plugin."/>
-    <choice id="choice_damage_au" title="Audio Unit (AU)" description="Installs Damage.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_damage" title="Damage - Fuzz" description="Damage - fuzz/distortion plugin."/>
+    <choice id="choice_damage_au" title="Audio Unit (AU)" description="Installs Damage - Fuzz.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.damage.au.pkg"/>
     </choice>
-    <choice id="choice_damage_vst3" title="VST3" description="Installs Damage.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_damage_vst3" title="VST3" description="Installs Damage - Fuzz.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.damage.vst3.pkg"/>
     </choice>
-    <choice id="choice_damage_standalone" title="Standalone App" description="Installs Damage.app into Applications." start_selected="true">
+    <choice id="choice_damage_standalone" title="Standalone App" description="Installs Damage - Fuzz.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.damage.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_corrosion" title="Corrosion" description="Corrosion - lo-fi drive plugin."/>
-    <choice id="choice_corrosion_au" title="Audio Unit (AU)" description="Installs Corrosion.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_corrosion" title="Corrosion - Overdrive" description="Corrosion - lo-fi drive plugin."/>
+    <choice id="choice_corrosion_au" title="Audio Unit (AU)" description="Installs Corrosion - Overdrive.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.corrosion.au.pkg"/>
     </choice>
-    <choice id="choice_corrosion_vst3" title="VST3" description="Installs Corrosion.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_corrosion_vst3" title="VST3" description="Installs Corrosion - Overdrive.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.corrosion.vst3.pkg"/>
     </choice>
-    <choice id="choice_corrosion_standalone" title="Standalone App" description="Installs Corrosion.app into Applications." start_selected="true">
+    <choice id="choice_corrosion_standalone" title="Standalone App" description="Installs Corrosion - Overdrive.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.corrosion.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_flux" title="Flux" description="Flux - analog phase shifter plugin."/>
-    <choice id="choice_flux_au" title="Audio Unit (AU)" description="Installs Flux.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_flux" title="Flux - Phaser" description="Flux - analog phase shifter plugin."/>
+    <choice id="choice_flux_au" title="Audio Unit (AU)" description="Installs Flux - Phaser.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.flux.au.pkg"/>
     </choice>
-    <choice id="choice_flux_vst3" title="VST3" description="Installs Flux.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_flux_vst3" title="VST3" description="Installs Flux - Phaser.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.flux.vst3.pkg"/>
     </choice>
-    <choice id="choice_flux_standalone" title="Standalone App" description="Installs Flux.app into Applications." start_selected="true">
+    <choice id="choice_flux_standalone" title="Standalone App" description="Installs Flux - Phaser.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.flux.standalone.pkg"/>
     </choice>
 
@@ -101,25 +101,25 @@
         <pkg-ref id="com.wildjag.alloy.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_gradient" title="Gradient" description="Gradient - pitch shifting delay plugin."/>
-    <choice id="choice_gradient_au" title="Audio Unit (AU)" description="Installs Gradient.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_gradient" title="Gradient - Pitch Delay" description="Gradient - pitch shifting delay plugin."/>
+    <choice id="choice_gradient_au" title="Audio Unit (AU)" description="Installs Gradient - Pitch Delay.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.gradient.au.pkg"/>
     </choice>
-    <choice id="choice_gradient_vst3" title="VST3" description="Installs Gradient.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_gradient_vst3" title="VST3" description="Installs Gradient - Pitch Delay.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.gradient.vst3.pkg"/>
     </choice>
-    <choice id="choice_gradient_standalone" title="Standalone App" description="Installs Gradient.app into Applications." start_selected="true">
+    <choice id="choice_gradient_standalone" title="Standalone App" description="Installs Gradient - Pitch Delay.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.gradient.standalone.pkg"/>
     </choice>
 
-    <choice id="choice_shields" title="Shields" description="Shields - diffuse reverb."/>
-    <choice id="choice_shields_au" title="Audio Unit (AU)" description="Installs Shields.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_shields" title="Shields - Reverb" description="Shields - diffuse reverb."/>
+    <choice id="choice_shields_au" title="Audio Unit (AU)" description="Installs Shields - Reverb.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.shields.au.pkg"/>
     </choice>
-    <choice id="choice_shields_vst3" title="VST3" description="Installs Shields.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_shields_vst3" title="VST3" description="Installs Shields - Reverb.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.shields.vst3.pkg"/>
     </choice>
-    <choice id="choice_shields_standalone" title="Standalone App" description="Installs Shields.app into Applications." start_selected="true">
+    <choice id="choice_shields_standalone" title="Standalone App" description="Installs Shields - Reverb.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.shields.standalone.pkg"/>
     </choice>
 
