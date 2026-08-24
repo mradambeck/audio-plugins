@@ -1,0 +1,152 @@
+name: Sync site version badges
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*/CMakeLists.txt"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-site-versions
+  cancel-in-progress: false
+
+jobs:
+  sync-badges:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Sync version badges into site/index.html
+        run: |
+          python3 - <<'EOF'
+          import re
+
+          # Mirrors the hardcoded matrix in build-and-test.yml's `test`/`version-guardrail`
+          # jobs. karplunk-synth has no site card yet -- kept in this list only so a change
+          # to it logs an explicit skip instead of being silently ignored; it self-activates
+          # the day a data-plugin="karplunk" card is added, no workflow edit needed.
+          PLUGIN_DIRS = [
+              "caverns-delay",
+              "damage-fuzz",
+              "corrosion-drive",
+              "flux-phaser",
+              "alloy-bass",
+              "gradient-pitch",
+              "shields-reverb",
+              "karplunk-synth",
+          ]
+
+          HTML_PATH = "site/index.html"
+
+          with open(HTML_PATH, "r", encoding="utf-8", newline="") as f:
+              html = f.read()
+          original_html = html
+
+          for dir_name in PLUGIN_DIRS:
+              cmake_path = f"main/{dir_name}/CMakeLists.txt"
+              try:
+                  with open(cmake_path, "r", encoding="utf-8") as f:
+                      cmake = f.read()
+              except FileNotFoundError:
+                  print(f"skip {dir_name}: no CMakeLists.txt found")
+                  continue
+
+              # Same idiom as build-and-test.yml's get_version(), reimplemented in Python:
+              # project(<Name> VERSION X.Y[.Z[...]])
+              m = re.search(r'project\((\w+)\s+VERSION\s+([0-9]+(?:\.[0-9]+)*)\)', cmake)
+              if not m:
+                  print(f"skip {dir_name}: could not parse project()/VERSION")
+                  continue
+              name, version = m.group(1), m.group(2)
+              slug = name.lower()
+
+              channel_m = re.search(r'set\(WILDJAG_RELEASE_CHANNEL\s+"([^"]+)"\)', cmake)
+              channel = channel_m.group(1) if channel_m else "stable"
+
+              major = int(version.split(".")[0])
+              prerelease = major == 0
+              beta = channel == "beta"
+
+              # --- Locate this plugin's card, scoped so we can never touch a different card ---
+              card_marker = f'data-plugin="{slug}"'
+              card_start = html.find(card_marker)
+              if card_start == -1:
+                  print(f'skip {dir_name}: no data-plugin="{slug}" card in index.html')
+                  continue
+
+              try:
+                  name_row_open = html.index('<div class="name-row">', card_start)
+              except ValueError:
+                  print(f"skip {dir_name}: no .name-row found in {slug} card")
+                  continue
+
+              content_start = name_row_open + len('<div class="name-row">\n')
+              try:
+                  content_end = html.index('\n            </div>', content_start)
+              except ValueError:
+                  print(f"skip {dir_name}: could not find end of {slug} card's .name-row")
+                  continue
+
+              inner = html[content_start:content_end]
+              lines = inner.split("\n")
+
+              version_idx = next(
+                  (i for i, line in enumerate(lines) if '<span class="version">' in line),
+                  None,
+              )
+              if version_idx is None:
+                  print(f'skip {dir_name}: no <span class="version"> in {slug} card')
+                  continue
+
+              # Preserve everything before .version (h3, .kind span, ...) verbatim, and
+              # match its existing indentation exactly.
+              indent_m = re.match(r"^(\s*)", lines[version_idx])
+              indent = indent_m.group(1) if indent_m else " " * 14
+
+              new_lines = lines[:version_idx]
+              new_lines.append(f'{indent}<span class="version">v{version}</span>')
+              if prerelease:
+                  new_lines.append(f'{indent}<span class="badge badge-prerelease">Pre-release</span>')
+              if beta:
+                  new_lines.append(f'{indent}<span class="badge badge-beta">Beta</span>')
+
+              new_inner = "\n".join(new_lines)
+              if new_inner != inner:
+                  html = html[:content_start] + new_inner + html[content_end:]
+                  print(f"{dir_name}: {slug} -> v{version} (prerelease={prerelease}, beta={beta})")
+              else:
+                  print(f"{dir_name}: {slug} already up to date")
+
+          if html != original_html:
+              with open(HTML_PATH, "w", encoding="utf-8", newline="") as f:
+                  f.write(html)
+              print("index.html changed")
+          else:
+              print("index.html unchanged")
+          EOF
+
+      - name: Commit and push to gh-pages if changed
+        working-directory: site
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- index.html; then
+            echo "No badge changes to publish."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Sync version badges from main"
+          git push origin HEAD:gh-pages
