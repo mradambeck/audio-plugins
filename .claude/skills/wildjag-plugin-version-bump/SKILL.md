@@ -1,14 +1,14 @@
 ---
 name: wildjag-plugin-version-bump
-description: Bump a Wild Jag plugin's version (the project(...VERSION...) line in its CMakeLists.txt) and update its version badge on the marketing site, whenever finalizing a commit or PR that changes a plugin's Source/ or CMakeLists.txt. Use PROACTIVELY and automatically before such a commit — don't wait to be asked; this repo has no git hooks, so this skill is the pre-commit-equivalent step. The build-and-test.yml version-guardrail CI job is a mechanical backstop for when this skill is skipped, not a substitute for it.
+description: Bump a Wild Jag plugin's version (the project(...VERSION...) line in its CMakeLists.txt), whenever finalizing a commit or PR that changes a plugin's Source/ or CMakeLists.txt. Use PROACTIVELY and automatically before such a commit — don't wait to be asked; this repo has no git hooks, so this skill is the pre-commit-equivalent step. The build-and-test.yml version-guardrail CI job is a mechanical backstop for when this skill is skipped, not a substitute for it. The marketing site's version badge is no longer part of this skill — sync-site-versions.yml updates it automatically from CMakeLists.txt on every push to main.
 ---
 
 # Wild Jag plugin version bumping
 
 Every plugin's version lives in exactly one place — `project(<Name> VERSION
 X.Y.Z)` in `<plugin>/CMakeLists.txt`. Everything else (each installer's
-`distribution.xml`, the group installer's welcome screen, this skill's own
-site-badge updates) is generated or updated *from* that value — never
+`distribution.xml`, the group installer's welcome screen, the marketing
+site's version badge) is generated or updated *from* that value — never
 hand-edit a version number anywhere else.
 
 This applies **per plugin, independently** — a PR touching two plugins gets
@@ -61,7 +61,7 @@ bump for a product that hasn't shipped under that identity yet.
 ## Step 3 — bump `CMakeLists.txt`
 
 Edit the `project(<Name> VERSION X.Y.Z)` line in the plugin's `CMakeLists.txt`
-per the Step 2 classification. That's the only file this step touches — the
+per the Step 2 classification. That's the only file this skill touches — the
 installer's `distribution.xml` (generated from a `.xml.in` template at build
 time) and the root group installer's `distribution.xml`/`welcome.html`
 (same) update themselves automatically the next time anyone runs
@@ -69,33 +69,15 @@ time) and the root group installer's `distribution.xml`/`welcome.html`
 generated file would just be overwritten, or worse, drift from the real
 source of truth — don't.
 
-## Step 4 — update the site card
+The marketing site's version badge (`~/code/audio-plugins-site`, a worktree
+checked out to `gh-pages`) is **not** touched here either — once this commit
+reaches `main`, `.github/workflows/sync-site-versions.yml` reads the new
+`CMakeLists.txt` and pushes the matching `.version`/`.badge-prerelease`/
+`.badge-beta` update to `gh-pages` on its own. Don't hand-edit `index.html`
+as part of a version bump; that would just be overwritten (or drift ahead of
+the source of truth) on the next sync run.
 
-The version badge lives in a separate git worktree/branch at
-`~/code/audio-plugins-site` (checked out to `gh-pages`, not `main`). Find the
-matching `data-plugin="<lowercase-name>"` card in `index.html` and update its
-`.version`/`.badge-prerelease`/`.badge-beta` markup — **`caverns`'s card is
-the canonical reference** for the exact markup shape and CSS classes
-(`.version`, `.badge`, `.badge-prerelease`, `.badge-beta` in `styles.css`),
-copy its structure rather than re-deriving it.
-
-Rules:
-- `.version` text is always `v` + the new version, always present.
-- `.badge-prerelease` (text "Pre-release") is present iff the major version
-  is `0`. Remove it the moment a plugin is deliberately bumped to `1.0.0`.
-- `.badge-beta` (text "Beta") is present iff `WILDJAG_RELEASE_CHANNEL` is
-  `"beta"` for that plugin. Both badges can co-occur.
-- Order in the markup: `.version` → `.badge-prerelease` → `.badge-beta`.
-
-## Step 5 — two separate commits/PRs
-
-The main repo (`~/code/audio-plugins`) and the site (`~/code/audio-plugins-site`)
-are different git repos/branches — this always produces one commit in the
-main repo and a separate one in the site worktree, never a combined commit.
-This is the same pattern already used for previous cross-repo plugin
-changes: land both, as two reviewable PRs, in the same sitting.
-
-## Step 6 — the CI guardrail is a backstop, not something to skip toward
+## Step 4 — the CI guardrail is a backstop, not something to skip toward
 
 `build-and-test.yml`'s `version-guardrail` job fails a PR if a plugin's
 `Source/`/`CMakeLists.txt` changed but its `project(...VERSION...)` string
@@ -114,6 +96,9 @@ solve independently. Fix it by going back to Step 3, not by editing CI.
   generated from `.xml.in`/`.html.in` templates at build time (see
   `wildjag-plugin-installer`'s skill for the templating mechanism) — editing
   the generated file is always wrong post-templatization.
+- **Hand-editing the site's `index.html` version badge.** Generated from
+  `CMakeLists.txt` by `sync-site-versions.yml` on every push to `main` — same
+  reasoning as the installer files above.
 - **Versioning the combined `WildJagPlugins-Installer.pkg` itself.** It has
   no version of its own by design — its welcome screen lists each bundled
   plugin's real version instead of inventing a meaningless aggregate number.
