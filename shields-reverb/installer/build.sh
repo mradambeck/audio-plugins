@@ -19,6 +19,7 @@ set -euo pipefail
 # Usage: installer/build.sh [--component-only]
 
 PLUGIN_NAME="Shields"
+PRODUCT_NAME="Shields - Reverb"
 BUNDLE_ID="com.wildjag.shields"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -43,9 +44,9 @@ echo "==> Staging payload"
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR/au" "$STAGE_DIR/vst3" "$STAGE_DIR/standalone"
 
-cp -R "$ARTEFACTS/AU/${PLUGIN_NAME}.component" "$STAGE_DIR/au/"
-cp -R "$ARTEFACTS/VST3/${PLUGIN_NAME}.vst3" "$STAGE_DIR/vst3/"
-cp -R "$ARTEFACTS/Standalone/${PLUGIN_NAME}.app" "$STAGE_DIR/standalone/"
+cp -R "$ARTEFACTS/AU/${PRODUCT_NAME}.component" "$STAGE_DIR/au/"
+cp -R "$ARTEFACTS/VST3/${PRODUCT_NAME}.vst3" "$STAGE_DIR/vst3/"
+cp -R "$ARTEFACTS/Standalone/${PRODUCT_NAME}.app" "$STAGE_DIR/standalone/"
 
 mkdir -p "$OUT_DIR"
 

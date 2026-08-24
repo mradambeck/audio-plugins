@@ -40,15 +40,14 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p release-assets
-          for entry in "caverns-delay:Caverns" "damage-fuzz:Damage" "corrosion-drive:Corrosion" "flux-phaser:Flux" "alloy-bass:Alloy" "gradient-pitch:Gradient" "shields-reverb:Shields"; do
-            repo="${entry%%:*}"
-            name="${entry##*:}"
+          for entry in "caverns-delay:Caverns:Caverns - Delay" "damage-fuzz:Damage:Damage - Fuzz" "corrosion-drive:Corrosion:Corrosion - Overdrive" "flux-phaser:Flux:Flux - Phaser" "alloy-bass:Alloy:Alloy" "gradient-pitch:Gradient:Gradient - Pitch Delay" "shields-reverb:Shields:Shields - Reverb"; do
+            IFS=':' read -r repo name product <<< "$entry"
             cp "$repo/installer/output/${name}-Installer.pkg" release-assets/
             ditto -c -k --keepParent \
-              "$repo/build/${name}_artefacts/Release/AU/${name}.component" \
+              "$repo/build/${name}_artefacts/Release/AU/${product}.component" \
               "release-assets/${name}-AU.zip"
             ditto -c -k --keepParent \
-              "$repo/build/${name}_artefacts/Release/VST3/${name}.vst3" \
+              "$repo/build/${name}_artefacts/Release/VST3/${product}.vst3" \
               "release-assets/${name}-VST3.zip"
           done
           cp installers/output/WildJagPlugins-Installer.pkg release-assets/

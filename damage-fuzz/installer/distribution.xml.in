@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Damage</title>
+    <title>Damage - Fuzz</title>
     <organization>com.wildjag</organization>
     <domains enable_currentUserHome="true" enable_localSystem="true" enable_anywhere="false"/>
     <options customize="always" require-scripts="false"/>
@@ -14,13 +14,13 @@
         <line choice="choice_standalone"/>
     </choices-outline>
 
-    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Damage.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Damage - Fuzz.component into Library/Audio/Plug-Ins/Components." start_selected="true">
         <pkg-ref id="com.wildjag.damage.au.pkg"/>
     </choice>
-    <choice id="choice_vst3" title="VST3" description="Installs Damage.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+    <choice id="choice_vst3" title="VST3" description="Installs Damage - Fuzz.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
         <pkg-ref id="com.wildjag.damage.vst3.pkg"/>
     </choice>
-    <choice id="choice_standalone" title="Standalone App" description="Installs Damage.app into Applications." start_selected="true">
+    <choice id="choice_standalone" title="Standalone App" description="Installs Damage - Fuzz.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.damage.standalone.pkg"/>
     </choice>
 
