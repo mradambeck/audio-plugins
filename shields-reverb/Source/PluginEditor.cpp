@@ -105,8 +105,8 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     setupRotarySlider(diffusionSlider, diffusionLabel, "Diffusion");
     setupRotarySlider(sizeSlider, sizeLabel, "Size");
     setupRotarySlider(feedbackSlider, feedbackLabel, "Feedback");
-    setupRotarySlider(dampingSlider, dampingLabel, "Damping");
-    setupRotarySlider(bandwidthSlider, bandwidthLabel, "Bandwidth");
+    setupRotarySlider(dampingSlider, dampingLabel, "Treble Decay");
+    setupRotarySlider(bandwidthSlider, bandwidthLabel, "High EQ Cutoff");
     setupRotarySlider(bitDepthSlider, bitDepthLabel, "Bit Depth");
     setupRotarySlider(wobbleSlider, wobbleLabel, "Wobble");
     setupRotarySlider(drySlider, dryLabel, "Dry");
