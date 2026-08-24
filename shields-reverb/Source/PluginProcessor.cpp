@@ -65,7 +65,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
     // suggested. Swept 0-65%; the log-spectral-distance score bottomed out in the 15-25% band.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{dampingParamID, 1},
-        "Damping",
+        "Treble Decay",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
         20.0f,
         juce::AudioParameterFloatAttributes()
@@ -78,7 +78,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
     // range, since a different reference capture (or a future preset) may well want it darker.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{bandwidthHzParamID, 1},
-        "Bandwidth",
+        "High EQ Cutoff",
         juce::NormalisableRange<float>(1000.0f, 20000.0f, 1.0f, 0.3f),
         19000.0f,
         juce::AudioParameterFloatAttributes()
