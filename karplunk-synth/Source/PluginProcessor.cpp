@@ -16,6 +16,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     brightnessParam = apvts.getRawParameterValue(brightnessParamID);
     bowAmountParam = apvts.getRawParameterValue(bowAmountParamID);
     bowForceParam = apvts.getRawParameterValue(bowForceParamID);
+    noiseColorParam = apvts.getRawParameterValue(noiseColorParamID);
     structureParam = apvts.getRawParameterValue(structureParamID);
     positionParam = apvts.getRawParameterValue(positionParamID);
     monoParam = apvts.getRawParameterValue(monoParamID);
@@ -69,6 +70,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         0.0f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Pluck-side noise generator's own spectral color, a runtime dropdown like Waveshaper Type/
+    // Loop Filter Type (see KarplunkExcitation::setNoiseColor()'s own comment) - defaults to White
+    // (index 0), preserving every existing preset/test's behavior exactly.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{noiseColorParamID, 1},
+        "Noise Color",
+        juce::StringArray{"White", "Pink", "Brown"},
+        0));
 
     // Bow-side only (no effect at Pluck/Bow=0%) - the friction bow model's own "Bow Pressure"
     // control (see KarplunkExcitation::setBowForce()'s own comment). Defaults to 50%, STK's own
@@ -452,6 +462,12 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // Topology, which have real cross-referencing bookkeeping that would otherwise go stale.
     const auto loopFilterType = (int) loopFilterTypeParam->load();
 
+    // Noise Color is the same kind of discrete choice as Waveshaper Type/Loop Filter Type, for the
+    // same reason: KarplunkExcitation always keeps every color's own filter state around (cheap
+    // scalar stores), so a mid-note switch just leaves the unselected colors' history momentarily
+    // stale until reselected - no implicit all-notes-off needed.
+    const auto noiseColor = (int) noiseColorParam->load();
+
     auto midiIterator = midiMessages.cbegin();
     const auto midiEnd = midiMessages.cend();
 
@@ -482,6 +498,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setDamping(damping);
             v.setBowAmount(bowAmount);
             v.setBowForce(bowForce);
+            v.setNoiseColor(noiseColor);
             v.setStructure(structure);
             v.setPosition(position);
             v.setWaveshapeAmount(waveshape);

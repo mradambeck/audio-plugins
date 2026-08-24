@@ -21,6 +21,14 @@ void KarplunkExcitation::reset() noexcept
 {
     lowpassState = 0.0f;
     bowNoiseLowpassState = 0.0f;
+    pinkB0 = 0.0f;
+    pinkB1 = 0.0f;
+    pinkB2 = 0.0f;
+    brownState = 0.0f;
+    bowPinkB0 = 0.0f;
+    bowPinkB1 = 0.0f;
+    bowPinkB2 = 0.0f;
+    bowBrownState = 0.0f;
     stage = Stage::Idle;
     envelope = 0.0f;
 }
@@ -48,6 +56,38 @@ void KarplunkExcitation::noteOff() noexcept
         stage = Stage::Release;
 }
 
+float KarplunkExcitation::nextPinkNoiseSample(float white) noexcept
+{
+    // Paul Kellet's "economy" pink-noise filter - see this method's own header declaration comment
+    // for the citation and boundedness argument.
+    pinkB0 = 0.99765f * pinkB0 + white * 0.0990460f;
+    pinkB1 = 0.96300f * pinkB1 + white * 0.2965164f;
+    pinkB2 = 0.57000f * pinkB2 + white * 1.0526913f;
+    const auto pink = pinkB0 + pinkB1 + pinkB2 + white * 0.1848f;
+    return pink * pinkNormalizationGain;
+}
+
+float KarplunkExcitation::nextBrownNoiseSample(float white) noexcept
+{
+    brownState += brownLowpassCoeff * (white - brownState);
+    return brownState * brownNormalizationGain;
+}
+
+float KarplunkExcitation::nextBowPinkNoiseSample(float white) noexcept
+{
+    bowPinkB0 = 0.99765f * bowPinkB0 + white * 0.0990460f;
+    bowPinkB1 = 0.96300f * bowPinkB1 + white * 0.2965164f;
+    bowPinkB2 = 0.57000f * bowPinkB2 + white * 1.0526913f;
+    const auto pink = bowPinkB0 + bowPinkB1 + bowPinkB2 + white * 0.1848f;
+    return pink * pinkNormalizationGain;
+}
+
+float KarplunkExcitation::nextBowBrownNoiseSample(float white) noexcept
+{
+    bowBrownState += brownLowpassCoeff * (white - bowBrownState);
+    return bowBrownState * brownNormalizationGain;
+}
+
 float KarplunkExcitation::nextNoiseSample() noexcept
 {
     // xorshift32 - fast, allocation-free, deterministic given a seed. Not juce::Random, to keep
@@ -58,8 +98,16 @@ float KarplunkExcitation::nextNoiseSample() noexcept
 
     const auto whiteNoise = (float) rngState / (float) UINT32_MAX * 2.0f - 1.0f;
 
+    // Noise Color shapes the RAW source before Brightness's own lowpass is applied on top - see
+    // setNoiseColor()'s own comment for why these are independent axes, not two versions of the
+    // same knob. White (default) is a bit-exact passthrough, unchanged from this class's original
+    // behavior.
+    const auto colored = noiseColor == 0 ? whiteNoise
+                        : noiseColor == 1 ? nextPinkNoiseSample(whiteNoise)
+                                          : nextBrownNoiseSample(whiteNoise);
+
     const auto alpha = minLowpassAlpha + brightness * (1.0f - minLowpassAlpha);
-    lowpassState += alpha * (whiteNoise - lowpassState);
+    lowpassState += alpha * (colored - lowpassState);
     return lowpassState;
 }
 
@@ -67,14 +115,22 @@ float KarplunkExcitation::nextBowNoiseSample() noexcept
 {
     // xorshift32, same technique as nextNoiseSample() but its own independent state - see this
     // class's own header comment for why the friction model's noise floor needs to stay independent
-    // of the Pluck side's (Brightness-shaped) noise source. Lowpassed (fixed coefficient, not tied
-    // to Brightness - see bowNoiseLowpassCoeff's own comment) - raw white noise measured, by ear, as
-    // reading like continuous hiss rather than bow character once mixed into the resonant tone.
+    // of the Pluck side's (Brightness-shaped) noise source. Noise Color shapes the raw source
+    // BEFORE this method's own fixed lowpass is applied on top - same layering the Pluck side uses,
+    // and White (default) is a bit-exact passthrough here too, unchanged from this class's original
+    // Bow-noise behavior. The fixed lowpass itself stays regardless of color (raw white noise
+    // measured, by ear, as reading like continuous hiss rather than bow character once mixed into
+    // the resonant tone - see bowNoiseLowpassCoeff's own comment).
     bowNoiseRngState ^= bowNoiseRngState << 13;
     bowNoiseRngState ^= bowNoiseRngState >> 17;
     bowNoiseRngState ^= bowNoiseRngState << 5;
     const auto whiteNoise = (float) bowNoiseRngState / (float) UINT32_MAX * 2.0f - 1.0f;
-    bowNoiseLowpassState += bowNoiseLowpassCoeff * (whiteNoise - bowNoiseLowpassState);
+
+    const auto colored = noiseColor == 0 ? whiteNoise
+                        : noiseColor == 1 ? nextBowPinkNoiseSample(whiteNoise)
+                                          : nextBowBrownNoiseSample(whiteNoise);
+
+    bowNoiseLowpassState += bowNoiseLowpassCoeff * (colored - bowNoiseLowpassState);
     return bowNoiseLowpassState;
 }
 

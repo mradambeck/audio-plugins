@@ -294,6 +294,15 @@ public:
         excitation.setBrightness(amount01);
     }
 
+    // Pluck-side only (no effect on the friction bow model's own noise floor) - runtime selector
+    // between the excitation's three noise-color generators (White/Pink/Brown), same
+    // live/every-sample convention as Waveshaper Type/Loop Filter Type - see
+    // KarplunkExcitation::setNoiseColor()'s own comment.
+    void setNoiseColor(int color) noexcept
+    {
+        excitation.setNoiseColor(color);
+    }
+
     // Unlike setBrightness(), this DOES take effect immediately, live, while a note rings - see
     // renderChannelSample(), which queries the excitation every sample for as long as the note is
     // held. PluginProcessor smooths this the same way it smooths Decay, not latched like
@@ -853,6 +862,7 @@ public:
     void setBrightness(float amount01) noexcept { lineA.setBrightness(amount01); lineB.setBrightness(amount01); }
     void setBowAmount(float amount01) noexcept { lineA.setBowAmount(amount01); lineB.setBowAmount(amount01); }
     void setBowForce(float amount01) noexcept { lineA.setBowForce(amount01); lineB.setBowForce(amount01); }
+    void setNoiseColor(int color) noexcept { lineA.setNoiseColor(color); lineB.setNoiseColor(color); }
     void setStructure(float amount01) noexcept { lineA.setStructure(amount01); lineB.setStructure(amount01); }
     void setPosition(float amount01) noexcept { lineA.setPosition(amount01); lineB.setPosition(amount01); }
     void setWaveshapeAmount(float amount01) noexcept { lineA.setWaveshapeAmount(amount01); lineB.setWaveshapeAmount(amount01); }

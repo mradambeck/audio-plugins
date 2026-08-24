@@ -47,6 +47,21 @@ public:
     // friction model below).
     void setBrightness(float amount01) noexcept;
 
+    // Affects BOTH the Pluck burst's own noise (nextNoiseSample(), colored BEFORE Brightness's own
+    // lowpass is applied on top) and the Bow model's own bow-noise term (nextBowNoiseSample(),
+    // colored BEFORE its own fixed lowpass) - one shared control across the whole Pluck<->Bow
+    // range, not two independent color knobs. Noise Color and Brightness/the bow-noise lowpass are
+    // independent axes either way (Noise Color = the source's own inherent spectral tilt; the
+    // existing lowpass stages = how much extra darkening on top of whichever color is chosen), not
+    // two versions of the same knob. 0 = White (flat spectrum, this class's original/default noise -
+    // bit-exact with every existing preset/test at this setting, on BOTH sides), 1 = Pink (~1/f,
+    // Paul Kellet's widely-published 3-pole "economy" approximation - warmer, less hissy), 2 =
+    // Brown/Red (~1/f^2, a single low-cutoff one-pole - bassier/rumblier still). Added directly in
+    // response to the user judging the Pluck burst itself "pretty noisy" even after the Bow-noise
+    // retune; originally Pluck-only, then extended to the Bow side too once the user noticed a
+    // bowed note didn't change much (correctly - full bow blends the Pluck component to zero).
+    void setNoiseColor(int color) noexcept { noiseColor = color; }
+
     // 0 = pure pluck: fast attack, decays fully away (sustain level 0) over a time tied to this
     // note's own period - see setBaseDuration(). 1 = pure bow: slow attack, settles into and holds
     // at full-amplitude sustain indefinitely, now driven by a real stick-slip friction model (see
@@ -115,6 +130,30 @@ private:
     float nextNoiseSample() noexcept;
     float nextBowNoiseSample() noexcept;
 
+    // Pink noise: Paul Kellet's "economy" 3-pole IIR approximation of a 1/f spectrum (a real,
+    // widely-published technique - see e.g. musicdsp.org's pink-noise-generation entry - not
+    // invented here), driven by the same raw white sample nextNoiseSample() already generated.
+    // Each stage is a stable one-pole IIR (coefficients < 1) fed a bounded input, so the sum is
+    // BIBO-bounded by construction - pinkNormalizationGain (see its own comment) was still measured,
+    // not assumed, to keep its actual output range comparable to White's [-1,1].
+    float nextPinkNoiseSample(float white) noexcept;
+
+    // Brown/Red noise: a single fixed, LOW-cutoff one-pole lowpass on raw white noise - the
+    // standard, simplest real-time-safe approximation of a 1/f^2 spectrum (a true integrator/random
+    // walk has an unbounded-variance pole exactly at z=1 and is unsafe for a note that can be held
+    // indefinitely; a stable one-pole avoids that while still giving the same -6dB/octave rolloff
+    // character above its cutoff). Deliberately a lower, FIXED coefficient than Brightness's own
+    // minimum (brownLowpassCoeff below), not a duplicate of Brightness at its darkest setting - see
+    // this class's own header comment for why Noise Color and Brightness are independent axes.
+    float nextBrownNoiseSample(float white) noexcept;
+
+    // Bow-side counterparts of the two methods above - identical math/coefficients, but their own
+    // independent filter state (bowPinkB0/B1/B2, bowBrownState below), since the bow-noise term
+    // advances on a different schedule (only when bowAmount > 0) and a different raw white stream
+    // than the Pluck side's own noise.
+    float nextBowPinkNoiseSample(float white) noexcept;
+    float nextBowBrownNoiseSample(float white) noexcept;
+
     // Stick-slip friction bow model - ported directly from Perry Cook & Gary Scavone's STK
     // (Synthesis ToolKit) `BowTable`/`Bowed` classes, themselves a real-time-safe implementation of
     // the McIntyre/Schumacher/Woodhouse friction-curve formulation described in Julius O. Smith's
@@ -176,12 +215,28 @@ private:
     uint32_t rngState = 1;
     float lowpassState = 0.0f;
 
+    // 0 = White, 1 = Pink, 2 = Brown - see setNoiseColor()'s own comment.
+    int noiseColor = 0;
+    float pinkB0 = 0.0f;
+    float pinkB1 = 0.0f;
+    float pinkB2 = 0.0f;
+    float brownState = 0.0f;
+
     // Separate, dedicated RNG state for the friction model's bow-noise term (see
     // nextFrictionSample()'s own comment) - kept independent of rngState/lowpassState above (the
     // Pluck side's own noise source, shaped by Brightness) so Brightness (a pluck-specific tone
     // control) can't accidentally alter the bow's noise floor. Fixed nonzero seed, distinct from
     // rngState's own default - xorshift32 is degenerate at 0.
     uint32_t bowNoiseRngState = 0x9e3779b9u;
+
+    // Bow-side color state (see setNoiseColor()'s own comment) - separate from the Pluck side's
+    // pinkB0/B1/B2/brownState above, since the two run independently (Pluck's own noise advances
+    // unconditionally every tick; the bow-noise term only advances at bowAmount > 0), driven by
+    // different raw white streams (rngState vs bowNoiseRngState).
+    float bowPinkB0 = 0.0f;
+    float bowPinkB1 = 0.0f;
+    float bowPinkB2 = 0.0f;
+    float bowBrownState = 0.0f;
 
     // One-pole lowpass state for the bow-noise term - see nextBowNoiseSample()'s own comment for
     // why raw white noise measured as reading like hiss layered on the tone rather than woven-in
@@ -271,4 +326,16 @@ private:
     // how much the noise read as literal static once mixed with the resonant tone. Reasoned
     // starting point pending confirmation by ear, same convention as every other new constant here.
     static constexpr float bowNoiseLowpassCoeff = 0.15f;
+
+    // Pink noise's own DC-normalized output range differs substantially from White's own [-1,1]
+    // (each of the three IIR stages has a large individual DC gain, e.g. pinkB0's alone is
+    // ~0.099/(1-0.99765)~=42x) - measured (not assumed) via a dense render before picking this,
+    // same discipline as every other new loudness constant in this codebase.
+    static constexpr float pinkNormalizationGain = 0.354f;
+
+    // Fixed, low cutoff - deliberately well below Brightness's own darkest setting (minLowpassAlpha
+    // = 0.02 in the .cpp) so Brown reads as a genuinely different, bassier color, not a duplicate of
+    // "Brightness = 0". Measured (not assumed) to keep RMS comparable to White's own.
+    static constexpr float brownLowpassCoeff = 0.006f;
+    static constexpr float brownNormalizationGain = 19.5f;
 };

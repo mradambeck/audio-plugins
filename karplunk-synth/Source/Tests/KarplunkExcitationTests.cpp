@@ -182,6 +182,134 @@ public:
             }
         }
 
+        beginTest("Noise Color: Pink and Brown are measurably different from White, and finite/bounded");
+        {
+            auto renderBlock = [this](int color, int n) {
+                KarplunkExcitation excitation;
+                excitation.prepare(44100.0);
+                excitation.setBrightness(1.0f);
+                excitation.setBowAmount(0.0f);
+                excitation.setBaseDuration(2000);
+                excitation.setNoiseColor(color);
+
+                std::vector<float> samples((size_t) n);
+                for (int i = 0; i < n; ++i)
+                {
+                    const auto s = excitation.nextExcitationSample(1.0f, 0.0f);
+                    expect(std::isfinite(s), "colored excitation output must stay finite");
+                    expect(std::abs(s) <= 4.0f, "colored excitation output should stay in a sane bounded range");
+                    samples[(size_t) i] = s;
+                }
+                return samples;
+            };
+
+            constexpr int n = 4000;
+            const auto white = renderBlock(0, n);
+            const auto pink = renderBlock(1, n);
+            const auto brown = renderBlock(2, n);
+
+            auto differsFrom = [&](const std::vector<float>& a, const std::vector<float>& b) {
+                double sumSquaredDiff = 0.0;
+                for (int i = 0; i < n; ++i)
+                    sumSquaredDiff += (double) (a[(size_t) i] - b[(size_t) i]) * (a[(size_t) i] - b[(size_t) i]);
+                return std::sqrt(sumSquaredDiff / n) > 0.01;
+            };
+
+            expect(differsFrom(white, pink), "Pink should measurably differ from White");
+            expect(differsFrom(white, brown), "Brown should measurably differ from White");
+            expect(differsFrom(pink, brown), "Brown should measurably differ from Pink");
+        }
+
+        beginTest("Noise Color: Pink/Brown RMS is comparable to White's (loudness parity across colors)");
+        {
+            auto measureRms = [](int color) {
+                KarplunkExcitation excitation;
+                excitation.prepare(44100.0);
+                excitation.setBrightness(1.0f);
+                excitation.setBowAmount(0.0f);
+                excitation.setBaseDuration(2000);
+                excitation.setNoiseColor(color);
+
+                double sumSquares = 0.0;
+                constexpr int n = 20000;
+                for (int i = 0; i < n; ++i)
+                {
+                    const auto s = excitation.nextExcitationSample(1.0f, 0.0f);
+                    sumSquares += (double) s * (double) s;
+                }
+                return std::sqrt(sumSquares / n);
+            };
+
+            const auto whiteRms = measureRms(0);
+            const auto pinkRms = measureRms(1);
+            const auto brownRms = measureRms(2);
+
+            logMessage("Noise Color RMS - White: " + juce::String(whiteRms, 5)
+                       + ", Pink: " + juce::String(pinkRms, 5) + ", Brown: " + juce::String(brownRms, 5));
+
+            expect(pinkRms > whiteRms * 0.6 && pinkRms < whiteRms * 1.6,
+                   "Pink's RMS should be roughly comparable to White's, not dramatically louder/quieter");
+            expect(brownRms > whiteRms * 0.6 && brownRms < whiteRms * 1.6,
+                   "Brown's RMS should be roughly comparable to White's, not dramatically louder/quieter");
+        }
+
+        beginTest("Noise Color: Brown has a lower zero-crossing rate than White (a real spectral-tilt indicator)");
+        {
+            auto zeroCrossingRate = [](int color) {
+                KarplunkExcitation excitation;
+                excitation.prepare(44100.0);
+                excitation.setBrightness(1.0f);
+                excitation.setBowAmount(0.0f);
+                excitation.setBaseDuration(2000);
+                excitation.setNoiseColor(color);
+
+                constexpr int n = 20000;
+                float previous = excitation.nextExcitationSample(1.0f, 0.0f);
+                int crossings = 0;
+                for (int i = 1; i < n; ++i)
+                {
+                    const auto s = excitation.nextExcitationSample(1.0f, 0.0f);
+                    if ((s >= 0.0f) != (previous >= 0.0f))
+                        ++crossings;
+                    previous = s;
+                }
+                return (double) crossings / (double) n;
+            };
+
+            const auto whiteRate = zeroCrossingRate(0);
+            const auto pinkRate = zeroCrossingRate(1);
+            const auto brownRate = zeroCrossingRate(2);
+
+            logMessage("Zero-crossing rate - White: " + juce::String(whiteRate, 4)
+                       + ", Pink: " + juce::String(pinkRate, 4) + ", Brown: " + juce::String(brownRate, 4));
+
+            expect(pinkRate < whiteRate, "Pink should cross zero less often than White (more low-frequency energy)");
+            expect(brownRate < pinkRate, "Brown should cross zero even less often than Pink (even more bass-heavy)");
+        }
+
+        beginTest("Noise Color defaults to White - explicitly setting it to White is bit-identical to never touching it");
+        {
+            auto render = [](bool touchColor) {
+                KarplunkExcitation excitation;
+                excitation.prepare(44100.0);
+                excitation.setBrightness(0.7f);
+                excitation.setBowAmount(0.0f);
+                excitation.setBaseDuration(1000);
+                if (touchColor)
+                    excitation.setNoiseColor(0);
+
+                std::vector<float> samples;
+                for (int i = 0; i < 2000; ++i)
+                    samples.push_back(excitation.nextExcitationSample(1.0f, 0.0f));
+                return samples;
+            };
+
+            const auto untouched = render(false);
+            const auto explicitWhite = render(true);
+            for (size_t i = 0; i < untouched.size(); ++i)
+                expectWithinAbsoluteError(explicitWhite[i], untouched[i], 1.0e-9f);
+        }
+
         beginTest("Bow Force measurably changes the friction character at fixed bowAmount/string signal");
         {
             // stringSignal=0.05 (the original choice here) put vDelta so close to zero that rho

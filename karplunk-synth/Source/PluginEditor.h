@@ -48,6 +48,9 @@ private:
     juce::Label bowForceLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowForceAttachment;
 
+    juce::ComboBox noiseColorBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> noiseColorAttachment;
+
     juce::Slider structureSlider;
     juce::Label structureLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> structureAttachment;

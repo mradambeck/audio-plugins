@@ -1301,6 +1301,115 @@ public:
                 expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
             }
         }
+
+        beginTest("Noise Color defaults to White - explicitly setting it to White is bit-identical to never touching it");
+        {
+            auto render = [&](bool touchColor) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                if (touchColor)
+                    setRaw(processor, KarplunkAudioProcessor::noiseColorParamID, 0.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (1.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto untouched = render(false);
+            auto explicitWhite = render(true);
+            const auto* a = untouched.getReadPointer(0);
+            const auto* b = explicitWhite.getReadPointer(0);
+            for (int i = 0; i < untouched.getNumSamples(); ++i)
+                expectWithinAbsoluteError(b[i], a[i], 1.0e-9f);
+        }
+
+        beginTest("Noise Color = Pink/Brown produce measurably different real-processor output than White, on a plucked note");
+        {
+            auto renderWithColor = [&](float color) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::noiseColorParamID, color);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 0.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (1.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto white = renderWithColor(0.0f);
+            auto pink = renderWithColor(1.0f);
+            auto brown = renderWithColor(2.0f);
+
+            const auto numSamples = white.getNumSamples();
+            const auto whiteRms = rms(white.getReadPointer(0), numSamples);
+            const auto pinkDiff = rmsOfDifference(white.getReadPointer(0), pink.getReadPointer(0), numSamples);
+            const auto brownDiff = rmsOfDifference(white.getReadPointer(0), brown.getReadPointer(0), numSamples);
+
+            logMessage("Noise Color - White RMS: " + juce::String(whiteRms, 6)
+                       + ", Pink diff RMS: " + juce::String(pinkDiff, 6)
+                       + ", Brown diff RMS: " + juce::String(brownDiff, 6));
+
+            expect(pinkDiff > whiteRms * 0.1f, "Pink should sound clearly different from White through the real processor");
+            expect(brownDiff > whiteRms * 0.1f, "Brown should sound clearly different from White through the real processor");
+        }
+
+        beginTest("Noise Color also measurably affects a BOWED note (extended from Pluck-only after the user found no audible difference on Bow)");
+        {
+            // The bow-noise term (see KarplunkExcitation::nextBowNoiseSample()'s own comment) was
+            // originally a fixed-color source, independent of Noise Color - this guards that the
+            // extension actually took effect end-to-end through the real processor, not just in the
+            // isolated Excitation class.
+            auto renderWithColor = [&](float color) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::noiseColorParamID, color);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                return buffer;
+            };
+
+            auto white = renderWithColor(0.0f);
+            auto pink = renderWithColor(1.0f);
+            auto brown = renderWithColor(2.0f);
+
+            const auto numSamples = white.getNumSamples();
+            const auto whiteRms = rms(white.getReadPointer(0), numSamples);
+            const auto pinkDiff = rmsOfDifference(white.getReadPointer(0), pink.getReadPointer(0), numSamples);
+            const auto brownDiff = rmsOfDifference(white.getReadPointer(0), brown.getReadPointer(0), numSamples);
+
+            logMessage("Noise Color (bowed) - White RMS: " + juce::String(whiteRms, 6)
+                       + ", Pink diff RMS: " + juce::String(pinkDiff, 6)
+                       + ", Brown diff RMS: " + juce::String(brownDiff, 6));
+
+            expect(pinkDiff > whiteRms * 0.02f, "Pink should measurably change a bowed note's output too");
+            expect(brownDiff > whiteRms * 0.02f, "Brown should measurably change a bowed note's output too");
+        }
+
+        beginTest("Noise Color = Pink/Brown stay finite and bounded at the worst-case combination (max Decay, full Bow)");
+        {
+            for (float color : { 0.0f, 1.0f, 2.0f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::noiseColorParamID, color);
+                setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    expect(std::isfinite(data[i]), "output must stay finite with Noise Color=" + juce::String(color) + " at worst-case settings");
+                    peak = std::max(peak, std::abs(data[i]));
+                }
+                expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
     }
 };
 

@@ -53,6 +53,7 @@ public:
     static constexpr auto brightnessParamID = "brightness";
     static constexpr auto bowAmountParamID = "bowAmount";
     static constexpr auto bowForceParamID = "bowForce";
+    static constexpr auto noiseColorParamID = "noiseColor";
     static constexpr auto structureParamID = "structure";
     static constexpr auto positionParamID = "position";
     static constexpr auto monoParamID = "mono";
@@ -78,6 +79,7 @@ private:
     std::atomic<float>* brightnessParam = nullptr;
     std::atomic<float>* bowAmountParam = nullptr;
     std::atomic<float>* bowForceParam = nullptr;
+    std::atomic<float>* noiseColorParam = nullptr;
     std::atomic<float>* structureParam = nullptr;
     std::atomic<float>* positionParam = nullptr;
     std::atomic<float>* monoParam = nullptr;

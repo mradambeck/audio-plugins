@@ -54,6 +54,13 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     bowForceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::bowForceParamID, bowForceSlider);
 
+    noiseColorBox.addItem("White", 1);
+    noiseColorBox.addItem("Pink", 2);
+    noiseColorBox.addItem("Brown", 3);
+    addAndMakeVisible(noiseColorBox);
+    noiseColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::noiseColorParamID, noiseColorBox);
+
     setupSlider(structureSlider, structureLabel, "Structure");
     structureAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::structureParamID, structureSlider);
@@ -170,7 +177,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 18;
+    const auto sliderCount = 19;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -184,6 +191,9 @@ void KarplunkAudioProcessorEditor::resized()
     layoutColumn(bounds.removeFromLeft(columnWidth), brightnessLabel, brightnessSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), bowAmountLabel, bowAmountSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), bowForceLabel, bowForceSlider);
+
+    auto noiseColorColumn = bounds.removeFromLeft(columnWidth);
+    noiseColorBox.setBounds(noiseColorColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
     layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), glideTimeLabel, glideTimeSlider);
