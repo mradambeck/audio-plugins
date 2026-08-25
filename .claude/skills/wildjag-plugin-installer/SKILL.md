@@ -1,6 +1,6 @@
 ---
 name: wildjag-plugin-installer
-description: Scaffold a macOS .pkg installer for a Wild Jag JUCE plugin, following the exact conventions used across the existing catalog (Caverns, Damage, Corrosion) — per-format (AU/VST3/Standalone) checkboxes plus a system-vs-user install-location choice. Use whenever a new plugin is added under ~/code/audio-plugins, or whenever asked to add/fix installer support for an existing one — including registering it in the shared group installer at ~/code/audio-plugins/installers/ so it appears there too.
+description: Scaffold a macOS .pkg installer for a Wild Jag JUCE plugin, following the exact conventions used across the existing catalog (Caverns, Damage, Corrosion) — per-format (AU/VST3/Standalone) checkboxes plus a system-vs-user install-location choice. Use whenever a new plugin is added under ~/code/audio-plugins, or whenever asked to add/fix installer support for an existing one — including registering it in the shared group installer at ~/code/audio-plugins/installers/, and in the download-counter Worker's PLUGIN_SLUGS allowlist, so it appears in both.
 ---
 
 # Wild Jag plugin installer scaffolding
@@ -166,11 +166,44 @@ for f in /tmp/wj-check/*.pkg; do echo "$(basename "$f"): $(grep -o 'install-loca
 rm -rf /tmp/wj-check
 ```
 
+## Step 4 — register the plugin in the download counter
+
+Add the new plugin's lowercase slug (same `lowercase(<Name>)` convention
+used everywhere else — the CMake project Name lowercased, e.g. `Corrosion`
+→ `corrosion`) to the `PLUGIN_SLUGS` array in
+`~/code/audio-plugins/download-counter/src/index.ts`. That allowlist is
+deliberately hardcoded (the Worker has no access to the repo's
+`CMakeLists.txt` at request time) and gates which `/dl/<slug>/<format>`
+routes the Worker will actually redirect — an unlisted slug 404s instead of
+guessing a filename.
+
+After editing, redeploy from that directory:
+```sh
+cd ~/code/audio-plugins/download-counter
+npx tsc --noEmit
+npx wrangler deploy
+```
+Then sanity-check the new route before moving on:
+```sh
+curl -I "https://wildjag-downloads.mr-adambeck.workers.dev/dl/<slug>/pkg"
+```
+Expect a `302` to `.../releases/latest/download/<Name>-Installer.pkg` — not
+a `404`.
+
+Note: as of this writing the live site's download buttons still link
+directly to GitHub, not through this Worker (a deliberate choice made when
+the Worker was first built — see git history for `download-counter/`). If
+that changes, a new plugin's site card needs its `href`s pointed at
+`/dl/<slug>/...` too, same as every other plugin's.
+
 ## Things that will silently go wrong if skipped
 
 - **Forgetting Step 3.** The per-plugin installer will work fine on its own,
   but the plugin won't show up as a checkbox in `WildJagPlugins-Installer.pkg`
   — nothing errors, the group installer just quietly ships without it.
+- **Forgetting Step 4.** Same silent-failure shape as Step 3, but for
+  downloads instead of installation: nothing errors, `/dl/<slug>/<format>`
+  just 404s for that plugin until its slug is added to `PLUGIN_SLUGS`.
 - **An absolute (leading-`/`) `--install-location`.** Locks that format to
   system-wide installation regardless of what the user picks in the "install
   for me only" vs "all users" choice — no error at build or install time,
