@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wildjag-downloads",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-24",
+  "kv_namespaces": [
+    { "binding": "DOWNLOAD_COUNTS", "id": "a77b9b3a66a14759a85d3c8b541500f0" }
+  ]
+}
