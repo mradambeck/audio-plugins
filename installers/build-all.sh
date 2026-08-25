@@ -17,6 +17,8 @@ INSTALLERS_DIR="$ROOT_DIR/installers"
 OUT_DIR="$INSTALLERS_DIR/output"
 STAGE_DIR="$INSTALLERS_DIR/stage"
 
+source "$INSTALLERS_DIR/sign-and-notarize.sh"
+
 mkdir -p "$OUT_DIR"
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR/Resources"
@@ -47,9 +49,12 @@ cp "$INSTALLERS_DIR/Resources/license.txt" "$INSTALLERS_DIR/Resources/conclusion
 
 echo "==> Building combined installer"
 productbuild \
+    --sign "$DEVELOPER_ID_INSTALLER" \
     --distribution "$STAGE_DIR/distribution.xml" \
     --resources "$STAGE_DIR/Resources" \
     --package-path "$STAGE_DIR" \
     "$OUT_DIR/WildJagPlugins-Installer.pkg"
+
+notarize_and_staple "$OUT_DIR/WildJagPlugins-Installer.pkg"
 
 echo "==> Done: $OUT_DIR/WildJagPlugins-Installer.pkg"

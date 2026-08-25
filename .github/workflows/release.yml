@@ -20,7 +20,39 @@ jobs:
           path: .deps
           key: juce-9.0.1
 
+      # Imports the Developer ID Application + Installer certs into a throwaway CI keychain
+      # (deleted in the cleanup step below regardless of outcome) and writes the App Store
+      # Connect API key to disk for notarytool. sign-and-notarize.sh picks up NOTARY_KEY_PATH
+      # over NOTARY_PROFILE automatically, so no local-vs-CI branching is needed here beyond that.
+      - name: Import signing certificates and notarization key
+        env:
+          APPLE_CERT_APPLICATION_P12: ${{ secrets.APPLE_CERT_APPLICATION_P12 }}
+          APPLE_CERT_INSTALLER_P12: ${{ secrets.APPLE_CERT_INSTALLER_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERT_APPLICATION_P12" | base64 --decode > "$RUNNER_TEMP/application.p12"
+          echo "$APPLE_CERT_INSTALLER_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+          security import "$RUNNER_TEMP/application.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/pkgbuild -T /usr/bin/security
+          security import "$RUNNER_TEMP/installer.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/pkgbuild -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign:,productbuild:,pkgbuild:,security: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          echo "$APPLE_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+
       - name: Build each plugin's own installer
+        env:
+          DEVELOPER_ID_APPLICATION: "Developer ID Application: ${{ secrets.APPLE_TEAM_NAME }} (${{ secrets.APPLE_TEAM_ID }})"
+          DEVELOPER_ID_INSTALLER: "Developer ID Installer: ${{ secrets.APPLE_TEAM_NAME }} (${{ secrets.APPLE_TEAM_ID }})"
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
           for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch shields-reverb; do
             echo "==> Configuring $repo"
@@ -30,9 +62,20 @@ jobs:
           done
 
       - name: Build the combined installer
+        env:
+          DEVELOPER_ID_APPLICATION: "Developer ID Application: ${{ secrets.APPLE_TEAM_NAME }} (${{ secrets.APPLE_TEAM_ID }})"
+          DEVELOPER_ID_INSTALLER: "Developer ID Installer: ${{ secrets.APPLE_TEAM_NAME }} (${{ secrets.APPLE_TEAM_ID }})"
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
           cd installers
           ./build-all.sh
+
+      - name: Clean up signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
       # Besides each plugin's full installer, also publish the raw AU/VST3 bundles zipped up
       # (ditto -k, not zip -r, so the code signature / extended attributes on the bundle survive

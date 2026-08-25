@@ -28,6 +28,8 @@ BUILD_DIR="$ROOT_DIR/build"
 STAGE_DIR="$INSTALLER_DIR/stage"
 OUT_DIR="$INSTALLER_DIR/output"
 
+source "$ROOT_DIR/../installers/sign-and-notarize.sh"
+
 VERSION="$("$ROOT_DIR/../scripts/plugin-version.sh" "$ROOT_DIR" version)"
 
 COMPONENT_ONLY=false
@@ -48,10 +50,15 @@ cp -R "$ARTEFACTS/AU/${PRODUCT_NAME}.component" "$STAGE_DIR/au/"
 cp -R "$ARTEFACTS/VST3/${PRODUCT_NAME}.vst3" "$STAGE_DIR/vst3/"
 cp -R "$ARTEFACTS/Standalone/${PRODUCT_NAME}.app" "$STAGE_DIR/standalone/"
 
+sign_bundle "$STAGE_DIR/au/${PRODUCT_NAME}.component"
+sign_bundle "$STAGE_DIR/vst3/${PRODUCT_NAME}.vst3"
+sign_bundle "$STAGE_DIR/standalone/${PRODUCT_NAME}.app"
+
 mkdir -p "$OUT_DIR"
 
 echo "==> Building component packages"
 pkgbuild \
+    --sign "$DEVELOPER_ID_INSTALLER" \
     --root "$STAGE_DIR/au" \
     --install-location "Library/Audio/Plug-Ins/Components" \
     --identifier "${BUNDLE_ID}.au.pkg" \
@@ -59,6 +66,7 @@ pkgbuild \
     "$OUT_DIR/${PLUGIN_NAME}-AU-Component.pkg"
 
 pkgbuild \
+    --sign "$DEVELOPER_ID_INSTALLER" \
     --root "$STAGE_DIR/vst3" \
     --install-location "Library/Audio/Plug-Ins/VST3" \
     --identifier "${BUNDLE_ID}.vst3.pkg" \
@@ -66,6 +74,7 @@ pkgbuild \
     "$OUT_DIR/${PLUGIN_NAME}-VST3-Component.pkg"
 
 pkgbuild \
+    --sign "$DEVELOPER_ID_INSTALLER" \
     --root "$STAGE_DIR/standalone" \
     --install-location "Applications" \
     --identifier "${BUNDLE_ID}.standalone.pkg" \
@@ -82,9 +91,12 @@ echo "==> Generating distribution.xml from template"
 sed "s/__VERSION__/$VERSION/g" "$INSTALLER_DIR/distribution.xml.in" > "$OUT_DIR/distribution.xml"
 
 productbuild \
+    --sign "$DEVELOPER_ID_INSTALLER" \
     --distribution "$OUT_DIR/distribution.xml" \
     --resources "$INSTALLER_DIR/Resources" \
     --package-path "$OUT_DIR" \
     "$OUT_DIR/${PLUGIN_NAME}-Installer.pkg"
+
+notarize_and_staple "$OUT_DIR/${PLUGIN_NAME}-Installer.pkg"
 
 echo "==> Done: $OUT_DIR/${PLUGIN_NAME}-Installer.pkg"
