@@ -80,6 +80,15 @@ the file is named `distribution.xml.in` and not `distribution.xml` — the
 
 After copying, `chmod +x installer/build.sh`.
 
+`build.sh` now sources `../../installers/sign-and-notarize.sh` and signs each
+staged bundle (`sign_bundle`) plus notarizes/staples the final `-Installer.pkg`
+(`notarize_and_staple`) — nothing to add for a new plugin, it inherits this
+automatically as long as `DEVELOPER_ID_APPLICATION`/`DEVELOPER_ID_INSTALLER`
+are set to real Developer ID identities and either `NOTARY_PROFILE` or
+`NOTARY_KEY_PATH`/`NOTARY_KEY_ID`/`NOTARY_ISSUER_ID` are set in the shell
+(see `installers/README.md`). Set `SKIP_NOTARIZE=1` for a fast sign-only local
+build while iterating.
+
 Verify it builds before moving on:
 ```sh
 cd <new-plugin-repo>

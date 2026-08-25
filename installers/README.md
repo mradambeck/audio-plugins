@@ -76,5 +76,5 @@ installers/
 ## Notes
 
 - Installing to the system-wide location (`/Library/...`, `/Applications`) prompts for admin credentials; installing to the per-user location (`~/Library/...`, `~/Applications`) doesn't.
-- **Unsigned**: there's no Developer ID signing identity configured on this machine, so all packages are only ad-hoc signed. On first run, Gatekeeper may block the installer — right-click → Open, or approve it under System Settings → Privacy & Security → Security. This is fine for installing on your own Mac; distributing to other people would require signing and notarizing with a paid Apple Developer ID.
+- **Signed and notarized**: every `.component`/`.vst3`/`.app` is signed with a Developer ID Application certificate, every `.pkg` is signed with a Developer ID Installer certificate, and the final installer `.pkg`s are submitted to Apple for notarization and stapled (see `installers/sign-and-notarize.sh`). Building locally requires `DEVELOPER_ID_APPLICATION`/`DEVELOPER_ID_INSTALLER` identities in your login Keychain and either a `NOTARY_PROFILE` (registered via `xcrun notarytool store-credentials`) or `NOTARY_KEY_PATH`/`NOTARY_KEY_ID`/`NOTARY_ISSUER_ID` exported in your shell; set `SKIP_NOTARIZE=1` to sign-only for fast local iteration.
 - Generated `stage/` and `output/` directories are git-ignored and can be deleted/rebuilt at any time.
