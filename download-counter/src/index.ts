@@ -3,7 +3,8 @@ interface Env {
   ADMIN_TOKEN: string;
 }
 
-const GITHUB_BASE = "https://github.com/mradambeck/audio-plugins/releases/latest/download";
+const GITHUB_BASE =
+  "https://github.com/mradambeck/audio-plugins/releases/latest/download";
 
 // Mirrors the slug list sync-site-versions.yml derives from each plugin's
 // project(<Name> VERSION ...) — kept hardcoded here too since this Worker
@@ -40,14 +41,23 @@ function capitalize(slug: string): string {
 
 type PluginCounts = Partial<Record<Format, number>>;
 
-async function incrementCount(env: Env, key: string, field: string): Promise<void> {
-  const existing = (await env.DOWNLOAD_COUNTS.get<Record<string, number>>(key, "json")) ?? {};
+async function incrementCount(
+  env: Env,
+  key: string,
+  field: string,
+): Promise<void> {
+  const existing =
+    (await env.DOWNLOAD_COUNTS.get<Record<string, number>>(key, "json")) ?? {};
   existing[field] = (existing[field] ?? 0) + 1;
   await env.DOWNLOAD_COUNTS.put(key, JSON.stringify(existing));
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
 
@@ -57,11 +67,14 @@ export default {
           console.error("count increment failed", err),
         ),
       );
-      return Response.redirect(`${GITHUB_BASE}/WildJagPlugins-Installer.pkg`, 302);
+      return Response.redirect(
+        `${GITHUB_BASE}/WildJagPlugins-Installer.pkg`,
+        302,
+      );
     }
 
     if (parts[0] === "dl" && parts.length === 3) {
-      const [, slug, format] = parts;
+      const [_, slug, format] = parts;
       if (isPluginSlug(slug) && isFormat(format)) {
         ctx.waitUntil(
           incrementCount(env, `counts:${slug}`, format).catch((err) =>
@@ -79,10 +92,13 @@ export default {
         return new Response("Unauthorized", { status: 401 });
       }
 
-      const keys = await env.DOWNLOAD_COUNTS.list({ prefix: "counts:" });
+      const response = await env.DOWNLOAD_COUNTS.list({ prefix: "counts:" });
       const stats: Record<string, PluginCounts | Record<string, number>> = {};
-      for (const { name } of keys.keys) {
-        const value = await env.DOWNLOAD_COUNTS.get<Record<string, number>>(name, "json");
+      for (const { name } of response.keys) {
+        const value = await env.DOWNLOAD_COUNTS.get<Record<string, number>>(
+          name,
+          "json",
+        );
         stats[name.replace(/^counts:/, "")] = value ?? {};
       }
       return Response.json(stats);
