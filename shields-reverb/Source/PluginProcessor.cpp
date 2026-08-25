@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 
+#include <algorithm>
+
 ShieldsAudioProcessor::ShieldsAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -141,10 +143,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
 void ShieldsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     engine.prepare(sampleRate);
-    wetBuffer.setSize(2, samplesPerBlock);
+
+    // Headroom over the host's stated block size so processBlock() never has to resize. Hosts are
+    // allowed to hand over a block LARGER than samplesPerBlock (Logic's offline bounce and a
+    // buffer-size change that lands before the re-prepare both do), and the previous
+    // setSize(..., avoidReallocating: true) call in processBlock() only avoids a reallocation when
+    // the new size still fits the existing allocation - so those cases malloc'd on the audio thread,
+    // which is a priority-inversion stall exactly when the machine is already loaded. Sizing high
+    // once here costs a few hundred KB and makes the audio path allocation-free.
+    maxBlockSize = std::max(samplesPerBlock, 1) * blockSizeHeadroom;
+    wetBuffer.setSize(2, maxBlockSize);
+    prepared = true;
 }
 
 void ShieldsAudioProcessor::releaseResources() {}
+
+// Hosts call this to clear tails between transport jumps/offline passes. The engine already had a
+// reset(), but nothing was ever wired to it, so a wedged tail (see the NaN sanitising in
+// ShieldsFDNEngine::processStereo) could only be cleared by deleting the plugin instance.
+void ShieldsAudioProcessor::reset()
+{
+    engine.reset();
+}
 
 bool ShieldsAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
@@ -162,7 +182,18 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     if (buffer.getNumChannels() < 2)
         return;
 
+    // prepareToPlay() must have run: the engine's delay lines are empty until it does, and indexing
+    // them divides by zero. Hosts shouldn't do this, but an early-out beats a SIGFPE if one does.
+    if (! prepared)
+        return;
+
     const auto numSamples = buffer.getNumSamples();
+
+    // wetBuffer is sized with headroom in prepareToPlay() so this never reallocates. If a host ever
+    // exceeds even that, process what fits rather than allocating on the audio thread - a truncated
+    // block is a far better failure than a dropout, and the assertion catches it in a debug build.
+    jassert(numSamples <= maxBlockSize);
+    const auto samplesToProcess = std::min(numSamples, maxBlockSize);
 
     engine.setDiffusion(diffusionParam->load());
     engine.setFeedback(feedbackParam->load() * 0.01f);
@@ -172,11 +203,10 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     engine.setBitDepth(bitDepthParam->load());
     engine.setWobble(wobbleParam->load() * 0.01f);
 
-    wetBuffer.setSize(2, numSamples, false, false, true);
-    wetBuffer.copyFrom(0, 0, buffer, 0, 0, numSamples);
-    wetBuffer.copyFrom(1, 0, buffer, 1, 0, numSamples);
+    wetBuffer.copyFrom(0, 0, buffer, 0, 0, samplesToProcess);
+    wetBuffer.copyFrom(1, 0, buffer, 1, 0, samplesToProcess);
 
-    engine.processStereo(wetBuffer.getWritePointer(0), wetBuffer.getWritePointer(1), numSamples);
+    engine.processStereo(wetBuffer.getWritePointer(0), wetBuffer.getWritePointer(1), samplesToProcess);
 
     const auto dryGain = dryParam->load() * 0.01f;
     const auto wetGain = wetParam->load() * 0.01f;
@@ -186,7 +216,7 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const auto* wetLeft = wetBuffer.getReadPointer(0);
     const auto* wetRight = wetBuffer.getReadPointer(1);
 
-    for (int i = 0; i < numSamples; ++i)
+    for (int i = 0; i < samplesToProcess; ++i)
     {
         left[i] = left[i] * dryGain + wetLeft[i] * wetGain;
         right[i] = right[i] * dryGain + wetRight[i] * wetGain;
