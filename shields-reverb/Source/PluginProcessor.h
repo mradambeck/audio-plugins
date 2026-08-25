@@ -16,6 +16,7 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
+    void reset() override;
 
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
@@ -73,9 +74,20 @@ private:
 
     ShieldsFDNEngine engine;
 
-    // Scratch buffers holding the engine's wet output before the dry/wet mix, sized in
-    // prepareToPlay() to the host's maximum block size.
+    // Scratch buffer holding the engine's wet output before the dry/wet mix. Sized once in
+    // prepareToPlay() with headroom over the host's stated block size and never resized on the
+    // audio thread - see prepareToPlay() for why that headroom matters.
     juce::AudioBuffer<float> wetBuffer;
+
+    // Multiple of the host's stated block size that wetBuffer is allocated for. 4x covers hosts
+    // that hand over a larger-than-advertised block (Logic's offline bounce being the case that
+    // prompted this) without the audio thread ever having to allocate.
+    static constexpr int blockSizeHeadroom = 4;
+    int maxBlockSize = 0;
+
+    // False until prepareToPlay() has run - processBlock() early-outs rather than indexing the
+    // engine's not-yet-allocated delay lines.
+    bool prepared = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShieldsAudioProcessor)
 };

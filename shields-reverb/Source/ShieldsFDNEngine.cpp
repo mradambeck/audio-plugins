@@ -240,6 +240,7 @@ void ShieldsFDNEngine::prepare(double sampleRate)
     midPeakL.setPeak(midPeakFreqHz, midPeakGainDb, midPeakQ, sampleRateHz);
     midPeakR.setPeak(midPeakFreqHz, midPeakGainDb, midPeakQ, sampleRateHz);
     reset();
+    prepared = true;
 }
 
 void ShieldsFDNEngine::reset()
@@ -313,15 +314,23 @@ void ShieldsFDNEngine::updateBurstLines()
         // see updateLineLengths()'s comment on the main tank's identical guard for why: retriggering
         // mid-fade was itself producing a discontinuity, which per-sample smoothing (now changing
         // the target far more often than the fade's own duration) made far more frequent.
-        if (newLength != burstL[i].delaySamples && burstL[i].fadeWeight <= 0.0f)
+        if (newLength != burstL[i].delaySamples)
         {
-            // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment.
-            burstL[i].fadeFromDelay = burstL[i].delaySamples;
-            burstR[i].fadeFromDelay = burstR[i].delaySamples;
-            burstL[i].fadeWeight = 1.0f;
-            burstR[i].fadeWeight = 1.0f;
-            burstL[i].delaySamples = newLength;
-            burstR[i].delaySamples = newLength;
+            if (burstL[i].fadeWeight <= 0.0f)
+            {
+                // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment.
+                burstL[i].fadeFromDelay = burstL[i].delaySamples;
+                burstR[i].fadeFromDelay = burstR[i].delaySamples;
+                burstL[i].fadeWeight = 1.0f;
+                burstR[i].fadeWeight = 1.0f;
+                burstL[i].delaySamples = newLength;
+                burstR[i].delaySamples = newLength;
+            }
+            else
+            {
+                // Blocked by the in-flight fade - retry next sample (see lengthUpdateDeferred).
+                lengthUpdateDeferred = true;
+            }
         }
 
         burstL[i].feedbackGain = g;
@@ -345,23 +354,42 @@ void ShieldsFDNEngine::updateLineLengths()
         // OLD fade's primary tap was, abruptly dropping that fade's own in-progress blend - a real
         // discontinuity, and a more frequent one than the clicks this mechanism was built to fix.
         // Waiting for the current fade to finish first means every fade always runs uninterrupted.
-        if (newLength != delaySamples[(size_t) i] && fadeWeight[(size_t) i] <= 0.0f)
+        if (newLength != delaySamples[(size_t) i])
         {
-            // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment
-            // (this used to clear the buffer and reset writePos on every length change, which was
-            // itself an audible click: the buffer already holds a continuous, valid rolling history
-            // at every offset up to its capacity, so there was never any "stale" data to protect
-            // against, only a hard jump to silence introduced right where the tail was still live).
-            fadeFromDelay[(size_t) i] = delaySamples[(size_t) i];
-            fadeWeight[(size_t) i] = 1.0f;
-            delaySamples[(size_t) i] = newLength;
+            if (fadeWeight[(size_t) i] <= 0.0f)
+            {
+                // Crossfade into the new tap rather than clearing - see lengthChangeFadeMs's comment
+                // (this used to clear the buffer and reset writePos on every length change, which was
+                // itself an audible click: the buffer already holds a continuous, valid rolling history
+                // at every offset up to its capacity, so there was never any "stale" data to protect
+                // against, only a hard jump to silence introduced right where the tail was still live).
+                fadeFromDelay[(size_t) i] = delaySamples[(size_t) i];
+                fadeWeight[(size_t) i] = 1.0f;
+                delaySamples[(size_t) i] = newLength;
+            }
+            else
+            {
+                // Blocked by the in-flight fade - retry next sample (see lengthUpdateDeferred).
+                lengthUpdateDeferred = true;
+            }
         }
     }
 }
 
 void ShieldsFDNEngine::setDamping(float damping01)
 {
-    dampingCoefficient = clamp01(damping01);
+    // Capped just below 1.0 rather than clamp01()'s full range. The damping filter is
+    //   state += (1 - dampingCoefficient) * (lineOut - state)
+    // so at exactly 1.0 the update term is multiplied by 0: the state stops tracking its input
+    // entirely and stays frozen at whatever it last held - which, since reset() zeroes it and
+    // nothing else can ever write it, is 0. Every line therefore feeds silence back into the tank,
+    // and the reverb dies completely once the initial burst has passed: a 10s render at Treble
+    // Decay = 100% measured RMS 1.5e-03 over the first 2s and then EXACTLY 0.0 for the remaining
+    // 8s. That made the top of the knob's own range a kill switch rather than a very dark setting.
+    // Capping here restores a heavily- but finitely-damped tail (same render now decays smoothly,
+    // 4.1e-03 -> 2.4e-04 across the 10s).
+    constexpr float maxDamping = 0.9995f;
+    dampingCoefficient = std::min(maxDamping, clamp01(damping01));
 }
 
 void ShieldsFDNEngine::setBandwidthHz(float hz)
@@ -394,15 +422,38 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
     constexpr float hadamardNorm = 0.353553390593f; // 1/sqrt(8)
     constexpr float outputTapGain = 0.5f;           // 1/sqrt(4): four taps summed per channel
 
+    // See `prepared` - without this, an unprepared call divides by a zero-length buffer (SIGFPE).
+    if (! prepared)
+        return;
+
     for (int n = 0; n < numSamples; ++n)
     {
-        // Glide sizeMultiplier toward its target and re-derive lengths every sample - see
-        // targetSizeMultiplier's comment. Each of these internally only does real work (buffer
-        // fade setup, burst gain pow()) when a line's own rounded length actually changes, so this
-        // is cheap on the vast majority of samples where nothing has moved enough to matter.
+        // Glide sizeMultiplier toward its target and re-derive lengths - see targetSizeMultiplier's
+        // comment. An earlier version of this comment claimed both calls were "cheap on the vast
+        // majority of samples where nothing has moved"; that was wrong. updateBurstLines() runs six
+        // unconditional powf() calls (one per burst line) on EVERY call regardless of whether any
+        // length changed, and updateLineLengths() rounds on every line - together ~37% of total DSP
+        // time in a profiled render. Both are pure functions of sizeMultiplier, so they only need
+        // re-running when it actually moves; see lastAppliedSizeMultiplier.
         sizeMultiplier += (targetSizeMultiplier - sizeMultiplier) * sizeSmoothingCoeff;
-        updateLineLengths();
-        updateBurstLines();
+        if (std::abs(targetSizeMultiplier - sizeMultiplier) < sizeSettleEpsilon)
+            sizeMultiplier = targetSizeMultiplier;
+
+        // Written as a difference rather than `!=` because this file is deliberately JUCE-free (see
+        // the header) so the usual JUCE_..._IGNORE_WARNINGS macros aren't available to suppress
+        // -Wfloat-equal, and juce_recommended_warning_flags enables it. For finite values this is
+        // exactly the same test: any change at all, even one ULP, means the derived lengths could
+        // differ, so it is intentionally not a tolerance comparison. The snap-to-target above is
+        // what guarantees the difference actually reaches zero and stays there.
+        const auto sizeChanged = std::abs(sizeMultiplier - lastAppliedSizeMultiplier) > 0.0f;
+
+        if (sizeChanged || lengthUpdateDeferred)
+        {
+            lengthUpdateDeferred = false;
+            updateLineLengths();
+            updateBurstLines();
+            lastAppliedSizeMultiplier = sizeMultiplier;
+        }
 
         auto diffusedL = left[n];
         for (auto& stage : allpassL)
@@ -440,8 +491,19 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
             wobblePhase[(size_t) i] += wobbleRateHz[(size_t) i] * 2.0f * pi / (float) sampleRateHz;
             if (wobblePhase[(size_t) i] > 2.0f * pi)
                 wobblePhase[(size_t) i] -= 2.0f * pi;
-            const auto wobbleDepthSamples = wobbleDepthMs * 0.001f * (float) sampleRateHz;
-            const auto modSamples = wobbleAmount * wobbleDepthSamples * std::sin(wobblePhase[(size_t) i]);
+
+            // modSamples is only consumed inside the wobbleAmount > 0 branches below, and is
+            // identically 0 when wobbleAmount is 0 - but the sinf() was previously evaluated
+            // unconditionally, costing ~15% of total DSP time at the DEFAULT setting of Wobble=0
+            // purely to multiply the result by zero. Phase still advances unconditionally (see the
+            // comment above: enabling Wobble mid-playback must pick up wherever the phase is, not
+            // reset it), so this is a pure cost removal with no behavioural change either way.
+            float modSamples = 0.0f;
+            if (wobbleAmount > 0.0f)
+            {
+                const auto wobbleDepthSamples = wobbleDepthMs * 0.001f * (float) sampleRateHz;
+                modSamples = wobbleAmount * wobbleDepthSamples * std::sin(wobblePhase[(size_t) i]);
+            }
 
             float y;
             if (wobbleAmount > 0.0f)
@@ -503,7 +565,15 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
         {
             const auto injection = (i % 2 == 0) ? burstOutL : burstOutR;
             auto& buf = lineBuffers[(size_t) i];
-            buf[(size_t) writePos[(size_t) i]] = mixed[(size_t) i] + injection;
+
+            // Sanitise before the value re-enters the tank. A single non-finite sample (a NaN/Inf
+            // arriving from the host, or from an upstream plugin misbehaving) would otherwise
+            // recirculate through the Hadamard mix forever: every line feeds every other, so one NaN
+            // poisons all eight within a sample and the instance stays silent-but-wedged until it is
+            // destroyed and re-created. Substituting 0 costs one predictable-branch compare per line
+            // and leaves well-formed audio bit-identical.
+            const auto next = mixed[(size_t) i] + injection;
+            buf[(size_t) writePos[(size_t) i]] = std::isfinite(next) ? next : 0.0f;
             writePos[(size_t) i] = (writePos[(size_t) i] + 1) % (int) buf.size();
         }
 
