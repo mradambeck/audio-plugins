@@ -85,7 +85,7 @@ target_link_libraries(ShieldsTests
 
 # Offline impulse-response render harness (build order step 2) - drives the real
 # ShieldsAudioProcessor with a single-sample impulse and writes the result to WAV, so
-# tools/compare_irs.py can score it against a captured reference IR in reference-irs/ without a
+# ../common/tools/compare_wavs.py can score it against a captured reference IR in reference-irs/ without a
 # DAW in the loop. Unlike ShieldsTests, this needs the full processor (and therefore
 # juce_audio_utils, for AudioProcessor/AudioProcessorEditor/WAV I/O) rather than just the DSP core.
 juce_add_console_app(ShieldsRenderIR

@@ -57,6 +57,14 @@ public:
 
     static const juce::StringArray& getSubdivisionChoices();
 
+    // Test/tooling-only - see GradientPitchShiftEngine::setDriftSeedForTesting()'s comment. Never
+    // called from the live audio path.
+    void setDriftSeedForTesting(uint32_t seedA, uint32_t seedB) noexcept
+    {
+        engineA.setDriftSeedForTesting(seedA);
+        engineB.setDriftSeedForTesting(seedB);
+    }
+
     // Parameter IDs get an A/B suffix from the start (per the implementation plan) even though
     // unit B doesn't exist until Milestone 6 - naming this now avoids a mass rename later.
     static constexpr auto pitchSemitonesAParamID = "pitchSemitonesA";

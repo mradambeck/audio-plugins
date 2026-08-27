@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Gradient VERSION 0.1.2)
+project(Gradient VERSION 0.1.3)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -84,6 +84,46 @@ target_sources(GradientTests
 target_link_libraries(GradientTests
     PRIVATE
         juce::juce_core
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Offline render harness (mirrors shields-reverb's ShieldsRenderIR) - drives the real
+# GradientAudioProcessor with a synthesized test signal and writes the result to WAV, so a
+# pre/post-change pair can be diffed byte-for-byte or scored via ../common/tools/compare_wavs.py
+# without a DAW in the loop. Unlike GradientTests, this needs the full processor (and therefore
+# juce_audio_utils, for AudioProcessor/AudioProcessorEditor/WAV I/O) rather than just the DSP core.
+juce_add_console_app(GradientRenderIR
+    PRODUCT_NAME "GradientRenderIR"
+)
+
+target_sources(GradientRenderIR
+    PRIVATE
+        Source/GradientDelayBuffer.cpp
+        Source/GradientPitchShiftEngine.cpp
+        Source/PluginProcessor.cpp
+        Source/GradientLookAndFeel.cpp
+        Source/PluginEditor.cpp
+        Source/Tools/RenderIR.cpp
+)
+
+target_compile_definitions(GradientRenderIR
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JucePlugin_Name="Gradient"
+        JucePlugin_VersionString="0.1.3"
+)
+
+target_link_libraries(GradientRenderIR
+    PRIVATE
+        GradientBinaryData
+        HardwarePanelLookAndFeel
+        juce::juce_audio_utils
+        juce::juce_audio_formats
         juce::juce_dsp
     PUBLIC
         juce::juce_recommended_config_flags

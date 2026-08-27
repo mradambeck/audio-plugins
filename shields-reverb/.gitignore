@@ -1,7 +1,2 @@
 # Regenerable output of Source/Tools/RenderIR.cpp (ShieldsRenderIR) - rerun that tool to recreate.
 rendered-irs/*.wav
-
-# tools/compare_irs.py's Python environment/output
-tools/__pycache__/
-tools/.venv/
-tools/venv/

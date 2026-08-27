@@ -1,6 +1,7 @@
 #include "GradientDelayBuffer.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 void GradientDelayBuffer::setSize(int numSamples)
@@ -18,17 +19,27 @@ void GradientDelayBuffer::reset() noexcept
 void GradientDelayBuffer::write(float sample) noexcept
 {
     buffer[(size_t) writeIndex] = sample;
-    writeIndex = (writeIndex + 1) % (int) buffer.size();
+    ++writeIndex;
+    if (writeIndex >= (int) buffer.size())
+        writeIndex = 0;
 }
 
 float GradientDelayBuffer::readInterpolated(float delayInSamples) const noexcept
 {
     const auto size = (int) buffer.size();
 
+    // Branch-based wrap, not true modulo: correct only within one buffer-length of [0, size), which
+    // GradientPitchShiftEngine::requiredBufferCapacitySamples()'s sizing rule (capacity = the SUM of
+    // every simultaneous-maximum excursion - delay + ramp window + drift + safety margin) guarantees
+    // delayInSamples always stays within. The assert is a real safety net, not decoration: unlike %,
+    // this is only correct under that invariant, so a future change that breaks it fails loudly in
+    // debug builds instead of silently reading/writing out of bounds.
     auto wrapIndex = [size](int index) noexcept
     {
-        index %= size;
-        return index < 0 ? index + size : index;
+        assert(index > -size && index < 2 * size && "single-wrap invariant violated - see comment above");
+        if (index < 0) index += size;
+        else if (index >= size) index -= size;
+        return index;
     };
 
     // The most-recently-written sample lives at (writeIndex - 1), not writeIndex itself - reading

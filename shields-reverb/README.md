@@ -8,8 +8,8 @@ discrete-tap swelling delay or an envelope applied to a normal reverb tail. The 
 from a bank of short feedback combs ahead of an 8-line, Hadamard-mixed feedback delay network
 (FDN) tank - see "How it works" below for why the buildup needed that burst stage specifically,
 and what "buildup" actually means here. Default parameters are tuned against real Midiverb II
-captures (`reference-irs/`, scored via `tools/compare_irs.py`): ~0.94 envelope correlation against
-both preset 45 and preset 49 at time of writing.
+captures (`reference-irs/`, scored via `../common/tools/compare_wavs.py`): ~0.94 envelope
+correlation against both preset 45 and preset 49 at time of writing.
 
 See the [root README](../README.md) for shared build requirements, the exFAT/apostrophe build
 gotchas, and running tests across all plugins at once.
@@ -69,12 +69,13 @@ pieces support that, on top of the usual `ShieldsTests` unit-test target:
    baseline). Rerunning to the same `--out` path correctly overwrites it - `File::createOutputStream()`
    appends by default, which silently corrupted comparisons during tuning until this tool started
    deleting the target file first; worth knowing if you ever touch this file.
-3. **`tools/compare_irs.py`** - scores a rendered IR against a reference one (RMS envelope overlay,
-   echo-density-over-time overlay, spectrogram, envelope correlation, log-spectral distance):
+3. **`../common/tools/compare_wavs.py`** (shared across every plugin in this catalog) - scores a
+   rendered IR against a reference one (RMS envelope overlay, echo-density-over-time overlay,
+   spectrogram, envelope correlation, log-spectral distance):
 
    ```sh
-   python3 -m venv .venv && source .venv/bin/activate && pip install -r tools/requirements.txt
-   python3 tools/compare_irs.py rendered-irs/mine.wav reference-irs/preset-45.wav
+   python3 -m venv .venv && source .venv/bin/activate && pip install -r ../common/tools/requirements.txt
+   python3 ../common/tools/compare_wavs.py rendered-irs/mine.wav reference-irs/preset-45.wav
    ```
 
 Rerun steps 2-3 after every parameter/topology change while tuning - that's the point of having
@@ -129,14 +130,14 @@ doesn't run afoul of "don't fake the swell with an envelope."
 
 Lo-fi coloration (bandwidth-limiting lowpass + bit-depth quantization) is applied to the wet output
 after the FDN. Defaults (Damping 20%, Bandwidth 19kHz, Bit Depth 13) came out of sweeping each
-parameter against `tools/compare_irs.py`'s log-spectral-distance score on both reference IRs -
+parameter against `../common/tools/compare_wavs.py`'s log-spectral-distance score on both reference IRs -
 notably, both reference captures scored *worse* under heavier damping/narrower bandwidth than the
 spec's "~15kHz, fairly damped" assumption suggested; a little bit-depth grain (not none) did help.
 See `PluginProcessor.cpp`'s `createParameterLayout()` for the per-parameter notes.
 
 **Fixed output EQ:** a low-shelf (350Hz, +7dB) and high-shelf (7kHz, -5dB), always active and not
 user-exposed, correcting a broadband tonal gap between this topology's raw output and the real
-hardware - found by extending `compare_irs.py` with a frequency-resolved spectral-difference plot
+hardware - found by extending `compare_wavs.py` with a frequency-resolved spectral-difference plot
 (see that script's own comments). Two things had to happen before this correction meant anything:
 first, matching overall level between the two signals before comparing tone at all (an unmatched
 level offset otherwise shows up as a uniform shift across every band, masking whatever the real
@@ -210,9 +211,11 @@ shields-reverb/
 ├── mockups/shields-mockup-v1.html  # Approved HTML/CSS mockup the real UI was built from
 ├── reference-irs/                # Ground-truth Midiverb II captures (see its own README)
 ├── rendered-irs/                 # ShieldsRenderIR output (gitignored, regenerable)
-├── tools/compare_irs.py          # Offline IR comparison/scoring script
 └── installer/                    # This plugin's .pkg installer (see installers/README.md)
 ```
+
+Offline IR comparison/scoring script: `../common/tools/compare_wavs.py` (shared across the catalog,
+not plugin-local).
 
 ## License
 
