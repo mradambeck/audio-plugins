@@ -61,7 +61,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
             .withLabel("x")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2) + "x"; })));
 
-    // Default 20%: tuned against the reference IRs via tools/compare_irs.py's log-spectral-distance
+    // Default 20%: tuned against the reference IRs via ../common/tools/compare_wavs.py's log-spectral-distance
     // score - higher damping settings (tried up to 65%) consistently scored WORSE, i.e. the real
     // hardware's tail is brighter for longer than the spec's "~15kHz, fairly damped" assumption
     // suggested. Swept 0-65%; the log-spectral-distance score bottomed out in the 15-25% band.

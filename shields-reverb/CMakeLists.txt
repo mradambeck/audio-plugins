@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Shields VERSION 0.3.0)
+project(Shields VERSION 0.3.1)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -85,7 +85,7 @@ target_link_libraries(ShieldsTests
 
 # Offline impulse-response render harness (build order step 2) - drives the real
 # ShieldsAudioProcessor with a single-sample impulse and writes the result to WAV, so
-# tools/compare_irs.py can score it against a captured reference IR in reference-irs/ without a
+# ../common/tools/compare_wavs.py can score it against a captured reference IR in reference-irs/ without a
 # DAW in the loop. Unlike ShieldsTests, this needs the full processor (and therefore
 # juce_audio_utils, for AudioProcessor/AudioProcessorEditor/WAV I/O) rather than just the DSP core.
 juce_add_console_app(ShieldsRenderIR
@@ -106,7 +106,7 @@ target_compile_definitions(ShieldsRenderIR
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JucePlugin_Name="Shields"
-        JucePlugin_VersionString="0.1.0"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
 )
 
 target_link_libraries(ShieldsRenderIR

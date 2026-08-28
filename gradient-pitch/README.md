@@ -46,6 +46,30 @@ auval -v aufx Grad WJag
 `Grad` is the plugin code, `WJag` the manufacturer code (both from `CMakeLists.txt`). A pass
 prints `AU VALIDATION SUCCEEDED`.
 
+## Offline validation workflow
+
+For verifying a DSP-internals change (e.g. a performance optimization) doesn't alter the sound,
+on top of the usual `GradientTests` unit-test target:
+
+1. **`GradientRenderIR`** (a console app, not a plugin format) - feeds a synthesized, deterministic
+   test signal (two-tone sine, sweep, noise, silence tail - see `Source/Tools/RenderIR.cpp`) through
+   the real `GradientAudioProcessor` and writes the result to WAV:
+
+   ```sh
+   cmake --build build --config Release --target GradientRenderIR
+   build/GradientRenderIR_artefacts/Release/GradientRenderIR --out rendered-audio/mine.wav --seconds 5
+   ```
+
+   Flags map 1:1 onto the plugin's own parameter IDs in their native units (e.g.
+   `--pitchSemitonesA 12 --spliceModeA smart --feedbackPercentA 80`) - see the tool's own header
+   comment for the full list. Unlike a plain run, Drift's RNG is normally seeded from each engine
+   instance's own memory address (varies per process under ASLR) - pass `--driftSeed <n>` to pin it
+   for reproducible renders when Drift > 0.
+2. Render the same parameter matrix before and after a change, and `cmp` each pair byte-for-byte -
+   expect zero differences for anything claimed to not alter the sound. `../common/tools/compare_wavs.py`
+   (shared across the catalog) is available for a fuzzier spectral/envelope comparison when an exact
+   diff isn't the right tool (e.g. comparing against a different signal source entirely).
+
 ## How it works
 
 Each of the two units (A/B) independently pitch-shifts and delays its input, using a splicing
@@ -88,7 +112,10 @@ gradient-pitch/
 │   ├── GradientDelayBuffer.h/.cpp      # Standalone, unit-testable delay-line class
 │   ├── GradientPitchShiftEngine.h/.cpp # Standalone, unit-testable pitch-shift engine
 │   ├── PluginEditor.h/.cpp             # UI layout
-│   └── GradientLookAndFeel.h/.cpp      # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── GradientLookAndFeel.h/.cpp      # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── Tests/                          # GradientTests: headless UnitTest console app (DSP core only)
+│   └── Tools/RenderIR.cpp              # GradientRenderIR: offline render console app
+├── rendered-audio/                     # GradientRenderIR output (gitignored, regenerable)
 └── installer/                          # This plugin's .pkg installer (see installers/README.md)
 ```
 

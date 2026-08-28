@@ -75,7 +75,7 @@ public:
             // much smaller later reflections in raw RMS terms. What genuinely does grow over time
             // is the COUNT of resolvable peaks per window, since decorrelated-length lines only
             // start compounding into a dense, noise-like texture after several round trips - this
-            // is what tools/compare_irs.py will also measure against the real reference IRs.
+            // is what ../common/tools/compare_wavs.py will also measure against the real reference IRs.
             ShieldsFDNEngine engine;
             engine.prepare(testSampleRate);
             engine.setDiffusion(0.5f);

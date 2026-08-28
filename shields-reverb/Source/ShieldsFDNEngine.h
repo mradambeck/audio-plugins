@@ -302,7 +302,7 @@ private:
     float diffusionCoefficient = 0.5f;
 
     // Cascaded one-pole stages for the output bandwidth limiter, per channel. A single one-pole is
-    // only 6dB/octave - comparison against the reference IRs (tools/compare_irs.py's frequency-
+    // only 6dB/octave - comparison against the reference IRs (../common/tools/compare_wavs.py's frequency-
     // resolved spectral-difference plot) showed the real hardware's high end falls off much more
     // sharply than that lets a single stage reproduce, so this cascades numBandwidthStages of them.
     // Each stage uses the SAME coefficient (they're identical), but that coefficient is computed
@@ -330,7 +330,7 @@ private:
     static constexpr float highShelfGainDb = -5.0f;
 
     // No mid-band correction needed: once the spectral comparison was fixed to compare 1/3-octave-
-    // smoothed energy (see tools/compare_irs.py's smooth_to_fractional_octave()) instead of raw FFT
+    // smoothed energy (see ../common/tools/compare_wavs.py's smooth_to_fractional_octave()) instead of raw FFT
     // bins, the apparent ~10dB mid-band gap mostly turned out to be comb-filtering/resonance
     // misalignment noise between this topology's and the real hardware's differently-spaced modes,
     // not a genuine colour difference - the smoothed comparison put it at ~3dB, close enough to

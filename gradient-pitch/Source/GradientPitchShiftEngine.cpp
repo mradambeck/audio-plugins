@@ -1,6 +1,7 @@
 #include "GradientPitchShiftEngine.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 
@@ -54,6 +55,11 @@ void GradientPitchShiftEngine::prepare(double sampleRate) noexcept
     reset();
 }
 
+void GradientPitchShiftEngine::setDriftSeedForTesting(uint32_t seed) noexcept
+{
+    driftRngState = (seed == 0) ? 1 : seed; // never zero - xorshift is stuck at 0 forever otherwise
+}
+
 void GradientPitchShiftEngine::reset() noexcept
 {
     buffer.reset();
@@ -82,6 +88,15 @@ int GradientPitchShiftEngine::requiredBufferCapacitySamples(double sampleRate) n
 
 void GradientPitchShiftEngine::setPitchSemitones(float coarseSemitones, float fineCents) noexcept
 {
+    // PluginProcessor calls this every block regardless of whether the knob moved - skip the pow()
+    // below when it hasn't. pitchSemitones/pitchFineCents already double as the "last seen" cache
+    // (nothing else in this class reads them), and their 0.0f/0.0f default coincides exactly with
+    // rampRate's own 0.0f default (pow(2,0)==1, rampRate==1-1==0), so skipping a first call of
+    // (0,0) is provably correct, not an accidental gap. std::abs(...) <= 0.0f, not ==, to avoid
+    // -Wfloat-equal (this repo's convention - see ShieldsFDNEngine's lastAppliedSizeMultiplier).
+    if (std::abs(coarseSemitones - pitchSemitones) <= 0.0f && std::abs(fineCents - pitchFineCents) <= 0.0f)
+        return;
+
     pitchSemitones = coarseSemitones;
     pitchFineCents = fineCents;
 
@@ -113,6 +128,13 @@ void GradientPitchShiftEngine::setMix(float mixPercent) noexcept
 
 void GradientPitchShiftEngine::setOutputTrimDb(float trimDb) noexcept
 {
+    // Same redundant-pow() guard as setPitchSemitones() above. lastOutputTrimDb's 0.0f default
+    // coincides with outputGain's own default (pow(10,0/20)==1.0f), so skipping a first call of
+    // 0.0f is correct for the same reason.
+    if (std::abs(trimDb - lastOutputTrimDb) <= 0.0f)
+        return;
+
+    lastOutputTrimDb = trimDb;
     outputGain = std::pow(10.0f, trimDb / 20.0f);
 }
 
@@ -241,7 +263,12 @@ void GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float d
 
 float GradientPitchShiftEngine::safetyDarken(float x) noexcept
 {
-    const auto saturated = std::tanh(x * fixedSafetyDrive) / fixedSafetyDrive;
+    // Feedback off (feedbackGain==0, the shipped default) makes x exactly 0.0f every sample - skip
+    // the transcendental call in that case (std::tanh(0)==0 exactly per IEEE-754/C++ <cmath>, so
+    // this is bit-identical, not an approximation). Passing x through rather than a 0.0f literal
+    // preserves sign-of-zero for true bit-exactness. The filter's own lowpass state still updates
+    // every sample regardless, so a feedback-on-to-off transition still decays correctly.
+    const auto saturated = (std::abs(x) <= 0.0f) ? x : (std::tanh(x * fixedSafetyDrive) / fixedSafetyDrive);
     darkeningFilterState += (saturated - darkeningFilterState) * darkeningCoeff;
     return darkeningFilterState;
 }

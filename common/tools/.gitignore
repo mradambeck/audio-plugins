@@ -1,0 +1,4 @@
+# compare_wavs.py's Python environment/output
+__pycache__/
+.venv/
+venv/

@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Compares a rendered Shields impulse response against a reference Midiverb II capture.
+"""Compares two rendered WAV files (e.g. a plugin's offline render against a reference capture, or
+the same render before/after a DSP change) and reports how similar they are.
 
 Usage:
-    python3 compare_irs.py <rendered.wav> <reference.wav> [--out report.png] [--window-ms 50]
+    python3 compare_wavs.py <a.wav> <b.wav> [--out report.png] [--window-ms 50]
 
-Meant to be rerun after every parameter/topology change during tuning (build order step 3/4), not
-a one-off script - it prints a small set of numbers to track across iterations and (unless
---no-plot is given) saves a PNG with the visual comparisons called for in the plan:
+Shared across every plugin in this catalog (originally written for shields-reverb's IR-tuning
+workflow; nothing in the logic below is plugin-specific) - meant to be rerun after every
+parameter/topology change during tuning, or as a spot-check alongside a byte-for-byte `cmp` when
+verifying a refactor didn't change the sound. It prints a small set of numbers to track across
+iterations and (unless --no-plot is given) saves a PNG with the visual comparisons:
 
-  1. RMS/energy decay envelope overlay - the overall loudness contour of both tails.
-  2. Echo-density-over-time overlay - count of resolvable peaks per time window, which per the
-     Bloom spec is the actual signature of the buildup, not the loudness contour above (a network
-     can have a fairly flat or falling envelope while its echo density still visibly increases -
-     see ShieldsFDNEngineTests.cpp for the same measurement done as a C++ regression check).
-  3. Spectrogram comparison - tonal/bandwidth matching over TIME (rendered and reference side by
-     side).
+  1. RMS/energy decay envelope overlay - the overall loudness contour of both signals.
+  2. Echo-density-over-time overlay - count of resolvable peaks per time window, a signature of
+     buildup/decay structure that the loudness envelope alone can miss (a signal can have a fairly
+     flat or falling envelope while its echo density still visibly increases).
+  3. Spectrogram comparison - tonal/bandwidth matching over TIME (A and B side by side).
   4. Averaged spectrum overlay + spectral difference curve - tonal/bandwidth matching averaged over
      the WHOLE signal, frequency-resolved. This is what the single-number log-spectral-distance
      score below collapses into one figure; the difference curve is what actually answers "is it
@@ -29,6 +30,7 @@ Similarity is reported two ways rather than picking just one, since they capture
     frequency-resolved version of this same comparison.
 """
 import argparse
+import os
 import sys
 
 import numpy as np
@@ -125,8 +127,8 @@ def averaged_psd(dataA, dataB, sampleRate, minHz=20.0):
 def smooth_to_fractional_octave(freqs, psd, bandsPerOctave=3):
     """Averages linear power within fractional-octave bands (energy-summing, like a real RTA/1/3-
     octave analyzer) and returns (centerFreqs, smoothedDb). This is the standard way to compare
-    tonal BALANCE while ignoring fine comb-filtering/resonance detail: two different delay-network
-    topologies (this engine's 8+6 lines vs. whatever the real Midiverb uses internally) will always
+    tonal BALANCE while ignoring fine comb-filtering/resonance detail: two different topologies (e.g.
+    this catalog's own delay-network engine vs. a real hardware unit it's modeled on) will always
     have resonant peaks at different exact frequencies, so a raw bin-by-bin comparison is dominated
     by peak-vs-null misalignment noise rather than genuine broadband colour - confirmed by how
     spiky (+-20-40dB bin to bin) the raw per-bin spectral-difference plot looked in practice, versus
@@ -158,9 +160,9 @@ def log_spectral_distance(freqDbA, freqDbB):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("rendered", help="Shields's own rendered IR (from ShieldsRenderIR)")
-    parser.add_argument("reference", help="Captured reference IR (reference-irs/*.wav)")
-    parser.add_argument("--out", default=None, help="Path to save the comparison PNG (default: alongside the rendered file)")
+    parser.add_argument("rendered", help="First WAV file (e.g. a plugin's own offline render)")
+    parser.add_argument("reference", help="Second WAV file to compare against (e.g. a reference capture, or a pre-change baseline render)")
+    parser.add_argument("--out", default=None, help="Path to save the comparison PNG (default: alongside the first file)")
     parser.add_argument("--no-plot", action="store_true", help="Skip saving the PNG, just print the metrics")
     parser.add_argument("--window-ms", type=float, default=50.0, help="Analysis window size in ms (default 50)")
     args = parser.parse_args()
@@ -224,19 +226,22 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    labelA = os.path.basename(args.rendered)
+    labelB = os.path.basename(args.reference)
+
     fig, axes = plt.subplots(6, 1, figsize=(10, 19))
 
     timeRendered = np.arange(len(rmsRendered)) * args.window_ms / 1000.0
     timeReference = np.arange(len(rmsReference)) * args.window_ms / 1000.0
-    axes[0].plot(timeRendered, rmsRendered, label="Rendered (Shields)")
-    axes[0].plot(timeReference, rmsReference, label="Reference (Midiverb)")
+    axes[0].plot(timeRendered, rmsRendered, label=labelA)
+    axes[0].plot(timeReference, rmsReference, label=labelB)
     axes[0].set_title("RMS energy envelope")
     axes[0].set_xlabel("Time (s)")
     axes[0].set_ylabel("RMS")
     axes[0].legend()
 
-    axes[1].plot(timeRendered, densityRendered, label="Rendered (Shields)")
-    axes[1].plot(timeReference, densityReference, label="Reference (Midiverb)")
+    axes[1].plot(timeRendered, densityRendered, label=labelA)
+    axes[1].plot(timeReference, densityReference, label=labelB)
     axes[1].set_title("Echo density (peaks per window) - the actual buildup signature")
     axes[1].set_xlabel("Time (s)")
     axes[1].set_ylabel("Peak count")
@@ -245,30 +250,30 @@ def main():
     nperseg = min(1024, max(64, windowSize))
     fRendered, tRendered, sxxRendered = spectrogram(renderedData, fs=targetRate, nperseg=nperseg)
     axes[2].pcolormesh(tRendered, fRendered, 10 * np.log10(sxxRendered + 1.0e-12), shading="gouraud")
-    axes[2].set_title("Rendered (Shields) spectrogram")
+    axes[2].set_title(f"{labelA} spectrogram")
     axes[2].set_xlabel("Time (s)")
     axes[2].set_ylabel("Frequency (Hz)")
 
     fReference, tReference, sxxReference = spectrogram(referenceData, fs=targetRate, nperseg=nperseg)
     axes[3].pcolormesh(tReference, fReference, 10 * np.log10(sxxReference + 1.0e-12), shading="gouraud")
-    axes[3].set_title("Reference (Midiverb) spectrogram")
+    axes[3].set_title(f"{labelB} spectrogram")
     axes[3].set_xlabel("Time (s)")
     axes[3].set_ylabel("Frequency (Hz)")
 
     # Averaged-over-the-whole-signal spectrum, frequency-resolved - the log-spectral-distance score
     # printed above is just the mean |gap| between these two curves, collapsed to one number.
-    axes[4].semilogx(spectrumFreqs, spectrumDbRendered, label="Rendered (Shields)")
-    axes[4].semilogx(spectrumFreqs, spectrumDbReference, label="Reference (Midiverb)")
+    axes[4].semilogx(spectrumFreqs, spectrumDbRendered, label=labelA)
+    axes[4].semilogx(spectrumFreqs, spectrumDbReference, label=labelB)
     axes[4].set_title("Averaged spectrum (Welch PSD, 1/3-octave smoothed)")
     axes[4].set_xlabel("Frequency (Hz)")
     axes[4].set_ylabel("Power (dB)")
     axes[4].legend()
 
-    # The actual answer to "where is the tonal mismatch": positive = rendered has more energy than
-    # the reference in that band (too bright/present there), negative = less (too dark/thin there).
+    # The actual answer to "where is the tonal mismatch": positive = A has more energy than B in
+    # that band (too bright/present there), negative = less (too dark/thin there).
     axes[5].semilogx(spectrumFreqs, spectrumDiff, color="tab:red")
     axes[5].axhline(0.0, color="black", linewidth=0.8)
-    axes[5].set_title("Spectral difference (Rendered minus Reference)")
+    axes[5].set_title(f"Spectral difference ({labelA} minus {labelB})")
     axes[5].set_xlabel("Frequency (Hz)")
     axes[5].set_ylabel("dB")
 

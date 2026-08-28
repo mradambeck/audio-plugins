@@ -57,6 +57,29 @@ public:
                 expectWithinAbsoluteError(buf.readInterpolated((float) delay), (float) (19 - delay), 1.0e-6f);
         }
 
+        beginTest("Negative delays read 'ahead' of the write head and still wrap correctly");
+        {
+            // Protects the branch-based index wrap (a single conditional add/subtract, replacing
+            // true modulo) added as a performance optimization: unlike %, it's only correct within
+            // one buffer-length of [0, size), so a negative delay - which pushes the raw index past
+            // size, needing the upper-bound wrap branch, not just the lower-bound one every other
+            // test here exercises - is exactly the case most likely to expose an off-by-one in that
+            // replacement (e.g. `>` instead of `>=` at the boundary).
+            GradientDelayBuffer buf;
+            buf.setSize(8);
+            for (int i = 0; i < 5; ++i) // writes 0..4 to indices 0-4; writeIndex lands on 5
+                buf.write((float) i);
+
+            // readPosition = (writeIndex-1) - delay = 4 - (-5) = 9 -> floorPosition 9, which is
+            // size(8)+1 -> wrapIndex must subtract size once to land on index 1 (value 1.0).
+            expectWithinAbsoluteError(buf.readInterpolated(-5.0f), 1.0f, 1.0e-6f);
+
+            // readPosition = 4 - (-4.5) = 8.5 -> floorPosition exactly AT size (8), the critical
+            // boundary for >= vs > in the wrap branch; index0 must wrap to 0 (value 0.0), index1 to
+            // 1 (value 1.0), interpolating halfway to 0.5.
+            expectWithinAbsoluteError(buf.readInterpolated(-4.5f), 0.5f, 1.0e-4f);
+        }
+
         beginTest("reset() clears history to silence");
         {
             GradientDelayBuffer buf;

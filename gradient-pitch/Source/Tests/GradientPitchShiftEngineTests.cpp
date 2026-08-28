@@ -229,6 +229,86 @@ public:
                        "frequency than Glitch mode");
             }
         }
+
+        // Regression tests for the pow()-caching optimization in setPitchSemitones()/
+        // setOutputTrimDb(): PluginProcessor calls both every block regardless of whether the knob
+        // moved, so each must still apply a REAL change even when it's preceded by many redundant
+        // calls at the old value (exactly what happens in practice: several blocks with a knob held
+        // still, then one where it moves). A wrong sentinel or comparing the wrong field could make
+        // the cache incorrectly treat a genuine change as a no-op - the static parameter matrix the
+        // render/diff verification uses elsewhere can't catch that (it never changes a parameter
+        // mid-render), so this is checked observably here instead, consistent with this file's
+        // measure-the-actual-output approach elsewhere rather than peeking at private state.
+        beginTest("setPitchSemitones() still applies a real change after many redundant calls at the old value");
+        {
+            GradientPitchShiftEngine engine;
+            engine.prepare(sampleRate);
+            engine.setDelayTimeMs(0.0f);
+            engine.setMix(100.0f);
+            engine.setOutputTrimDb(0.0f);
+
+            for (int i = 0; i < 10; ++i) // cache-hit path: repeated identical value
+                engine.setPitchSemitones(7.0f, 0.0f);
+
+            constexpr float changedSemitones = -12.0f;
+            for (int i = 0; i < 10; ++i) // first call is cache-miss (real change), rest are cache-hit
+                engine.setPitchSemitones(changedSemitones, 0.0f);
+
+            constexpr double totalSeconds = 2.0;
+            const auto totalSamples = (int) (sampleRate * totalSeconds);
+            std::vector<float> output;
+            output.reserve((size_t) totalSamples);
+
+            double phase = 0.0;
+            const auto phaseIncrement = juce::MathConstants<double>::twoPi * (double) inputFreq / sampleRate;
+            for (int i = 0; i < totalSamples; ++i)
+            {
+                const auto inputSample = (float) std::sin(phase);
+                phase += phaseIncrement;
+                if (phase >= juce::MathConstants<double>::twoPi)
+                    phase -= juce::MathConstants<double>::twoPi;
+                output.push_back(engine.process(inputSample));
+            }
+
+            const auto startIndex = (size_t) (sampleRate * 0.3);
+            const auto endIndex = (size_t) (sampleRate * (totalSeconds - 0.1));
+            const std::vector<float> steadyRegion(output.begin() + (long) startIndex, output.begin() + (long) endIndex);
+
+            const auto expectedRatio = std::pow(2.0, (double) changedSemitones / 12.0);
+            const auto expectedFreq = (double) inputFreq * expectedRatio;
+            const auto measuredFreq = measureFrequency(steadyRegion, sampleRate, expectedFreq);
+
+            // If the cache incorrectly skipped the real change, the engine would still be applying
+            // +7st (shifted UP), not -12st (shifted DOWN) - direction alone distinguishes them.
+            expect(measuredFreq < inputFreq, "Engine should reflect the LATEST setPitchSemitones() call "
+                                              "(-12st, shifted down), not an earlier one the cache incorrectly "
+                                              "treated as unchanged");
+            const auto toleranceHz = expectedFreq * 0.30; // same tolerance runPitchTest() uses for non-bypass cases
+            expectWithinAbsoluteError(measuredFreq, expectedFreq, toleranceHz);
+        }
+
+        beginTest("setOutputTrimDb() still applies a real change after many redundant calls at the old value");
+        {
+            GradientPitchShiftEngine engine;
+            engine.prepare(sampleRate);
+            engine.setPitchSemitones(0.0f, 0.0f); // bypass - isolate the trim itself
+            engine.setDelayTimeMs(0.0f);
+            engine.setMix(100.0f);
+
+            for (int i = 0; i < 10; ++i) // cache-hit path
+                engine.setOutputTrimDb(0.0f);
+
+            constexpr float changedTrimDb = -12.0f;
+            for (int i = 0; i < 10; ++i) // first call is cache-miss, rest are cache-hit
+                engine.setOutputTrimDb(changedTrimDb);
+
+            // Bypass + delay 0 + Mix 100% means a single unit-amplitude sample comes straight back
+            // out scaled by outputGain (then the fixed output-safety tanh - see outputSafetyLimit())
+            // - if the cache incorrectly skipped the change, this would still be at unity (0dB).
+            const auto out = engine.process(1.0f);
+            const auto expectedOutput = std::tanh(std::pow(10.0f, changedTrimDb / 20.0f));
+            expectWithinAbsoluteError(out, expectedOutput, 1.0e-4f);
+        }
     }
 };
 

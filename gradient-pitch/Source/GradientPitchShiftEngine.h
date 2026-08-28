@@ -41,6 +41,14 @@ public:
     void prepare(double sampleRate) noexcept;
     void reset() noexcept;
 
+    // Test/tooling-only override for the address-derived RNG seed (see prepare()) - lets offline
+    // renders (GradientRenderIR) reproduce bit-identical Drift sequences across separate process
+    // invocations, where ASLR would otherwise vary this instance's own address every run. Never
+    // called from PluginProcessor's live audio path; production behavior (each instance seeded
+    // from its own address, so two simultaneous engines never lock-step - see GradientDriftTests)
+    // is unchanged. Call after prepare(), which is the only other place driftRngState is set.
+    void setDriftSeedForTesting(uint32_t seed) noexcept;
+
     // Per-block parameter setters, called once per block from the processor rather than having
     // the engine read juce::AudioProcessorValueTreeState itself - keeps this class trivially
     // testable and duplicable.
@@ -120,6 +128,7 @@ private:
     float feedbackGain = 0.0f;
     float mixAmount = 0.5f;
     float outputGain = 1.0f;
+    float lastOutputTrimDb = 0.0f; // cache so setOutputTrimDb() can skip a redundant pow() below
     SpliceMode spliceMode = SpliceMode::glitch;
     float crossfadeLengthMs = fixedCrossfadeMs; // live only for deglitchSoft/deglitchSmart
     float driftAmount = 0.0f; // 0-1, from setDrift()

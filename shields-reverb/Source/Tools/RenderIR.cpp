@@ -12,7 +12,7 @@
 
 // Offline impulse-response render harness for Shields (build order step 2). Feeds a single-sample
 // impulse through the real ShieldsAudioProcessor (not a re-implementation of the DSP) and writes the
-// result to a WAV file, so tools/compare_irs.py can compare it against a captured reference IR in
+// result to a WAV file, so ../common/tools/compare_wavs.py can compare it against a captured reference IR in
 // reference-irs/ without ever needing to build/load the plugin itself in a DAW.
 //
 // Usage:
