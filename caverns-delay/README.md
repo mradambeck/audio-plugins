@@ -46,6 +46,31 @@ auval -v aufx Cavn WJag
 `Cavn` is the plugin code, `WJag` the manufacturer code (both from `CMakeLists.txt`). A pass
 prints `AU VALIDATION SUCCEEDED`.
 
+## Offline validation workflow
+
+For verifying a DSP-internals change (e.g. a performance optimization) doesn't alter the sound,
+on top of the usual `CavernsTests` unit-test target:
+
+1. **`CavernsRenderIR`** (a console app, not a plugin format) - feeds a synthesized audio-in test
+   signal (two-tone sine, sweep, noise, silence tail) through the real `CavernsAudioProcessor` and
+   writes the result to WAV:
+
+   ```sh
+   cmake --build build --config Release --target CavernsRenderIR
+   build/CavernsRenderIR_artefacts/Release/CavernsRenderIR --out rendered-audio/mine.wav --seconds 6
+   ```
+
+   Flags map 1:1 onto the plugin's own parameter IDs in their native units, plus `--preset "<name>"`
+   for the 8 factory presets. Two extra capabilities exist specifically for exercising the
+   filter-coefficient cache (see `PluginProcessor.cpp`'s `lastLowCutHz`/`lastHighCutHz`/
+   `lastDegradeDarkenerHz`): `--changeParamID/--changeParamValue/--changeAtSecond` applies one
+   parameter change mid-render, and `--sampleRate2/--warmupSeconds` renders in two phases across a
+   `prepareToPlay()` call at a different sample rate - see the tool's own header comment for both.
+2. Render the same signal/parameter matrix before and after a change, and `cmp` each pair
+   byte-for-byte - expect zero differences for anything claimed to not alter the sound.
+   `../common/tools/compare_wavs.py` (shared across the catalog) is available for a fuzzier
+   spectral/envelope comparison when an exact diff isn't the right tool.
+
 ## How it works
 
 Independent L/R delay lines (free-running in ms, tempo-Synced to a note division, or Linked so R
@@ -79,7 +104,10 @@ caverns-delay/
 ├── Source/
 │   ├── PluginProcessor.h/.cpp      # DSP + parameter state
 │   ├── PluginEditor.h/.cpp         # UI layout
-│   └── CavernsLookAndFeel.h/.cpp   # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── CavernsLookAndFeel.h/.cpp   # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── Tests/                      # CavernsTests: headless UnitTest console app
+│   └── Tools/RenderIR.cpp          # CavernsRenderIR: offline audio-in render console app
+├── rendered-audio/                 # CavernsRenderIR output (gitignored, regenerable)
 └── installer/                      # This plugin's .pkg installer (see installers/README.md)
 ```
 

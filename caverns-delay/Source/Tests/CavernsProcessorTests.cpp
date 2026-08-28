@@ -270,6 +270,103 @@ public:
             const auto cutRms = measureRms(1200.0f);
             expect(cutRms < passthroughRms * 0.3f, "1.2kHz High Cut should substantially attenuate a 15kHz tone");
         }
+
+        // Regression tests for the filter-coefficient cache guard added to
+        // feedbackDarkenerL/R.coefficients, lowCutFilterL/R.coefficients, and
+        // highCutFilterL/R.coefficients (skips the std::tan()+heap-allocating make*() call when
+        // the Hz value hasn't changed since the last block).
+        beginTest("Low Cut cache invalidates when the parameter changes mid-session, not just at prepareToPlay");
+        {
+            CavernsAudioProcessor processor;
+            setRaw(processor, CavernsAudioProcessor::syncParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::linkParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::leftTimeParamID, 1.0f);
+            setRaw(processor, CavernsAudioProcessor::rightTimeParamID, 1.0f);
+            setRaw(processor, CavernsAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::dryParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::wetParamID, 100.0f);
+            setRaw(processor, CavernsAudioProcessor::degradeParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::lowCutParamID, 20.0f); // near-passthrough
+            setRaw(processor, CavernsAudioProcessor::highCutParamID, 20000.0f);
+            processor.prepareToPlay(sampleRate, 4096);
+
+            auto renderFiftyHzToneRms = [&]
+            {
+                const int numSamples = 4096;
+                juce::AudioBuffer<float> buffer(2, numSamples);
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    const auto s = std::sin(juce::MathConstants<float>::twoPi * 50.0f * (float) i / (float) sampleRate);
+                    buffer.setSample(0, i, s);
+                    buffer.setSample(1, i, s);
+                }
+                juce::MidiBuffer midi;
+                processor.processBlock(buffer, midi);
+                return rms(buffer.getReadPointer(0) + 200, numSamples - 200);
+            };
+
+            const auto passthroughRms = renderFiftyHzToneRms();
+
+            // A genuine change AFTER the cache has already computed once (previous block already
+            // established lastLowCutHz) - the very next block must still pick it up.
+            setRaw(processor, CavernsAudioProcessor::lowCutParamID, 1000.0f);
+            const auto cutRms = renderFiftyHzToneRms();
+
+            expect(cutRms < passthroughRms * 0.3f,
+                   "Changing Low Cut mid-session should still take effect on the very next block, "
+                   "not stay stuck at the previously-cached coefficient");
+        }
+
+        beginTest("Filter coefficients don't survive a session sample-rate change with unmoved knobs");
+        {
+            // Two ways to reach the SAME final sample rate with the SAME Low Cut value: a direct
+            // prepare at that rate (unambiguously correct), and a prepare at a very different rate
+            // FIRST (establishing cached coefficient state) followed by a second prepareToPlay() at
+            // the target rate with Low Cut left untouched (the actual bug scenario - see
+            // lastLowCutHz's own member comment). Both must measure the same, since final behavior
+            // should only depend on the CURRENT sample rate and parameter value, never on history.
+            auto measureLowCutRmsAt2kHz = [&](double firstPrepareRate, double finalPrepareRate)
+            {
+                CavernsAudioProcessor processor;
+                setRaw(processor, CavernsAudioProcessor::syncParamID, 0.0f);
+                setRaw(processor, CavernsAudioProcessor::linkParamID, 0.0f);
+                setRaw(processor, CavernsAudioProcessor::leftTimeParamID, 1.0f);
+                setRaw(processor, CavernsAudioProcessor::rightTimeParamID, 1.0f);
+                setRaw(processor, CavernsAudioProcessor::feedbackParamID, 0.0f);
+                setRaw(processor, CavernsAudioProcessor::dryParamID, 0.0f);
+                setRaw(processor, CavernsAudioProcessor::wetParamID, 100.0f);
+                setRaw(processor, CavernsAudioProcessor::degradeParamID, 0.0f);
+                setRaw(processor, CavernsAudioProcessor::lowCutParamID, 2000.0f);
+                setRaw(processor, CavernsAudioProcessor::highCutParamID, 20000.0f);
+
+                processor.prepareToPlay(firstPrepareRate, 512);
+                juce::AudioBuffer<float> warmup(2, 512);
+                warmup.clear();
+                juce::MidiBuffer warmupMidi;
+                processor.processBlock(warmup, warmupMidi); // establishes cached coefficient state
+
+                processor.prepareToPlay(finalPrepareRate, 4096); // Low Cut untouched across this call
+
+                const int numSamples = 4096;
+                juce::AudioBuffer<float> buffer(2, numSamples);
+                for (int i = 0; i < numSamples; ++i)
+                {
+                    const auto s = std::sin(juce::MathConstants<float>::twoPi * 2000.0f * (float) i / (float) finalPrepareRate);
+                    buffer.setSample(0, i, s);
+                    buffer.setSample(1, i, s);
+                }
+                juce::MidiBuffer midi;
+                processor.processBlock(buffer, midi);
+                return rms(buffer.getReadPointer(0) + 200, numSamples - 200);
+            };
+
+            const auto directRms = measureLowCutRmsAt2kHz(48000.0, 48000.0);
+            const auto afterRateChangeRms = measureLowCutRmsAt2kHz(11025.0, 48000.0);
+
+            expectWithinAbsoluteError(afterRateChangeRms, directRms, directRms * 0.1f,
+                                       "Filter response after a sample-rate change should match a direct prepare "
+                                       "at the same final rate, not a coefficient stale from the old rate");
+        }
     }
 };
 

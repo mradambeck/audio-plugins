@@ -99,6 +99,16 @@ private:
     // rather than every echo sounding identically processed.
     juce::dsp::IIR::Filter<float> feedbackDarkenerL, feedbackDarkenerR;
 
+    // Cache guards for the three IIR::Coefficients::make*() calls in processBlock() (each does a
+    // genuine std::tan() plus a heap allocation - see that call site's comment) - skip recompute
+    // when the Hz value hasn't changed since the last block. -1.0f sentinels (Hz is always
+    // positive) reset in prepareToPlay(), not just at construction - these coefficients also
+    // depend on sampleRateHz, so a cached "unchanged Hz" value from a prior session at a different
+    // sample rate must not survive a prepareToPlay() call at a new rate.
+    float lastDegradeDarkenerHz = -1.0f;
+    float lastLowCutHz = -1.0f;
+    float lastHighCutHz = -1.0f;
+
     // A tiny modulated delay sitting only in the feedback return path (after saturation, before
     // the signal rejoins the main delay line) - separate from the user-facing Mod Speed/Depth
     // knobs, which wobble the whole line uniformly. Because this only touches the returning

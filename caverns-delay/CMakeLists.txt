@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Caverns VERSION 0.1.2)
+project(Caverns VERSION 0.1.3)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -84,6 +84,40 @@ target_compile_definitions(CavernsTests
 target_link_libraries(CavernsTests
     PRIVATE
         juce::juce_audio_processors
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Offline render harness (mirrors gradient-pitch's GradientRenderIR / shields-reverb's
+# ShieldsRenderIR) - drives the real CavernsAudioProcessor with a synthesized audio-in test signal
+# and writes the result to WAV, so a pre/post-change pair can be diffed byte-for-byte or scored via
+# ../common/tools/compare_wavs.py without a DAW in the loop. Reuses the same
+# TestCreateEditorStub.cpp CavernsTests already uses, so this stays free of the
+# editor/LookAndFeel/BinaryData too.
+juce_add_console_app(CavernsRenderIR
+    PRODUCT_NAME "CavernsRenderIR"
+)
+
+target_sources(CavernsRenderIR
+    PRIVATE
+        Source/PluginProcessor.cpp
+        Source/Tests/TestCreateEditorStub.cpp
+        Source/Tools/RenderIR.cpp
+)
+
+target_compile_definitions(CavernsRenderIR
+    PRIVATE
+        JucePlugin_Name="Caverns"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
+)
+
+target_link_libraries(CavernsRenderIR
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats
         juce::juce_dsp
     PUBLIC
         juce::juce_recommended_config_flags
