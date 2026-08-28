@@ -189,7 +189,7 @@ float GradientPitchShiftEngine::getEffectiveCrossfadeSamples() const noexcept
     return std::min(requestedSamples, rampWindowSamples * 0.49f);
 }
 
-void GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float driftOffsetSamples) noexcept
+std::optional<float> GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float driftOffsetSamples) noexcept
 {
     const int otherTapIndex = 1 - tapIndex;
 
@@ -205,15 +205,16 @@ void GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float d
 
         --spliceSearchCountdown[tapIndex];
         searchDebt[tapIndex] += 1.0f;
+        lastTapSample[tapIndex] = candidateSample; // unconditional either way below, so set it up front
 
         if (crossedZero || lowEnergy || spliceSearchCountdown[tapIndex] <= 0)
         {
             tapDelay[tapIndex] = pitchingUp ? rampWindowSamples : 0.0f;
             awaitingSplice[tapIndex] = false;
+            return std::nullopt; // tapDelay just changed - candidateSample is now stale, see header comment
         }
 
-        lastTapSample[tapIndex] = candidateSample;
-        return;
+        return candidateSample; // still frozen at the position a readTap() call would read
     }
 
     tapDelay[tapIndex] += rampRate;
@@ -226,7 +227,7 @@ void GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float d
     const bool crossedBoundary = (pitchingUp && effectivePosition <= 0.0f)
                                || (!pitchingUp && effectivePosition >= rampWindowSamples);
     if (!crossedBoundary)
-        return;
+        return std::nullopt;
 
     if (spliceMode == SpliceMode::deglitchSmart)
     {
@@ -245,20 +246,20 @@ void GradientPitchShiftEngine::advanceTap(int tapIndex, bool pitchingUp, float d
             // No budget left this wrap - wrap immediately, same as glitch/soft, so the partner can
             // catch up (its own debt keeps growing while this tap's stays flat).
             tapDelay[tapIndex] += pitchingUp ? rampWindowSamples : -rampWindowSamples;
+            return std::nullopt;
         }
-        else
-        {
-            awaitingSplice[tapIndex] = true;
-            spliceSearchCountdown[tapIndex] = throttledBudget;
-            lastTapSample[tapIndex] = buffer.readInterpolated(delayTimeSamples + tapDelay[tapIndex] + driftOffsetSamples);
-        }
+
+        awaitingSplice[tapIndex] = true;
+        spliceSearchCountdown[tapIndex] = throttledBudget;
+        const auto sample = buffer.readInterpolated(delayTimeSamples + tapDelay[tapIndex] + driftOffsetSamples);
+        lastTapSample[tapIndex] = sample;
+        return sample; // tapDelay is frozen here and untouched for the rest of this call
     }
-    else
-    {
-        // Glitch / de-glitch soft: wrap immediately, preserving the tiny overshoot past the
-        // boundary - matches Milestone 2's already-verified behaviour exactly.
-        tapDelay[tapIndex] += pitchingUp ? rampWindowSamples : -rampWindowSamples;
-    }
+
+    // Glitch / de-glitch soft: wrap immediately, preserving the tiny overshoot past the
+    // boundary - matches Milestone 2's already-verified behaviour exactly.
+    tapDelay[tapIndex] += pitchingUp ? rampWindowSamples : -rampWindowSamples;
+    return std::nullopt;
 }
 
 float GradientPitchShiftEngine::safetyDarken(float x) noexcept
@@ -324,8 +325,14 @@ float GradientPitchShiftEngine::process(float drySample, float externalFeedbackS
     {
         const bool pitchingUp = rampRate < 0.0f;
 
-        for (int i = 0; i < 2; ++i)
-            advanceTap(i, pitchingUp, driftOffsetSamples);
+        // advanceTap() returns the sample it already read as a side effect, when the Smart-splice
+        // search's own zero-crossing/low-energy probe happens to land at the exact position a
+        // readTap() call below would read anyway - avoiding reading the same delay-buffer position
+        // twice per sample during a search (see advanceTap()'s header comment for exactly which
+        // cases qualify). std::nullopt means no such reusable read exists this sample, so the
+        // readTap() fallback below reproduces the unconditional call this class always made here.
+        const auto cachedRead0 = advanceTap(0, pitchingUp, driftOffsetSamples);
+        const auto cachedRead1 = advanceTap(1, pitchingUp, driftOffsetSamples);
 
         const auto effectiveCrossfadeSamples = getEffectiveCrossfadeSamples();
         const auto gain0 = trapezoidGain(tapDelay[0] + driftOffsetSamples, rampWindowSamples, effectiveCrossfadeSamples);
@@ -338,7 +345,19 @@ float GradientPitchShiftEngine::process(float drySample, float externalFeedbackS
         const auto normGain0 = gainSum > 1.0e-6f ? gain0 / gainSum : 0.5f;
         const auto normGain1 = gainSum > 1.0e-6f ? gain1 / gainSum : 0.5f;
 
-        wetSample = readTap(0, driftOffsetSamples) * normGain0 + readTap(1, driftOffsetSamples) * normGain1;
+        const auto tapSample0 = cachedRead0 ? *cachedRead0 : readTap(0, driftOffsetSamples);
+        const auto tapSample1 = cachedRead1 ? *cachedRead1 : readTap(1, driftOffsetSamples);
+
+        // Direct, per-sample proof of the optimization's core invariant (not just an aggregate
+        // output diff): whenever advanceTap() claims a cached read is reusable, it must be
+        // bit-identical to what an independent, authoritative readTap() call would compute right
+        // now. assert(), not JUCE's jassert - this class deliberately has no JUCE dependency (see
+        // the class comment) - compiled out via NDEBUG in Release, same as GradientDelayBuffer's
+        // own wrap-invariant assert.
+        assert(!cachedRead0 || *cachedRead0 == readTap(0, driftOffsetSamples));
+        assert(!cachedRead1 || *cachedRead1 == readTap(1, driftOffsetSamples));
+
+        wetSample = tapSample0 * normGain0 + tapSample1 * normGain1;
     }
 
     lastWetSample = wetSample;

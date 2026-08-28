@@ -3,6 +3,7 @@
 #include "GradientDelayBuffer.h"
 
 #include <cstdint>
+#include <optional>
 
 // The "core engine" - a single mono unit implementing the H910/H949-style dual-tap crossfading
 // pitch shifter, with Feedback, Splice mode, and Drift. This is the class duplicated for dual mode
@@ -85,7 +86,16 @@ private:
     // Advances one tap by rampRate and handles its boundary crossing per the current splice mode -
     // immediate wrap for glitch/soft, or (smart) freezing at the boundary and searching for a
     // favourable moment (see advanceTap()'s definition for the full search logic).
-    void advanceTap(int tapIndex, bool pitchingUp, float driftOffsetSamples) noexcept;
+    //
+    // Returns the sample this call already read at the tap's CURRENT (post-call) position, when one
+    // was read as a side effect of the Smart-splice search AND that position is still what a
+    // subsequent readTap() call would read - letting process() reuse it instead of reading the same
+    // delay-buffer position twice per sample. Returns std::nullopt whenever no such reusable read
+    // exists (the normal ramp path; an immediate wrap; or a search that completes THIS call, which
+    // changes tapDelay right after its own read and so makes that read stale) - process() must fall
+    // back to a fresh readTap() call in that case, reproducing the read this optimization elides in
+    // every other case exactly.
+    std::optional<float> advanceTap(int tapIndex, bool pitchingUp, float driftOffsetSamples) noexcept;
 
     // Drift's noise source: a tiny, fast, per-instance xorshift PRNG rather than juce::Random, to
     // keep this class free of any JUCE dependency beyond GradientDelayBuffer (the same reasoning
