@@ -172,6 +172,168 @@ public:
             expect(diff > baseline * 0.2f, "Engaging Grit should measurably change the output waveform, not leave it near-identical");
         }
 
+        beginTest("Grit's cache invalidates on a genuine change mid-session, not just at prepareToPlay");
+        {
+            FluxAudioProcessor processor;
+            setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::brightnessParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::gritParamID, 0.0f);
+            processor.prepareToPlay(sampleRate, 8192);
+
+            const int numSamples = 8192;
+            juce::AudioBuffer<float> firstBlock(2, numSamples);
+            fillSine(firstBlock, 0.3f, 110.0f, sampleRate); // probe right at gritEqHz, where the cached peaking cut bites hardest
+            juce::MidiBuffer midi;
+            processor.processBlock(firstBlock, midi);
+            const auto firstRms = rms(firstBlock.getReadPointer(0) + 1000, numSamples - 1000);
+
+            setRaw(processor, FluxAudioProcessor::gritParamID, 90.0f); // same processor instance, no reprepare
+            juce::AudioBuffer<float> secondBlock(2, numSamples);
+            fillSine(secondBlock, 0.3f, 110.0f, sampleRate);
+            processor.processBlock(secondBlock, midi);
+            const auto secondRms = rms(secondBlock.getReadPointer(0) + 1000, numSamples - 1000);
+
+            expect(std::abs(secondRms - firstRms) > firstRms * 0.1f,
+                "Changing Grit mid-session should measurably change the output - if the coefficient "
+                "cache were stuck at the first value, this block would look the same as the first");
+        }
+
+        beginTest("Brightness's cache invalidates on a genuine change mid-session, not just at prepareToPlay");
+        {
+            FluxAudioProcessor processor;
+            setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::gritParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::brightnessParamID, 100.0f);
+            processor.prepareToPlay(sampleRate, 8192);
+
+            const int numSamples = 8192;
+            juce::AudioBuffer<float> firstBlock(2, numSamples);
+            fillSine(firstBlock, 0.5f, 8000.0f, sampleRate);
+            juce::MidiBuffer midi;
+            processor.processBlock(firstBlock, midi);
+            const auto firstRms = rms(firstBlock.getReadPointer(0) + 1000, numSamples - 1000);
+
+            setRaw(processor, FluxAudioProcessor::brightnessParamID, 0.0f); // same processor instance, no reprepare
+            juce::AudioBuffer<float> secondBlock(2, numSamples);
+            fillSine(secondBlock, 0.5f, 8000.0f, sampleRate);
+            processor.processBlock(secondBlock, midi);
+            const auto secondRms = rms(secondBlock.getReadPointer(0) + 1000, numSamples - 1000);
+
+            expect(secondRms < firstRms * 0.3f,
+                "Dropping Brightness to 0% mid-session should substantially attenuate an 8kHz tone - "
+                "if the coefficient cache were stuck at the first value, this block would look the same as the first");
+        }
+
+        beginTest("Grit's EQ cache doesn't survive a session sample-rate change with unmoved knobs");
+        {
+            constexpr float gritValue = 70.0f;
+            constexpr int numSamples = 8192;
+
+            auto measureGritCutAt110Hz = [&](double rate)
+            {
+                FluxAudioProcessor processor;
+                setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+                setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::brightnessParamID, 100.0f);
+                setRaw(processor, FluxAudioProcessor::gritParamID, gritValue);
+                processor.prepareToPlay(rate, numSamples);
+
+                juce::AudioBuffer<float> buffer(2, numSamples);
+                fillSine(buffer, 0.3f, 110.0f, rate);
+                juce::MidiBuffer midi;
+                processor.processBlock(buffer, midi);
+                return rms(buffer.getReadPointer(0) + 1000, numSamples - 1000);
+            };
+
+            // Correct rate-B behaviour: a processor that only ever knew 11025Hz.
+            const auto directAt11025 = measureGritCutAt110Hz(11025.0);
+
+            // Same processor: establish the Grit cache at 44100Hz, THEN switch to 11025Hz with
+            // Grit left untouched - exactly the scenario lastGritAmount's reset in prepareToPlay()
+            // exists to handle. Without that reset, processBlock() at 11025Hz would incorrectly
+            // skip recompute (lastGritAmount already equals gritAmount from the first block) and
+            // keep using 44100Hz-derived coefficients.
+            FluxAudioProcessor processor;
+            setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::brightnessParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::gritParamID, gritValue);
+            processor.prepareToPlay(44100.0, numSamples);
+            {
+                juce::AudioBuffer<float> warmup(2, numSamples);
+                fillSine(warmup, 0.3f, 110.0f, 44100.0);
+                juce::MidiBuffer midi;
+                processor.processBlock(warmup, midi);
+            }
+            processor.prepareToPlay(11025.0, numSamples);
+            juce::AudioBuffer<float> afterRateChange(2, numSamples);
+            fillSine(afterRateChange, 0.3f, 110.0f, 11025.0);
+            juce::MidiBuffer midi2;
+            processor.processBlock(afterRateChange, midi2);
+            const auto afterRateChangeRms = rms(afterRateChange.getReadPointer(0) + 1000, numSamples - 1000);
+
+            expectWithinAbsoluteError(afterRateChangeRms, directAt11025, directAt11025 * 0.1f + 1.0e-6f);
+        }
+
+        beginTest("Brightness's filter cache doesn't survive a session sample-rate change with unmoved knobs");
+        {
+            constexpr float brightnessValue = 20.0f; // ~1024Hz cutoff, well under either rate's Nyquist
+            constexpr int numSamples = 8192;
+
+            auto measureBrightnessAt2kHz = [&](double rate)
+            {
+                FluxAudioProcessor processor;
+                setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+                setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::gritParamID, 0.0f);
+                setRaw(processor, FluxAudioProcessor::brightnessParamID, brightnessValue);
+                processor.prepareToPlay(rate, numSamples);
+
+                juce::AudioBuffer<float> buffer(2, numSamples);
+                fillSine(buffer, 0.5f, 2000.0f, rate);
+                juce::MidiBuffer midi;
+                processor.processBlock(buffer, midi);
+                return rms(buffer.getReadPointer(0) + 1000, numSamples - 1000);
+            };
+
+            const auto directAt11025 = measureBrightnessAt2kHz(11025.0);
+
+            FluxAudioProcessor processor;
+            setRaw(processor, FluxAudioProcessor::bypassParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::blendParamID, 100.0f);
+            setRaw(processor, FluxAudioProcessor::depthParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::gritParamID, 0.0f);
+            setRaw(processor, FluxAudioProcessor::brightnessParamID, brightnessValue);
+            processor.prepareToPlay(44100.0, numSamples);
+            {
+                juce::AudioBuffer<float> warmup(2, numSamples);
+                fillSine(warmup, 0.5f, 2000.0f, 44100.0);
+                juce::MidiBuffer midi;
+                processor.processBlock(warmup, midi);
+            }
+            processor.prepareToPlay(11025.0, numSamples);
+            juce::AudioBuffer<float> afterRateChange(2, numSamples);
+            fillSine(afterRateChange, 0.5f, 2000.0f, 11025.0);
+            juce::MidiBuffer midi2;
+            processor.processBlock(afterRateChange, midi2);
+            const auto afterRateChangeRms = rms(afterRateChange.getReadPointer(0) + 1000, numSamples - 1000);
+
+            expectWithinAbsoluteError(afterRateChangeRms, directAt11025, directAt11025 * 0.1f + 1.0e-6f);
+        }
+
         beginTest("Feedback stays bounded (no runaway/NaN) even at 100% with a loud sustained input");
         {
             FluxAudioProcessor processor;
