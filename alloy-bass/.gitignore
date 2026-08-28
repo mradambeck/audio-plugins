@@ -1,0 +1,5 @@
+# Regenerable output of Source/Tools/RenderIR.cpp (AlloyRenderIR) - rerun that tool to recreate.
+rendered-audio/
+
+# ../common/tools/compare_wavs.py's Python environment/output
+.venv/

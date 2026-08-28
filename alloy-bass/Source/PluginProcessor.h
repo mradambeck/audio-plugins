@@ -174,12 +174,29 @@ public:
     // data race between the two threads.
     void requestPanic() noexcept { panicRequested.store(true, std::memory_order_relaxed); }
 
+    // Test/tooling-only - ageNoiseRandom (see its own member comment) is otherwise seeded
+    // randomly from system entropy/time, so offline renders (AlloyRenderIR) can't reproduce a
+    // bit-identical Age sequence across separate process invocations without this. Never called
+    // from the live audio path; production behavior (a different, non-repeating drift/warble
+    // pattern each time the plugin loads - the correct behavior for modeling analog drift) is
+    // unchanged.
+    void setAgeSeedForTesting(juce::int64 seed) noexcept { ageNoiseRandom.setSeed(seed); }
+
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     void handleMidiMessage(const juce::MidiMessage& message);
     float frequencyForNote(int midiNoteNumber, int octaveShift) const noexcept;
     double getCurrentBpm() const;
+
+    // Memoizes noteToHz() (a free function in PluginProcessor.cpp's anonymous namespace) against
+    // the caller's own persistent (lastNote, lastHz) cache slot - skips the pow() inside noteToHz()
+    // when `note` hasn't changed since the last call through THIS slot. Four independent call
+    // sites in processBlock (base/sub/FM-modulator/FM-carrier pitch) each pass their own pair of
+    // member floats, since each combines currentSemitone with a different (also block-constant)
+    // octave-shift term - a change in any of those, not just currentSemitone itself, must still
+    // invalidate the cache, which comparing the full combined `note` argument handles correctly.
+    float cachedNoteToHz(float note, float& lastNote, float& lastHz) const noexcept;
 
     // Shared by both the raw-MIDI path (arp off) and the arpeggiator engine (arp on) - the
     // difference between them is forceRetrigger: raw MIDI legatos between still-held notes
@@ -190,8 +207,12 @@ private:
 
     // Rebuilds the arp's current step pool (held notes expanded across the octave range, in
     // whatever order Pattern calls for) from whichever note list is authoritative right now -
-    // heldNotes normally, or the latched chord while Hold is engaged.
-    std::vector<int> buildArpNotePool() const;
+    // heldNotes normally, or the latched chord while Hold is engaged. Returns a reference to the
+    // persistent arpScratchResultPool member (not by value) - called every arp step from inside
+    // processBlock's per-sample loop, so it writes into reusable scratch buffers instead of
+    // allocating fresh vectors each call; not const because of that. heldNotes/latchedNotes
+    // themselves are only ever read here, never used as scratch space.
+    const std::vector<int>& buildArpNotePool();
     void advanceArpStep();
 
     std::atomic<float>* analogWaveformParam = nullptr;
@@ -269,6 +290,12 @@ private:
     // MIDI handling in handleMidiMessage(). heldNotes above remains the physical key state
     // either way; latchedNotes is only populated/consulted while Hold is engaged. ----
     std::vector<int> latchedNotes;
+
+    // buildArpNotePool()'s persistent scratch buffers - see that method's own comment. Never
+    // reused as the authoritative note-list state; heldNotes/latchedNotes above are separate.
+    std::vector<int> arpScratchBaseNotes;
+    std::vector<int> arpScratchUpPool;
+    std::vector<int> arpScratchResultPool;
     bool wasHoldEnabled = false;
 
     int arpStepSampleCounter = 0;
@@ -295,6 +322,15 @@ private:
     float currentSemitone = 60.0f;
     float glideTargetSemitone = 60.0f;
 
+    // cachedNoteToHz() cache slots for the four per-sample pitch calls in processBlock (base
+    // analog voice, sub, FM modulator, FM carrier) - -1.0e6f is a sentinel far outside any
+    // plausible combined semitone+octave-shift argument, forcing the first call through each slot
+    // to always compute fresh.
+    float lastBaseNoteArg = -1.0e6f, lastBaseNoteHz = 0.0f;
+    float lastSubNoteArg = -1.0e6f, lastSubNoteHz = 0.0f;
+    float lastFmModulatorNoteArg = -1.0e6f, lastFmModulatorNoteHz = 0.0f;
+    float lastFmCarrierNoteArg = -1.0e6f, lastFmCarrierNoteHz = 0.0f;
+
     static constexpr int maxUnisonVoices = 4;
     std::array<AlloyPhaseOscillator, maxUnisonVoices> analogOscillators;
     AlloyPhaseOscillator subOscillator;
@@ -303,7 +339,10 @@ private:
     // a slow wandering "drift" component and a faster "warble" component, each a one-pole lowpass
     // of white noise at a different cutoff (see ageDriftCutoffHz/ageWarbleCutoffHz in the .cpp) so
     // they wander smoothly rather than jittering sample-to-sample. One shared value drifts all
-    // unison voices together, on top of their existing relative detune spread. ----
+    // unison voices together, on top of their existing relative detune spread. Deliberately left
+    // at its default (entropy/time-seeded, non-reproducible between loads) rather than seeded
+    // explicitly - a different, non-repeating wander pattern each time is the correct behavior
+    // for modeling analog drift. See setAgeSeedForTesting() for the offline-render-only override. ----
     juce::Random ageNoiseRandom;
     float ageDriftState = 0.0f;
     float ageWarbleState = 0.0f;
@@ -315,6 +354,12 @@ private:
     juce::dsp::StateVariableTPTFilter<float> analogFilter;
     juce::ADSR analogFilterEnv;
     juce::ADSR analogAmpEnv;
+
+    // Cache guard for analogFilter.setCutoffFrequency() (see its call site in processBlock) - -1.0f
+    // sentinel is provably impossible for either (ADSR values are always in [0,1]; velocity is
+    // always >= 0), so the very first sample always computes fresh.
+    float lastFilterEnvValue = -1.0f;
+    float lastCutoffVelocity = -1.0f;
 
     // ---- FM Bass: 2-op phase modulation, summed with the analog+sub layer at the very end
     // (not routed through analogFilter - it's a separate voice sharing only the mono

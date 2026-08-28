@@ -47,6 +47,31 @@ auval -v aumu Aloy WJag
 type is `aumu` (music device/synth), not `aufx` — Alloy is `IS_SYNTH TRUE`. A pass prints
 `AU VALIDATION SUCCEEDED`.
 
+## Offline validation workflow
+
+For verifying a DSP-internals change (e.g. a performance optimization) doesn't alter the sound,
+on top of the usual `AlloyTests` unit-test target:
+
+1. **`AlloyRenderIR`** (a console app, not a plugin format) - feeds a scripted MIDI note sequence
+   through the real `AlloyAudioProcessor` and writes the result to WAV (Alloy is a synth, not an
+   effect, so there's no audio input to process - output comes entirely from MIDI):
+
+   ```sh
+   cmake --build build --config Release --target AlloyRenderIR
+   build/AlloyRenderIR_artefacts/Release/AlloyRenderIR --out rendered-audio/mine.wav --seconds 6
+   ```
+
+   Flags map 1:1 onto the plugin's own parameter IDs in their native units, plus `--preset "<name>"`
+   to apply one of the 8 factory presets first (see the tool's own header comment for the full
+   list). `ageNoiseRandom` (the Age knob's drift/warble source) is normally seeded from system
+   entropy - pass `--ageSeed <n>` to pin it for reproducible renders when Age > 0.
+2. Render the same MIDI sequence/parameter matrix before and after a change, and `cmp` each pair
+   byte-for-byte - expect zero differences for anything claimed to not alter the sound.
+   `../common/tools/compare_wavs.py` (shared across the catalog) is available for a fuzzier
+   spectral/envelope comparison when an exact diff isn't the right tool - e.g. the arpeggiator's
+   Random pattern uses the process-global `juce::Random::getSystemRandom()` with no per-instance
+   seed available, so it isn't byte-reproducible across renders by design.
+
 ## How it works
 
 Alloy layers three sound sources into one mono voice: an **Analog** oscillator (selectable
@@ -78,7 +103,10 @@ alloy-bass/
 ├── Source/
 │   ├── PluginProcessor.h/.cpp    # DSP + parameter state
 │   ├── PluginEditor.h/.cpp       # UI layout (2-page: Analog+FM, Sub/Arp/Mix)
-│   └── AlloyLookAndFeel.h/.cpp   # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── AlloyLookAndFeel.h/.cpp   # Thin subclass of the shared HardwarePanelLookAndFeel
+│   ├── Tests/                    # AlloyTests: headless UnitTest console app
+│   └── Tools/RenderIR.cpp        # AlloyRenderIR: offline MIDI-driven render console app
+├── rendered-audio/               # AlloyRenderIR output (gitignored, regenerable)
 └── installer/                    # This plugin's .pkg installer (see installers/README.md)
 ```
 

@@ -923,6 +923,16 @@ float AlloyAudioProcessor::frequencyForNote(int midiNoteNumber, int octaveShift)
     return noteToHz((float) (midiNoteNumber + octaveShift * 12));
 }
 
+float AlloyAudioProcessor::cachedNoteToHz(float note, float& lastNote, float& lastHz) const noexcept
+{
+    if (std::abs(note - lastNote) > 0.0f)
+    {
+        lastNote = note;
+        lastHz = noteToHz(note);
+    }
+    return lastHz;
+}
+
 double AlloyAudioProcessor::getCurrentBpm() const
 {
     constexpr double fallbackBpm = 120.0;
@@ -1033,53 +1043,59 @@ void AlloyAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
     }
 }
 
-std::vector<int> AlloyAudioProcessor::buildArpNotePool() const
+const std::vector<int>& AlloyAudioProcessor::buildArpNotePool()
 {
     const auto holdOn = arpHoldParam->load() > 0.5f;
     const auto& sourceNotes = (holdOn && !latchedNotes.empty()) ? latchedNotes : heldNotes;
 
+    arpScratchResultPool.clear();
+
     if (sourceNotes.empty())
-        return {};
+        return arpScratchResultPool;
 
     const auto pattern = static_cast<ArpPattern>(juce::jlimit(0, 4, (int) arpPatternParam->load()));
     const auto octaveRange = juce::jlimit(1, 4, (int) arpOctaveRangeParam->load() + 1);
 
-    std::vector<int> baseNotes(sourceNotes.begin(), sourceNotes.end());
+    // Persistent scratch buffers, cleared (not deallocated) and refilled each call instead of
+    // fresh local vectors - this is called every arp step (up to 20/sec free-running, or faster
+    // for fast synced divisions) from inside processBlock's per-sample loop, so repeated
+    // malloc/free churn here was a genuine audio-thread heap-allocation anti-pattern.
+    arpScratchBaseNotes.assign(sourceNotes.begin(), sourceNotes.end());
     if (pattern != ArpPattern::asPlayed)
-        std::sort(baseNotes.begin(), baseNotes.end());
+        std::sort(arpScratchBaseNotes.begin(), arpScratchBaseNotes.end());
 
-    std::vector<int> upPool;
-    upPool.reserve(baseNotes.size() * (size_t) octaveRange);
+    arpScratchUpPool.clear();
+    arpScratchUpPool.reserve(arpScratchBaseNotes.size() * (size_t) octaveRange);
     for (int oct = 0; oct < octaveRange; ++oct)
-        for (auto note : baseNotes)
-            upPool.push_back(note + oct * 12);
+        for (auto note : arpScratchBaseNotes)
+            arpScratchUpPool.push_back(note + oct * 12);
 
     switch (pattern)
     {
         case ArpPattern::down:
-        {
-            std::vector<int> downPool(upPool.rbegin(), upPool.rend());
-            return downPool;
-        }
+            arpScratchResultPool.assign(arpScratchUpPool.rbegin(), arpScratchUpPool.rend());
+            break;
         case ArpPattern::upDown:
-        {
             // Ping-pong without repeating the top/bottom notes on the turnaround.
-            std::vector<int> pool = upPool;
-            if (upPool.size() > 2)
-                pool.insert(pool.end(), upPool.rbegin() + 1, upPool.rend() - 1);
-            return pool;
-        }
+            arpScratchResultPool = arpScratchUpPool;
+            if (arpScratchUpPool.size() > 2)
+                arpScratchResultPool.insert(arpScratchResultPool.end(),
+                                             arpScratchUpPool.rbegin() + 1, arpScratchUpPool.rend() - 1);
+            break;
         case ArpPattern::up:
         case ArpPattern::random:
         case ArpPattern::asPlayed:
         default:
-            return upPool;
+            arpScratchResultPool = arpScratchUpPool;
+            break;
     }
+
+    return arpScratchResultPool;
 }
 
 void AlloyAudioProcessor::advanceArpStep()
 {
-    const auto pool = buildArpNotePool();
+    const auto& pool = buildArpNotePool();
 
     if (pool.empty())
     {
@@ -1141,6 +1157,11 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const auto baseCutoffHz = analogFilterCutoffParam->load();
     const auto filterEnvAmount = analogFilterEnvAmountParam->load() * 0.01f;
     const auto velToFilterAmount = analogVelocityToFilterParam->load() * 0.01f;
+    // Block-constant (baseCutoffHz doesn't vary within a block) - hoisted out of the per-sample
+    // loop below. NOT joined with the velocity term (currentVelocity CAN change mid-block, on a
+    // note-on landing anywhere in this block via handleMidiMessage() - see the per-sample cache
+    // guard below, which reads currentVelocity fresh every sample for exactly that reason).
+    const auto baseCutoffLog2 = std::log2(juce::jmax(20.0f, baseCutoffHz));
     const auto resonanceAmount = analogFilterResonanceParam->load() * 0.01f;
     analogFilter.setResonance(juce::jmap(resonanceAmount, 0.0f, 1.0f, 0.1f, 0.99f));
 
@@ -1249,10 +1270,15 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Symmetric detune spread across the unison voices (e.g. 4 voices -> offsets at
     // -1.5d, -0.5d, +0.5d, +1.5d "detune steps" so the set is centred on 0).
     std::array<float, maxUnisonVoices> unisonCentsOffsets {};
+    // Block-constant per-voice pitch multiplier (unisonCentsOffsets doesn't vary within a block) -
+    // reused per sample below whenever Age is off (the default), when the per-sample pow() in the
+    // loop would otherwise recompute this exact same value every sample for no reason.
+    std::array<float, maxUnisonVoices> unisonPitchMultipliers {};
     for (int v = 0; v < unisonVoices; ++v)
     {
         const auto t = unisonVoices > 1 ? (float) v / (float) (unisonVoices - 1) - 0.5f : 0.0f;
         unisonCentsOffsets[(size_t) v] = t * maxDetuneCents * detuneAmount;
+        unisonPitchMultipliers[(size_t) v] = std::pow(2.0f, unisonCentsOffsets[(size_t) v] / 1200.0f);
     }
     // Loudness-compensate so adding more unison voices thickens rather than just getting
     // louder in proportion to voice count.
@@ -1322,7 +1348,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
 
         currentSemitone += (glideTargetSemitone - currentSemitone) * glideCoeff;
-        const auto baseNoteHz = noteToHz(currentSemitone + (float) (octaveShift * 12));
+        const auto baseNoteHz = cachedNoteToHz(currentSemitone + (float) (octaveShift * 12), lastBaseNoteArg, lastBaseNoteHz);
 
         // Age: two independently-lowpassed noise walks (slow "drift", faster "warble") applied
         // only to the Analog VCO's pitch - all unison voices drift together as one VCO would,
@@ -1335,7 +1361,13 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float analogSum = 0.0f;
         for (int v = 0; v < unisonVoices; ++v)
         {
-            const auto voiceHz = baseNoteHz * std::pow(2.0f, (unisonCentsOffsets[(size_t) v] + ageCentsOffset) / 1200.0f);
+            // ageCentsOffset is exactly 0.0f whenever Age is off (0.0f * finite == 0.0f in
+            // IEEE-754) - the block-constant multiplier above is then bit-identical to computing
+            // pow() fresh here, so reuse it instead. Falls back to the original per-sample
+            // computation, unchanged, whenever Age is actually perturbing pitch.
+            const auto voiceHz = ageCentsOffset == 0.0f
+                                      ? baseNoteHz * unisonPitchMultipliers[(size_t) v]
+                                      : baseNoteHz * std::pow(2.0f, (unisonCentsOffsets[(size_t) v] + ageCentsOffset) / 1200.0f);
             analogOscillators[(size_t) v].setFrequency(voiceHz, sampleRateHz);
             analogSum += analogOscillators[(size_t) v].renderAndAdvance(waveform);
         }
@@ -1344,7 +1376,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         float subRaw = 0.0f;
         if (subOn)
         {
-            const auto subHz = noteToHz(currentSemitone + (float) (octaveShift * 12) + (float) (subOctaveShift * 12));
+            const auto subHz = cachedNoteToHz(currentSemitone + (float) (octaveShift * 12) + (float) (subOctaveShift * 12), lastSubNoteArg, lastSubNoteHz);
             subOscillator.setFrequency(subHz, sampleRateHz);
             subRaw = subOscillator.renderAndAdvance(subWaveform);
             subRaw = subShelfFilter.processSample(subRaw);
@@ -1357,11 +1389,22 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         const auto mixedPreFilter = analogSum * analogVolume + subRaw * subVolume;
 
         const auto filterEnvValue = analogFilterEnv.getNextSample();
-        const auto cutoffLog2 = std::log2(juce::jmax(20.0f, baseCutoffHz))
-                                 + filterEnvAmount * filterEnvMaxOctaves * filterEnvValue
-                                 + velToFilterAmount * filterVelocityMaxOctaves * currentVelocity;
-        const auto cutoffHz = juce::jlimit(20.0f, (float) (sampleRateHz * 0.49), std::pow(2.0f, cutoffLog2));
-        analogFilter.setCutoffFrequency(cutoffHz);
+        // Skip the pow()/tan() (inside setCutoffFrequency()) below when neither genuinely
+        // per-sample-varying input has changed since the last sample - true for the entire
+        // sustain portion of a held note (ADSR::getNextSample() returns exactly the same value
+        // every call in that state) and for idle gaps between notes (exactly 0.0f every call),
+        // a bass synth's dominant use pattern. -1.0f is a provably-impossible sentinel for both:
+        // ADSR values are always in [0,1], velocity is always >= 0.
+        if (std::abs(filterEnvValue - lastFilterEnvValue) > 0.0f || std::abs(currentVelocity - lastCutoffVelocity) > 0.0f)
+        {
+            lastFilterEnvValue = filterEnvValue;
+            lastCutoffVelocity = currentVelocity;
+            const auto cutoffLog2 = baseCutoffLog2
+                                     + filterEnvAmount * filterEnvMaxOctaves * filterEnvValue
+                                     + velToFilterAmount * filterVelocityMaxOctaves * currentVelocity;
+            const auto cutoffHz = juce::jlimit(20.0f, (float) (sampleRateHz * 0.49), std::pow(2.0f, cutoffLog2));
+            analogFilter.setCutoffFrequency(cutoffHz);
+        }
 
         const auto filtered = analogFilter.processSample(0, mixedPreFilter);
 
@@ -1372,7 +1415,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // note's life (a full ADSR here, not just a static depth) - that's what gives a classic
         // FM patch its "bright pluck settling into a duller tone" character. Not routed through
         // analogFilter - a separate voice, summed with the analog+sub layer only at the very end.
-        const auto fmModulatorHz = noteToHz(currentSemitone + (float) (fmModulatorOctaveShift * 12));
+        const auto fmModulatorHz = cachedNoteToHz(currentSemitone + (float) (fmModulatorOctaveShift * 12), lastFmModulatorNoteArg, lastFmModulatorNoteHz);
         fmModulatorOscillator.setFrequency(fmModulatorHz, sampleRateHz);
         const auto modulatorRaw = fmModulatorOscillator.renderAndAdvance(fmModulatorWaveform);
         // Brightness: waveshapes the raw Modulator oscillator itself (adding harmonics), before
@@ -1389,7 +1432,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         const auto fmModulatorVolume = fmModulatorVolumeBase * (1.0f + fmVelocityToBrightnessAmount * currentVelocity * velToFmMaxBoost);
         const auto modulatorOutput = modulatorShaped * fmModulatorEnvSmoothed * fmModulatorVolume;
 
-        const auto fmCarrierHz = noteToHz(currentSemitone + (float) (fmCarrierOctaveShift * 12));
+        const auto fmCarrierHz = cachedNoteToHz(currentSemitone + (float) (fmCarrierOctaveShift * 12), lastFmCarrierNoteArg, lastFmCarrierNoteHz);
         fmCarrierOscillator.setFrequency(fmCarrierHz, sampleRateHz);
         const auto carrierRaw = fmCarrierOscillator.renderAndAdvanceWithPhaseOffset(
             fmCarrierWaveform, modulatorOutput * fmMaxModulationIndex);
@@ -1405,8 +1448,11 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         const auto toned = mixToneFilter.processSample(0, eqShaped);
         const auto withOutputGain = toned * mixOutputGain;
 
-        // Fixed safety soft-clip, always on - see mixSafetyDrive.
-        const auto out = std::tanh(withOutputGain * mixSafetyDrive) / mixSafetyDrive;
+        // Fixed safety soft-clip, always on - see mixSafetyDrive. Skip the tanh() call itself
+        // during exact silence (idle gaps between notes, once the filter tail has fully decayed
+        // to 0) - tanh(0)==0 exactly per IEEE-754/C++ <cmath>, so this is bit-identical, not an
+        // approximation.
+        const auto out = std::abs(withOutputGain) <= 0.0f ? withOutputGain : std::tanh(withOutputGain * mixSafetyDrive) / mixSafetyDrive;
 
         left[sample] = out;
         right[sample] = out;
