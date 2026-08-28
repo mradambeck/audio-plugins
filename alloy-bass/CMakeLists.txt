@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Alloy VERSION 0.1.2)
+project(Alloy VERSION 0.1.3)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -82,6 +82,40 @@ target_compile_definitions(AlloyTests
 target_link_libraries(AlloyTests
     PRIVATE
         juce::juce_audio_processors
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Offline render harness (mirrors gradient-pitch's GradientRenderIR / shields-reverb's
+# ShieldsRenderIR) - drives the real AlloyAudioProcessor with a scripted MIDI note sequence and
+# writes the result to WAV, so a pre/post-change pair can be diffed byte-for-byte or scored via
+# ../common/tools/compare_wavs.py without a DAW in the loop. Reuses the same
+# TestCreateEditorStub.cpp AlloyTests already uses, so - unlike Gradient/Shields' RenderIR tools,
+# which had no such stub available - this stays free of the editor/LookAndFeel/BinaryData too.
+juce_add_console_app(AlloyRenderIR
+    PRODUCT_NAME "AlloyRenderIR"
+)
+
+target_sources(AlloyRenderIR
+    PRIVATE
+        Source/PluginProcessor.cpp
+        Source/Tests/TestCreateEditorStub.cpp
+        Source/Tools/RenderIR.cpp
+)
+
+target_compile_definitions(AlloyRenderIR
+    PRIVATE
+        JucePlugin_Name="Alloy"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
+)
+
+target_link_libraries(AlloyRenderIR
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats
         juce::juce_dsp
     PUBLIC
         juce::juce_recommended_config_flags

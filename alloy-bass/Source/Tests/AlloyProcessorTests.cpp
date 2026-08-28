@@ -1,6 +1,7 @@
 #include "../PluginProcessor.h"
 
 #include <cmath>
+#include <vector>
 
 // Alloy's DSP lives directly in PluginProcessor.cpp (there's no separate testable DSP class the
 // way Gradient has GradientDelayBuffer/GradientPitchShiftEngine), so these tests construct and
@@ -123,6 +124,41 @@ namespace
 
         const auto windowSeconds = (double) numSamples / sampleRate;
         return (float) ((crossings / 2.0) / windowSeconds);
+    }
+
+    // Runs the arp for numSteps free-running (Sync off) steps of stepLengthSamples each and
+    // returns the measured fundamental of each step, sampled from the middle third of its window
+    // (safely past the near-instant attack settling and before the gate closes for the release
+    // tail at the step's end). midi is delivered only in the FIRST block (step 0) - later steps
+    // pass an empty MidiBuffer, matching how a host would only deliver the note-on/off events once.
+    std::vector<float> measureArpStepFrequencies(AlloyAudioProcessor& processor, juce::MidiBuffer firstStepMidi,
+                                                   int stepLengthSamples, int numSteps, double sampleRate)
+    {
+        std::vector<float> frequencies;
+        for (int step = 0; step < numSteps; ++step)
+        {
+            juce::AudioBuffer<float> buffer(2, stepLengthSamples);
+            buffer.clear();
+            auto midi = (step == 0) ? firstStepMidi : juce::MidiBuffer();
+            processor.processBlock(buffer, midi);
+
+            const auto windowStart = stepLengthSamples / 2;
+            const auto windowLength = (stepLengthSamples * 35) / 100;
+            frequencies.push_back(estimateFrequencyByZeroCrossings(
+                buffer.getReadPointer(0) + windowStart, windowLength, sampleRate));
+        }
+        return frequencies;
+    }
+
+    void setupArpTestPatch(AlloyAudioProcessor& p, int pattern, int octaveRangeChoiceIndex)
+    {
+        setupIsolatedAnalogPatch(p);
+        setRaw(p, AlloyAudioProcessor::arpEnabledParamID, 1.0f);
+        setRaw(p, AlloyAudioProcessor::arpSyncParamID, 0.0f); // free-running, deterministic step timing
+        setRaw(p, AlloyAudioProcessor::arpRateParamID, 10.0f); // 10 Hz - 100ms/step
+        setRaw(p, AlloyAudioProcessor::arpPatternParamID, (float) pattern);
+        setRaw(p, AlloyAudioProcessor::arpOctaveRangeParamID, (float) octaveRangeChoiceIndex);
+        setRaw(p, AlloyAudioProcessor::arpGateParamID, 90.0f); // mostly open, so the release tail doesn't reach the measurement window
     }
 }
 
@@ -275,6 +311,175 @@ public:
             // even Tone=0%'s 200Hz cutoff, so only the harmonics above it get cut; most of the
             // saw's RMS energy is concentrated in that uncuttable fundamental.
             expect(darkRms < brightRms * 0.85f, "Mix Tone at 0% (200Hz lowpass) should measurably darken a harmonically rich 110Hz saw versus 100% (near-passthrough)");
+        }
+
+        // Regression test for the analogFilter.setCutoffFrequency() cache guard (skips the pow()/
+        // tan() when neither filterEnvValue nor currentVelocity have changed since the last
+        // sample) - a velocity change landing deep into sustain, after many redundant cache-hit
+        // samples, must still move the cutoff. Isolates velocity's effect from the envelope's by
+        // zeroing Filter Env Amount, so any brightness change can only come from the velocity term.
+        beginTest("Filter cutoff responds to a velocity change mid-note, even deep into sustain");
+        {
+            AlloyAudioProcessor processor;
+            setupIsolatedAnalogPatch(processor);
+            setRaw(processor, AlloyAudioProcessor::analogWaveformParamID, 0.0f); // saw - rich in harmonics
+            setRaw(processor, AlloyAudioProcessor::analogFilterCutoffParamID, 300.0f);
+            setRaw(processor, AlloyAudioProcessor::analogFilterResonanceParamID, 30.0f);
+            setRaw(processor, AlloyAudioProcessor::analogVelocityToFilterParamID, 100.0f);
+            setRaw(processor, AlloyAudioProcessor::analogFilterEnvAmountParamID, 0.0f);
+            processor.prepareToPlay(sampleRate, 96000);
+
+            // Low-velocity note-on, held deep into sustain - many redundant cache-hit samples.
+            const int sustainSamples = 48000; // 1s
+            juce::AudioBuffer<float> sustainBuffer(2, sustainSamples);
+            sustainBuffer.clear();
+            auto noteOnLow = noteOnBuffer(45, 10);
+            processor.processBlock(sustainBuffer, noteOnLow);
+            const auto darkRms = rms(sustainBuffer.getReadPointer(0) + sustainSamples - 4800, 4800);
+
+            // Legato note-on (gate still open, same note - no pitch/envelope confound) at a much
+            // higher velocity.
+            const int afterChangeSamples = 4800; // 100ms - comfortably past the filter settling
+            juce::AudioBuffer<float> afterBuffer(2, afterChangeSamples);
+            afterBuffer.clear();
+            auto noteOnHigh = noteOnBuffer(45, 120);
+            processor.processBlock(afterBuffer, noteOnHigh);
+            const auto brightRms = rms(afterBuffer.getReadPointer(0) + afterChangeSamples - 480, 480);
+
+            expect(brightRms > darkRms * 1.3f,
+                   "A velocity increase mid-note (legato, still sustaining) should open the filter and "
+                   "measurably brighten the output - if the cutoff cache incorrectly stuck at the old "
+                   "velocity, this wouldn't change");
+        }
+
+        // Regression tests for the persistent-buffer buildArpNotePool() refactor - no prior test
+        // coverage touched the arpeggiator at all, so this is new ground, not just a regression
+        // guard. Pattern ordering/octave expansion is verified observably (measured pitch per arp
+        // step), matching this file's approach elsewhere rather than peeking at private state.
+        beginTest("Arp Up pattern plays held notes in ascending order, expanded across the octave range");
+        {
+            AlloyAudioProcessor processor;
+            setupArpTestPatch(processor, /*pattern*/ 0 /*Up*/, /*octaveRangeChoiceIndex*/ 1 /*-> 2 octaves*/);
+            processor.prepareToPlay(sampleRate, 4800);
+
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::noteOn(1, 48, (juce::uint8) 100), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(1, 52, (juce::uint8) 100), 0);
+
+            // 2 notes x 2 octaves -> a 4-step pool: 48, 52, 60, 64 - one full cycle. (Capacity-reuse
+            // across many repeated calls is covered separately below, without per-step pitch
+            // checking - a retrigger landing exactly on a cycle-wrap boundary is measurably
+            // fragile for zero-crossing pitch estimation specifically, independent of this test's
+            // actual concern, which is pool CONTENT/ORDER, not the modulo-index wraparound itself.)
+            const auto freqs = measureArpStepFrequencies(processor, midi, /*stepLengthSamples*/ 4800, /*numSteps*/ 4, sampleRate);
+
+            const float expectedSemitones[] = { 48.0f, 52.0f, 60.0f, 64.0f };
+            for (size_t i = 0; i < freqs.size(); ++i)
+            {
+                const auto expectedHz = 440.0f * std::pow(2.0f, (expectedSemitones[i] - 69.0f) / 12.0f);
+                expectWithinAbsoluteError(freqs[i], expectedHz, expectedHz * 0.05f,
+                                           "Step " + juce::String((int) i) + " should play the expected note in the Up sequence");
+            }
+        }
+
+        beginTest("Arp Down pattern is the exact reverse of Up's sequence");
+        {
+            AlloyAudioProcessor processor;
+            setupArpTestPatch(processor, /*pattern*/ 1 /*Down*/, /*octaveRangeChoiceIndex*/ 1 /*-> 2 octaves*/);
+            processor.prepareToPlay(sampleRate, 4800);
+
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::noteOn(1, 48, (juce::uint8) 100), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(1, 52, (juce::uint8) 100), 0);
+
+            const auto freqs = measureArpStepFrequencies(processor, midi, 4800, 4, sampleRate);
+
+            const float expectedSemitones[] = { 64.0f, 60.0f, 52.0f, 48.0f };
+            for (size_t i = 0; i < freqs.size(); ++i)
+            {
+                const auto expectedHz = 440.0f * std::pow(2.0f, (expectedSemitones[i] - 69.0f) / 12.0f);
+                expectWithinAbsoluteError(freqs[i], expectedHz, expectedHz * 0.05f,
+                                           "Step " + juce::String((int) i) + " should play the expected note in the Down sequence");
+            }
+        }
+
+        beginTest("Arp stays stable (no NaN/Inf, no unexpected silence) across many repeated steps");
+        {
+            // Capacity-reuse correctness for the persistent scratch buffers - buildArpNotePool()
+            // is called fresh every step, so any corruption from reusing (not reallocating)
+            // arpScratchBaseNotes/arpScratchUpPool/arpScratchResultPool across many calls would
+            // show up as instability well before this many steps.
+            AlloyAudioProcessor processor;
+            setupArpTestPatch(processor, /*pattern*/ 2 /*Up-Down*/, /*octaveRangeChoiceIndex*/ 2 /*3 octaves*/);
+            processor.prepareToPlay(sampleRate, 4800);
+
+            juce::MidiBuffer midi;
+            midi.addEvent(juce::MidiMessage::noteOn(1, 48, (juce::uint8) 100), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(1, 52, (juce::uint8) 100), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(1, 55, (juce::uint8) 100), 0);
+
+            constexpr int numSteps = 50;
+            juce::AudioBuffer<float> lastStep(2, 4800);
+            for (int step = 0; step < numSteps; ++step)
+            {
+                juce::AudioBuffer<float> buffer(2, 4800);
+                buffer.clear();
+                auto stepMidi = (step == 0) ? midi : juce::MidiBuffer();
+                processor.processBlock(buffer, stepMidi);
+
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < 4800; ++i)
+                        expect(std::isfinite(buffer.getSample(ch, i)), "Output must stay finite across many repeated arp steps");
+
+                if (step == numSteps - 1)
+                    lastStep = buffer;
+            }
+
+            expect(rms(lastStep.getReadPointer(0), 4800) > 0.01f,
+                   "The arp should still be audibly playing after many repeated steps, not have gone silent");
+        }
+
+        beginTest("Hold keeps the arp playing the latched chord after all physical keys release, unlike Hold off");
+        {
+            auto measureRmsAfterReleasingAllKeys = [&](bool holdOn)
+            {
+                AlloyAudioProcessor processor;
+                setupArpTestPatch(processor, /*pattern*/ 0 /*Up*/, /*octaveRangeChoiceIndex*/ 0 /*1 octave*/);
+                setRaw(processor, AlloyAudioProcessor::arpHoldParamID, holdOn ? 1.0f : 0.0f);
+                processor.prepareToPlay(sampleRate, 4800);
+
+                juce::MidiBuffer noteOns;
+                noteOns.addEvent(juce::MidiMessage::noteOn(1, 48, (juce::uint8) 100), 0);
+                noteOns.addEvent(juce::MidiMessage::noteOn(1, 52, (juce::uint8) 100), 0);
+                juce::AudioBuffer<float> firstStep(2, 4800);
+                firstStep.clear();
+                processor.processBlock(firstStep, noteOns);
+
+                // Release both physical keys - heldNotes empties either way; latchedNotes (Hold's
+                // chord memory) is untouched by note-off, per handleMidiMessage's own comment.
+                juce::MidiBuffer noteOffs;
+                noteOffs.addEvent(juce::MidiMessage::noteOff(1, 48), 0);
+                noteOffs.addEvent(juce::MidiMessage::noteOff(1, 52), 0);
+                juce::AudioBuffer<float> releaseStep(2, 4800);
+                releaseStep.clear();
+                processor.processBlock(releaseStep, noteOffs);
+
+                // A few more steps with no MIDI at all - the arp must keep sourcing from
+                // latchedNotes (Hold on) or fall silent once heldNotes is empty (Hold off).
+                juce::AudioBuffer<float> laterStep(2, 4800);
+                laterStep.clear();
+                juce::MidiBuffer noMidi;
+                processor.processBlock(laterStep, noMidi);
+                processor.processBlock(laterStep, noMidi);
+
+                return rms(laterStep.getReadPointer(0) + 1600, 1600);
+            };
+
+            const auto holdOnRms = measureRmsAfterReleasingAllKeys(true);
+            const auto holdOffRms = measureRmsAfterReleasingAllKeys(false);
+
+            expect(holdOnRms > 0.05f, "With Hold on, the arp should keep playing the latched chord after all physical keys release");
+            expect(holdOffRms < 0.01f, "With Hold off, the arp should fall silent once all physical keys release (empty pool)");
         }
     }
 };
