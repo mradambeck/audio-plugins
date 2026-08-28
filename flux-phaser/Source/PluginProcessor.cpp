@@ -79,6 +79,13 @@ namespace
     constexpr float brightnessMinHz = 500.0f;
     constexpr float brightnessMaxHz = 18000.0f;
 
+    // log2() of the three constants directly above - fixed for the life of the process (not just
+    // the block), but std::log2() isn't constexpr in C++17, so these are computed once here via
+    // static initialization instead of being recomputed from scratch every block.
+    const float log2NominalCenterHz = std::log2(nominalCenterHz);
+    const float log2BrightnessMinHz = std::log2(brightnessMinHz);
+    const float log2BrightnessMaxHz = std::log2(brightnessMaxHz);
+
     // A peaking cut riding on the Grit knob, not a separate control - 0dB (no effect) at Grit =
     // 0%, deepening to gritEqMaxGainDb as Grit reaches 100%.
     constexpr float gritEqHz = 110.0f;
@@ -118,15 +125,16 @@ namespace
     // the triangle->sine half instead.
     constexpr float shapeBreakpoint = 0.35f;
 
-    // shapeAmount: 0 = square, shapeBreakpoint = triangle, 1 = sine, continuously blended in between.
-    float lfoValueForPhase(float p, float shapeAmount) noexcept
+    // shapeAmount: 0 = square, shapeBreakpoint = triangle, 1 = sine, continuously blended in
+    // between. lowerShapeRegime (shapeAmount <= shapeBreakpoint) is block-constant - the caller
+    // hoists it once per block so this only computes the two waveforms the blend actually needs,
+    // instead of always computing all three and discarding one.
+    float lfoValueForPhase(float p, float shapeAmount, bool lowerShapeRegime) noexcept
     {
-        const auto sq = squareWave(p);
         const auto tri = triangleWave(p);
-        const auto sine = sineWave(p);
-        if (shapeAmount <= shapeBreakpoint)
-            return juce::jmap(shapeAmount, 0.0f, shapeBreakpoint, sq, tri);
-        return juce::jmap(shapeAmount, shapeBreakpoint, 1.0f, tri, sine);
+        if (lowerShapeRegime)
+            return juce::jmap(shapeAmount, 0.0f, shapeBreakpoint, squareWave(p), tri);
+        return juce::jmap(shapeAmount, shapeBreakpoint, 1.0f, tri, sineWave(p));
     }
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
@@ -410,6 +418,7 @@ void FluxAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     feedbackStateL = feedbackStateR = 0.0f;
     lfoPhase = 0.0;
+    lastGritAmount = lastBrightnessAmount = -1.0f;
 
     brightnessFilterL.prepare(spec);
     brightnessFilterR.prepare(spec);
@@ -486,7 +495,7 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
     const auto offsetAmount = offsetParam->load() * 0.01f;
     const auto depthAmount = depthParam->load() * 0.01f;
-    const auto centerLog2 = std::log2(nominalCenterHz) + offsetAmount * offsetOctaveRange;
+    const auto centerLog2 = log2NominalCenterHz + offsetAmount * offsetOctaveRange;
     const auto depthOctaves = depthAmount * depthOctaveRange;
 
     const auto activeStages = juce::jlimit(0, maxStages,
@@ -498,23 +507,32 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
 
     const auto feedbackAmount = feedbackParam->load() * 0.01f;
+    const auto feedbackActive = feedbackAmount > 0.0f;
 
     const auto gritAmount = gritParam->load() * 0.01f;
-    const auto gritK = gritAmount * gritDriveRange;
-    const auto gritMakeup = 1.0f + gritAmount * gritMakeupRange;
-    const auto gritOutputTrim = juce::Decibels::decibelsToGain(gritAmount * gritOutputTrimMaxDb);
+    if (std::abs(gritAmount - lastGritAmount) > 0.0f)
+    {
+        lastGritAmount = gritAmount;
+        gritK = gritAmount * gritDriveRange;
+        gritMakeup = 1.0f + gritAmount * gritMakeupRange;
+        gritOutputTrim = juce::Decibels::decibelsToGain(gritAmount * gritOutputTrimMaxDb);
 
-    const auto gritEqGainDb = gritAmount * gritEqMaxGainDb;
-    const auto gritEqGainLinear = juce::Decibels::decibelsToGain(gritEqGainDb);
-    gritEqFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRateHz, gritEqHz, gritEqQ, gritEqGainLinear);
-    gritEqFilterR.coefficients = gritEqFilterL.coefficients;
+        const auto gritEqGainDb = gritAmount * gritEqMaxGainDb;
+        const auto gritEqGainLinear = juce::Decibels::decibelsToGain(gritEqGainDb);
+        gritEqFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRateHz, gritEqHz, gritEqQ, gritEqGainLinear);
+        gritEqFilterR.coefficients = gritEqFilterL.coefficients;
+    }
 
     const auto brightnessAmount = brightnessParam->load() * 0.01f;
-    const auto brightnessLog = juce::jmap(brightnessAmount, 0.0f, 1.0f,
-                                           std::log2(brightnessMinHz), std::log2(brightnessMaxHz));
-    const auto brightnessHz = juce::jmin(std::pow(2.0f, brightnessLog), (float) (sampleRateHz * 0.49));
-    brightnessFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, brightnessHz);
-    brightnessFilterR.coefficients = brightnessFilterL.coefficients;
+    if (std::abs(brightnessAmount - lastBrightnessAmount) > 0.0f)
+    {
+        lastBrightnessAmount = brightnessAmount;
+        const auto brightnessLog = juce::jmap(brightnessAmount, 0.0f, 1.0f,
+                                               log2BrightnessMinHz, log2BrightnessMaxHz);
+        const auto brightnessHz = juce::jmin(std::pow(2.0f, brightnessLog), (float) (sampleRateHz * 0.49));
+        brightnessFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, brightnessHz);
+        brightnessFilterR.coefficients = brightnessFilterL.coefficients;
+    }
 
     // Equal-power crossfade (sin/cos, not a plain linear 1-x/x split) so the blend doesn't dip in
     // perceived loudness at the centre - dry and wet gain both sit at ~0.707 (not 0.5) when Blend
@@ -526,9 +544,11 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
 
+    const auto lowerShapeRegime = shapeAmount <= shapeBreakpoint;
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        const auto lfoValue = lfoValueForPhase((float) lfoPhase, shapeAmount);
+        const auto lfoValue = lfoValueForPhase((float) lfoPhase, shapeAmount, lowerShapeRegime);
         lfoPhase += phaseIncrement;
         if (lfoPhase >= 1.0)
             lfoPhase -= 1.0;
@@ -542,7 +562,10 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         const auto freqHzL = juce::jlimit(minAllpassHz, maxAllpassHz, std::pow(2.0f, sweepLog2 + stereoSpread));
         const auto freqHzR = juce::jlimit(minAllpassHz, maxAllpassHz, std::pow(2.0f, sweepLog2 - stereoSpread));
         const auto coeffL = coefficientForFrequency(freqHzL, sampleRateHz);
-        const auto coeffR = coefficientForFrequency(freqHzR, sampleRateHz);
+        // stereoSpread == 0.0f (roughly half of every LFO cycle) makes freqHzR bit-identical to
+        // freqHzL (adding/subtracting exact zero never changes a finite float), so coeffR would
+        // come out bit-identical too - skip the redundant tan()-bearing call in that case.
+        const auto coeffR = stereoSpread > 0.0f ? coefficientForFrequency(freqHzR, sampleRateHz) : coeffL;
 
         for (int s = 0; s < activeStages; ++s)
         {
@@ -555,8 +578,10 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
         // Feedback tap: the allpass chain's own previous output, safety-saturated so the loop
         // can never actually run away regardless of the Feedback knob (see feedbackSafetyDrive).
-        const auto feedbackTapL = std::tanh(feedbackStateL * feedbackSafetyDrive) / feedbackSafetyDrive;
-        const auto feedbackTapR = std::tanh(feedbackStateR * feedbackSafetyDrive) / feedbackSafetyDrive;
+        // At feedbackAmount == 0 the tanh() result is multiplied by exact zero below regardless of
+        // its value, so it's skipped entirely rather than computed and discarded.
+        const auto feedbackTapL = feedbackActive ? std::tanh(feedbackStateL * feedbackSafetyDrive) / feedbackSafetyDrive : 0.0f;
+        const auto feedbackTapR = feedbackActive ? std::tanh(feedbackStateR * feedbackSafetyDrive) / feedbackSafetyDrive : 0.0f;
 
         auto wetL = inL + feedbackAmount * feedbackTapL;
         auto wetR = inR + feedbackAmount * feedbackTapR;

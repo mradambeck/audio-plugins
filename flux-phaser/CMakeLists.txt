@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Flux VERSION 0.1.2)
+project(Flux VERSION 0.1.3)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -84,6 +84,40 @@ target_compile_definitions(FluxTests
 target_link_libraries(FluxTests
     PRIVATE
         juce::juce_audio_processors
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Offline render harness (mirrors caverns-delay's CavernsRenderIR / gradient-pitch's
+# GradientRenderIR) - drives the real FluxAudioProcessor with a synthesized audio-in test signal
+# and writes the result to WAV, so a pre/post-change pair can be diffed byte-for-byte or scored via
+# ../common/tools/compare_wavs.py without a DAW in the loop. Reuses the same
+# TestCreateEditorStub.cpp FluxTests already uses, so this stays free of the editor/LookAndFeel/
+# BinaryData too.
+juce_add_console_app(FluxRenderIR
+    PRODUCT_NAME "FluxRenderIR"
+)
+
+target_sources(FluxRenderIR
+    PRIVATE
+        Source/PluginProcessor.cpp
+        Source/Tests/TestCreateEditorStub.cpp
+        Source/Tools/RenderIR.cpp
+)
+
+target_compile_definitions(FluxRenderIR
+    PRIVATE
+        JucePlugin_Name="Flux"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
+)
+
+target_link_libraries(FluxRenderIR
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats
         juce::juce_dsp
     PUBLIC
         juce::juce_recommended_config_flags

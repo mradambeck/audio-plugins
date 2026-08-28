@@ -138,5 +138,20 @@ private:
     // gainDb in PluginProcessor.cpp for why 110Hz specifically.
     juce::dsp::IIR::Filter<float> gritEqFilterL, gritEqFilterR;
 
+    // Cache guards for the Grit EQ / Brightness filter coefficient recomputation in processBlock()
+    // (each involves a genuine std::tan() call plus a heap allocation - see that call site's
+    // comment) - skip recompute when the underlying amount hasn't changed since the last block.
+    // -1.0f sentinels (both amounts are always in [0,1]) reset in prepareToPlay(), not just at
+    // construction - both filters' coefficients also depend on sampleRateHz, so a cached
+    // "unchanged amount" value from a prior session at a different sample rate must not survive a
+    // prepareToPlay() call at a new rate.
+    float lastGritAmount = -1.0f;
+    float lastBrightnessAmount = -1.0f;
+
+    // Grit's drive/makeup/output-trim coefficients, derived purely from Grit (no sample-rate
+    // dependency) - recomputed only inside the lastGritAmount cache guard above, so they're now
+    // members (read every sample in the per-sample loop) rather than per-block locals.
+    float gritK = 0.0f, gritMakeup = 1.0f, gritOutputTrim = 1.0f;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FluxAudioProcessor)
 };
