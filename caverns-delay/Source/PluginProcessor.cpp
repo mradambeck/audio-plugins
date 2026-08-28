@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include <cmath>
 #include <iterator>
 
 namespace
@@ -480,6 +481,11 @@ void CavernsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     maxDelaySamplesLimit = static_cast<float>(maxDelaySamples - 1);
     modPhase = 0.0;
 
+    // Force an unconditional recompute of all three cached filter coefficients on the first block
+    // after this call - see the members' own comment for why a cached Hz value can't survive a
+    // sample-rate change.
+    lastDegradeDarkenerHz = lastLowCutHz = lastHighCutHz = -1.0f;
+
     delayLineL.setMaximumDelayInSamples(maxDelaySamples);
     delayLineL.prepare(spec);
     delayLineL.reset();
@@ -617,25 +623,59 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     // top of the drive/wobble above - a slight extra warmth that deepens with every pass, rather
     // than another dramatic effect.
     const auto degradeDarkenerHz = feedbackDarkenerHz - degradeAmount * degradeDarkenerRangeHz;
-    feedbackDarkenerL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, degradeDarkenerHz);
-    feedbackDarkenerR.coefficients = feedbackDarkenerL.coefficients;
+
+    // IIR::Coefficients::makeLowPass()/makeHighPass() each do a genuine std::tan() plus a heap
+    // allocation (a new reference-counted Coefficients object) - skip recompute when the Hz value
+    // hasn't changed since the last block. See lastDegradeDarkenerHz/lastLowCutHz/lastHighCutHz's
+    // own member comment for why prepareToPlay() resets these sentinels.
+    if (std::abs(degradeDarkenerHz - lastDegradeDarkenerHz) > 0.0f)
+    {
+        lastDegradeDarkenerHz = degradeDarkenerHz;
+        feedbackDarkenerL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, degradeDarkenerHz);
+        feedbackDarkenerR.coefficients = feedbackDarkenerL.coefficients;
+    }
 
     const auto nyquist = static_cast<float>(sampleRateHz * 0.49);
     const auto lowCutHz = juce::jmin(lowCutParam->load(), nyquist);
     const auto highCutHz = juce::jmin(highCutParam->load(), nyquist);
 
-    lowCutFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRateHz, lowCutHz);
-    lowCutFilterR.coefficients = lowCutFilterL.coefficients;
-    highCutFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, highCutHz);
-    highCutFilterR.coefficients = highCutFilterL.coefficients;
+    if (std::abs(lowCutHz - lastLowCutHz) > 0.0f)
+    {
+        lastLowCutHz = lowCutHz;
+        lowCutFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRateHz, lowCutHz);
+        lowCutFilterR.coefficients = lowCutFilterL.coefficients;
+    }
+    if (std::abs(highCutHz - lastHighCutHz) > 0.0f)
+    {
+        lastHighCutHz = highCutHz;
+        highCutFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRateHz, highCutHz);
+        highCutFilterR.coefficients = highCutFilterL.coefficients;
+    }
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
 
+    // modDepthMs is block-constant; when it's exactly 0 (the default), modOffsetSamples is exactly
+    // 0 regardless of sin(modPhase)'s value (sin() is always finite, and finite * 0.0f == 0.0f
+    // exactly) - skip the sin() call itself in that case. modPhase keeps advancing every sample
+    // either way (see its own member comment) so there's no discontinuity if depth is raised
+    // mid-playback.
+    const auto modActive = modDepthMs > 0.0f;
+
+    // degradeExtraDrive/wetDegradeDrive/degradeWobbleCeilingSamples are all block-constant and
+    // exactly 0 when Degrade is at its default - multiplied against degradeDriveWobble (finite,
+    // bounded [0.5,1.5]) or (0.5+0.5*sin(x)) (bounded [0,1]), the resulting degradeK/wetDegradeK/
+    // degradeWobbleSamples are exactly 0 regardless of the sin() terms' actual values (already
+    // proven irrelevant by the existing degradeK > 0.0f / wetDegradeK > 0.0f guards below) - skip
+    // both sin() evaluations in that case. Phase increments stay unconditional, same reasoning as
+    // modPhase above.
+    const auto degradeActive = degradeAmount > 0.0f;
+
     for (int sample = 0; sample < numSamples; ++sample)
     {
-        const auto modOffsetSamples = static_cast<float>(std::sin(modPhase))
-                                       * modDepthMs * 0.001f * static_cast<float>(sampleRateHz);
+        const auto modOffsetSamples = modActive
+                                           ? static_cast<float>(std::sin(modPhase)) * modDepthMs * 0.001f * static_cast<float>(sampleRateHz)
+                                           : 0.0f;
         modPhase += modPhaseIncrement;
         if (modPhase >= juce::MathConstants<double>::twoPi)
             modPhase -= juce::MathConstants<double>::twoPi;
@@ -655,8 +695,9 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // moves together rather than independently. Riding degradeWobblePhase at 3x its own rate
         // gives a faster, more chattery wobble than the (slow, ~1 Hz) delay-flutter use of the same
         // phase elsewhere in this loop.
-        const auto degradeDriveWobble = 1.0f + degradeDriveWobbleDepth
-                                                    * static_cast<float>(std::sin(degradeWobblePhase * 3.0));
+        const auto degradeDriveWobble = degradeActive
+                                             ? 1.0f + degradeDriveWobbleDepth * static_cast<float>(std::sin(degradeWobblePhase * 3.0))
+                                             : 1.0f;
 
         // Only the feedback path - not the tap that's actually heard - passes through the darkening
         // filter and saturator, so the character compounds one repeat at a time. Stage 1 always uses
@@ -668,8 +709,13 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // it only reshapes louder/mid-level signal. degradeExtraDrive == 0 (Degrade == 0) is guarded
         // to an exact passthrough, since tanh(k*u)/k is a 0/0 indeterminate form as k -> 0 - this is
         // what keeps 0% Degrade bit-identical to the pre-Degrade sound.
-        const auto stage1L = std::tanh(feedbackDarkenerL.processSample(tapL) * feedbackDriveAmount);
-        const auto stage1R = std::tanh(feedbackDarkenerR.processSample(tapR) * feedbackDriveAmount);
+        // Filter output must still be computed every sample regardless (its internal state has to
+        // keep advancing) - only the tanh() call itself is skipped on exact silence. tanh(0)==0
+        // exactly per IEEE-754, so this is bit-identical, not an approximation.
+        const auto stage1PreDriveL = feedbackDarkenerL.processSample(tapL) * feedbackDriveAmount;
+        const auto stage1PreDriveR = feedbackDarkenerR.processSample(tapR) * feedbackDriveAmount;
+        const auto stage1L = std::abs(stage1PreDriveL) <= 0.0f ? stage1PreDriveL : std::tanh(stage1PreDriveL);
+        const auto stage1R = std::abs(stage1PreDriveR) <= 0.0f ? stage1PreDriveR : std::tanh(stage1PreDriveR);
 
         const auto degradeK = degradeExtraDrive * degradeDriveWobble;
         const auto degradeKNeg = degradeK * degradeAsymmetry;
@@ -689,8 +735,9 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // Degrade-driven flutter: a tiny modulated delay sitting only in the feedback return path,
         // so it too compounds with every additional loop rather than applying evenly to everything.
         // Silent (0-sample, exact passthrough) at Degrade = 0.
-        const auto degradeWobbleSamples = degradeWobbleCeilingSamples
-                                           * (0.5f + 0.5f * static_cast<float>(std::sin(degradeWobblePhase)));
+        const auto degradeWobbleSamples = degradeActive
+                                               ? degradeWobbleCeilingSamples * (0.5f + 0.5f * static_cast<float>(std::sin(degradeWobblePhase)))
+                                               : 0.0f;
         degradeWobblePhase += degradeWobblePhaseIncrement;
         if (degradeWobblePhase >= juce::MathConstants<double>::twoPi)
             degradeWobblePhase -= juce::MathConstants<double>::twoPi;
