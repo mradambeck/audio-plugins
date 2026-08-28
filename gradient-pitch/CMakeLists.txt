@@ -115,7 +115,7 @@ target_compile_definitions(GradientRenderIR
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JucePlugin_Name="Gradient"
-        JucePlugin_VersionString="0.1.3"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
 )
 
 target_link_libraries(GradientRenderIR

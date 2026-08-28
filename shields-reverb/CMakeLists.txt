@@ -106,7 +106,7 @@ target_compile_definitions(ShieldsRenderIR
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JucePlugin_Name="Shields"
-        JucePlugin_VersionString="0.1.0"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
 )
 
 target_link_libraries(ShieldsRenderIR
