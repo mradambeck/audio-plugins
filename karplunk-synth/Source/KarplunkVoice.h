@@ -678,6 +678,10 @@ public:
 
     bool isActive() const noexcept { return active; }
 
+    // The currently-playing note's own period, in samples - see KarplunkVoice::levelOutput()'s own
+    // comment for why this feeds a pitch-adaptive time constant there.
+    float getCurrentDelaySamples() const noexcept { return currentDelaySamples; }
+
 private:
     // xorshift32, same technique/rationale as KarplunkExcitation::nextNoiseSample() (deterministic,
     // allocation-free, no JUCE dependency) - a separate RNG/state from the excitation's own noise,
@@ -958,7 +962,7 @@ public:
             const auto a = lineA.renderChannelSample();
             lineA.writeBack(a.filtered);
             const auto positioned = lineA.positionOutput(a.forOutput);
-            return levelOutput(lineA.applyOutputEffects(positioned), positioned);
+            return levelOutput(lineA.applyOutputEffects(positioned), positioned, lineA.getCurrentDelaySamples());
         }
 
         // Dual topology: cross-couple both lines' write-back values at the exact point each
@@ -1074,7 +1078,8 @@ public:
             * (1.0f - std::exp(-coupleDelayMs / coupleDelayCompensationTimeConstantMs));
 
         return levelOutput(dualTopologyOutputGain * coupleDelayCompensation * (outputA + outputB),
-                            dualTopologyOutputGain * coupleDelayCompensation * (positionedA + positionedB));
+                            dualTopologyOutputGain * coupleDelayCompensation * (positionedA + positionedB),
+                            0.5f * (lineA.getCurrentDelaySamples() + lineB.getCurrentDelaySamples()));
     }
 
     // Single topology: only lineA matters (lineB was triggered by noteOn() too, per this class's
@@ -1111,10 +1116,23 @@ private:
     // leveler doing its original job (taming genuine noise-driven resonant warble, Position tap
     // included) without fighting a deliberate output-stage effect it was never designed to react
     // to.
-    float levelOutput(float output, float reference) noexcept
+    // `delaySamples` is the currently-playing note's own period, in samples - see
+    // fastOutputTimeSeconds's own comment for why the fast envelope's time constant needs to
+    // scale with it (a rectify-then-smooth envelope follower needs several PERIODS to properly
+    // resolve amplitude - a fixed constant shorter than a low note's own period goes unstable).
+    float levelOutput(float output, float reference, float delaySamples) noexcept
     {
         const auto instantMagnitude = std::abs(reference);
-        const auto fastOutputCoeff = 1.0f - std::exp(-1.0f / (float) (fastOutputTimeSeconds * sampleRateHz));
+
+        // max(), not the fixed constant directly - preserves the original fast, responsive
+        // behavior exactly for every note whose own period already fits inside
+        // fastOutputTimeSeconds (everything above roughly A2, ~110Hz), and only stretches the
+        // window for lower notes where the fixed value would otherwise be too short to resolve a
+        // full cycle.
+        const auto periodSeconds = delaySamples / (float) sampleRateHz;
+        const auto effectiveFastOutputTimeSeconds = std::max(fastOutputTimeSeconds, periodSeconds * fastOutputPeriodMultiplier);
+
+        const auto fastOutputCoeff = 1.0f - std::exp(-1.0f / (float) (effectiveFastOutputTimeSeconds * sampleRateHz));
         const auto slowOutputCoeff = 1.0f - std::exp(-1.0f / (float) (slowOutputTimeSeconds * sampleRateHz));
         fastOutputEnvelope += fastOutputCoeff * (instantMagnitude - fastOutputEnvelope);
         slowOutputEnvelope += slowOutputCoeff * (instantMagnitude - slowOutputEnvelope);
@@ -1167,7 +1185,27 @@ private:
 
     float fastOutputEnvelope = 0.0f;
     float slowOutputEnvelope = 0.0f;
+
+    // fastOutputTimeSeconds is now a FLOOR, not the actual time constant used - see
+    // levelOutput()'s own comment. A real, measured bug: a rectify-then-one-pole-smooth envelope
+    // follower needs a time constant of several PERIODS to properly resolve amplitude (a
+    // well-known envelope-follower property, not specific to this codebase) - the flat 15ms was
+    // shorter than a single cycle of this instrument's own lowest supported note (A0, 27.5Hz,
+    // ~36ms/cycle), so fastOutputEnvelope couldn't track low notes at all; instead of settling,
+    // the fast/slow ratio (levelingGain) went unstable and pinned near its own 3x ceiling for most
+    // of the note, producing a real, audible "swell" - reported by the user as low notes "coming
+    // up in an unnatural way" as they rang out (and independently observable, smaller, even at
+    // Brightness=100% before this fix - Brightness's own loudness-compensation pass, see
+    // KarplunkExcitation.cpp, made a PRE-EXISTING artifact newly audible by raising Brightness=0's
+    // overall level into a normally-audible range, it didn't introduce the artifact itself).
+    // fastOutputPeriodMultiplier (measured: 8 cycles) stretches the effective time constant
+    // proportionally to how low the note is - at note 60 (period*8 ~= 31ms, above the 15ms floor)
+    // it's already a bit slower than the original flat 15ms, but re-measured to still satisfy the
+    // existing "held bow loudness stays bounded window-to-window" regression test's own <1.5x
+    // ratio requirement; the floor only matters for the very highest notes, where period*8 drops
+    // back under 15ms.
     static constexpr float fastOutputTimeSeconds = 0.015f;
+    static constexpr float fastOutputPeriodMultiplier = 8.0f;
     static constexpr float slowOutputTimeSeconds = 0.6f;
     static constexpr float minLevelingGain = 0.3f;
     static constexpr float maxLevelingGain = 3.0f;

@@ -688,6 +688,54 @@ public:
             }
         }
 
+        // Regression test for a real, measured bug in the SAME leveler the test above guards: its
+        // fast envelope used a flat 15ms time constant, shorter than a single cycle of this
+        // instrument's own lowest supported note (A0, ~36ms/cycle) - a rectify-then-smooth
+        // envelope follower needs several PERIODS to properly resolve amplitude, so the fast/slow
+        // ratio went unstable on low notes and pinned near its own 3x ceiling for most of a note,
+        // producing a real, audible "swell" (a plucked low note getting LOUDER as it rang out,
+        // instead of decaying) - reported by the user as low notes "coming up in an unnatural
+        // way." Fixed with a pitch-adaptive floor (fastOutputPeriodMultiplier, see
+        // levelOutput()'s own comment) - confirms a plucked low note now decays close to
+        // monotonically instead of swelling mid-decay.
+        beginTest("A plucked low note decays without swelling mid-decay (loudness leveling, low-note regression)");
+        {
+            for (int note : { Voice::kLowestSupportedMidiNote, Voice::kLowestSupportedMidiNote + 3 })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.6f);
+                voice.noteOn(note, 1.0f);
+
+                // Skip the excitation's own brief attack/decay-to-sustain settling window (a
+                // small, benign level bump there is normal note-attack physics, present even in
+                // the raw un-leveled signal - not what this test is guarding against).
+                constexpr int skipSamples = 44100 / 5; // 200ms
+                for (int i = 0; i < skipSamples; ++i)
+                    voice.renderNextSample();
+
+                constexpr int windowSamples = 2205; // 50ms
+                float previousRms = std::numeric_limits<float>::max();
+                bool everRoseSubstantially = false;
+                for (int w = 0; w < 16; ++w) // 200ms-1s after onset
+                {
+                    double sumSquares = 0.0;
+                    for (int i = 0; i < windowSamples; ++i)
+                    {
+                        const auto s = voice.renderNextSample();
+                        sumSquares += (double) s * (double) s;
+                    }
+                    const auto rms = (float) std::sqrt(sumSquares / windowSamples);
+                    if (rms > previousRms * 1.5f) // > ~3.5dB window-to-window rise
+                        everRoseSubstantially = true;
+                    previousRms = rms;
+                }
+
+                expect(!everRoseSubstantially,
+                       "a plucked low note's loudness should not rise substantially window-to-window while decaying");
+            }
+        }
+
         beginTest("Structure does not measurably detune the fundamental across the note range");
         {
             // This test exists because of a real, shipped, empirically-measured bug: the
