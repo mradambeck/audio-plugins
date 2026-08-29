@@ -35,7 +35,6 @@ juce_add_binary_data(GradientBinaryData
 
 target_sources(Gradient
     PRIVATE
-        Source/GradientDelayBuffer.cpp
         Source/GradientPitchShiftEngine.cpp
         Source/PluginProcessor.cpp
         Source/GradientLookAndFeel.cpp
@@ -72,7 +71,6 @@ juce_add_console_app(GradientTests
 
 target_sources(GradientTests
     PRIVATE
-        Source/GradientDelayBuffer.cpp
         Source/GradientPitchShiftEngine.cpp
         Source/Tests/GradientDelayBufferTests.cpp
         Source/Tests/GradientPitchShiftEngineTests.cpp
@@ -102,7 +100,6 @@ juce_add_console_app(GradientRenderIR
 
 target_sources(GradientRenderIR
     PRIVATE
-        Source/GradientDelayBuffer.cpp
         Source/GradientPitchShiftEngine.cpp
         Source/PluginProcessor.cpp
         Source/GradientLookAndFeel.cpp
