@@ -17,6 +17,7 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Alloy | [`alloy-bass/`](alloy-bass/) | Stacked analog + FM mono synth |
 | Gradient | [`gradient-pitch/`](gradient-pitch/) | Pitch-shifting delay |
 | Shields | [`shields-reverb/`](shields-reverb/) | Diffuse algorithmic reverb with a slow-building swell |
+| Intruder | [`intruder-gated-reverb/`](intruder-gated-reverb/) | Non-linear gated reverb modeled on the AMS RMX16's Non-Lin 2 |
 
 Each plugin has its own README with build/launch instructions specific to that plugin and a
 description of how it works; this README covers everything shared across the whole monorepo.
@@ -36,6 +37,7 @@ audio-plugins/
 ├── alloy-bass/
 ├── gradient-pitch/
 ├── shields-reverb/
+├── intruder-gated-reverb/
 ├── installers/               # Combined "install everything" .pkg builder
 ├── scripts/                  # build-all.sh / test-all.sh (loop over all plugins)
 ├── .claude/skills/            # Project-scoped Claude Code skills for this catalog's conventions
