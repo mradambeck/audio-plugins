@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -58,37 +59,29 @@ private:
     static constexpr float maxLoopGain = 0.9995f;
 };
 
-// A generic, reusable resonant bandpass primitive (RBJ Audio-EQ-Cookbook "BPF, constant 0dB peak
-// gain," direct-form-II-transposed) - deliberately has no notion of "Resonance" or "Formant
-// Frequency" itself (those live in KarplunkResonantLoopFilter below), matching how
-// KarplunkDispersionFilter itself has no notion of "Structure."
+// A generic, reusable resonant LOWPASS primitive (RBJ Audio-EQ-Cookbook "LPF," direct-form-II-
+// transposed) - deliberately has no notion of "Resonance," "Cutoff," or the filter envelope itself
+// (those live in KarplunkResonantLoopFilter below), matching how KarplunkDispersionFilter itself
+// has no notion of "Structure."
 //
-// Chosen (over a second internal comb/allpass creating non-harmonic peaks) specifically because
-// its safety proof is a simple, closed-form, control-independent one - see KarplunkResonantLoopFilter's
-// own comment for the full argument. Researched directly from Jaffe & Smith 1983 ("Extensions of
-// the Karplus-Strong Plucked-String Algorithm," Computer Music Journal 7(2)) and Julius O. Smith's
-// PASP treatment of the Extended KS loop filter, which states the stability requirement plainly:
-// |H_d(e^jwT)| <= 1. Every canonical EKS loop filter in that literature (the pick-direction one-pole,
-// the dynamic-level filter) is a damping/lowpass filter, never a resonant boost - confirming a
-// resonant stage placed INSIDE the loop needs its own explicit, provable bound, not an assumption
-// borrowed from the reference designs. Also cross-checked against Mutable Instruments Rings'
-// string.cc (already this codebase's reference for Structure/Position): Rings' own "extra
-// resonance" trick (a detuned comb readout) is applied to a non-recirculating OUTPUT tap, not
-// injected as gain inside the loop - independent confirmation that resonant colouring's risk
-// surface is normally kept outside (or provably bounded within) the recirculating path.
+// A classic subtractive-synth cutoff+resonance lowpass, at the user's explicit request, replacing
+// this file's original resonant-BANDPASS design (a fixed "Formant Frequency" peak crossfaded into
+// the signal) once that shipped as an output-only tap (see KarplunkResonantLoopFilter's own
+// comment): a bandpass peak coloring is a genuinely different, more exotic instrument than the
+// cutoff-sweep character most users expect from a synth's "filter" control, and a real lowpass is
+// what an Envelope Amount control (also new - see KarplunkResonantLoopFilter) actually sweeps in
+// every subtractive synth this is modeled on.
 //
-// SAFETY: at its own design frequency w0, |H(e^jw0)| = 1 EXACTLY, for any Q>0 and any w0 in
-// (0, pi) - derived directly (not trusted from the cookbook formula alone, given how load-bearing
-// this is): evaluating the transposed-direct-form-II biquad at z=e^jw0 makes numerator and
-// denominator reduce to the identical complex factor 2*alpha*sin(w0)*(sin(w0)+j*cos(w0)), so their
-// ratio's magnitude is exactly 1. Also: b0+b1+b2=0 (DC) and b0-b1+b2=0 (Nyquist) are exact
-// identities independent of w0/Q - the standard "zero at both band edges, single resonant maximum
-// of exactly 1 at w0, nowhere higher" property of this exact filter family. Poles stay inside the
-// unit circle unconditionally too: a2 = (1-alpha)/(1+alpha) is in (-1,1) for ANY alpha>0, i.e. any
-// Q>0 - no upper/lower bound on Q is needed for safety, only for musical taste. Verified by a dense
-// numeric frequency sweep in the test suite, not just trusted from this derivation - matching this
-// project's "measured, not just reasoned" convention even for an already-provable property.
-class KarplunkResonantPeakFilter
+// SAFETY is straightforward now, unlike the bandpass predecessor's careful closed-form proof: this
+// filter is called ONLY from outputColor() (never recirculated into the string - see
+// KarplunkResonantLoopFilter's own comment), so there is no loop-gain-runaway risk to prove at all,
+// only "is this filter itself stable for its own bounded input" - the RBJ lowpass biquad's poles
+// stay strictly inside the unit circle for any Q>0 and any 0 < freqHz < sampleRateHz/2 (the
+// standard, widely-implemented result this cookbook formula is built to guarantee), so a bounded
+// input can only ever produce a bounded output through it, for any Cutoff/Resonance combination -
+// verified by a dense numeric frequency sweep in the test suite, not just trusted from the
+// citation, matching this project's own "measured, not just reasoned" convention.
+class KarplunkLowpassFilter
 {
 public:
     void prepare(double sampleRate) noexcept
@@ -109,19 +102,21 @@ public:
     float process(float x, float freqHz, float q) noexcept
     {
         const auto w0 = karplunkLoopFilterTwoPi * freqHz / (float) sampleRateHz;
+        const auto cosw0 = std::cos(w0);
         const auto alpha = std::sin(w0) / (2.0f * q);
         const auto a0 = 1.0f + alpha;
-        const auto b0 = alpha / a0;
-        const auto b2 = -alpha / a0;
-        const auto a1 = (-2.0f * std::cos(w0)) / a0;
+        const auto b1 = (1.0f - cosw0) / a0;
+        const auto b0 = b1 * 0.5f;
+        const auto b2 = b0;
+        const auto a1 = (-2.0f * cosw0) / a0;
         const auto a2 = (1.0f - alpha) / a0;
 
-        // Direct-form-II-transposed, with b1=0 folded out:
+        // Direct-form-II-transposed:
         //   y      = b0*x + z1
-        //   z1_new = -a1*y + z2
+        //   z1_new = b1*x - a1*y + z2
         //   z2_new = b2*x - a2*y
         const auto y = b0 * x + z1;
-        const auto z1New = -a1 * y + z2;
+        const auto z1New = b1 * x - a1 * y + z2;
         const auto z2New = b2 * x - a2 * y;
         z1 = z1New;
         z2 = z2New;
@@ -140,84 +135,167 @@ private:
 // pattern this follows: KarplunkStringLineChannel owns BOTH concrete loop filter types by value and
 // branches on a plain int each sample, no virtual dispatch).
 //
-// Cascades the existing TwoPointAverageLoopFilter (keeps the physically-correct "brightness fades
-// as decay progresses" character exactly as before) with KarplunkResonantPeakFilter, mixed in by
-// Resonance (0 = pure two-point-average, bit-exact bypass; 1 = full resonant peak blended in) -
-// Resonance also drives Q (a single, intuitive "more resonance = narrower/ringier peak" knob; an
-// independent Q/bandwidth control is a natural, equally-safe future addition).
+// REDESIGNED TWICE. First, from an in-loop crossfade (H_mix(w) = (1-r) + r*H_peak(w), written back
+// into the recirculating string every pass) that was measured crushing a note's own natural decay
+// severely even at small Resonance amounts - a plucked note that should ring for ~600ms (Damping=
+// 0.6) measured cut to under 200ms at Resonance=5%, since (1-r) attenuates every off-peak frequency
+// EVERY loop pass, and that loss compounds across the thousands of passes a note's fundamental
+// makes per second. Fixed by moving to a non-recirculating OUTPUT tap - cross-checked directly
+// against Mutable Instruments Rings' own string.cc (already this codebase's reference for
+// Structure/Position), which does the same thing for its own "extra resonance" trick.
 //
-// SAFETY (this is the load-bearing part - see this file's own top for why a resonant stage inside
-// the loop needs a real proof, not a hope): the convex mix H_mix(w) = (1-r) + r*H_peak(w) is bounded
-// by the triangle inequality - |H_mix(w)| <= (1-r)*1 + r*1 = 1 for EVERY frequency, EVERY r in
-// [0,1], EVERY Q, EVERY Formant Frequency (the identical algebraic pattern already used and proven
-// for Cross-Couple's convex combination and Couple Delay's triangle-inequality argument in
-// KarplunkVoice.h). Combined with TwoPointAverageLoopFilter's own already-proven |H(w)| <= g <=
-// 0.9995 for all w, the total per-pass gain |H_total(w)| = |H_TwoPoint(w)| * |H_mix(w)| <= 0.9995
-// for EVERY frequency, EVERY Damping, EVERY Resonance, EVERY Formant Frequency - no tuned ceiling
-// needed on Resonance or Formant Frequency for safety, the same "already at its provably-safe
-// maximum" category Cross-Couple/Couple Delay occupy. This bound is note-independent by
-// construction too (Formant Frequency only ever needs 0 < freqHz < sampleRateHz/2 - it never
-// appears in the bound itself), unlike Structure's dispersion bound, which had to be re-checked
-// per note - so Formant Frequency is a purely musical choice (absolute Hz, not pitch-tracking), not
-// a stability one.
+// Second, from a resonant BANDPASS (a fixed "Formant Frequency" peak blended additively into the
+// output) to a traditional subtractive-synth resonant LOWPASS with Cutoff, Resonance, and an
+// Envelope Amount that sweeps Cutoff over each note's own Attack+Decay - at the user's explicit
+// request, once the bandpass design was already safely output-only: a synth player expects
+// "Resonance" to mean a lowpass's cutoff-adjacent peak, and expects a movable cutoff with its own
+// envelope, not a fixed coloring frequency. See KarplunkLowpassFilter's own comment for why this
+// swap needed no new safety argument (the output-only architecture already proved that once).
 //
-// getLoopGain() is redefined as this filter's own DC gain (H_total(0)), the same interpretation
-// TwoPointAverageLoopFilter's own already has (its own g literally IS its DC value): since
-// H_peak(0)=0 exactly (the DC-zero identity above) and H_TwoPoint(0)=g, H_mix(0)=(1-r), giving
-// getLoopGain()=g*(1-r) - confirmed to keep Bow's sqrt(1-loopGain) compensation well-behaved at
-// every Resonance/Formant/Damping combination: g*(1-r) is always in [0, 0.9995), so 1-g*(1-r) is
-// always in (0.0005, 1], never zero/negative, so the sqrt() never NaNs.
+// processSample() is ALWAYS baseFilter's own (un-filtered) output, for every Resonance/Cutoff/
+// Envelope setting - none of them touch the recirculating signal or the loop's own gain/decay time
+// AT ALL, matching TwoPointAverageLoopFilter's decay exactly regardless of any of this class's own
+// controls. The lowpass, its envelope-swept cutoff, and Resonance (the lowpass's own Q) are all
+// applied only by outputColor(), a genuinely non-recirculating post-processing tap called
+// separately by KarplunkStringLineChannel::applyOutputEffects() and folded only into the audible
+// output copy, never written back into the string - see that call site's own comment.
+//
+// The envelope itself is a simple two-stage Attack->Decay generator (0 by default, no sustain/
+// release stage tied to note-off) - the same one-pole-recurrence-per-stage shape
+// KarplunkExcitation's own ADSR-ish envelope uses (see its own header comment for why a one-pole
+// recurrence, not a closed-form/elapsed-sample formula, stays continuous no matter how live the
+// Attack/Decay TIME controls themselves move). Triggered by reset() (called at the top of every
+// noteOn() - see KarplunkStringLineChannel's own "always retriggers" convention), so a fresh note
+// always starts its own cutoff sweep from the beginning, exactly like the excitation's own
+// envelope. envelopeAmount is BIPOLAR (-1 to 1): positive sweeps Cutoff UP then back down as the
+// note begins (the classic "pluck brightness" filter-opening character), negative sweeps it DOWN
+// then back up.
+//
+// getLoopGain() is simply baseFilter's own gain - none of this class's own controls affect it,
+// since none of them affect the loop at all.
 class KarplunkResonantLoopFilter
 {
 public:
     void prepare(double sampleRate) noexcept
     {
+        sampleRateHz = sampleRate;
         baseFilter.prepare(sampleRate);
-        peakFilter.prepare(sampleRate);
+        lowpass.prepare(sampleRate);
         reset();
     }
 
+    // Also triggers the filter envelope's own Attack stage from 0 - called at the top of every
+    // noteOn() (see KarplunkStringLineChannel's own "always retriggers, everything reset"
+    // convention), so a fresh note always starts its own cutoff sweep from the beginning. Harmless
+    // to call outside a note too (e.g. the initial prepare()/idle-voice case) - the envelope just
+    // sweeps once against silence and settles at 0, inaudible either way.
     void reset() noexcept
     {
         baseFilter.reset();
-        peakFilter.reset();
+        lowpass.reset();
+        envelopeStage = EnvelopeStage::Attack;
+        envelope = 0.0f;
     }
 
     void setDamping(float amount01) noexcept { baseFilter.setDamping(amount01); }
 
     void setResonance(float amount01) noexcept { resonanceAmount = amount01; }
-    void setFormantFrequency(float hz) noexcept { formantHz = hz; }
+    void setCutoffFrequency(float hz) noexcept { cutoffHz = hz; }
 
-    // Resonance=0 is a bit-exact bypass - peakFilter's own state never even advances, same
-    // convention as every other "amount01=0" no-op in this codebase (Waveshape, Structure, Ring Mod).
+    // Bipolar - see this class's own header comment. 0 (default) is a bit-exact no-op: the
+    // envelope stage machine still advances every outputColor() call (cheap, matching Waveshape/
+    // Structure's own "keep state current regardless of whether it's audible" convention) but
+    // multiplying by amount=0 always contributes exactly 0 octaves of sweep, so Cutoff stays fixed
+    // at cutoffHz throughout the note, unaffected by the (still-running) envelope.
+    void setEnvelopeAmount(float bipolarAmount) noexcept { envelopeAmount = bipolarAmount; }
+    void setEnvelopeAttackSeconds(float seconds) noexcept { envelopeAttackSeconds = seconds; }
+    void setEnvelopeDecaySeconds(float seconds) noexcept { envelopeDecaySeconds = seconds; }
+
+    // Always baseFilter's own output, unaffected by any of this class's own controls - see this
+    // class's own header comment for why (all of Cutoff/Resonance/Envelope moved to a
+    // non-recirculating output tap, outputColor() below).
     float processSample(float x) noexcept
     {
-        const auto baseline = baseFilter.processSample(x);
-        if (resonanceAmount <= 0.0f)
-            return baseline;
-
-        const auto q = minQ + resonanceAmount * (maxQ - minQ);
-        const auto peaked = peakFilter.process(baseline, formantHz, q);
-        return (1.0f - resonanceAmount) * baseline + resonanceAmount * peaked;
+        return baseFilter.processSample(x);
     }
 
-    // See this class's own header comment for the derivation: this filter's DC gain is
-    // baseFilter's own g scaled by (1-resonanceAmount), since the resonant peak has an exact DC
-    // zero regardless of Resonance/Formant/Q.
-    float getLoopGain() const noexcept { return baseFilter.getLoopGain() * (1.0f - resonanceAmount); }
+    // Non-recirculating: runs `loopValue` (the loop filter's own already-computed recirculating
+    // value, from processSample() above) through a resonant lowpass whose cutoff is swept by this
+    // note's own Attack->Decay envelope, and returns the filtered result - never written back into
+    // the string, called separately by KarplunkStringLineChannel for its OUTPUT-only copy.
+    float outputColor(float loopValue) noexcept
+    {
+        // Two-stage envelope (Attack rises to 1, Decay falls back to 0, then just stays there -
+        // see this class's own header comment) - the exact same one-pole-per-stage shape/threshold
+        // KarplunkExcitation.cpp's own Attack stage uses.
+        const auto attackCoeff = 1.0f - std::exp(-1.0f / std::max(1.0f, envelopeAttackSeconds * (float) sampleRateHz));
+        const auto decayCoeff = 1.0f - std::exp(-1.0f / std::max(1.0f, envelopeDecaySeconds * (float) sampleRateHz));
+        switch (envelopeStage)
+        {
+            case EnvelopeStage::Attack:
+                envelope += attackCoeff * (1.0f - envelope);
+                if (envelope > 0.999f)
+                    envelopeStage = EnvelopeStage::Decay;
+                break;
+            case EnvelopeStage::Decay:
+                envelope += decayCoeff * (0.0f - envelope);
+                break;
+        }
+
+        // Exponential (octave-based) sweep - the musically standard way to move a filter cutoff,
+        // and what keeps a fixed envelopeAmount sound like the same PROPORTIONAL sweep regardless
+        // of where Cutoff itself is set. Clamped well clear of both DC and Nyquist so the lowpass
+        // biquad's own coefficients (see KarplunkLowpassFilter's own comment) never see a
+        // degenerate w0.
+        const auto sweptCutoffHz = cutoffHz * std::pow(2.0f, envelopeAmount * maxEnvelopeOctaves * envelope);
+        const auto clampedCutoffHz = std::clamp(sweptCutoffHz, minCutoffHz, (float) sampleRateHz * 0.49f);
+
+        const auto q = minQ + resonanceAmount * (maxQ - minQ);
+        return lowpass.process(loopValue, clampedCutoffHz, q);
+    }
+
+    // Simply baseFilter's own gain - none of this class's own controls affect the loop at all, see
+    // this class's own header comment.
+    float getLoopGain() const noexcept { return baseFilter.getLoopGain(); }
 
 private:
+    double sampleRateHz = 44100.0;
     TwoPointAverageLoopFilter baseFilter;
-    KarplunkResonantPeakFilter peakFilter;
+    KarplunkLowpassFilter lowpass;
     float resonanceAmount = 0.0f;
 
-    // 1000Hz - a reasoned, vowel-ish starting default, not measured against Karplunk's own loop -
-    // to be confirmed (or retuned) by listening, same convention as every other new-feature
-    // constant in this codebase.
-    float formantHz = 1000.0f;
+    // 8000Hz - deliberately bright/near-open by default (not a "vowel-ish" mid frequency like the
+    // old bandpass design's own formantHz default), so simply selecting Loop Filter Type=Resonant
+    // doesn't unexpectedly darken a patch before the user has touched Cutoff at all - matches
+    // real analog synth convention (cutoff fully open = filter reads as barely engaged). To be
+    // confirmed (or retuned) by listening, same convention as every other new-feature constant in
+    // this codebase.
+    float cutoffHz = 8000.0f;
 
-    // Resonance's own range: 0.7 (gentle bump) to 10.0 (sharp, bell-like ring) - starting points
-    // pending listening, not safety-derived (see this class's own comment: no Q value is unsafe).
+    // Hard floor well above DC, regardless of Cutoff/Envelope settings - avoids a degenerate w0 in
+    // KarplunkLowpassFilter's own coefficient formulas at the extreme low end of a downward
+    // envelope sweep.
+    static constexpr float minCutoffHz = 20.0f;
+
+    // Resonance's own range: 0.7 (gentle bump) to 18.0 (screaming, near-self-oscillating) - safe at
+    // any value now that this filter is output-only (see KarplunkLowpassFilter's own comment: no Q
+    // value is unsafe, unlike the old in-loop design), so raised well past the old bandpass
+    // design's own 10.0 ceiling for a more dramatic synth-filter character. Starting points pending
+    // listening, not safety-derived.
     static constexpr float minQ = 0.7f;
-    static constexpr float maxQ = 10.0f;
+    static constexpr float maxQ = 18.0f;
+
+    // Envelope Amount's own octave range at its bipolar extremes (+-1) - +-4 octaves is a
+    // dramatic-but-still-musical sweep (matches typical hardware/software synth filter-envelope
+    // ranges), covering Cutoff's own full displayed range from either polarity at its own default.
+    // A starting point pending listening, not safety-derived (see this class's own header comment:
+    // any sweep amount is safe, this only affects how far it travels).
+    static constexpr float maxEnvelopeOctaves = 4.0f;
+
+    float envelopeAmount = 0.0f;
+    float envelopeAttackSeconds = 0.001f;
+    float envelopeDecaySeconds = 0.2f;
+    enum class EnvelopeStage { Attack, Decay };
+    EnvelopeStage envelopeStage = EnvelopeStage::Attack;
+    float envelope = 0.0f;
 };

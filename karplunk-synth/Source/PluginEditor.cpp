@@ -54,9 +54,9 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     bowForceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::bowForceParamID, bowForceSlider);
 
-    noiseColorBox.addItem("White", 1);
-    noiseColorBox.addItem("Pink", 2);
-    noiseColorBox.addItem("Brown", 3);
+    noiseColorBox.addItem("Cold", 1);
+    noiseColorBox.addItem("Warm", 2);
+    noiseColorBox.addItem("Dark", 3);
     addAndMakeVisible(noiseColorBox);
     noiseColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::noiseColorParamID, noiseColorBox);
@@ -74,24 +74,17 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     monoAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::monoParamID, monoButton);
 
-    setupSlider(glideTimeSlider, glideTimeLabel, "Glide Time");
-    glideTimeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::glideTimeParamID, glideTimeSlider);
-
     setupSlider(waveshapeSlider, waveshapeLabel, "Waveshape");
     waveshapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshapeParamID, waveshapeSlider);
 
-    // The runtime dropdown for the Waveshaper seam's four concrete types (see
+    // The runtime dropdown for the Waveshaper seam's two concrete types (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime choice rather than a
     // compile-time template parameter like the other three). Item IDs are 1-based (JUCE
     // ComboBox convention) and map to AudioParameterChoice's 0-based indices in order - "Fold" is
-    // index 0, "Fuzz" is index 1, "Saturate" is index 2, "BitCrush" is index 3, matching
-    // createParameterLayout()'s own choice list.
+    // index 0, "BitCrush" is index 1, matching createParameterLayout()'s own choice list.
     waveshaperTypeBox.addItem("Fold", 1);
-    waveshaperTypeBox.addItem("Fuzz", 2);
-    waveshaperTypeBox.addItem("Saturate", 3);
-    waveshaperTypeBox.addItem("BitCrush", 4);
+    waveshaperTypeBox.addItem("BitCrush", 2);
     addAndMakeVisible(waveshaperTypeBox);
     waveshaperTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperTypeBox);
@@ -137,9 +130,21 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     resonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, KarplunkAudioProcessor::resonanceParamID, resonanceSlider);
 
-    setupSlider(formantFrequencySlider, formantFrequencyLabel, "Formant Freq");
-    formantFrequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::formantFrequencyParamID, formantFrequencySlider);
+    setupSlider(filterCutoffSlider, filterCutoffLabel, "Filter Cutoff");
+    filterCutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::filterCutoffParamID, filterCutoffSlider);
+
+    setupSlider(filterEnvAmountSlider, filterEnvAmountLabel, "Filter Env");
+    filterEnvAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::filterEnvAmountParamID, filterEnvAmountSlider);
+
+    setupSlider(filterAttackSlider, filterAttackLabel, "Filter Attack");
+    filterAttackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::filterAttackParamID, filterAttackSlider);
+
+    setupSlider(filterDecaySlider, filterDecayLabel, "Filter Decay");
+    filterDecayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, KarplunkAudioProcessor::filterDecayParamID, filterDecaySlider);
 
     setSize(editorWidth, editorHeight);
 }
@@ -177,7 +182,7 @@ void KarplunkAudioProcessorEditor::resized()
     titleLabel.setBounds(titleRow);
     bounds.removeFromTop(12);
 
-    const auto sliderCount = 19;
+    const auto sliderCount = 21;
     const auto columnWidth = bounds.getWidth() / sliderCount;
 
     auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
@@ -196,7 +201,6 @@ void KarplunkAudioProcessorEditor::resized()
     noiseColorBox.setBounds(noiseColorColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
     layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
     layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), glideTimeLabel, glideTimeSlider);
 
     auto waveshapeColumn = bounds.removeFromLeft(columnWidth);
     waveshaperTypeBox.setBounds(waveshapeColumn.removeFromBottom(labelHeight + 4).reduced(4, 2));
@@ -216,5 +220,8 @@ void KarplunkAudioProcessorEditor::resized()
     loopFilterTypeBox.setBounds(loopFilterTypeColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
 
     layoutColumn(bounds.removeFromLeft(columnWidth), resonanceLabel, resonanceSlider);
-    layoutColumn(bounds, formantFrequencyLabel, formantFrequencySlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), filterCutoffLabel, filterCutoffSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), filterEnvAmountLabel, filterEnvAmountSlider);
+    layoutColumn(bounds.removeFromLeft(columnWidth), filterAttackLabel, filterAttackSlider);
+    layoutColumn(bounds, filterDecayLabel, filterDecaySlider);
 }

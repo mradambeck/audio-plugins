@@ -156,12 +156,16 @@ public:
         stringLine.prepare(sampleRate, capacitySamples);
         dispersionFilter.prepare();
         waveFolder.prepare(sampleRate);
-        fuzz.prepare(sampleRate);
-        saturator.prepare(sampleRate);
         bitCrush.prepare(sampleRate);
         ringMod.prepare(sampleRate);
 
         silenceHoldSamples = (int) (sampleRate * 0.05); // ~50ms
+
+        // See renderChannelSample()'s waveshaping step for what this envelope is for. A one-pole
+        // rise toward 1 (the same one-pole-coefficient pattern used throughout this file, e.g.
+        // glideCoeff below) - waveshapeAttackSeconds is a short, "just enough to round off the
+        // very first sample or two" time constant, not a slow fade-in.
+        waveshapeAttackCoeff = 1.0f - std::exp(-1.0f / (waveshapeAttackSeconds * (float) sampleRate));
 
         reset();
     }
@@ -174,13 +178,12 @@ public:
         stringLine.reset();
         dispersionFilter.reset();
         waveFolder.reset();
-        fuzz.reset();
-        saturator.reset();
         bitCrush.reset();
         ringMod.reset();
         active = false;
         silenceRunSamples = 0;
         dispersionNoise = 0.0f; // dispersionRngState deliberately NOT reset - see its own comment
+        waveshapeAttackEnvelope = 0.0f; // starts silent-of-effect at noteOn - see renderChannelSample()
     }
 
     // Gives this channel's Excitation and dispersion-noise generator a genuinely different noise
@@ -279,9 +282,16 @@ public:
 
     // Resonant-loop-filter-only (has no effect at Loop Filter Type = Two-Point Average) - live,
     // every-sample, same convention as Waveshape/Structure. See KarplunkResonantLoopFilter's own
-    // comment for the closed-form argument that this needs no ceiling either.
+    // comment for why none of these need a safety ceiling (output-only, never recirculated).
     void setResonance(float amount01) noexcept { loopFilterResonant.setResonance(amount01); }
-    void setFormantFrequency(float hz) noexcept { loopFilterResonant.setFormantFrequency(hz); }
+    void setFilterCutoff(float hz) noexcept { loopFilterResonant.setCutoffFrequency(hz); }
+
+    // Filter envelope (Cutoff's own Attack->Decay sweep) - also Resonant-loop-filter-only, also
+    // live/every-sample, same convention. See KarplunkResonantLoopFilter's own comment for the
+    // envelope shape and why envelopeAmount is bipolar.
+    void setFilterEnvAmount(float bipolarAmount) noexcept { loopFilterResonant.setEnvelopeAmount(bipolarAmount); }
+    void setFilterAttack(float seconds) noexcept { loopFilterResonant.setEnvelopeAttackSeconds(seconds); }
+    void setFilterDecay(float seconds) noexcept { loopFilterResonant.setEnvelopeDecaySeconds(seconds); }
 
     // Since the unified-envelope redesign, nextExcitationSample() reads brightness every tick, the
     // same way it reads bowAmount - so this class itself has no "only at noteOn" restriction any
@@ -328,9 +338,9 @@ public:
     // precedent for a "new control defaults to unchanged behavior" convention.
     void setWaveshapeAmount(float amount01) noexcept { waveshapeAmount = amount01; }
 
-    // Runtime selector between the four concrete waveshapers (0 = Fold, 1 = Fuzz, 2 = Saturate,
-    // 3 = BitCrush) - see KarplunkWaveshaper.h's own comment for why this seam is a runtime choice
-    // rather than a compile-time template parameter like the other three.
+    // Runtime selector between the two concrete waveshapers (0 = Fold, 1 = BitCrush) - see
+    // KarplunkWaveshaper.h's own comment for why this seam is a runtime choice rather than a
+    // compile-time template parameter like the other three.
     void setWaveshaperType(int type) noexcept { waveshaperType = type; }
 
     // Live, every-sample - see renderChannelSample()'s ring modulation step (applied in-loop,
@@ -491,7 +501,23 @@ public:
         // on safety softening at the very top of the range, not a structural change from before.
         const auto activeLoopGain = loopFilterType == 0 ? loopFilterTwoPoint.getLoopGain() : loopFilterResonant.getLoopGain();
         const auto fullBowGain = continuousLevelAnalog * std::sqrt(1.0f - activeLoopGain);
-        const auto injectionGain = 1.0f + excitation.getBowAmount() * (fullBowGain - 1.0f);
+
+        // Attack-loudness hump compensation: measured a real ~5dB attack-peak loudness BUMP as
+        // bowAmount rises from 0, peaking around bowHumpPeakAmount and settling back down toward
+        // fullBowGain's own (much gentler) curve past it - reported by the user as "pluck to bow
+        // causes gain around 14%." Root cause is the excitation's own Attack TIME (see
+        // KarplunkExcitation::nextExcitationSample()) lengthening from a near-instant pluck burst
+        // toward a much slower bow attack as bowAmount rises - even a small amount of "bow" mixed
+        // in injects real energy into the resonant loop over a much longer window than a pure
+        // pluck's near-instant burst did, before the (much smaller) fullBowGain-based reduction
+        // above catches up. A measured (not derived) x*e^(1-x)-shaped dip, peaking at exactly 1.0
+        // (full compensation) at bowHumpPeakAmount and tapering to 0 (no compensation) at both
+        // bowAmount=0 and well past the peak - see git history/PR discussion for the measured
+        // before/after numbers.
+        const auto bowHumpRatio = excitation.getBowAmount() / bowHumpPeakAmount;
+        const auto bowHumpCompensation = 1.0f - bowHumpCompensationAmount * bowHumpRatio * std::exp(1.0f - bowHumpRatio);
+
+        const auto injectionGain = (1.0f + excitation.getBowAmount() * (fullBowGain - 1.0f)) * bowHumpCompensation;
         // `filtered` (the string's own already-computed current content - post-Structure-
         // dispersion, post-loop-filter) is passed in as the friction model's velocity proxy - see
         // KarplunkExcitation.h's own comment for why this is the direct single-rail analogue of
@@ -514,75 +540,88 @@ public:
         // requirements at high drive (see KarplunkWaveFolder's own comment for the full story).
         // The write-back call always uses full drive compensation (driveCompensation=1, the
         // safety-critical default) since it's what actually recirculates; the output call uses
-        // much less, tuned per-waveshaper (foldOutputDriveCompensation/fuzzOutputDriveCompensation)
-        // by rendering and measuring loudness parity, since output is never fed back and full
-        // compensation was measured crushing the fold's own audible character almost to silence at
-        // high drive.
+        // much less (foldOutputDriveCompensation) by rendering and measuring loudness parity,
+        // since output is never fed back and full compensation was measured crushing the fold's
+        // own audible character almost to silence at high drive.
+        // Only Fold stays here - it's a deterministic, memoryless function of the SAME
+        // instantaneous signal, so it doesn't disturb the harmonic relationship Position's own
+        // tap-cancellation (below, in positionOutput()) depends on. BitCrush/Ring Mod/Resonance
+        // moved to applyOutputEffects() - see its own comment for why.
         const auto preWaveshapeSignal = filtered;
         float waveshapedForOutput = filtered;
-        if (waveshapeAmount > 0.0f)
+        if (waveshaperType == 0 && waveshapeAmount > 0.0f)
         {
-            // Per-type knob range compression: the user found the full 0-100% Waveshape turn
-            // pushed each waveshaper past a musically usable point well before reaching 100%, at
-            // different rates per type. The knob's displayed 0-100% is unchanged (still what
-            // PluginProcessor reads/smooths/shows) - only how far that maps into each
-            // waveshaper's own amount01 range is rescaled, per type, so the full physical turn
-            // stays useful across its whole travel instead of the musically relevant part being
-            // crammed into the first fraction of it. amount01=0 is unaffected either way (this
-            // whole block is already skipped above at waveshapeAmount=0).
-            if (waveshaperType == 0)
-            {
-                const auto effectiveAmount = waveshapeAmount * foldMaxAmountFraction;
-                filtered = waveFolder.process(preWaveshapeSignal, effectiveAmount, 1.0f);
-                waveshapedForOutput = waveFolder.process(preWaveshapeSignal, effectiveAmount, foldOutputDriveCompensation);
-            }
-            else if (waveshaperType == 1)
-            {
-                // updateFilter() computes and lowpasses the shaped value once (shared by both
-                // calls below) - see KarplunkFuzz's own comment for why this differs from
-                // KarplunkWaveFolder's shape (Fuzz has real per-sample filter state; Fold doesn't).
-                const auto effectiveAmount = waveshapeAmount * fuzzMaxAmountFraction;
-                fuzz.updateFilter(preWaveshapeSignal, effectiveAmount);
-                filtered = fuzz.process(effectiveAmount, 1.0f);
-                waveshapedForOutput = fuzz.process(effectiveAmount, fuzzOutputDriveCompensation);
-            }
-            else if (waveshaperType == 2)
-            {
-                const auto effectiveAmount = waveshapeAmount * saturatorMaxAmountFraction;
-                saturator.updateFilter(preWaveshapeSignal, effectiveAmount);
-                filtered = saturator.process(effectiveAmount, 1.0f);
-                waveshapedForOutput = saturator.process(effectiveAmount, saturatorOutputDriveCompensation);
-            }
-            else
-            {
-                // KarplunkBitCrush's process() takes no amount/driveCompensation parameters at
-                // all - quantization/sample-hold can't amplify a signal, so there's no loop-safety
-                // or output-loudness split to make (see its own class comment) - the identical
-                // crushed value is used for both the recirculating and output paths.
-                const auto effectiveAmount = waveshapeAmount * bitCrushMaxAmountFraction;
-                bitCrush.updateFilter(preWaveshapeSignal, effectiveAmount);
-                filtered = bitCrush.process();
-                waveshapedForOutput = filtered;
-            }
+            // Knob range compression - the user found the full 0-100% Waveshape turn pushed Fold
+            // past a musically usable point well before reaching 100%. The knob's displayed
+            // 0-100% is unchanged - only how far that maps into Fold's own amount01 range is
+            // rescaled.
+            const auto effectiveAmount = waveshapeAmount * foldMaxAmountFraction;
+            filtered = waveFolder.process(preWaveshapeSignal, effectiveAmount, 1.0f);
+            waveshapedForOutput = waveFolder.process(preWaveshapeSignal, effectiveAmount, foldOutputDriveCompensation);
+
+            // Attack envelope: crossfades from the unshaped signal up to the full folded result
+            // over the first few ms of a fresh note (reset to 0 at noteOn, see reset()), instead
+            // of applying full drive to the excitation's own near-instant initial transient -
+            // without this, Fold's hard nonlinearity sees a huge sample-to-sample jump right at
+            // the pluck's own attack and produces an audible pop/click there, reported by the
+            // user at higher Waveshape settings. Only affects the very start of a note
+            // (waveshapeAttackEnvelope reaches ~1 within a few time constants and just stays
+            // there) - doesn't touch Fold's own deliberately-strongest-at-the-loud-initial-hit
+            // character once past that opening window.
+            waveshapedForOutput = preWaveshapeSignal + waveshapeAttackEnvelope * (waveshapedForOutput - preWaveshapeSignal);
+            filtered = preWaveshapeSignal + waveshapeAttackEnvelope * (filtered - preWaveshapeSignal);
+        }
+        waveshapeAttackEnvelope += waveshapeAttackCoeff * (1.0f - waveshapeAttackEnvelope);
+
+        return { filtered, waveshapedForOutput };
+    }
+
+    // Post-Position output-only effects: BitCrush, Ring Mod, and Resonance's own peak coloring
+    // all moved here (out of renderChannelSample()/ChannelResult, applied instead by the
+    // orchestrator to positionOutput()'s own result - see KarplunkVoice::renderNextSample()) after
+    // being measured breaking Position's tap-cancellation design when they ran BEFORE it: Position
+    // subtracts a phase-shifted tap of the SAME periodic signal to cancel specific harmonics (see
+    // positionOutput()'s own comment) - that cancellation relies on the two things being
+    // subtracted staying correlated copies of one periodic waveform. Ring Mod (an independent
+    // oscillator) and BitCrush (discrete quantization) both break that correlation, turning a
+    // designed CANCELLATION into an uncorrelated ADDITION instead - measured making a Ring-
+    // Modulated, Position-tapped note up to ~25x louder than the same signal without Position
+    // engaged, not quieter as the safety argument ("ring mod can only shrink a signal") assumed in
+    // isolation. Running all three strictly AFTER Position (and after write-back, since none of
+    // them recirculate any more - see KarplunkLoopFilter.h/KarplunkRingModulator.h's own comments)
+    // sidesteps the interaction entirely: Position's cancellation now only ever sees the string's
+    // own clean, correlated content, exactly as designed.
+    float applyOutputEffects(float positionedOutput) noexcept
+    {
+        auto value = positionedOutput;
+
+        if (loopFilterType == 1)
+            value = loopFilterResonant.outputColor(value);
+
+        if (waveshaperType == 1 && waveshapeAmount > 0.0f)
+        {
+            // BitCrush used to also be written back into the loop (like Fold still is), and was
+            // measured causing real "massive feedback": quantizing the recirculating signal
+            // creates a classic zero-input limit cycle (a well-known failure mode of quantization
+            // inside a feedback loop) - a plucked note that should decay to silence instead
+            // locked into a stable non-decaying buzz, or at higher amounts actively GREW over
+            // time (measured RMS rising from -26dB to -5dB and staying there over a few seconds
+            // at Waveshape=100%, on a single plucked note with no continuous excitation at all).
+            // Now that quantization never re-enters the string, there's no limit-cycle risk left
+            // at any amount - full range restored (bitCrushMaxAmountFraction=1) instead of the
+            // knob-compression workaround this used before that root cause was found.
+            const auto effectiveAmount = waveshapeAmount * bitCrushMaxAmountFraction;
+            bitCrush.updateFilter(value, effectiveAmount);
+            value = bitCrush.process();
         }
 
-        // Ring Modulator: applied in-loop, after the Waveshaper, right before writing back - so
-        // the modulated signal itself becomes part of what's actually resonating (the user's
-        // explicit choice - see KarplunkRingModulator.h's own comment for the alternative
-        // considered, output-only, and why this needed its own area rather than being a fifth
-        // Waveshaper Type). updateOscillator() advances the shared phase exactly once per sample;
-        // both process() calls below read the SAME oscillator sample so the recirculating and
-        // audible paths stay in sync - no driveCompensation-style split needed at all (ring
-        // modulation can only ever shrink or invert a signal, never amplify it, see process()'s
-        // own comment).
         if (ringModAmount > 0.0f)
         {
             ringMod.updateOscillator(ringModFrequency);
-            filtered = ringMod.process(filtered, ringModAmount);
-            waveshapedForOutput = ringMod.process(waveshapedForOutput, ringModAmount);
+            value = ringMod.process(value, ringModAmount);
         }
 
-        return { filtered, waveshapedForOutput };
+        return value;
     }
 
     // Writes the (possibly cross-coupled - see KarplunkVoice::renderNextSample()) value back into
@@ -679,12 +718,10 @@ private:
     KarplunkStringLine<InterpolationType> stringLine;
     KarplunkDispersionFilter dispersionFilter;
     // Runtime-selectable, not a template parameter - see KarplunkWaveshaper.h's own comment for
-    // why this one seam works differently from Excitation/Delay Tuning. All four
-    // concrete types live here unconditionally (no polymorphism/vtable), selected per-sample by
-    // `waveshaperType` in renderChannelSample().
+    // why this one seam works differently from Excitation/Delay Tuning. Both concrete types live
+    // here unconditionally (no polymorphism/vtable), selected per-sample by `waveshaperType` in
+    // renderChannelSample().
     KarplunkWaveFolder waveFolder;
-    KarplunkFuzz fuzz;
-    KarplunkSaturator saturator;
     KarplunkBitCrush bitCrush;
 
     // Its own area, not a fifth Waveshaper type - see KarplunkRingModulator.h's own comment.
@@ -709,26 +746,30 @@ private:
     float noteVelocity = 0.0f;
     float structure = 0.0f;
     float waveshapeAmount = 0.0f;
-    int waveshaperType = 0; // 0 = Fold, 1 = Fuzz, 2 = Saturate, 3 = BitCrush - see setWaveshaperType()
+    int waveshaperType = 0; // 0 = Fold, 1 = BitCrush - see setWaveshaperType()
     float ringModAmount = 0.0f;
     float ringModFrequency = 200.0f; // matches PluginProcessor's own default
 
+    // Attack envelope for the waveshaping step - see renderChannelSample()'s own comment. Reset to
+    // 0 at noteOn() (via reset()); waveshapeAttackCoeff is computed from waveshapeAttackSeconds in
+    // prepare(), same one-pole-coefficient pattern used throughout this file.
+    float waveshapeAttackEnvelope = 0.0f;
+    float waveshapeAttackCoeff = 1.0f;
+    static constexpr float waveshapeAttackSeconds = 0.008f; // ~8ms - just long enough to round off
+                                                              // the pluck's own near-instant attack
+
     // See renderChannelSample()'s comment on the two separate waveshaper calls per type - how much
     // drive compensation the OUTPUT-only path gets (0 = none/loudest, 1 = full/matches the
-    // recirculating path). Tuned by measurement, per waveshaper (they saturate differently, so
-    // there's no reason to expect the same number would suit both) - placeholder pending real
-    // render/measure iteration for KarplunkFuzz and KarplunkSaturator specifically.
+    // recirculating path). Tuned by measurement.
     static constexpr float foldOutputDriveCompensation = 0.0f;
-    static constexpr float fuzzOutputDriveCompensation = 0.0f;
-    static constexpr float saturatorOutputDriveCompensation = 0.0f;
 
-    // Waveshape knob range compression - see renderChannelSample()'s own comment. Tuned directly
-    // by the user (not measured/derived), one per waveshaper type since each one reaches "too
-    // much" at a different point on the knob's travel.
+    // Waveshape knob range compression - see renderChannelSample()'s own comment. Fold still needs
+    // this (it stays in-loop, so its own drive has a musically-useful-range ceiling well before
+    // 100%, tuned directly by the user). BitCrush no longer does - now that it's output-only (see
+    // renderChannelSample()'s own comment), there's no loop-gain/limit-cycle concern left to cap,
+    // so its knob gets its full, uncompressed range back.
     static constexpr float foldMaxAmountFraction = 0.59f;
-    static constexpr float fuzzMaxAmountFraction = 0.20f;
-    static constexpr float saturatorMaxAmountFraction = 0.30f;
-    static constexpr float bitCrushMaxAmountFraction = 1.0f; // not yet tuned by ear - full range for now
+    static constexpr float bitCrushMaxAmountFraction = 1.0f;
 
     // Defaults to the string's midpoint (clampedPosition = 0.5, the maximum tap fraction), not 0
     // - 0 folds to clampedPosition = 0.01, a near-zero-length tap that's most correlated with
@@ -744,6 +785,11 @@ private:
     // this class's own renderChannelSample() comment, and git history/PR discussion for the
     // measured numbers this was calibrated against).
     static constexpr float continuousLevelAnalog = 4.0f;
+
+    // See renderChannelSample()'s own comment for the attack-loudness-hump this compensates for.
+    // Tuned empirically by rendering and measuring attack-peak level across the Pluck/Bow range.
+    static constexpr float bowHumpPeakAmount = 0.1f;
+    static constexpr float bowHumpCompensationAmount = 0.65f;
 
     // Scales the subtracted tap in `forOutput - positionOutputGain * positionTap` - see
     // positionOutput()'s own comment for why subtraction (not addition) gives the
@@ -858,7 +904,10 @@ public:
     // renderNextSample()'s own coupling-safety comment.
     void setLoopFilterType(int type) noexcept { lineA.setLoopFilterType(type); lineB.setLoopFilterType(type); }
     void setResonance(float amount01) noexcept { lineA.setResonance(amount01); lineB.setResonance(amount01); }
-    void setFormantFrequency(float hz) noexcept { lineA.setFormantFrequency(hz); lineB.setFormantFrequency(hz); }
+    void setFilterCutoff(float hz) noexcept { lineA.setFilterCutoff(hz); lineB.setFilterCutoff(hz); }
+    void setFilterEnvAmount(float bipolarAmount) noexcept { lineA.setFilterEnvAmount(bipolarAmount); lineB.setFilterEnvAmount(bipolarAmount); }
+    void setFilterAttack(float seconds) noexcept { lineA.setFilterAttack(seconds); lineB.setFilterAttack(seconds); }
+    void setFilterDecay(float seconds) noexcept { lineA.setFilterDecay(seconds); lineB.setFilterDecay(seconds); }
     void setBrightness(float amount01) noexcept { lineA.setBrightness(amount01); lineB.setBrightness(amount01); }
     void setBowAmount(float amount01) noexcept { lineA.setBowAmount(amount01); lineB.setBowAmount(amount01); }
     void setBowForce(float amount01) noexcept { lineA.setBowForce(amount01); lineB.setBowForce(amount01); }
@@ -894,12 +943,22 @@ public:
     {
         if (topology == 0)
         {
-            // Single topology: bit-exact with this file's pre-refactor behavior - lineB is never
-            // touched this tick at all (not rendered, not written back, not read from), so it
-            // costs nothing and cannot perturb lineA in any way.
+            // Single topology: lineB is never touched this tick at all (not rendered, not
+            // written back, not read from), so it costs nothing and cannot perturb lineA in any
+            // way. applyOutputEffects() (BitCrush/Ring Mod/Resonance color) runs strictly AFTER
+            // positionOutput() - see its own comment for why that order matters. levelOutput()'s
+            // own envelope tracking reads `positioned` (the Position-tapped signal it was always
+            // designed around), not the further-processed `output`, so it keeps taming the
+            // string's own genuine resonant warble without fighting Ring Mod's own fast,
+            // deliberate amplitude modulation (using the even-earlier `a.filtered` here instead
+            // was tried first and measured reintroducing the loudness-warble regression this
+            // exact leveler exists to prevent - Position's own tap already meaningfully changes
+            // the signal's dynamics, so the leveler needs to see it too, just not what comes
+            // after it).
             const auto a = lineA.renderChannelSample();
             lineA.writeBack(a.filtered);
-            return levelOutput(lineA.positionOutput(a.forOutput));
+            const auto positioned = lineA.positionOutput(a.forOutput);
+            return levelOutput(lineA.applyOutputEffects(positioned), positioned);
         }
 
         // Dual topology: cross-couple both lines' write-back values at the exact point each
@@ -929,10 +988,12 @@ public:
         //     m=(A+B)/2 and differential mode d=(A-B)/2. Algebraically, writeBackA+writeBackB =
         //     filteredA+filteredB (common mode UNCHANGED by coupling), while writeBackA-writeBackB
         //     = (1-2c)*(filteredA-filteredB) (differential mode scaled by (1-2c) each pass). Both
-        //     lines get IDENTICAL setDamping()/setLoopFilterType()/setResonance()/
-        //     setFormantFrequency() calls every sample (see those setters above), so their ACTIVE
-        //     loop filter's magnitude response H(w) is EXACTLY equal at every frequency, always -
-        //     not approximately, and regardless of which Loop Filter Type is selected. Common-mode
+        //     lines get IDENTICAL setDamping()/setLoopFilterType() calls every sample (see those
+        //     setters above), so their ACTIVE loop filter's magnitude response H(w) is EXACTLY
+        //     equal at every frequency, always - not approximately, and regardless of which Loop
+        //     Filter Type is selected (Resonance/Cutoff/Envelope no longer factor in at all here -
+        //     they're output-only now, see KarplunkResonantLoopFilter's own comment, so they don't
+        //     touch either line's recirculating H(w)). Common-mode
         //     round-trip gain per pass is exactly H(w) (unaffected by coupling, already proven safe
         //     by every existing Single-topology test, for either filter type - see
         //     KarplunkLoopFilter.h's own comment for why |H(w)| <= 0.9995 holds for BOTH
@@ -982,14 +1043,38 @@ public:
         // PARTICULAR string) - there's no single well-defined "position" against a combined
         // signal, so each line gets its own tap off its own stringLine, summed at voice level.
         // dualTopologyOutputGain (0.5, plain linear averaging/-6dB) is a conservative starting
-        // headroom choice, not the incoherent-power-sum 1/sqrt(2) polyHeadroomGain uses - the two
-        // coupled lines aren't statistically independent the way pooled voices are, so the more
-        // conservative constant was chosen deliberately; flagged for level-matching against Single
-        // topology by ear, same as polyHeadroomGain itself was originally reasoned rather than
-        // measured.
-        const auto outputA = lineA.positionOutput(a.forOutput);
-        const auto outputB = lineB.positionOutput(b.forOutput);
-        return levelOutput(dualTopologyOutputGain * (outputA + outputB));
+        // headroom choice, not the incoherent-power-sum 1/sqrt(2) an active-voice-count-based
+        // headroom would use - the two coupled lines aren't statistically independent the way
+        // pooled voices are, so the more conservative constant was chosen deliberately; flagged
+        // for level-matching against Single topology by ear, same as that headroom constant was
+        // itself originally reasoned rather than measured.
+        const auto positionedA = lineA.positionOutput(a.forOutput);
+        const auto positionedB = lineB.positionOutput(b.forOutput);
+        const auto outputA = lineA.applyOutputEffects(positionedA);
+        const auto outputB = lineB.applyOutputEffects(positionedB);
+
+        // Couple Delay loudness compensation: measured a real, consistent ~2.8dB drop the instant
+        // Couple Delay becomes nonzero (any amount from the smallest tested, 0.5ms, up through the
+        // full 10ms range) - reported by the user as "Couple Delay causes about a 10dB drop"
+        // (measured closer to 2.8-4dB in isolation, but compounds with the general loudness pass
+        // this same investigation covered - see PluginProcessor.cpp's own masterPreGain/
+        // headroomSmoothed comments). Root cause: at Couple Delay=0, both lines' write-back mixes
+        // in the OTHER line's CURRENT (same-instant) value - since both lines default to the same
+        // pitch (Detune=0), they're nearly identical signals, and summing two nearly-identical
+        // signals reinforces coherently (close to a full linear sum). Any nonzero delay
+        // phase-shifts the coupled copy relative to the receiving line's own content, breaking
+        // that phase alignment across most harmonics - a real, physically-expected drop in
+        // coherent reinforcement, not a bug in the coupling math itself, but still worth
+        // compensating back toward the Couple Delay=0 loudness the user reasonably expects to
+        // carry through as Couple Delay is dialed in. Saturates almost immediately (a small time
+        // constant, matching the measured "already near-max drop by 0.5ms" shape) and is exactly
+        // 1.0 at Couple Delay=0, so the existing bit-exact "0ms matches the original undelayed
+        // formula" behavior is unaffected.
+        const auto coupleDelayCompensation = 1.0f + coupleDelayCompensationAmount
+            * (1.0f - std::exp(-coupleDelayMs / coupleDelayCompensationTimeConstantMs));
+
+        return levelOutput(dualTopologyOutputGain * coupleDelayCompensation * (outputA + outputB),
+                            dualTopologyOutputGain * coupleDelayCompensation * (positionedA + positionedB));
     }
 
     // Single topology: only lineA matters (lineB was triggered by noteOn() too, per this class's
@@ -1009,9 +1094,26 @@ private:
     // physical meaning the way Position does. Straight relocation, not a redesign - same formula,
     // same constants, same order of operations, applied once to whichever `output` value
     // renderNextSample() produced (Single or Dual).
-    float levelOutput(float output) noexcept
+    //
+    // `reference` (the Position-tapped signal BEFORE applyOutputEffects() - `positioned`, not the
+    // further-processed `output` passed alongside it) is what the fast/slow envelopes are computed
+    // FROM now, even though `output` (the fully-processed, Ring-Mod/BitCrush/Resonance-colored
+    // signal) is what actually gets scaled and returned - a real bug fix, not a stylistic split:
+    // when this used `output` itself, Ring Mod's own fast, deliberate amplitude swings dragged the
+    // FAST envelope down every time the oscillator neared zero, while the SLOW envelope barely
+    // moved - so levelingGain (slow/fast) spiked toward its own 3x ceiling right when Ring Mod
+    // wanted the signal quiet, measured pumping a held bow note up to ~5x louder WITH Ring Mod on
+    // than off, exactly backwards from Ring Mod's own bounded-shrink-only safety property. Using
+    // the even-earlier `filtered` (before Position's own tap) was tried next and measured
+    // reintroducing this exact leveler's OWN original regression (loudness warble on a held bow
+    // note) - Position's tap meaningfully changes the signal's dynamics too, so the leveler still
+    // needs to see it, just not what's layered on AFTER it. Tracking `positioned` keeps the
+    // leveler doing its original job (taming genuine noise-driven resonant warble, Position tap
+    // included) without fighting a deliberate output-stage effect it was never designed to react
+    // to.
+    float levelOutput(float output, float reference) noexcept
     {
-        const auto instantMagnitude = std::abs(output);
+        const auto instantMagnitude = std::abs(reference);
         const auto fastOutputCoeff = 1.0f - std::exp(-1.0f / (float) (fastOutputTimeSeconds * sampleRateHz));
         const auto slowOutputCoeff = 1.0f - std::exp(-1.0f / (float) (slowOutputTimeSeconds * sampleRateHz));
         fastOutputEnvelope += fastOutputCoeff * (instantMagnitude - fastOutputEnvelope);
@@ -1055,6 +1157,13 @@ private:
     // See renderNextSample()'s Dual-topology comment for why this is 0.5 (plain averaging) rather
     // than the incoherent-sum 1/sqrt(2).
     static constexpr float dualTopologyOutputGain = 0.5f;
+
+    // See renderNextSample()'s own comment for the Couple Delay loudness drop this compensates
+    // for. Tuned by measurement: +2.8dB (1.38x) fully closes the observed gap; 0.3ms time constant
+    // matches how quickly the real drop saturates (already near-maximum by the smallest tested
+    // nonzero delay, 0.5ms).
+    static constexpr float coupleDelayCompensationAmount = 0.38f; // +2.8dB at full saturation
+    static constexpr float coupleDelayCompensationTimeConstantMs = 0.3f;
 
     float fastOutputEnvelope = 0.0f;
     float slowOutputEnvelope = 0.0f;

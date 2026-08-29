@@ -62,10 +62,6 @@ private:
     juce::ToggleButton monoButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> monoAttachment;
 
-    juce::Slider glideTimeSlider;
-    juce::Label glideTimeLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> glideTimeAttachment;
-
     juce::Slider waveshapeSlider;
     juce::Label waveshapeLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> waveshapeAttachment;
@@ -103,9 +99,21 @@ private:
     juce::Label resonanceLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAttachment;
 
-    juce::Slider formantFrequencySlider;
-    juce::Label formantFrequencyLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> formantFrequencyAttachment;
+    juce::Slider filterCutoffSlider;
+    juce::Label filterCutoffLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterCutoffAttachment;
+
+    juce::Slider filterEnvAmountSlider;
+    juce::Label filterEnvAmountLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterEnvAmountAttachment;
+
+    juce::Slider filterAttackSlider;
+    juce::Label filterAttackLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterAttackAttachment;
+
+    juce::Slider filterDecaySlider;
+    juce::Label filterDecayLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterDecayAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };

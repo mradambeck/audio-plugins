@@ -5,6 +5,17 @@ namespace
     // Ramp time for the two live-smoothed parameters (damping, output level) - short enough to
     // feel immediate, long enough to eliminate zipper noise/clicks when moved during playback.
     constexpr double smoothingRampSeconds = 0.02;
+
+    // Master pre-gain, applied alongside the adaptive headroom below, at the user's explicit
+    // request: the default patch (a single plucked note, every control at its own default)
+    // measured its attack peak at -15.3dBFS even after the adaptive-headroom fix (see
+    // headroomSmoothed's own comment) closed the Mono/Poly mismatch that accounted for most of
+    // the original -24.3dBFS gap - the user wanted the default patch averaging closer to -10dBFS.
+    // +5.3dB (measured, not guessed) closes the remaining gap exactly. Re-verified against every
+    // existing worst-case "stays bounded" test in this suite before landing on this value - none
+    // of them needed their own bound raised, so this is real headroom the instrument already had,
+    // not a value that trades away safety margin elsewhere.
+    constexpr float masterPreGain = 1.8415f; // +5.3dB
 }
 
 KarplunkAudioProcessor::KarplunkAudioProcessor()
@@ -20,7 +31,6 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     structureParam = apvts.getRawParameterValue(structureParamID);
     positionParam = apvts.getRawParameterValue(positionParamID);
     monoParam = apvts.getRawParameterValue(monoParamID);
-    glideTimeParam = apvts.getRawParameterValue(glideTimeParamID);
     waveshapeParam = apvts.getRawParameterValue(waveshapeParamID);
     waveshaperTypeParam = apvts.getRawParameterValue(waveshaperTypeParamID);
     ringModAmountParam = apvts.getRawParameterValue(ringModAmountParamID);
@@ -31,7 +41,10 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     detuneParam = apvts.getRawParameterValue(detuneParamID);
     loopFilterTypeParam = apvts.getRawParameterValue(loopFilterTypeParamID);
     resonanceParam = apvts.getRawParameterValue(resonanceParamID);
-    formantFrequencyParam = apvts.getRawParameterValue(formantFrequencyParamID);
+    filterCutoffParam = apvts.getRawParameterValue(filterCutoffParamID);
+    filterEnvAmountParam = apvts.getRawParameterValue(filterEnvAmountParamID);
+    filterAttackParam = apvts.getRawParameterValue(filterAttackParamID);
+    filterDecayParam = apvts.getRawParameterValue(filterDecayParamID);
 }
 
 KarplunkAudioProcessor::~KarplunkAudioProcessor() = default;
@@ -63,21 +76,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
+    // Range compressed from the full 0-100% to 0-30% - the user found only that first third of the
+    // knob's travel sounded good, so the knob's full physical turn now covers exactly that range
+    // (100% right = the old 30%) instead of cramming the useful part into the first third.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{bowAmountParamID, 1},
         "Pluck / Bow",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        juce::NormalisableRange<float>(0.0f, 0.3f, 0.001f),
         0.0f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
     // Pluck-side noise generator's own spectral color, a runtime dropdown like Waveshaper Type/
-    // Loop Filter Type (see KarplunkExcitation::setNoiseColor()'s own comment) - defaults to White
-    // (index 0), preserving every existing preset/test's behavior exactly.
+    // Loop Filter Type (see KarplunkExcitation::setNoiseColor()'s own comment) - defaults to Cold
+    // (index 0, the flat-white noise source), preserving every existing preset/test's behavior
+    // exactly. Labeled Cold/Warm/Dark rather than White/Pink/Brown in the UI (the user's own
+    // choice of names for the same three underlying colors) - the internal DSP naming (White/Pink/
+    // Brown noise) is unchanged, only the on-screen labels differ.
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{noiseColorParamID, 1},
         "Noise Color",
-        juce::StringArray{"White", "Pink", "Brown"},
+        juce::StringArray{"Cold", "Warm", "Dark"},
         0));
 
     // Bow-side only (no effect at Pluck/Bow=0%) - the friction bow model's own "Bow Pressure"
@@ -102,14 +121,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
-    // Defaults to 50% (the string's midpoint) - unlike Structure, Position has no neutral/bypass
-    // value (every setting mixes an alternate string tap into the output - see KarplunkVoice.h's
-    // renderNextSample()), so 50% was chosen as a deliberate, musically reasonable default rather
-    // than a "no effect" one.
+    // KarplunkVoice.h's clampedPosition formula (0.5 - 0.98*|position-0.5|) is symmetric around
+    // position=0.5, so the original 0-100% range gave two mirrored halves that sounded identical
+    // (0%->50% traced the same clampedPosition sweep as 100%->50%, just in reverse) - the user
+    // asked to halve the control to remove that redundant duplicate half. Range compressed to
+    // 0-50%: full left (0%) is the old position=0 (minimal tap effect), full right (50%) is the
+    // old position=0.5 (maximal tap effect, still the default), covering every unique sound
+    // exactly once across the knob's whole travel.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{positionParamID, 1},
         "Position",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        juce::NormalisableRange<float>(0.0f, 0.5f, 0.001f),
         0.5f,
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
@@ -118,17 +140,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
     // before this control existed, matching this project's convention of non-breaking defaults.
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{monoParamID, 1}, "Mono", false));
-
-    // Mono-only (see handleMidiMessage()'s mono branch) - a legato retrigger between two held
-    // notes glides the pitch over this time instead of jumping instantly; a fresh note struck
-    // from silence is unaffected regardless of this setting (nothing to glide from). Defaults to
-    // 0ms (off) - preserves the exact instant-retrigger behavior Mono already shipped with.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{glideTimeParamID, 1},
-        "Glide Time",
-        juce::NormalisableRange<float>(0.0f, 500.0f, 1.0f),
-        0.0f,
-        juce::AudioParameterFloatAttributes().withLabel("ms")));
 
     // The Waveshaper seam (see KarplunkWaveshaper.h) - defaults to 0% (bit-exact no-op, the
     // Waveshaper is never even called at this value - see KarplunkStringLineChannel::
@@ -141,14 +152,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
-    // Runtime choice between the Waveshaper seam's four concrete implementations (see
+    // Runtime choice between the Waveshaper seam's two concrete implementations (see
     // KarplunkWaveshaper.h's own comment for why this one seam is a runtime dropdown rather than
     // a compile-time template parameter like the other three) - defaults to Fold (index 0),
-    // matching every build/listening session so far.
+    // matching every build/listening session so far. Fuzz and Saturate were removed at the user's
+    // request.
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{waveshaperTypeParamID, 1},
         "Waveshaper Type",
-        juce::StringArray{"Fold", "Fuzz", "Saturate", "BitCrush"},
+        juce::StringArray{"Fold", "BitCrush"},
         0));
 
     // Ring Modulator (see KarplunkRingModulator.h) - its own area, not a Waveshaper Type, since it
@@ -237,10 +249,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         0));
 
     // Resonant-loop-filter-only (no effect at Loop Filter Type=Two-Point Average) - live/every-
-    // sample, provably safe across the full 0-100% range with no ceiling needed (a resonant peak
-    // mixed in via a convex combination can't push the loop's combined gain above what the
-    // existing Two-Point Average stage already safely caps it to) - see KarplunkLoopFilter.h's own
-    // closed-form argument.
+    // sample. A traditional subtractive-synth lowpass's own Resonance (Q) control - see
+    // KarplunkLoopFilter.h's own comment for why this needs no safety ceiling (output-only, never
+    // recirculated into the string).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{resonanceParamID, 1},
         "Resonance",
@@ -249,18 +260,51 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::AudioParameterFloatAttributes().withStringFromValueFunction(
             [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
 
-    // 80Hz-8kHz, skewed toward a vowel-ish/formant-relevant range - a reasoned starting range, not
-    // measured against Karplunk's own loop, to be confirmed by listening. The stability proof is
-    // completely independent of this value (see KarplunkLoopFilter.h), so this is a purely musical
-    // choice - an absolute Hz value, not tracking the note's own pitch.
-    juce::NormalisableRange<float> formantFrequencyRange(80.0f, 8000.0f);
-    formantFrequencyRange.setSkewForCentre(800.0f);
+    // 20Hz-18kHz, skewed toward a musically central range - deliberately spans close to the full
+    // audible range (not the old bandpass design's narrower 80Hz-8kHz "Formant Freq"), matching a
+    // traditional synth filter's own cutoff span. Default (8000Hz) is deliberately bright/near-open
+    // - see KarplunkLoopFilter.h's own comment for why. A reasoned starting range, not measured
+    // against Karplunk's own loop, to be confirmed by listening - the safety proof is completely
+    // independent of this value (see KarplunkLoopFilter.h), so this is a purely musical choice, an
+    // absolute Hz value, not tracking the note's own pitch.
+    juce::NormalisableRange<float> filterCutoffRange(20.0f, 18000.0f);
+    filterCutoffRange.setSkewForCentre(1500.0f);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{formantFrequencyParamID, 1},
-        "Formant Freq",
-        formantFrequencyRange,
-        1000.0f,
+        juce::ParameterID{filterCutoffParamID, 1},
+        "Filter Cutoff",
+        filterCutoffRange,
+        8000.0f,
         juce::AudioParameterFloatAttributes().withLabel("Hz")));
+
+    // Bipolar - see KarplunkLoopFilter.h's own comment for the sweep direction convention. Defaults
+    // to 0% (bit-exact no-op: Cutoff stays fixed regardless of the still-running Attack/Decay
+    // envelope underneath it), matching every other new-control convention in this project.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterEnvAmountParamID, 1},
+        "Filter Envelope",
+        juce::NormalisableRange<float>(-1.0f, 1.0f, 0.001f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value * 100.0f)) + "%"; })));
+
+    // Filter envelope's own Attack/Decay times - has no audible effect at Filter Envelope=0 (the
+    // envelope itself still runs every note, but contributes zero octaves of sweep - see
+    // KarplunkLoopFilter.h's own comment). Defaults (1ms attack, 200ms decay) give an immediate-
+    // opening, moderately-paced closing sweep once Filter Envelope is turned up - a reasoned
+    // starting point, not measured, pending listening.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterAttackParamID, 1},
+        "Filter Attack",
+        juce::NormalisableRange<float>(1.0f, 1000.0f, 1.0f),
+        1.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterDecayParamID, 1},
+        "Filter Decay",
+        juce::NormalisableRange<float>(5.0f, 5000.0f, 1.0f),
+        200.0f,
+        juce::AudioParameterFloatAttributes().withLabel("ms")));
 
     return { params.begin(), params.end() };
 }
@@ -273,6 +317,12 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     monoNoteStack.reset();
     previousMonoMode = monoParam->load() >= 0.5f;
     previousTopology = (int) topologyParam->load();
+
+    // Starts at 1.0 (as if a single voice were already active) - matches the real state right
+    // after prepareToPlay() (no voices active, so the very first note struck should ramp toward
+    // headroomGain=1.0 anyway, not up from some stale/arbitrary starting point).
+    headroomSmoothed.reset(sampleRate, smoothingRampSeconds);
+    headroomSmoothed.setCurrentAndTargetValue(1.0f);
 
     dampingSmoothed.reset(sampleRate, smoothingRampSeconds);
     dampingSmoothed.setCurrentAndTargetValue(dampingParam->load());
@@ -311,8 +361,17 @@ void KarplunkAudioProcessor::prepareToPlay(double sampleRate, int)
     resonanceSmoothed.reset(sampleRate, smoothingRampSeconds);
     resonanceSmoothed.setCurrentAndTargetValue(resonanceParam->load());
 
-    formantFrequencySmoothed.reset(sampleRate, smoothingRampSeconds);
-    formantFrequencySmoothed.setCurrentAndTargetValue(formantFrequencyParam->load());
+    filterCutoffSmoothed.reset(sampleRate, smoothingRampSeconds);
+    filterCutoffSmoothed.setCurrentAndTargetValue(filterCutoffParam->load());
+
+    filterEnvAmountSmoothed.reset(sampleRate, smoothingRampSeconds);
+    filterEnvAmountSmoothed.setCurrentAndTargetValue(filterEnvAmountParam->load());
+
+    filterAttackSmoothed.reset(sampleRate, smoothingRampSeconds);
+    filterAttackSmoothed.setCurrentAndTargetValue(filterAttackParam->load() * 0.001f);
+
+    filterDecaySmoothed.reset(sampleRate, smoothingRampSeconds);
+    filterDecaySmoothed.setCurrentAndTargetValue(filterDecayParam->load() * 0.001f);
 }
 
 void KarplunkAudioProcessor::releaseResources() {}
@@ -334,12 +393,10 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
         {
             // Mono always retriggers with whatever note the stack says should now sound - on a
             // plain note-on that's just this note itself (see KarplunkMonoNoteStack::noteOn()).
-            // Glide only actually engages if this is a legato retrigger (Voice::noteOn() checks
-            // isActive() itself) - a fresh note from silence always snaps straight to pitch.
             const auto event = monoNoteStack.noteOn(note, velocity);
             voices[0].setBrightness(brightnessParam->load());
             voices[0].setDetuneAmount(detuneParam->load());
-            voices[0].noteOn(event.note, event.velocity01, glideTimeParam->load() * 0.001f);
+            voices[0].noteOn(event.note, event.velocity01);
         }
         else
         {
@@ -367,7 +424,7 @@ void KarplunkAudioProcessor::handleMidiMessage(const juce::MidiMessage& message)
             {
                 voices[0].setBrightness(brightnessParam->load());
                 voices[0].setDetuneAmount(detuneParam->load());
-                voices[0].noteOn(result.event.note, result.event.velocity01, glideTimeParam->load() * 0.001f);
+                voices[0].noteOn(result.event.note, result.event.velocity01);
             }
             else
             {
@@ -409,7 +466,10 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     crossCoupleSmoothed.setTargetValue(crossCoupleParam->load());
     coupleDelaySmoothed.setTargetValue(coupleDelayParam->load());
     resonanceSmoothed.setTargetValue(resonanceParam->load());
-    formantFrequencySmoothed.setTargetValue(formantFrequencyParam->load());
+    filterCutoffSmoothed.setTargetValue(filterCutoffParam->load());
+    filterEnvAmountSmoothed.setTargetValue(filterEnvAmountParam->load());
+    filterAttackSmoothed.setTargetValue(filterAttackParam->load() * 0.001f);
+    filterDecaySmoothed.setTargetValue(filterDecayParam->load() * 0.001f);
 
     // Poly/Mono is a discrete mode switch, not a live-sweepable control - deliberately not
     // smoothed, and checked once per block rather than every sample. Toggling it while notes are
@@ -444,11 +504,6 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         previousTopology = topology;
     }
 
-    // Mono only ever sounds one voice, so it gets no headroom reduction - the 8-voice headroom
-    // below exists so a full chord doesn't clip harder than a single Poly note did; applying it
-    // to a single Mono voice would just make Mono sound quieter than Poly for no reason.
-    const auto headroomGain = mono ? 1.0f : polyHeadroomGain;
-
     // Waveshaper Type is a discrete choice like Mono, but - unlike Mono - has no cross-referencing
     // bookkeeping (voiceAllocator/monoNoteStack) that could go stale on a mid-note switch; both
     // concrete waveshapers are stateless, so reading this fresh every block and letting it change
@@ -479,6 +534,23 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             ++midiIterator;
         }
 
+        // Adaptive headroom: scaled by how many voices are ACTUALLY sounding this sample, not a
+        // fixed worst-case-chord assumption - a real, measured bug fix (reported as "Mono is ~9dB
+        // louder than Poly" and, independently, "the default patch sits ~9dB too quiet"): the old
+        // scheme applied a flat 1/sqrt(8) reduction to every Poly note regardless of how many
+        // voices were actually active, so a single Poly note was reserving headroom for a
+        // hypothetical 8-note chord that wasn't playing - quieter than the same single note in
+        // Mono (which skipped the reduction entirely) for no audible reason. Mono only ever drives
+        // voices[0], so it naturally always measures activeCount<=1 here too - no special-casing
+        // needed any more, unlike the old mono-vs-poly branch this replaces. Smoothed (not a bare
+        // per-sample jump) so a chord being struck/released doesn't snap the gain audibly.
+        int activeVoiceCount = 0;
+        for (auto& v : voices)
+            if (v.isActive())
+                ++activeVoiceCount;
+        headroomSmoothed.setTargetValue(1.0f / std::sqrt((float) std::max(1, activeVoiceCount)));
+        const auto headroomGain = headroomSmoothed.getNextValue();
+
         const auto damping = dampingSmoothed.getNextValue();
         const auto bowAmount = bowAmountSmoothed.getNextValue();
         const auto bowForce = bowForceSmoothed.getNextValue();
@@ -490,7 +562,10 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         const auto crossCouple = crossCoupleSmoothed.getNextValue();
         const auto coupleDelay = coupleDelaySmoothed.getNextValue();
         const auto resonance = resonanceSmoothed.getNextValue();
-        const auto formantFrequency = formantFrequencySmoothed.getNextValue();
+        const auto filterCutoff = filterCutoffSmoothed.getNextValue();
+        const auto filterEnvAmount = filterEnvAmountSmoothed.getNextValue();
+        const auto filterAttack = filterAttackSmoothed.getNextValue();
+        const auto filterDecay = filterDecaySmoothed.getNextValue();
 
         float mixedSample = 0.0f;
         for (auto& v : voices)
@@ -510,11 +585,14 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setCrossCoupleAmount(crossCouple);
             v.setLoopFilterType(loopFilterType);
             v.setResonance(resonance);
-            v.setFormantFrequency(formantFrequency);
+            v.setFilterCutoff(filterCutoff);
+            v.setFilterEnvAmount(filterEnvAmount);
+            v.setFilterAttack(filterAttack);
+            v.setFilterDecay(filterDecay);
             mixedSample += v.renderNextSample();
         }
 
-        const auto out = mixedSample * headroomGain * outputLevelSmoothed.getNextValue();
+        const auto out = mixedSample * headroomGain * masterPreGain * outputLevelSmoothed.getNextValue();
         for (int channel = 0; channel < numChannels; ++channel)
             buffer.setSample(channel, sample, out);
     }

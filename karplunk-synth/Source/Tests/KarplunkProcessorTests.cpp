@@ -300,79 +300,13 @@ public:
             expectEquals(diff, 0.0f, "explicitly setting Mono=off should render bit-identical to never touching it at all");
         }
 
-        // Glide's whole point: a legato retrigger should audibly SLIDE through intermediate
-        // pitches over Glide Time, not jump instantly - measured at three points within a single
-        // continuous render (right at the retrigger, partway through the glide, and well past it)
-        // to directly prove a real, gradual pitch sweep is happening, not just "eventually arrives
-        // at the right note" (which an instant jump would also satisfy).
-        beginTest("Mono + Glide: pitch actually slides between notes over time, not jumping instantly");
+        // Glide was removed (the control never made it usable) - a legato Mono retrigger always
+        // jumps instantly to the new pitch, matching the noteOn() default of glideTimeSeconds=0.
+        beginTest("Mono: legato retrigger jumps instantly to the new pitch");
         {
             KarplunkAudioProcessor processor;
             processor.prepareToPlay(sampleRate, 512);
             setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
-            setRaw(processor, KarplunkAudioProcessor::glideTimeParamID, 300.0f); // 300ms
-            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
-            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f); // continuous tone
-
-            const auto noteAHz = 440.0 * std::pow(2.0, (60.0 - 69.0) / 12.0); // C4
-            const auto noteBHz = 440.0 * std::pow(2.0, (67.0 - 69.0) / 12.0); // G4
-
-            const int settleSamples = (int) (0.2 * sampleRate);
-            juce::AudioBuffer<float> bufferA(2, settleSamples);
-            auto midiA = noteOnBuffer(60, 100);
-            processor.processBlock(bufferA, midiA); // hold A, let it settle
-
-            // One continuous render spanning the whole glide (and beyond), so all three
-            // measurements come from the same unbroken buffer - retriggering B at sample 0.
-            const int glideRenderSamples = (int) (1.6 * sampleRate);
-            juce::AudioBuffer<float> bufferGlide(2, glideRenderSamples);
-            auto midiB = noteOnBuffer(67, 100);
-            processor.processBlock(bufferGlide, midiB);
-
-            const int windowSize = 1024; // short - needs to resolve pitch AT a moment in time, not
-                                          // average across the whole glide
-
-            // The search must be centered wide enough to find EITHER endpoint's period, not just
-            // A's - a search centered/radius-limited around A's own period (as a plain "is this
-            // note being played" check would use) can lock onto the wrong autocorrelation peak
-            // once the true period has moved well outside that window, which looks exactly like
-            // "broken glide" (implausible, non-monotonic frequency readings) but is actually just
-            // a search-window bug in the measurement, not the DSP - caught by cross-checking
-            // against the closed-form expected trajectory before trusting the numbers.
-            const auto periodA = sampleRate / noteAHz;
-            const auto periodB = sampleRate / noteBHz;
-            const auto searchCenterHz = sampleRate / ((periodA + periodB) / 2.0);
-            const auto searchRadius = (int) std::ceil(std::abs(periodA - periodB) / 2.0) + 10;
-
-            auto measureAt = [&](double seconds) {
-                const int start = (int) (seconds * sampleRate);
-                return estimateFrequencyHz(bufferGlide.getReadPointer(0) + start, windowSize, sampleRate,
-                                            (float) searchCenterHz, searchRadius);
-            };
-
-            const auto earlyHz = measureAt(0.01);  // ~10ms in - glide has barely started
-            const auto midHz = measureAt(0.15);    // ~150ms in - 0.5 time constants, ~39% of the way
-            const auto lateHz = measureAt(1.5);    // ~1.5s in - 5 time constants (300ms glide), ~99.3% arrived
-
-            logMessage("Glide sweep - early: " + juce::String(earlyHz, 1) + "Hz, mid: " + juce::String(midHz, 1)
-                       + "Hz, late: " + juce::String(lateHz, 1) + "Hz (A=" + juce::String(noteAHz, 1)
-                       + "Hz, B=" + juce::String(noteBHz, 1) + "Hz)");
-
-            expect(std::abs(earlyHz - noteAHz) < 10.0, "glide should start at A's pitch, not jump to B immediately");
-            expect(std::abs(lateHz - noteBHz) < 10.0, "glide should have reached B's pitch well after the glide time");
-            expect(midHz > earlyHz + 5.0 && midHz < lateHz - 5.0,
-                   "midway through the glide, pitch should be clearly BETWEEN A and B, not already at either endpoint");
-        }
-
-        // Control: with Glide Time at its default (0ms, off), a legato retrigger still jumps
-        // instantly - Glide must be an opt-in behavior change, not something that alters Mono's
-        // existing retrigger character unless explicitly dialed in.
-        beginTest("Mono + Glide=0 (default): legato retrigger still jumps instantly, exactly as before Glide existed");
-        {
-            KarplunkAudioProcessor processor;
-            processor.prepareToPlay(sampleRate, 512);
-            setRaw(processor, KarplunkAudioProcessor::monoParamID, 1.0f);
-            // glideTimeParamID left untouched - confirms the default (0ms) preserves old behavior.
             setRaw(processor, KarplunkAudioProcessor::dampingParamID, 0.9f);
             setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
 
@@ -390,14 +324,14 @@ public:
             const int windowSize = 1024;
             const auto earlyHz = estimateFrequencyHz(bufferB.getReadPointer(0), windowSize, sampleRate, (float) noteBHz);
 
-            logMessage("Glide=0 early measurement: " + juce::String(earlyHz, 1) + "Hz (expected B=" + juce::String(noteBHz, 1) + "Hz immediately)");
+            logMessage("Early measurement: " + juce::String(earlyHz, 1) + "Hz (expected B=" + juce::String(noteBHz, 1) + "Hz immediately)");
 
             // A generous tolerance (not 5Hz) - the estimator itself only searches over INTEGER
             // sample lags with no sub-sample refinement, which alone is worth a few Hz of
             // quantization error at this frequency (measured ~386.8Hz vs 392.0Hz expected before
             // this was widened) - still comfortably distinguishes "reached B" from "still at A"
             // (261.6Hz, 130Hz away).
-            expect(std::abs(earlyHz - noteBHz) < 10.0, "with no Glide time set, the retrigger should reach B's pitch immediately, not glide");
+            expect(std::abs(earlyHz - noteBHz) < 10.0, "a legato retrigger should reach B's pitch immediately, not glide");
         }
 
         // Waveshape's direct answer to "does this control do anything in the real, APVTS/MIDI-
@@ -497,8 +431,7 @@ public:
         }
 
         // Waveshaper Type defaults to Fold (index 0) - preserves every existing Waveshape test's
-        // behavior exactly, matching every other new-control convention in this project (Mono,
-        // Glide Time).
+        // behavior exactly, matching every other new-control convention in this project (Mono).
         beginTest("Waveshaper Type defaults to Fold - explicitly setting it to Fold is bit-identical to never touching it");
         {
             const int numSamples = (int) (2.0 * sampleRate);
@@ -518,200 +451,12 @@ public:
             expectEquals(diff, 0.0f, "explicitly selecting Fold should render bit-identical to never touching Waveshaper Type at all");
         }
 
-        beginTest("Waveshaper Type = Fuzz substantially changes the real plugin's rendered output vs Waveshape = 0%");
-        {
-            auto renderWithFuzz = [&](float waveshape) {
-                KarplunkAudioProcessor processor;
-                processor.prepareToPlay(sampleRate, 512);
-                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // Fuzz
-                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
-                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
-                auto midi = noteOnBuffer(60, 100);
-                processor.processBlock(buffer, midi);
-                return buffer;
-            };
-
-            auto withoutFuzz = renderWithFuzz(0.0f);
-            auto withFuzz = renderWithFuzz(1.0f);
-
-            const int numSamples = (int) (2.0 * sampleRate);
-            const int skipSamples = (int) (0.6 * sampleRate);
-            const int tailSamples = numSamples - skipSamples;
-
-            const auto baseline = rms(withoutFuzz.getReadPointer(0) + skipSamples, tailSamples);
-            const auto diff = rmsOfDifference(
-                withoutFuzz.getReadPointer(0) + skipSamples,
-                withFuzz.getReadPointer(0) + skipSamples,
-                tailSamples);
-
-            logMessage("Fuzz=0 tail RMS: " + juce::String(baseline, 6)
-                       + ", diff RMS: " + juce::String(diff, 6)
-                       + ", ratio: " + juce::String(diff / baseline, 4));
-
-            expect(diff > baseline * 0.05f);
-        }
-
-        beginTest("Fold and Fuzz produce measurably DIFFERENT output at the same Waveshape amount - the selector actually changes character");
-        {
-            auto renderWithType = [&](float type) {
-                KarplunkAudioProcessor processor;
-                processor.prepareToPlay(sampleRate, 512);
-                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, type);
-                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
-                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
-                auto midi = noteOnBuffer(60, 100);
-                processor.processBlock(buffer, midi);
-                return buffer;
-            };
-
-            auto foldOutput = renderWithType(0.0f);
-            auto fuzzOutput = renderWithType(1.0f);
-
-            const int numSamples = (int) (2.0 * sampleRate);
-            const int skipSamples = (int) (0.6 * sampleRate);
-            const int tailSamples = numSamples - skipSamples;
-
-            const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
-            const auto diff = rmsOfDifference(
-                foldOutput.getReadPointer(0) + skipSamples,
-                fuzzOutput.getReadPointer(0) + skipSamples,
-                tailSamples);
-
-            logMessage("Fold vs Fuzz at Waveshape=100% - Fold tail RMS: " + juce::String(foldRms, 6)
-                       + ", diff RMS: " + juce::String(diff, 6));
-
-            expect(diff > foldRms * 0.1f, "Fold and Fuzz should sound clearly different at the same Waveshape amount, not coincidentally similar");
-        }
-
-        beginTest("Waveshaper Type = Fuzz stays finite and bounded at the worst-case combination (max Decay, full Bow)");
-        {
-            KarplunkAudioProcessor processor;
-            processor.prepareToPlay(sampleRate, 512);
-            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // Fuzz
-            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
-            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-            setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
-            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
-            auto midi = noteOnBuffer(60, 100);
-            processor.processBlock(buffer, midi);
-
-            const auto* data = buffer.getReadPointer(0);
-            float peak = 0.0f;
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
-            {
-                expect(std::isfinite(data[i]), "output must stay finite through the real processor at Fuzz=100%");
-                peak = std::max(peak, std::abs(data[i]));
-            }
-
-            logMessage("Fuzz=100% worst-case peak: " + juce::String(peak, 4));
-            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
-        }
-
-        beginTest("Waveshaper Type = Saturate substantially changes the real plugin's rendered output vs Waveshape = 0%");
-        {
-            auto renderWithSaturate = [&](float waveshape) {
-                KarplunkAudioProcessor processor;
-                processor.prepareToPlay(sampleRate, 512);
-                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 2.0f); // Saturate
-                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
-                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
-                auto midi = noteOnBuffer(60, 100);
-                processor.processBlock(buffer, midi);
-                return buffer;
-            };
-
-            auto withoutSaturate = renderWithSaturate(0.0f);
-            auto withSaturate = renderWithSaturate(1.0f);
-
-            const int numSamples = (int) (2.0 * sampleRate);
-            const int skipSamples = (int) (0.6 * sampleRate);
-            const int tailSamples = numSamples - skipSamples;
-
-            const auto baseline = rms(withoutSaturate.getReadPointer(0) + skipSamples, tailSamples);
-            const auto diff = rmsOfDifference(
-                withoutSaturate.getReadPointer(0) + skipSamples,
-                withSaturate.getReadPointer(0) + skipSamples,
-                tailSamples);
-
-            logMessage("Saturate=0 tail RMS: " + juce::String(baseline, 6)
-                       + ", diff RMS: " + juce::String(diff, 6)
-                       + ", ratio: " + juce::String(diff / baseline, 4));
-
-            expect(diff > baseline * 0.05f);
-        }
-
-        beginTest("Fold, Fuzz, and Saturate each produce measurably DIFFERENT output at the same Waveshape amount");
-        {
-            auto renderWithType = [&](float type) {
-                KarplunkAudioProcessor processor;
-                processor.prepareToPlay(sampleRate, 512);
-                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, type);
-                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-                setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
-                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
-                auto midi = noteOnBuffer(60, 100);
-                processor.processBlock(buffer, midi);
-                return buffer;
-            };
-
-            auto foldOutput = renderWithType(0.0f);
-            auto fuzzOutput = renderWithType(1.0f);
-            auto saturateOutput = renderWithType(2.0f);
-
-            const int numSamples = (int) (2.0 * sampleRate);
-            const int skipSamples = (int) (0.6 * sampleRate);
-            const int tailSamples = numSamples - skipSamples;
-
-            const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
-            const auto diffFoldSaturate = rmsOfDifference(
-                foldOutput.getReadPointer(0) + skipSamples,
-                saturateOutput.getReadPointer(0) + skipSamples,
-                tailSamples);
-            const auto diffFuzzSaturate = rmsOfDifference(
-                fuzzOutput.getReadPointer(0) + skipSamples,
-                saturateOutput.getReadPointer(0) + skipSamples,
-                tailSamples);
-
-            logMessage("Fold vs Saturate diff RMS: " + juce::String(diffFoldSaturate, 6)
-                       + ", Fuzz vs Saturate diff RMS: " + juce::String(diffFuzzSaturate, 6));
-
-            expect(diffFoldSaturate > foldRms * 0.1f, "Fold and Saturate should sound clearly different at the same Waveshape amount");
-            expect(diffFuzzSaturate > foldRms * 0.1f, "Fuzz and Saturate should sound clearly different at the same Waveshape amount");
-        }
-
-        beginTest("Waveshaper Type = Saturate stays finite and bounded at the worst-case combination (max Decay, full Bow)");
-        {
-            KarplunkAudioProcessor processor;
-            processor.prepareToPlay(sampleRate, 512);
-            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 2.0f); // Saturate
-            setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
-            setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
-            setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
-            juce::AudioBuffer<float> buffer(2, (int) (4.0 * sampleRate));
-            auto midi = noteOnBuffer(60, 100);
-            processor.processBlock(buffer, midi);
-
-            const auto* data = buffer.getReadPointer(0);
-            float peak = 0.0f;
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
-            {
-                expect(std::isfinite(data[i]), "output must stay finite through the real processor at Saturate=100%");
-                peak = std::max(peak, std::abs(data[i]));
-            }
-
-            logMessage("Saturate=100% worst-case peak: " + juce::String(peak, 4));
-            expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
-        }
-
         beginTest("Waveshaper Type = BitCrush substantially changes the real plugin's rendered output vs Waveshape = 0%");
         {
             auto renderWithBitCrush = [&](float waveshape) {
                 KarplunkAudioProcessor processor;
                 processor.prepareToPlay(sampleRate, 512);
-                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 3.0f); // BitCrush
+                setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // BitCrush
                 setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
                 setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, waveshape);
                 juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
@@ -740,7 +485,7 @@ public:
             expect(diff > baseline * 0.05f);
         }
 
-        beginTest("Fold, Fuzz, Saturate, and BitCrush each produce measurably DIFFERENT output at the same Waveshape amount");
+        beginTest("Fold and BitCrush produce measurably DIFFERENT output at the same Waveshape amount - the selector actually changes character");
         {
             auto renderWithType = [&](float type) {
                 KarplunkAudioProcessor processor;
@@ -755,42 +500,32 @@ public:
             };
 
             auto foldOutput = renderWithType(0.0f);
-            auto fuzzOutput = renderWithType(1.0f);
-            auto saturateOutput = renderWithType(2.0f);
-            auto bitCrushOutput = renderWithType(3.0f);
+            auto bitCrushOutput = renderWithType(1.0f);
 
             const int numSamples = (int) (2.0 * sampleRate);
             const int skipSamples = (int) (0.6 * sampleRate);
             const int tailSamples = numSamples - skipSamples;
 
             const auto foldRms = rms(foldOutput.getReadPointer(0) + skipSamples, tailSamples);
-            const auto diffFoldBitCrush = rmsOfDifference(
+            const auto diff = rmsOfDifference(
                 foldOutput.getReadPointer(0) + skipSamples,
                 bitCrushOutput.getReadPointer(0) + skipSamples,
                 tailSamples);
-            const auto diffFuzzBitCrush = rmsOfDifference(
-                fuzzOutput.getReadPointer(0) + skipSamples,
-                bitCrushOutput.getReadPointer(0) + skipSamples,
-                tailSamples);
-            const auto diffSaturateBitCrush = rmsOfDifference(
-                saturateOutput.getReadPointer(0) + skipSamples,
-                bitCrushOutput.getReadPointer(0) + skipSamples,
-                tailSamples);
 
-            logMessage("Fold vs BitCrush diff RMS: " + juce::String(diffFoldBitCrush, 6)
-                       + ", Fuzz vs BitCrush diff RMS: " + juce::String(diffFuzzBitCrush, 6)
-                       + ", Saturate vs BitCrush diff RMS: " + juce::String(diffSaturateBitCrush, 6));
+            logMessage("Fold vs BitCrush at Waveshape=100% - Fold tail RMS: " + juce::String(foldRms, 6)
+                       + ", diff RMS: " + juce::String(diff, 6));
 
-            expect(diffFoldBitCrush > foldRms * 0.1f, "Fold and BitCrush should sound clearly different at the same Waveshape amount");
-            expect(diffFuzzBitCrush > foldRms * 0.1f, "Fuzz and BitCrush should sound clearly different at the same Waveshape amount");
-            expect(diffSaturateBitCrush > foldRms * 0.1f, "Saturate and BitCrush should sound clearly different at the same Waveshape amount");
+            expect(diff > foldRms * 0.1f, "Fold and BitCrush should sound clearly different at the same Waveshape amount, not coincidentally similar");
         }
 
+        // Regression test for the reported "massive feedback above ~7% Waveshape" bug: BitCrush's
+        // knob range is now compressed (bitCrushMaxAmountFraction, see KarplunkVoice.h) the same
+        // way Fold's already was, so even Waveshape=100% must stay bounded here.
         beginTest("Waveshaper Type = BitCrush stays finite and bounded at the worst-case combination (max Decay, full Bow)");
         {
             KarplunkAudioProcessor processor;
             processor.prepareToPlay(sampleRate, 512);
-            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 3.0f); // BitCrush
+            setRaw(processor, KarplunkAudioProcessor::waveshaperTypeParamID, 1.0f); // BitCrush
             setRaw(processor, KarplunkAudioProcessor::dampingParamID, 1.0f);
             setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
             setRaw(processor, KarplunkAudioProcessor::waveshapeParamID, 1.0f);
@@ -901,7 +636,7 @@ public:
 
         beginTest("Ring Mod combined with each Waveshaper Type stays finite and bounded at the worst-case combination");
         {
-            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            for (float waveshaperType : { 0.0f, 1.0f })
             {
                 KarplunkAudioProcessor processor;
                 processor.prepareToPlay(sampleRate, 512);
@@ -1049,7 +784,7 @@ public:
 
         beginTest("Topology=Dual combined with each Waveshaper Type and Ring Mod stays finite and bounded at the worst-case combination");
         {
-            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            for (float waveshaperType : { 0.0f, 1.0f })
             {
                 KarplunkAudioProcessor processor;
                 processor.prepareToPlay(sampleRate, 512);
@@ -1269,7 +1004,7 @@ public:
 
         beginTest("Loop Filter Type=Resonant + Topology=Dual + Cross-Couple + each Waveshaper Type + Ring Mod stays finite and bounded");
         {
-            for (float waveshaperType : { 0.0f, 1.0f, 2.0f, 3.0f })
+            for (float waveshaperType : { 0.0f, 1.0f })
             {
                 KarplunkAudioProcessor processor;
                 processor.prepareToPlay(sampleRate, 512);
@@ -1408,6 +1143,142 @@ public:
                     peak = std::max(peak, std::abs(data[i]));
                 }
                 expect(peak <= 2.5f, "peak output should stay within the same bound used elsewhere in this suite");
+            }
+        }
+
+        // Regression tests for a real, measured loudness-calibration pass: the user reported the
+        // default patch averaging -24 to -21dBFS (wanted ~-10dBFS), Mono ~9-16dB louder than the
+        // same note in Poly, Brightness=0 ~20dB quieter than Brightness=100%, a ~5-10dB attack-peak
+        // gain bump right around 10-14% Pluck/Bow, and Couple Delay dropping loudness ~10dB versus
+        // 0ms. Measured root causes and fixes - see PluginProcessor.cpp's own headroomSmoothed/
+        // masterPreGain comments, KarplunkExcitation.cpp's own brightnessCompensationAmount
+        // comment, and KarplunkVoice.h's own bowHumpCompensation/coupleDelayCompensation comments
+        // for the full story on each.
+        beginTest("Default patch attack peak lands close to -10dBFS");
+        {
+            KarplunkAudioProcessor processor;
+            processor.prepareToPlay(sampleRate, 512);
+            juce::AudioBuffer<float> buffer(2, (int) (0.1 * sampleRate));
+            auto midi = noteOnBuffer(60, 100);
+            processor.processBlock(buffer, midi);
+
+            const auto* data = buffer.getReadPointer(0);
+            float peak = 0.0f;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+                peak = std::max(peak, std::abs(data[i]));
+            const auto peakDb = 20.0f * std::log10(std::max(peak, 1.0e-9f));
+
+            logMessage("Default patch attack peak: " + juce::String(peakDb, 2) + "dB");
+            expect(peakDb > -13.0f && peakDb < -7.0f, "the default patch's attack peak should land close to -10dBFS");
+        }
+
+        beginTest("Mono and Poly render a single note at the same loudness");
+        {
+            auto renderPeak = [&](bool mono) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::monoParamID, mono ? 1.0f : 0.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (0.1 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                    peak = std::max(peak, std::abs(data[i]));
+                return peak;
+            };
+
+            const auto polyPeak = renderPeak(false);
+            const auto monoPeak = renderPeak(true);
+            const auto deltaDb = 20.0f * std::log10(monoPeak / polyPeak);
+
+            logMessage("Mono-Poly single-note delta: " + juce::String(deltaDb, 2) + "dB");
+            expect(std::abs(deltaDb) < 0.5f, "a single note should sound the same loudness in Mono and Poly, not favor either");
+        }
+
+        beginTest("Brightness=0 is meaningfully quieter than Brightness=100%, but not extremely so");
+        {
+            auto renderPeak = [&](float brightness) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::brightnessParamID, brightness);
+                juce::AudioBuffer<float> buffer(2, (int) (0.1 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                    peak = std::max(peak, std::abs(data[i]));
+                return peak;
+            };
+
+            const auto darkPeak = renderPeak(0.0f);
+            const auto brightPeak = renderPeak(1.0f);
+            const auto deltaDb = 20.0f * std::log10(darkPeak / brightPeak);
+
+            logMessage("Brightness 0-vs-100% delta: " + juce::String(deltaDb, 2) + "dB");
+            expect(deltaDb < -1.0f, "Brightness=0 should still read as noticeably quieter than Brightness=100%");
+            expect(deltaDb > -10.0f, "but not extremely so (this was measured at ~-20dB before compensation) - it's a tone control, not a mute");
+        }
+
+        beginTest("Pluck/Bow attack peak stays roughly flat across the whole compressed range - no large loudness bump");
+        {
+            KarplunkAudioProcessor baseline;
+            baseline.prepareToPlay(sampleRate, 512);
+            juce::AudioBuffer<float> baselineBuffer(2, (int) (0.1 * sampleRate));
+            auto baselineMidi = noteOnBuffer(60, 100);
+            baseline.processBlock(baselineBuffer, baselineMidi);
+            const auto* baselineData = baselineBuffer.getReadPointer(0);
+            float baselinePeak = 0.0f;
+            for (int i = 0; i < baselineBuffer.getNumSamples(); ++i)
+                baselinePeak = std::max(baselinePeak, std::abs(baselineData[i]));
+
+            for (float bow : { 0.02f, 0.05f, 0.08f, 0.1f, 0.14f, 0.2f, 0.3f })
+            {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, bow);
+                juce::AudioBuffer<float> buffer(2, (int) (0.1 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                const auto* data = buffer.getReadPointer(0);
+                float peak = 0.0f;
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                    peak = std::max(peak, std::abs(data[i]));
+                const auto deltaDb = 20.0f * std::log10(peak / baselinePeak);
+
+                logMessage("Pluck/Bow=" + juce::String(bow, 2) + " attack-peak delta vs pure pluck: " + juce::String(deltaDb, 2) + "dB");
+                expect(std::abs(deltaDb) < 4.0f,
+                       "attack peak shouldn't swing more than a few dB across the compressed Pluck/Bow range (this was measured at ~+5.4dB before compensation)");
+            }
+        }
+
+        beginTest("Couple Delay doesn't meaningfully change loudness versus 0ms, at any amount");
+        {
+            auto renderSettledRms = [&](float ms) {
+                KarplunkAudioProcessor processor;
+                processor.prepareToPlay(sampleRate, 512);
+                setRaw(processor, KarplunkAudioProcessor::topologyParamID, 1.0f);
+                setRaw(processor, KarplunkAudioProcessor::crossCoupleParamID, 0.7f);
+                setRaw(processor, KarplunkAudioProcessor::coupleDelayParamID, ms);
+                setRaw(processor, KarplunkAudioProcessor::bowAmountParamID, 1.0f);
+                juce::AudioBuffer<float> buffer(2, (int) (2.0 * sampleRate));
+                auto midi = noteOnBuffer(60, 100);
+                processor.processBlock(buffer, midi);
+                const int settleStart = (int) (1.5 * sampleRate);
+                const int windowSamples = (int) (0.4 * sampleRate);
+                return rms(buffer.getReadPointer(0) + settleStart, windowSamples);
+            };
+
+            const auto baselineRms = renderSettledRms(0.0f);
+            for (float ms : { 0.5f, 1.0f, 2.0f, 5.0f, 10.0f })
+            {
+                const auto r = renderSettledRms(ms);
+                const auto deltaDb = 20.0f * std::log10(r / baselineRms);
+
+                logMessage("CoupleDelay=" + juce::String(ms, 1) + "ms delta vs 0ms: " + juce::String(deltaDb, 2) + "dB");
+                expect(std::abs(deltaDb) < 2.0f,
+                       "Couple Delay shouldn't meaningfully change loudness vs 0ms, at any amount (this was measured at ~-2.8dB before compensation)");
             }
         }
     }

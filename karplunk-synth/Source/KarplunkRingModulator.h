@@ -8,11 +8,17 @@ namespace
 }
 
 // KarplunkRingModulator: multiplies a signal by a free-running sine oscillator - the classic ring
-// modulation effect (sum/difference sideband frequencies, not harmonically related to the input),
-// applied IN-LOOP (see KarplunkStringLineChannel::renderChannelSample()) rather than only to the final
-// output, at the user's explicit choice: multiplying the loop's own recirculating signal makes the
-// modulation part of what's actually resonating, compounding every pass, for a much more extreme/
-// metallic/inharmonic character than a bolted-on post-effect would give.
+// modulation effect (sum/difference sideband frequencies, not harmonically related to the input).
+//
+// Originally applied IN-LOOP (recirculated into the string, not just the final output) at the
+// user's explicit request, for a more extreme/metallic/inharmonic character than a bolted-on
+// post-effect would give. Reverted to OUTPUT-ONLY after being measured cutting a note's natural
+// decay severely even at tiny amounts - the oscillator's own near-zero crossings, multiplied into
+// the recirculating signal every single pass (thousands of times per second at a typical
+// fundamental), compounded into a note dying in well under 100ms even at Ring Mod=2%, reported by
+// the user as the control making notes sound like "a tiny metallic ping" instead of ringing out.
+// KarplunkStringLineChannel::renderChannelSample() now only calls process() on its OUTPUT-only
+// copy - see that call site's own comment.
 //
 // This is its own area, not a fourth Waveshaper Type, for two reasons: it needs its own Frequency
 // control (a modulator Hz, not just a 0-100% amount) that none of the Waveshaper curves have any
@@ -45,12 +51,10 @@ public:
         currentOscValue = 0.0f;
     }
 
-    // Call exactly once per sample tick, before any process() calls for that tick - advances the
-    // oscillator's own phase. Separated from process() (which is stateless and takes the signal to
-    // modulate) for the same reason KarplunkFuzz/KarplunkSaturator/KarplunkBitCrush split
-    // updateFilter()/process(): this gets called with TWO different signals per sample (the
-    // recirculating loop value and the audible output copy - see renderNextSample()) that must
-    // both hear the identical oscillator sample, not two different ones from advancing phase twice.
+    // Call exactly once per sample tick, before process() - advances the oscillator's own phase.
+    // Kept as a separate call (not folded into process()) for the same reason KarplunkBitCrush
+    // splits updateFilter()/process(): a shared per-sample state update, computed once, read via
+    // a separate accessor.
     void updateOscillator(float frequencyHz) noexcept
     {
         currentOscValue = std::sin(karplunkRingModulatorPi * 2.0f * phase);
@@ -64,10 +68,11 @@ public:
     // dry/wet blend - `x*(1-amount) + (x*oscValue)*amount == x*(1 + amount*(oscValue-1))` - and
     // has a real safety consequence: since oscValue is bounded to [-1, 1] and amount01 to [0, 1],
     // the resulting gain factor `1 + amount01*(oscValue-1)` is itself ALWAYS bounded to [-1, 1] -
-    // ring modulation can only ever shrink or invert a signal passing through it, never amplify it.
-    // Unlike every waveshaping curve in KarplunkWaveshaper.h, there is no loop-gain-runaway risk
-    // here at all, so this needs no driveCompensation-style split between what recirculates and
-    // what's heard - the identical call is correct for both.
+    // ring modulation can only ever shrink or invert a signal passing through it, never amplify it -
+    // still true and still relied on now that this is output-only (no risk of accidentally
+    // amplifying the audible copy), even though the old "no loop-gain-runaway risk, so no
+    // driveCompensation-style split needed" framing no longer applies now that there's no
+    // recirculating call to compare against at all.
     float process(float x, float amount01) const noexcept
     {
         const auto gain = 1.0f + amount01 * (currentOscValue - 1.0f);

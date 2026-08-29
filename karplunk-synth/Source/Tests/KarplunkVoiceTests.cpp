@@ -543,6 +543,35 @@ public:
             }
         }
 
+        // Regression test for a real, measured bug: BitCrush used to also be written back into
+        // the loop (like Fold still is), which was measured causing a classic zero-input limit
+        // cycle - a plucked note (no continuous excitation at all) that should decay to silence
+        // instead locked into a stable non-decaying buzz, or at higher amounts actively GREW over
+        // several seconds, reported by the user as "massive feedback" above a modest Waveshape
+        // setting. Now that BitCrush is output-only (never recirculated - see
+        // applyOutputEffects()'s own comment), a plucked note should decay to silence at ANY
+        // BitCrush amount, exactly like the un-shaped baseline.
+        beginTest("BitCrush no longer causes a non-decaying limit cycle - a plucked note decays to silence at any amount");
+        {
+            for (float waveshapeAmount : { 0.1f, 0.3f, 0.5f, 0.7f, 1.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.5f);
+                voice.setWaveshaperType(1); // BitCrush
+                voice.setWaveshapeAmount(waveshapeAmount);
+                voice.noteOn(60, 1.0f); // pluck only - bowAmount defaults to 0
+
+                constexpr int maxSamples = 44100 * 5;
+                int samples = 0;
+                for (; samples < maxSamples && voice.isActive(); ++samples)
+                    voice.renderNextSample();
+
+                expect(samples < maxSamples,
+                       "a plucked note should decay to silence within 5 seconds at any BitCrush amount, not lock into a limit cycle or grow");
+            }
+        }
+
         beginTest("Abruptly changing structure mid-note keeps output continuous, no discontinuity spike");
         {
             Voice voice;
@@ -1348,16 +1377,20 @@ public:
                 expectWithinAbsoluteError(withType.renderNextSample(), withoutTouchingType.renderNextSample(), 1.0e-6f);
         }
 
-        beginTest("Loop Filter Type=Resonant + Resonance=0 renders bit-identical to Loop Filter Type=Two-Point-Average");
+        // A real lowpass has no natural "off" state tied to Resonance any more (see
+        // KarplunkLoopFilter.h's own comment) - Resonance is just the filter's own Q now, and the
+        // filter is always genuinely applied whenever Loop Filter Type=Resonant is selected. The
+        // equivalent "basically off" state is Cutoff wide open relative to the note, same as a
+        // real analog synth filter fully open.
+        beginTest("Loop Filter Type=Resonant with Cutoff wide open renders near-identical to Loop Filter Type=Two-Point-Average");
         {
-            // Confirms the internal bypass fires even when the TYPE is switched but the AMOUNT is
-            // 0 - not just when the type is left untouched (the test above).
-            Voice resonantAtZero;
-            resonantAtZero.prepare(44100.0);
-            resonantAtZero.setDamping(0.6f);
-            resonantAtZero.setLoopFilterType(1);
-            resonantAtZero.setResonance(0.0f);
-            resonantAtZero.noteOn(60, 1.0f);
+            Voice resonantOpen;
+            resonantOpen.prepare(44100.0);
+            resonantOpen.setDamping(0.6f);
+            resonantOpen.setLoopFilterType(1);
+            resonantOpen.setResonance(0.0f);
+            resonantOpen.setFilterCutoff(18000.0f);
+            resonantOpen.noteOn(60, 1.0f);
 
             Voice twoPoint;
             twoPoint.prepare(44100.0);
@@ -1365,20 +1398,41 @@ public:
             twoPoint.setLoopFilterType(0);
             twoPoint.noteOn(60, 1.0f);
 
+            // RMS comparison, not a per-sample difference - the excitation's own noisy attack
+            // transient has real broadband content up near Nyquist, so even a near-transparent
+            // filter shifts its phase enough to make a per-sample diff look large (a classic
+            // noisy-signal artifact, not a real loudness/tone difference) - RMS level is the
+            // property that actually matters for "basically off."
+            double energyA = 0.0, energyB = 0.0;
             for (int i = 0; i < 4410; ++i)
-                expectWithinAbsoluteError(resonantAtZero.renderNextSample(), twoPoint.renderNextSample(), 1.0e-6f);
+            {
+                const auto a = resonantOpen.renderNextSample();
+                const auto b = twoPoint.renderNextSample();
+                energyA += (double) a * (double) a;
+                energyB += (double) b * (double) b;
+            }
+            const auto rmsA = std::sqrt(energyA / 4410.0);
+            const auto rmsB = std::sqrt(energyB / 4410.0);
+            expect(rmsA > rmsB * 0.85 && rmsA < rmsB * 1.15,
+                   "a wide-open Cutoff should render at nearly the same loudness as Two-Point Average, at any Resonance");
         }
 
-        beginTest("Loop Filter Type=Resonant at max Resonance/Damping produces bounded, decaying output across the full note range");
+        beginTest("Loop Filter Type=Resonant at max Resonance produces bounded, decaying output across the full note range");
         {
             for (int note : { Voice::kLowestSupportedMidiNote, 60, Voice::kHighestSupportedMidiNote })
             {
                 Voice voice;
                 voice.prepare(44100.0);
-                voice.setDamping(1.0f);
+                // Damping=0.6, not 1.0 - matches the sibling "Notes across the supported range"
+                // test's own convention (see its comment): Damping=1.0 is a genuinely long-sustain
+                // setting on its own (by design - that's what max Decay means), independent of
+                // Resonance now that Resonance no longer touches the loop's own gain/decay time at
+                // all (see KarplunkLoopFilter.h's own comment) - it would no longer be testing
+                // Resonance's own behavior to require decay-within-10s at Damping=1.0 here.
+                voice.setDamping(0.6f);
                 voice.setLoopFilterType(1);
                 voice.setResonance(1.0f);
-                voice.setFormantFrequency(1000.0f);
+                voice.setFilterCutoff(1000.0f);
                 voice.noteOn(note, 1.0f);
 
                 constexpr int maxSamples = 44100 * 10;
@@ -1394,9 +1448,106 @@ public:
             }
         }
 
-        beginTest("Loop Filter Type=Resonant worst-case stability: max Resonance/Damping/Bow, held for several seconds, Formant Frequency sweep");
+        // Regression test for a real, measured bug: Resonance/Ring Mod both used to run IN-LOOP
+        // (recirculated into the string), which was measured crushing a note's natural decay
+        // severely even at small amounts - reported by the user as the controls "cutting off the
+        // tail, sounding like a tiny metallic ping." Both are now output-only (never recirculated
+        // - see KarplunkLoopFilter.h/KarplunkRingModulator.h's own comments), so decay time at a
+        // fixed Damping should now be identical with either control at any amount, matching the
+        // plain Two-Point-Average baseline exactly.
+        beginTest("Resonance and Ring Mod no longer shorten a note's own decay time, at any amount");
         {
-            for (float formantHz : { 80.0f, 1000.0f, 8000.0f })
+            auto decaySamples = [](Voice& voice) {
+                voice.noteOn(60, 1.0f);
+                constexpr int maxSamples = 44100 * 5;
+                int samples = 0;
+                for (; samples < maxSamples && voice.isActive(); ++samples)
+                    voice.renderNextSample();
+                return samples;
+            };
+
+            Voice baseline;
+            baseline.prepare(44100.0);
+            baseline.setDamping(0.6f);
+            const auto baselineSamples = decaySamples(baseline);
+
+            for (float resonance : { 0.02f, 0.3f, 1.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.6f);
+                voice.setLoopFilterType(1);
+                voice.setResonance(resonance);
+                voice.setFilterCutoff(1000.0f);
+                const auto samples = decaySamples(voice);
+
+                expect(std::abs(samples - baselineSamples) < (int) (44100 * 0.1),
+                       "Resonance should not measurably change decay time, at any amount");
+            }
+
+            for (float ringMod : { 0.02f, 0.3f, 1.0f })
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.6f);
+                voice.setRingModAmount(ringMod);
+                voice.setRingModFrequency(200.0f);
+                const auto samples = decaySamples(voice);
+
+                expect(std::abs(samples - baselineSamples) < (int) (44100 * 0.1),
+                       "Ring Mod should not measurably change decay time, at any amount");
+            }
+        }
+
+        // Regression test for a second, independently-measured bug found while fixing the first:
+        // once Ring Mod (and BitCrush) stopped recirculating, applying them BEFORE Position's own
+        // tap-cancellation broke that cancellation's own correlation assumption (see
+        // applyOutputEffects()'s own comment) - measured making a Ring-Modulated, Position-tapped
+        // held bow note up to ~25x LOUDER than the same signal with Position off, the opposite of
+        // Ring Mod's own bounded-shrink-only safety property. Confirms Ring Mod now only ever
+        // reduces or leaves unchanged a held bow note's loudness, matching that safety property,
+        // regardless of Position.
+        beginTest("Ring Mod never makes a held, Position-tapped bow note louder than the same note without Ring Mod");
+        {
+            auto settledRms = [](Voice& voice) {
+                voice.setDamping(1.0f);
+                voice.setBowAmount(1.0f);
+                voice.noteOn(60, 1.0f);
+                constexpr int settleSamples = 44100 * 2;
+                for (int i = 0; i < settleSamples; ++i)
+                    voice.renderNextSample();
+                constexpr int windowSamples = 44100;
+                double sum = 0.0;
+                for (int i = 0; i < windowSamples; ++i)
+                {
+                    const auto s = voice.renderNextSample();
+                    sum += (double) s * (double) s;
+                }
+                return std::sqrt(sum / windowSamples);
+            };
+
+            for (float position : { 0.0f, 0.25f, 0.5f })
+            {
+                Voice without;
+                without.prepare(44100.0);
+                without.setPosition(position);
+                const auto rmsWithout = settledRms(without);
+
+                Voice with;
+                with.prepare(44100.0);
+                with.setPosition(position);
+                with.setRingModAmount(1.0f);
+                with.setRingModFrequency(200.0f);
+                const auto rmsWith = settledRms(with);
+
+                expect(rmsWith <= rmsWithout * 1.05f,
+                       "Ring Mod should never make a Position-tapped held bow note louder");
+            }
+        }
+
+        beginTest("Loop Filter Type=Resonant worst-case stability: max Resonance/Damping/Bow, held for several seconds, Cutoff sweep");
+        {
+            for (float cutoffHz : { 80.0f, 1000.0f, 8000.0f })
             {
                 Voice voice;
                 voice.prepare(44100.0);
@@ -1404,7 +1555,7 @@ public:
                 voice.setBowAmount(1.0f);
                 voice.setLoopFilterType(1);
                 voice.setResonance(1.0f);
-                voice.setFormantFrequency(formantHz);
+                voice.setFilterCutoff(cutoffHz);
                 voice.noteOn(60, 1.0f);
                 // Deliberately never calling noteOff() - held bow, the worst case for sustained energy.
 
@@ -1421,7 +1572,7 @@ public:
             }
         }
 
-        beginTest("Resonance measurably changes spectral content near the Formant Frequency vs Resonance=0%");
+        beginTest("Resonance measurably boosts spectral content near Cutoff vs Resonance=0%");
         {
             auto goertzelMagnitude = [](const std::vector<float>& buf, double omega) -> double
             {
@@ -1434,11 +1585,11 @@ public:
                 return std::sqrt(real * real + imag * imag);
             };
 
-            constexpr float formantHz = 1200.0f;
+            constexpr float cutoffHz = 1200.0f;
             constexpr double sampleRate = 44100.0;
-            const auto formantOmega = 2.0 * 3.14159265358979323846 * formantHz / sampleRate;
+            const auto cutoffOmega = 2.0 * 3.14159265358979323846 * cutoffHz / sampleRate;
 
-            auto measureNearFormant = [&](float resonance) -> double
+            auto measureNearCutoff = [&](float resonance) -> double
             {
                 Voice voice;
                 voice.prepare(sampleRate);
@@ -1446,8 +1597,8 @@ public:
                 voice.setBowAmount(1.0f); // continuous excitation - broadband content to shape
                 voice.setLoopFilterType(1);
                 voice.setResonance(resonance);
-                voice.setFormantFrequency(formantHz);
-                voice.noteOn(48, 1.0f); // a low note, so the formant sits well above the fundamental
+                voice.setFilterCutoff(cutoffHz);
+                voice.noteOn(48, 1.0f); // a low note, so Cutoff sits well above the fundamental
 
                 for (int i = 0; i < 22050; ++i)
                     voice.renderNextSample();
@@ -1457,16 +1608,16 @@ public:
                 for (auto& s : buf)
                     s = voice.renderNextSample();
 
-                return goertzelMagnitude(buf, formantOmega);
+                return goertzelMagnitude(buf, cutoffOmega);
             };
 
-            const auto magnitudeOff = measureNearFormant(0.0f);
-            const auto magnitudeOn = measureNearFormant(1.0f);
+            const auto magnitudeOff = measureNearCutoff(0.0f);
+            const auto magnitudeOn = measureNearCutoff(1.0f);
 
-            logMessage("Resonance=0 magnitude near Formant Freq: " + juce::String(magnitudeOff, 3)
+            logMessage("Resonance=0 magnitude near Cutoff: " + juce::String(magnitudeOff, 3)
                        + ", Resonance=100%: " + juce::String(magnitudeOn, 3));
 
-            expect(magnitudeOn > magnitudeOff * 1.5, "Resonance should measurably boost spectral content near the Formant Frequency");
+            expect(magnitudeOn > magnitudeOff * 1.5, "Resonance should measurably boost spectral content near Cutoff");
         }
 
         beginTest("Dual Topology + Loop Filter Type=Resonant at max Resonance/Cross-Couple/Bow stays bounded");
@@ -1479,7 +1630,7 @@ public:
             voice.setCrossCoupleAmount(1.0f);
             voice.setLoopFilterType(1);
             voice.setResonance(1.0f);
-            voice.setFormantFrequency(1000.0f);
+            voice.setFilterCutoff(1000.0f);
             voice.noteOn(60, 1.0f);
 
             constexpr int numSamples = 44100 * 4;

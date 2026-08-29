@@ -57,7 +57,6 @@ public:
     static constexpr auto structureParamID = "structure";
     static constexpr auto positionParamID = "position";
     static constexpr auto monoParamID = "mono";
-    static constexpr auto glideTimeParamID = "glideTime";
     static constexpr auto waveshapeParamID = "waveshape";
     static constexpr auto waveshaperTypeParamID = "waveshaperType";
     static constexpr auto ringModAmountParamID = "ringModAmount";
@@ -68,7 +67,10 @@ public:
     static constexpr auto detuneParamID = "detune";
     static constexpr auto loopFilterTypeParamID = "loopFilterType";
     static constexpr auto resonanceParamID = "resonance";
-    static constexpr auto formantFrequencyParamID = "formantFrequency";
+    static constexpr auto filterCutoffParamID = "filterCutoff";
+    static constexpr auto filterEnvAmountParamID = "filterEnvAmount";
+    static constexpr auto filterAttackParamID = "filterAttack";
+    static constexpr auto filterDecayParamID = "filterDecay";
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -83,7 +85,6 @@ private:
     std::atomic<float>* structureParam = nullptr;
     std::atomic<float>* positionParam = nullptr;
     std::atomic<float>* monoParam = nullptr;
-    std::atomic<float>* glideTimeParam = nullptr;
     std::atomic<float>* waveshapeParam = nullptr;
     std::atomic<float>* waveshaperTypeParam = nullptr;
     std::atomic<float>* ringModAmountParam = nullptr;
@@ -94,7 +95,10 @@ private:
     std::atomic<float>* detuneParam = nullptr;
     std::atomic<float>* loopFilterTypeParam = nullptr;
     std::atomic<float>* resonanceParam = nullptr;
-    std::atomic<float>* formantFrequencyParam = nullptr;
+    std::atomic<float>* filterCutoffParam = nullptr;
+    std::atomic<float>* filterEnvAmountParam = nullptr;
+    std::atomic<float>* filterAttackParam = nullptr;
+    std::atomic<float>* filterDecayParam = nullptr;
 
     using Voice = KarplunkVoice<KarplunkExcitation, LinearInterpolator>;
 
@@ -125,13 +129,13 @@ private:
     // normalized 0-1 value, so this is an int, not a bool.
     int previousTopology = 0;
 
-    // Fixed headroom applied to the summed voice output before Output Level, so a full chord at
-    // max velocity doesn't clip harder than a single note did in the mono scaffold. A constant
-    // (not activity-dependent) scale, so it doesn't itself introduce level pumping as voices
-    // come and go. Mono mode only ever sounds one voice, so it uses no headroom reduction at all
-    // (1.0) - applying the 8-voice headroom to a single mono voice would make mono notes sound
-    // noticeably quieter than the same note played in Poly for no reason.
-    static constexpr float polyHeadroomGain = 0.35355339f; // 1 / sqrt(numVoices)
+    // Adaptive headroom applied to the summed voice output before Output Level - scaled by how
+    // many voices are ACTUALLY active each sample (1/sqrt(activeCount), floored at 1 voice), not a
+    // fixed worst-case-chord assumption - see processBlock()'s own comment for the real, measured
+    // bug this replaced (Mono ~9dB louder than Poly for a single note, and Poly's own single-note
+    // loudness reserving headroom for a chord that wasn't playing). Smoothed like every other
+    // live-changing gain in this codebase, so a chord being struck/released doesn't snap the gain.
+    juce::SmoothedValue<float> headroomSmoothed;
 
     juce::SmoothedValue<float> dampingSmoothed;
     juce::SmoothedValue<float> outputLevelSmoothed;
@@ -171,12 +175,15 @@ private:
     // KarplunkVoice.h's own safety argument for why this needs no ceiling either).
     juce::SmoothedValue<float> coupleDelaySmoothed;
 
-    // Resonance/Formant Frequency are also live/every-sample, same convention as Waveshape/
-    // Structure - see KarplunkLoopFilter.h's own safety argument for why Resonance needs no
-    // ceiling either. Loop Filter Type itself is a discrete choice, read once per block like
-    // Waveshaper Type - see processBlock().
+    // Resonance/Filter Cutoff/Filter Envelope Amount/Attack/Decay are also live/every-sample, same
+    // convention as Waveshape/Structure - see KarplunkLoopFilter.h's own comment for why none of
+    // them need a safety ceiling (output-only, never recirculated). Loop Filter Type itself is a
+    // discrete choice, read once per block like Waveshaper Type - see processBlock().
     juce::SmoothedValue<float> resonanceSmoothed;
-    juce::SmoothedValue<float> formantFrequencySmoothed;
+    juce::SmoothedValue<float> filterCutoffSmoothed;
+    juce::SmoothedValue<float> filterEnvAmountSmoothed;
+    juce::SmoothedValue<float> filterAttackSmoothed;
+    juce::SmoothedValue<float> filterDecaySmoothed;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessor)
 };

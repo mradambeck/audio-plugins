@@ -9,6 +9,11 @@ namespace
     // (alpha = 0 would never update the filter state at all). At brightness = 1, alpha = 1.0,
     // an exact passthrough (raw white noise, no filtering).
     constexpr float minLowpassAlpha = 0.02f;
+
+    // See nextNoiseSample()'s own comment - what fraction of full RMS-parity compensation to
+    // apply across the Brightness range. 0.8 was measured to bring the full Brightness=0-vs-1 gap
+    // down from ~20dB to a modest, still-audible ~4dB.
+    constexpr float brightnessCompensationAmount = 0.8f;
 }
 
 void KarplunkExcitation::prepare(double sampleRate) noexcept
@@ -108,7 +113,20 @@ float KarplunkExcitation::nextNoiseSample() noexcept
 
     const auto alpha = minLowpassAlpha + brightness * (1.0f - minLowpassAlpha);
     lowpassState += alpha * (colored - lowpassState);
-    return lowpassState;
+
+    // Loudness compensation - see this class's own header comment (setBrightness()'s) for why a
+    // real, but not extreme, loudness drop toward Brightness=0 is the desired character (a fully
+    // darkened pluck reading as quieter is physically reasonable; a fully darkened pluck reading
+    // as ~20dB quieter, MEASURED before this compensation existed, is not - reported by the user).
+    // A one-pole lowpass driven by white noise has steady-state RMS gain sqrt(alpha/(2-alpha))
+    // relative to its own input (the standard one-pole-filtered-white-noise variance result) -
+    // brightnessCompensationAmount applies a TUNED FRACTION of the gain that would fully equalize
+    // RMS across the whole Brightness range (1.0 would remove the loudness drop entirely, which
+    // the user did NOT ask for) - 0.8 was measured to bring the full 0-vs-1 gap down from ~20dB to
+    // a modest, still-audible ~4dB. Exactly 1.0 at alpha=1 (Brightness=1) regardless of this
+    // constant, so the existing bit-exact passthrough there is unaffected.
+    const auto brightnessCompensationGain = std::pow((2.0f - alpha) / alpha, brightnessCompensationAmount * 0.5f);
+    return lowpassState * brightnessCompensationGain;
 }
 
 float KarplunkExcitation::nextBowNoiseSample() noexcept
