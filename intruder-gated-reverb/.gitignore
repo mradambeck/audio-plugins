@@ -1,0 +1,22 @@
+# Python virtualenv for analysis/ scripts - recreate with:
+#   python3 -m venv analysis/venv && source analysis/venv/bin/activate && pip install -r ../common/tools/requirements.txt soundfile
+analysis/venv/
+
+# Regenerable renders/plots from analysis/*.py and Source/Tools/RenderIR.cpp - rerun the scripts
+# to recreate. features.json/inventory.json/validation_results.json and the *.md reports ARE
+# committed (small, and the reports are the actual documentation deliverable).
+analysis/engine_renders/
+analysis/validation_renders/
+analysis/plots/
+analysis/validation_plots/
+rendered/
+
+# Installer build output
+installer/stage/
+installer/output/
+*.pkg
+
+# Adam's personal debug loops used to diagnose the gate-retrigger chattering bug (2026-08-29) -
+# not part of the plugin itself, don't belong in the repo.
+/BadVerb.wav
+/BadVerb-with-verb.wav

@@ -1,0 +1,401 @@
+[
+  {
+    "envelope_correlation": 0.8956,
+    "log_spectral_distance_db": 4.412,
+    "spectral_band_diff_db": {
+      "low": 4.13,
+      "mid": 2.53,
+      "high": 4.85
+    },
+    "crest_factor_ref_db": 13.67,
+    "crest_factor_render_db": 13.16,
+    "crest_factor_diff_db": -0.51,
+    "spectral_flatness_ref_db": -15.97,
+    "spectral_flatness_render_db": -20.95,
+    "spectral_flatness_diff_db": -4.98,
+    "filename": "NonLin_0.1s_-3H.wav",
+    "decay_label_s": 0.1,
+    "h_db": -3,
+    "tighter": false,
+    "ref_rt60_s": 0.1918,
+    "ref_full_decay_rt60_s": 0.3352
+  },
+  {
+    "envelope_correlation": 0.9321,
+    "log_spectral_distance_db": 9.667,
+    "spectral_band_diff_db": {
+      "low": 9.81,
+      "mid": 8.13,
+      "high": 11.36
+    },
+    "crest_factor_ref_db": 13.03,
+    "crest_factor_render_db": 13.05,
+    "crest_factor_diff_db": 0.02,
+    "spectral_flatness_ref_db": -18.79,
+    "spectral_flatness_render_db": -18.34,
+    "spectral_flatness_diff_db": 0.45,
+    "filename": "NonLin_0.1s_-3H_1_Tighter.wav",
+    "decay_label_s": 0.1,
+    "h_db": -3,
+    "tighter": true,
+    "ref_rt60_s": 0.1907,
+    "ref_full_decay_rt60_s": 0.3242
+  },
+  {
+    "envelope_correlation": 0.9267,
+    "log_spectral_distance_db": 9.672,
+    "spectral_band_diff_db": {
+      "low": 9.94,
+      "mid": 8.06,
+      "high": 11.22
+    },
+    "crest_factor_ref_db": 13.1,
+    "crest_factor_render_db": 13.0,
+    "crest_factor_diff_db": -0.1,
+    "spectral_flatness_ref_db": -18.68,
+    "spectral_flatness_render_db": -18.59,
+    "spectral_flatness_diff_db": 0.1,
+    "filename": "NonLin_0.1s_-3H_Tighter.wav",
+    "decay_label_s": 0.1,
+    "h_db": -3,
+    "tighter": true,
+    "ref_rt60_s": 0.1908,
+    "ref_full_decay_rt60_s": 0.3286
+  },
+  {
+    "envelope_correlation": 0.888,
+    "log_spectral_distance_db": 4.998,
+    "spectral_band_diff_db": {
+      "low": 4.93,
+      "mid": 3.33,
+      "high": 5.65
+    },
+    "crest_factor_ref_db": 14.11,
+    "crest_factor_render_db": 13.16,
+    "crest_factor_diff_db": -0.95,
+    "spectral_flatness_ref_db": -15.04,
+    "spectral_flatness_render_db": -21.53,
+    "spectral_flatness_diff_db": -6.49,
+    "filename": "NonLin_0.8s_-3H.wav",
+    "decay_label_s": 0.8,
+    "h_db": -3,
+    "tighter": false,
+    "ref_rt60_s": 0.1918,
+    "ref_full_decay_rt60_s": 0.3443
+  },
+  {
+    "envelope_correlation": 0.9371,
+    "log_spectral_distance_db": 6.961,
+    "spectral_band_diff_db": {
+      "low": 6.85,
+      "mid": 5.61,
+      "high": 8.26
+    },
+    "crest_factor_ref_db": 12.77,
+    "crest_factor_render_db": 13.0,
+    "crest_factor_diff_db": 0.23,
+    "spectral_flatness_ref_db": -16.19,
+    "spectral_flatness_render_db": -19.42,
+    "spectral_flatness_diff_db": -3.23,
+    "filename": "NonLin_0.8s_-3H_1_Tighter.wav",
+    "decay_label_s": 0.8,
+    "h_db": -3,
+    "tighter": true,
+    "ref_rt60_s": 0.1912,
+    "ref_full_decay_rt60_s": 0.3257
+  },
+  {
+    "envelope_correlation": 0.8635,
+    "log_spectral_distance_db": 2.602,
+    "spectral_band_diff_db": {
+      "low": 3.13,
+      "mid": -0.15,
+      "high": 2.19
+    },
+    "crest_factor_ref_db": 14.27,
+    "crest_factor_render_db": 12.04,
+    "crest_factor_diff_db": -2.24,
+    "spectral_flatness_ref_db": -6.42,
+    "spectral_flatness_render_db": -32.89,
+    "spectral_flatness_diff_db": -26.46,
+    "filename": "NonLin_2.2s_0H.wav",
+    "decay_label_s": 2.2,
+    "h_db": 0,
+    "tighter": false,
+    "ref_rt60_s": 0.2285,
+    "ref_full_decay_rt60_s": 0.4098
+  },
+  {
+    "envelope_correlation": 0.9923,
+    "log_spectral_distance_db": 4.989,
+    "spectral_band_diff_db": {
+      "low": 6.02,
+      "mid": 2.41,
+      "high": 5.34
+    },
+    "crest_factor_ref_db": 13.99,
+    "crest_factor_render_db": 12.04,
+    "crest_factor_diff_db": -1.95,
+    "spectral_flatness_ref_db": -7.99,
+    "spectral_flatness_render_db": -29.29,
+    "spectral_flatness_diff_db": -21.3,
+    "filename": "NonLin_2.2s_0H_Tighter.wav",
+    "decay_label_s": 2.2,
+    "h_db": 0,
+    "tighter": true,
+    "ref_rt60_s": 0.2265,
+    "ref_full_decay_rt60_s": 0.388
+  },
+  {
+    "envelope_correlation": 0.7054,
+    "log_spectral_distance_db": 2.2,
+    "spectral_band_diff_db": {
+      "low": 2.69,
+      "mid": -0.98,
+      "high": 0.68
+    },
+    "crest_factor_ref_db": 14.61,
+    "crest_factor_render_db": 11.19,
+    "crest_factor_diff_db": -3.42,
+    "spectral_flatness_ref_db": -4.75,
+    "spectral_flatness_render_db": -40.39,
+    "spectral_flatness_diff_db": -35.64,
+    "filename": "NonLin_4.8s_0H.wav",
+    "decay_label_s": 4.8,
+    "h_db": 0,
+    "tighter": false,
+    "ref_rt60_s": 0.3209,
+    "ref_full_decay_rt60_s": 0.4752
+  },
+  {
+    "envelope_correlation": 0.8766,
+    "log_spectral_distance_db": 2.254,
+    "spectral_band_diff_db": {
+      "low": 1.73,
+      "mid": -0.7,
+      "high": 1.39
+    },
+    "crest_factor_ref_db": 14.6,
+    "crest_factor_render_db": 12.38,
+    "crest_factor_diff_db": -2.22,
+    "spectral_flatness_ref_db": -5.49,
+    "spectral_flatness_render_db": -27.57,
+    "spectral_flatness_diff_db": -22.08,
+    "filename": "NonLin_4.8s_0H_Tighter.wav",
+    "decay_label_s": 4.8,
+    "h_db": 0,
+    "tighter": true,
+    "ref_rt60_s": 0.3152,
+    "ref_full_decay_rt60_s": 0.3669
+  },
+  {
+    "envelope_correlation": 0.6915,
+    "log_spectral_distance_db": 1.832,
+    "spectral_band_diff_db": {
+      "low": -0.3,
+      "mid": -2.09,
+      "high": 0.22
+    },
+    "crest_factor_ref_db": 12.4,
+    "crest_factor_render_db": 11.87,
+    "crest_factor_diff_db": -0.52,
+    "spectral_flatness_ref_db": -11.23,
+    "spectral_flatness_render_db": -34.51,
+    "spectral_flatness_diff_db": -23.28,
+    "filename": "NonLin_7.0s_-7H.wav",
+    "decay_label_s": 7.0,
+    "h_db": -7,
+    "tighter": false,
+    "ref_rt60_s": 0.4205,
+    "ref_full_decay_rt60_s": 0.4682
+  },
+  {
+    "envelope_correlation": 0.8411,
+    "log_spectral_distance_db": 2.144,
+    "spectral_band_diff_db": {
+      "low": 0.01,
+      "mid": -1.49,
+      "high": 1.41
+    },
+    "crest_factor_ref_db": 11.82,
+    "crest_factor_render_db": 12.18,
+    "crest_factor_diff_db": 0.36,
+    "spectral_flatness_ref_db": -12.04,
+    "spectral_flatness_render_db": -32.31,
+    "spectral_flatness_diff_db": -20.27,
+    "filename": "NonLin_7.0s_-7H_Tighter.wav",
+    "decay_label_s": 7.0,
+    "h_db": -7,
+    "tighter": true,
+    "ref_rt60_s": 0.4118,
+    "ref_full_decay_rt60_s": 0.3994
+  },
+  {
+    "envelope_correlation": 0.6473,
+    "log_spectral_distance_db": 2.702,
+    "spectral_band_diff_db": {
+      "low": -1.73,
+      "mid": -3.79,
+      "high": -2.11
+    },
+    "crest_factor_ref_db": 13.0,
+    "crest_factor_render_db": 11.98,
+    "crest_factor_diff_db": -1.02,
+    "spectral_flatness_ref_db": -5.99,
+    "spectral_flatness_render_db": -33.72,
+    "spectral_flatness_diff_db": -27.72,
+    "filename": "NonLin_7.0s_0H.wav",
+    "decay_label_s": 7.0,
+    "h_db": 0,
+    "tighter": false,
+    "ref_rt60_s": 0.432,
+    "ref_full_decay_rt60_s": 0.4231
+  },
+  {
+    "envelope_correlation": 0.8214,
+    "log_spectral_distance_db": 3.298,
+    "spectral_band_diff_db": {
+      "low": -2.8,
+      "mid": -3.97,
+      "high": -2.01
+    },
+    "crest_factor_ref_db": 12.47,
+    "crest_factor_render_db": 12.74,
+    "crest_factor_diff_db": 0.26,
+    "spectral_flatness_ref_db": -9.02,
+    "spectral_flatness_render_db": -22.12,
+    "spectral_flatness_diff_db": -13.1,
+    "filename": "NonLin_7.0s_0H_Tighter.wav",
+    "decay_label_s": 7.0,
+    "h_db": 0,
+    "tighter": true,
+    "ref_rt60_s": 0.4134,
+    "ref_full_decay_rt60_s": 0.3463
+  },
+  {
+    "envelope_correlation": 0.6842,
+    "log_spectral_distance_db": 2.172,
+    "spectral_band_diff_db": {
+      "low": -0.09,
+      "mid": -2.81,
+      "high": -1.46
+    },
+    "crest_factor_ref_db": 11.98,
+    "crest_factor_render_db": 11.9,
+    "crest_factor_diff_db": -0.08,
+    "spectral_flatness_ref_db": -11.35,
+    "spectral_flatness_render_db": -33.43,
+    "spectral_flatness_diff_db": -22.08,
+    "filename": "NonLin_9.8s_-4H.wav",
+    "decay_label_s": 9.8,
+    "h_db": -4,
+    "tighter": false,
+    "ref_rt60_s": 0.4899,
+    "ref_full_decay_rt60_s": 0.4583
+  },
+  {
+    "envelope_correlation": 0.8387,
+    "log_spectral_distance_db": 2.598,
+    "spectral_band_diff_db": {
+      "low": -0.95,
+      "mid": -2.83,
+      "high": -0.83
+    },
+    "crest_factor_ref_db": 11.22,
+    "crest_factor_render_db": 12.52,
+    "crest_factor_diff_db": 1.3,
+    "spectral_flatness_ref_db": -14.68,
+    "spectral_flatness_render_db": -18.03,
+    "spectral_flatness_diff_db": -3.36,
+    "filename": "NonLin_9.8s_-4H_Tighter.wav",
+    "decay_label_s": 9.8,
+    "h_db": -4,
+    "tighter": true,
+    "ref_rt60_s": 0.4504,
+    "ref_full_decay_rt60_s": 0.3634
+  },
+  {
+    "envelope_correlation": 0.7018,
+    "log_spectral_distance_db": 1.925,
+    "spectral_band_diff_db": {
+      "low": -1.39,
+      "mid": -2.43,
+      "high": 0.43
+    },
+    "crest_factor_ref_db": 11.35,
+    "crest_factor_render_db": 11.62,
+    "crest_factor_diff_db": 0.26,
+    "spectral_flatness_ref_db": -12.48,
+    "spectral_flatness_render_db": -34.3,
+    "spectral_flatness_diff_db": -21.82,
+    "filename": "NonLin_9.8s_-9H.wav",
+    "decay_label_s": 9.8,
+    "h_db": -9,
+    "tighter": false,
+    "ref_rt60_s": 0.4923,
+    "ref_full_decay_rt60_s": 0.4908
+  },
+  {
+    "envelope_correlation": 0.8798,
+    "log_spectral_distance_db": 2.051,
+    "spectral_band_diff_db": {
+      "low": -0.61,
+      "mid": -1.31,
+      "high": 2.18
+    },
+    "crest_factor_ref_db": 10.48,
+    "crest_factor_render_db": 11.95,
+    "crest_factor_diff_db": 1.47,
+    "spectral_flatness_ref_db": -14.38,
+    "spectral_flatness_render_db": -32.69,
+    "spectral_flatness_diff_db": -18.31,
+    "filename": "NonLin_9.8s_-9H_Tighter.wav",
+    "decay_label_s": 9.8,
+    "h_db": -9,
+    "tighter": true,
+    "ref_rt60_s": 0.4551,
+    "ref_full_decay_rt60_s": 0.4262
+  },
+  {
+    "envelope_correlation": 0.6355,
+    "log_spectral_distance_db": 2.706,
+    "spectral_band_diff_db": {
+      "low": -1.7,
+      "mid": -3.82,
+      "high": -2.19
+    },
+    "crest_factor_ref_db": 12.93,
+    "crest_factor_render_db": 11.8,
+    "crest_factor_diff_db": -1.13,
+    "spectral_flatness_ref_db": -5.63,
+    "spectral_flatness_render_db": -30.4,
+    "spectral_flatness_diff_db": -24.77,
+    "filename": "NonLin_9.8s_0H.wav",
+    "decay_label_s": 9.8,
+    "h_db": 0,
+    "tighter": false,
+    "ref_rt60_s": 0.4879,
+    "ref_full_decay_rt60_s": 0.4311
+  },
+  {
+    "envelope_correlation": 0.8324,
+    "log_spectral_distance_db": 3.352,
+    "spectral_band_diff_db": {
+      "low": -2.99,
+      "mid": -4.04,
+      "high": -2.05
+    },
+    "crest_factor_ref_db": 12.35,
+    "crest_factor_render_db": 12.74,
+    "crest_factor_diff_db": 0.38,
+    "spectral_flatness_ref_db": -9.87,
+    "spectral_flatness_render_db": -20.69,
+    "spectral_flatness_diff_db": -10.81,
+    "filename": "NonLin_9.8s_0H_Tighter.wav",
+    "decay_label_s": 9.8,
+    "h_db": 0,
+    "tighter": true,
+    "ref_rt60_s": 0.4455,
+    "ref_full_decay_rt60_s": 0.349
+  }
+]

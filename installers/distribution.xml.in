@@ -44,6 +44,11 @@
             <line choice="choice_shields_vst3"/>
             <line choice="choice_shields_standalone"/>
         </line>
+        <line choice="choice_intruder">
+            <line choice="choice_intruder_au"/>
+            <line choice="choice_intruder_vst3"/>
+            <line choice="choice_intruder_standalone"/>
+        </line>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
@@ -123,6 +128,17 @@
         <pkg-ref id="com.wildjag.shields.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_intruder" title="Intruder - Reverb" description="Intruder - non-linear gated reverb."/>
+    <choice id="choice_intruder_au" title="Audio Unit (AU)" description="Installs Intruder - Reverb.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.intruder.au.pkg"/>
+    </choice>
+    <choice id="choice_intruder_vst3" title="VST3" description="Installs Intruder - Reverb.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.intruder.vst3.pkg"/>
+    </choice>
+    <choice id="choice_intruder_standalone" title="Standalone App" description="Installs Intruder - Reverb.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.intruder.standalone.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -150,4 +166,8 @@
     <pkg-ref id="com.wildjag.shields.au.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.shields.vst3.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.shields.standalone.pkg" version="__SHIELDS_VERSION__" onConclusion="none">Shields-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.intruder.au.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.intruder.vst3.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.intruder.standalone.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

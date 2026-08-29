@@ -10,6 +10,7 @@
 <li><b>Alloy</b> v__ALLOY_VERSION__ - industrial bass synth</li>
 <li><b>Gradient</b> v__GRADIENT_VERSION__ - pitch shifting delay</li>
 <li><b>Shields</b> v__SHIELDS_VERSION__ - diffuse reverb</li>
+<li><b>Intruder</b> v__INTRUDER_VERSION__ - non-linear gated reverb</li>
 </ul>
 <p>You'll also be asked whether to install for all users of this Mac (<code>/Library/Audio/Plug-Ins</code>, <code>/Applications</code> - requires an administrator password) or just for you (<code>~/Library/Audio/Plug-Ins</code>, <code>~/Applications</code> - no password needed). Both are locations every AU/VST3 host scans.</p>
 <p>Restart your DAW (or run AU validation) after installing so it picks up the new plugins.</p>

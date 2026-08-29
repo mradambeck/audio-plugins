@@ -45,6 +45,7 @@ jobs:
               "alloy-bass",
               "gradient-pitch",
               "shields-reverb",
+              "intruder-gated-reverb",
               "karplunk-synth",
           ]
 

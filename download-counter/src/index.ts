@@ -17,6 +17,7 @@ const PLUGIN_SLUGS = [
   "alloy",
   "gradient",
   "shields",
+  "intruder",
 ] as const;
 type PluginSlug = (typeof PLUGIN_SLUGS)[number];
 
