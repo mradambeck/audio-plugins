@@ -21,6 +21,8 @@
   --gradient-muted: #ce7954;
   --shields: #d74377;
   --shields-muted: #a74467;
+  --intruder: #bbc32a;
+  --intruder-muted: #a1a45c;
 }
 
 * {
@@ -383,6 +385,13 @@ header p.sub {
 .card[data-plugin="shields"] .btn-accent {
   background: var(--shields);
   color: #2f0e1a;
+}
+.card[data-plugin="intruder"] h3 {
+  color: var(--intruder);
+}
+.card[data-plugin="intruder"] .btn-accent {
+  background: var(--intruder);
+  color: #282815;
 }
 
 /* Notes */
