@@ -1,0 +1,256 @@
+{
+  "files": [
+    {
+      "filename": "NonLin_0.1s_-3H.wav",
+      "decay_label_s": 0.1,
+      "h_db": -3,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.387,
+      "frames": 17050
+    },
+    {
+      "filename": "NonLin_0.1s_-3H_1_Tighter.wav",
+      "decay_label_s": 0.1,
+      "h_db": -3,
+      "variant": 1,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.355,
+      "frames": 15655
+    },
+    {
+      "filename": "NonLin_0.1s_-3H_Tighter.wav",
+      "decay_label_s": 0.1,
+      "h_db": -3,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.356,
+      "frames": 15706
+    },
+    {
+      "filename": "NonLin_0.8s_-3H.wav",
+      "decay_label_s": 0.8,
+      "h_db": -3,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.322,
+      "frames": 14202
+    },
+    {
+      "filename": "NonLin_0.8s_-3H_1_Tighter.wav",
+      "decay_label_s": 0.8,
+      "h_db": -3,
+      "variant": 1,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.305,
+      "frames": 13441
+    },
+    {
+      "filename": "NonLin_2.2s_0H.wav",
+      "decay_label_s": 2.2,
+      "h_db": 0,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.381,
+      "frames": 16796
+    },
+    {
+      "filename": "NonLin_2.2s_0H_Tighter.wav",
+      "decay_label_s": 2.2,
+      "h_db": 0,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.347,
+      "frames": 15317
+    },
+    {
+      "filename": "NonLin_4.8s_0H.wav",
+      "decay_label_s": 4.8,
+      "h_db": 0,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.438,
+      "frames": 19335
+    },
+    {
+      "filename": "NonLin_4.8s_0H_Tighter.wav",
+      "decay_label_s": 4.8,
+      "h_db": 0,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.405,
+      "frames": 17854
+    },
+    {
+      "filename": "NonLin_7.0s_-7H.wav",
+      "decay_label_s": 7.0,
+      "h_db": -7,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.718,
+      "frames": 31659
+    },
+    {
+      "filename": "NonLin_7.0s_-7H_Tighter.wav",
+      "decay_label_s": 7.0,
+      "h_db": -7,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.677,
+      "frames": 29842
+    },
+    {
+      "filename": "NonLin_7.0s_0H.wav",
+      "decay_label_s": 7.0,
+      "h_db": 0,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.824,
+      "frames": 36317
+    },
+    {
+      "filename": "NonLin_7.0s_0H_Tighter.wav",
+      "decay_label_s": 7.0,
+      "h_db": 0,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.777,
+      "frames": 34273
+    },
+    {
+      "filename": "NonLin_9.8s_-4H.wav",
+      "decay_label_s": 9.8,
+      "h_db": -4,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.976,
+      "frames": 43028
+    },
+    {
+      "filename": "NonLin_9.8s_-4H_Tighter.wav",
+      "decay_label_s": 9.8,
+      "h_db": -4,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.914,
+      "frames": 40310
+    },
+    {
+      "filename": "NonLin_9.8s_-9H.wav",
+      "decay_label_s": 9.8,
+      "h_db": -9,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.823,
+      "frames": 36312
+    },
+    {
+      "filename": "NonLin_9.8s_-9H_Tighter.wav",
+      "decay_label_s": 9.8,
+      "h_db": -9,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.762,
+      "frames": 33595
+    },
+    {
+      "filename": "NonLin_9.8s_0H.wav",
+      "decay_label_s": 9.8,
+      "h_db": 0,
+      "variant": null,
+      "tighter": false,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.879,
+      "frames": 38770
+    },
+    {
+      "filename": "NonLin_9.8s_0H_Tighter.wav",
+      "decay_label_s": 9.8,
+      "h_db": 0,
+      "variant": null,
+      "tighter": true,
+      "samplerate": 44100,
+      "channels": 2,
+      "subtype": "PCM_24",
+      "duration_s": 0.816,
+      "frames": 35966
+    }
+  ],
+  "samplerates": [
+    44100
+  ],
+  "subtypes": [
+    "PCM_24"
+  ],
+  "channels": [
+    2
+  ],
+  "decay_labels": [
+    0.1,
+    0.8,
+    2.2,
+    4.8,
+    7.0,
+    9.8
+  ],
+  "h_values": [
+    -9,
+    -7,
+    -4,
+    -3,
+    0
+  ]
+}
