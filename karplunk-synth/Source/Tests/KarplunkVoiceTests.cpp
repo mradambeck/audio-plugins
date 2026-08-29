@@ -103,23 +103,27 @@ public:
                 voice.setDamping(0.6f);
                 voice.noteOn(note, 1.0f);
 
-                // 10s, not 5s: decay time is genuinely pitch-dependent at fixed damping (see
-                // TwoPointAverageLoopFilter's own comment) - the lowest supported note (A0) takes
-                // ~7s to fully cross the silence-hold threshold at this damping setting, confirmed
-                // empirically. This isn't a bug to fix, just headroom the test needs to account for.
-                constexpr int maxSamples = 44100 * 10;
+                // 30s: decay time is genuinely pitch-dependent at fixed damping (see
+                // TwoPointAverageLoopFilter's own comment) - the lowest supported note now takes
+                // ~23.5s to fully cross the silence-hold threshold at this damping setting
+                // (measured after the note range was widened down to MIDI 0, ~8.18Hz - the
+                // previous MIDI-21 floor only took ~7s). This isn't a bug to fix, just headroom
+                // the test needs to account for.
+                constexpr int maxSamples = 44100 * 30;
                 int samples = 0;
                 for (; samples < maxSamples && voice.isActive(); ++samples)
                 {
                     const auto sample = voice.renderNextSample();
-                    // Bound raised 1.5 -> 2.5, same Position-related reason as the single-note
-                    // test above - the highest supported note (shortest delay) is measurably the
-                    // worst case (up to ~2.2 peak, confirmed empirically), since Position's tap
-                    // length there can be under a sample.
-                    expect(std::abs(sample) <= 2.5f, "output should stay bounded across the whole supported note range");
+                    // Bound raised 1.5 -> 2.5 -> 3.0. The 2.5 step was Position-related, same
+                    // reason as the single-note test above (the highest supported note's own
+                    // short delay makes its own tap length sub-sample). The 3.0 step is the SAME
+                    // mechanism at the opposite (now much lower) extreme: the lowest supported
+                    // note's own pluck transient combined with Position's tap measured peaking at
+                    // ~2.86 after the note range was widened down to MIDI 0.
+                    expect(std::abs(sample) <= 3.0f, "output should stay bounded across the whole supported note range");
                 }
 
-                expect(samples < maxSamples, "every supported note should decay to silence within 10 seconds");
+                expect(samples < maxSamples, "every supported note should decay to silence within 30 seconds");
             }
         }
 
@@ -570,6 +574,134 @@ public:
                 expect(samples < maxSamples,
                        "a plucked note should decay to silence within 5 seconds at any BitCrush amount, not lock into a limit cycle or grow");
             }
+        }
+
+        // Distortion Position (Pre/Post Filter) - new control at the user's explicit request, so
+        // Fold/BitCrush can sit before or after the Resonant loop filter's own coloring. See
+        // KarplunkVoice.h's setDistortionPosition() comment for the exact scope.
+        beginTest("Distortion Position defaults to Pre Filter - explicitly setting it is bit-identical to never touching it");
+        {
+            for (int waveshaperType : { 0, 1 })
+            {
+                Voice withoutTouching;
+                withoutTouching.prepare(44100.0);
+                withoutTouching.setDamping(0.6f);
+                withoutTouching.setLoopFilterType(1);
+                withoutTouching.setResonance(1.0f);
+                withoutTouching.setWaveshaperType(waveshaperType);
+                withoutTouching.setWaveshapeAmount(1.0f);
+                withoutTouching.noteOn(60, 1.0f);
+
+                Voice explicitPre;
+                explicitPre.prepare(44100.0);
+                explicitPre.setDamping(0.6f);
+                explicitPre.setLoopFilterType(1);
+                explicitPre.setResonance(1.0f);
+                explicitPre.setWaveshaperType(waveshaperType);
+                explicitPre.setWaveshapeAmount(1.0f);
+                explicitPre.setDistortionPosition(0);
+                explicitPre.noteOn(60, 1.0f);
+
+                for (int i = 0; i < 22050; ++i)
+                    expectWithinAbsoluteError(withoutTouching.renderNextSample(), explicitPre.renderNextSample(), 1.0e-6f);
+            }
+        }
+
+        beginTest("Distortion Position: Pre vs Post Filter renders measurably different output, for both Fold and BitCrush, when Loop Filter Type=Resonant");
+        {
+            for (int waveshaperType : { 0, 1 })
+            {
+                auto render = [&](int distortionPosition) {
+                    Voice voice;
+                    voice.prepare(44100.0);
+                    voice.setDamping(0.9f);
+                    voice.setBowAmount(1.0f); // continuous excitation, loud enough that max BitCrush
+                                              // (2-bit) doesn't quantize the whole signal to exact
+                                              // zero - a quieter bow amount was tried first and
+                                              // measured producing bit-identical (all-zero) output
+                                              // for BOTH positions, a degenerate, uninformative test
+                    voice.setLoopFilterType(1);
+                    voice.setResonance(1.0f);
+                    voice.setFilterCutoff(800.0f); // well below the excitation's own broadband content
+                    voice.setWaveshaperType(waveshaperType);
+                    voice.setWaveshapeAmount(1.0f);
+                    voice.setDistortionPosition(distortionPosition);
+                    voice.noteOn(60, 1.0f);
+
+                    for (int i = 0; i < 22050; ++i)
+                        voice.renderNextSample();
+
+                    double sumSquares = 0.0;
+                    constexpr int window = 8192;
+                    for (int i = 0; i < window; ++i)
+                    {
+                        const auto s = voice.renderNextSample();
+                        sumSquares += (double) s * (double) s;
+                    }
+                    return (float) std::sqrt(sumSquares / window);
+                };
+
+                const auto preRms = render(0);
+                const auto postRms = render(1);
+
+                logMessage("waveshaperType=" + juce::String(waveshaperType) + "  Pre Filter rms=" + juce::String(preRms, 6)
+                           + "  Post Filter rms=" + juce::String(postRms, 6));
+
+                expect(std::abs(preRms - postRms) > std::min(preRms, postRms) * 0.1f,
+                       "Pre Filter and Post Filter should render measurably different output when Loop Filter Type=Resonant");
+            }
+        }
+
+        beginTest("Distortion Position: Pre and Post Filter are bit-identical when Loop Filter Type=Two-Point Average (no filter stage to reorder around)");
+        {
+            for (int waveshaperType : { 0, 1 })
+            {
+                Voice pre;
+                pre.prepare(44100.0);
+                pre.setDamping(0.9f);
+                pre.setBowAmount(0.2f);
+                pre.setWaveshaperType(waveshaperType);
+                pre.setWaveshapeAmount(1.0f);
+                pre.setDistortionPosition(0);
+                pre.noteOn(60, 1.0f);
+
+                Voice post;
+                post.prepare(44100.0);
+                post.setDamping(0.9f);
+                post.setBowAmount(0.2f);
+                post.setWaveshaperType(waveshaperType);
+                post.setWaveshapeAmount(1.0f);
+                post.setDistortionPosition(1);
+                post.noteOn(60, 1.0f);
+
+                for (int i = 0; i < 22050; ++i)
+                    expectWithinAbsoluteError(pre.renderNextSample(), post.renderNextSample(), 1.0e-6f);
+            }
+        }
+
+        beginTest("Distortion Position: Fold's in-loop recirculating character (decay time) is unaffected by Pre vs Post Filter");
+        {
+            // Post Filter only reorders the OUTPUT-only copy - Fold's own write-back into the
+            // string (renderChannelSample()'s in-loop `filtered` update) is identical either way,
+            // so a plucked note's decay time should match exactly regardless of this control.
+            auto decaySamples = [](int distortionPosition) {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.6f);
+                voice.setWaveshaperType(0); // Fold
+                voice.setWaveshapeAmount(1.0f);
+                voice.setDistortionPosition(distortionPosition);
+                voice.noteOn(60, 1.0f);
+
+                constexpr int maxSamples = 44100 * 5;
+                int samples = 0;
+                for (; samples < maxSamples && voice.isActive(); ++samples)
+                    voice.renderNextSample();
+                return samples;
+            };
+
+            expectEquals(decaySamples(0), decaySamples(1),
+                         "Fold's own decay time should be identical regardless of Distortion Position");
         }
 
         beginTest("Abruptly changing structure mid-note keeps output continuous, no discontinuity spike");
@@ -1483,7 +1615,11 @@ public:
                 voice.setFilterCutoff(1000.0f);
                 voice.noteOn(note, 1.0f);
 
-                constexpr int maxSamples = 44100 * 10;
+                // 30s, matching the sibling "Notes across the supported range" test's own updated
+                // timeout - decay time is governed purely by the loop's own gain (Resonance
+                // doesn't touch it, see this test's own Damping comment above), so it's identical
+                // to the plain-filter case: ~23.5s measured for the lowest supported note.
+                constexpr int maxSamples = 44100 * 30;
                 int samples = 0;
                 for (; samples < maxSamples && voice.isActive(); ++samples)
                 {
@@ -1492,7 +1628,7 @@ public:
                     expect(std::abs(sample) <= 2.5f, "output should stay within the same bound as every other note-range test");
                 }
 
-                expect(samples < maxSamples, "every supported note should still decay to silence within 10 seconds at max Resonance");
+                expect(samples < maxSamples, "every supported note should still decay to silence within 30 seconds at max Resonance");
             }
         }
 

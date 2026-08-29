@@ -240,12 +240,20 @@ public:
                 }
         }
 
-        beginTest("outputColor(): a wide-open Cutoff (well above the test signal) is near-transparent, at any Resonance");
+        beginTest("outputColor(): a wide-open Cutoff (well above the test signal) is near-transparent at Resonance=0, and predictably scaled at Resonance>0");
         {
             // Unlike the old bandpass design (a bit-exact bypass at Resonance=0), a real lowpass
             // has no natural "off" state tied to Resonance - Resonance is just the filter's own Q
             // now, same as any subtractive synth. The equivalent "basically off" state is Cutoff
             // wide open relative to the signal, matching real analog synth convention.
+            //
+            // At Resonance>0, outputColor() is no longer exactly transparent even with the signal
+            // far below Cutoff - see its own comment: the resonant-peak loudness compensation is a
+            // flat scalar (not frequency-selective), so it also attenuates content nowhere near
+            // the peak, a known, accepted tradeoff. Checking against that same scalar (mirroring
+            // resonancePeakCompensationAmount's own tuned value) confirms the ATTENUATION is
+            // exactly what's expected, not an unrelated regression.
+            constexpr float resonancePeakCompensationAmount = 7.0f; // mirrors the production tuning
             for (float resonance : { 0.0f, 0.5f, 1.0f })
             {
                 KarplunkResonantLoopFilter filter;
@@ -253,11 +261,12 @@ public:
                 filter.setResonance(resonance);
                 filter.setCutoffFrequency(18000.0f);
 
+                const auto expectedCompensation = 1.0f / (1.0f + resonance * resonancePeakCompensationAmount);
                 for (int i = 0; i < 2000; ++i)
                 {
                     const auto x = std::sin((float) i * (2.0f * 3.14159265358979323846f * 200.0f / 44100.0f));
-                    expectWithinAbsoluteError(filter.outputColor(x), x, 0.05f,
-                                               "a Cutoff far above the test signal should be near-transparent, at any Resonance");
+                    expectWithinAbsoluteError(filter.outputColor(x), x * expectedCompensation, 0.05f,
+                                               "a Cutoff far above the test signal should be near-transparent (up to the known compensation scalar), at any Resonance");
                 }
             }
         }

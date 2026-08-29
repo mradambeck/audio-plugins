@@ -59,6 +59,7 @@ public:
     static constexpr auto monoParamID = "mono";
     static constexpr auto waveshapeParamID = "waveshape";
     static constexpr auto waveshaperTypeParamID = "waveshaperType";
+    static constexpr auto distortionPositionParamID = "distortionPosition";
     static constexpr auto ringModAmountParamID = "ringModAmount";
     static constexpr auto ringModFrequencyParamID = "ringModFrequency";
     static constexpr auto topologyParamID = "topology";
@@ -87,6 +88,7 @@ private:
     std::atomic<float>* monoParam = nullptr;
     std::atomic<float>* waveshapeParam = nullptr;
     std::atomic<float>* waveshaperTypeParam = nullptr;
+    std::atomic<float>* distortionPositionParam = nullptr;
     std::atomic<float>* ringModAmountParam = nullptr;
     std::atomic<float>* ringModFrequencyParam = nullptr;
     std::atomic<float>* topologyParam = nullptr;

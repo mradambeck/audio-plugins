@@ -251,7 +251,25 @@ public:
         const auto clampedCutoffHz = std::clamp(sweptCutoffHz, minCutoffHz, (float) sampleRateHz * 0.49f);
 
         const auto q = minQ + resonanceAmount * (maxQ - minQ);
-        return lowpass.process(loopValue, clampedCutoffHz, q);
+
+        // Resonant-peak loudness compensation - a real, measured bug: unlike the old bandpass
+        // design this replaced (which had a proven, unconditional "gain never exceeds 1.0
+        // anywhere" property - see KarplunkLowpassFilter's own comment for why that guarantee no
+        // longer holds for a genuine resonant LOWPASS), a resonant lowpass's peak gain near
+        // Cutoff scales roughly with Q, unbounded above 1.0 as Q rises - exactly the "screaming
+        // resonance" character the redesign wanted, but with no headroom compensation at all, a
+        // broadband transient (the excitation's own initial pluck burst) with real energy near
+        // Cutoff measured producing peaks over 11x the input's own amplitude at high Resonance -
+        // worst on the lowest supported notes, whose own excitation burst is broadband relative to
+        // its very low fundamental. A flat scalar (not frequency-selective, so it does trade away
+        // some of the filter's own overall loudness at high Resonance, not just the excess peak -
+        // an accepted, simpler tradeoff over a full peak-tracking compensator) tuned by a dense
+        // measured sweep across the whole supported note range, every Cutoff/Resonance/Damping/
+        // Bow/Topology combination this codebase already tests - the worst measured peak with this
+        // compensation in place is ~2.1, comfortably under this project's established <=2.5 bound.
+        const auto resonancePeakCompensation = 1.0f / (1.0f + resonanceAmount * resonancePeakCompensationAmount);
+
+        return lowpass.process(loopValue, clampedCutoffHz, q) * resonancePeakCompensation;
     }
 
     // Simply baseFilter's own gain - none of this class's own controls affect the loop at all, see
@@ -277,13 +295,21 @@ private:
     // envelope sweep.
     static constexpr float minCutoffHz = 20.0f;
 
-    // Resonance's own range: 0.7 (gentle bump) to 18.0 (screaming, near-self-oscillating) - safe at
-    // any value now that this filter is output-only (see KarplunkLowpassFilter's own comment: no Q
-    // value is unsafe, unlike the old in-loop design), so raised well past the old bandpass
-    // design's own 10.0 ceiling for a more dramatic synth-filter character. Starting points pending
-    // listening, not safety-derived.
+    // Resonance's own range: 0.7 (gentle bump) to 18.0 (screaming, near-self-oscillating) - stable
+    // at any value now that this filter is output-only (no loop-recirculation-instability risk,
+    // unlike the old in-loop design - see KarplunkLowpassFilter's own comment), so raised well past
+    // the old bandpass design's own 10.0 ceiling for a more dramatic synth-filter character.
+    // Stability isn't the same thing as bounded LOUDNESS, though - see
+    // resonancePeakCompensationAmount's own comment for the real, measured peak-gain issue high Q
+    // still needed compensating for. Starting points pending listening, not safety-derived.
     static constexpr float minQ = 0.7f;
     static constexpr float maxQ = 18.0f;
+
+    // See outputColor()'s own comment for the resonant-peak loudness bug this compensates for.
+    // Tuned by a dense measured sweep (every supported note x Cutoff x Resonance x Damping x Bow x
+    // Topology combination this codebase already tests) - 7.0 keeps the worst measured peak at
+    // ~2.1, safely under this project's established <=2.5 bound.
+    static constexpr float resonancePeakCompensationAmount = 7.0f;
 
     // Envelope Amount's own octave range at its bipolar extremes (+-1) - +-4 octaves is a
     // dramatic-but-still-musical sweep (matches typical hardware/software synth filter-envelope

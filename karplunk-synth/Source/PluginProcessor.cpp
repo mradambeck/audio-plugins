@@ -33,6 +33,7 @@ KarplunkAudioProcessor::KarplunkAudioProcessor()
     monoParam = apvts.getRawParameterValue(monoParamID);
     waveshapeParam = apvts.getRawParameterValue(waveshapeParamID);
     waveshaperTypeParam = apvts.getRawParameterValue(waveshaperTypeParamID);
+    distortionPositionParam = apvts.getRawParameterValue(distortionPositionParamID);
     ringModAmountParam = apvts.getRawParameterValue(ringModAmountParamID);
     ringModFrequencyParam = apvts.getRawParameterValue(ringModFrequencyParamID);
     topologyParam = apvts.getRawParameterValue(topologyParamID);
@@ -161,6 +162,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         juce::ParameterID{waveshaperTypeParamID, 1},
         "Waveshaper Type",
         juce::StringArray{"Fold", "BitCrush"},
+        0));
+
+    // Pre/Post Filter - at the user's explicit request, so the Waveshaper (Fold or BitCrush) can
+    // sit before or after the Resonant loop filter's own coloring in the output signal path - see
+    // KarplunkVoice.h's own setDistortionPosition() comment for the exact scope (output-only
+    // reorder; Fold's in-loop recirculating character is unaffected either way). Defaults to Pre
+    // Filter (index 0), matching this project's pre-existing behavior bit-for-bit.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{distortionPositionParamID, 1},
+        "Distortion Position",
+        juce::StringArray{"Pre Filter", "Post Filter"},
         0));
 
     // Ring Modulator (see KarplunkRingModulator.h) - its own area, not a Waveshaper Type, since it
@@ -510,6 +522,11 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // mid-note is completely safe.
     const auto waveshaperType = (int) waveshaperTypeParam->load();
 
+    // Distortion Position is the same kind of discrete choice as Waveshaper Type, for the same
+    // reason - it only reorders two already-stateless output stages relative to each other, so a
+    // mid-note switch is completely safe.
+    const auto distortionPosition = (int) distortionPositionParam->load();
+
     // Loop Filter Type is the same kind of discrete choice as Waveshaper Type, for the same reason:
     // both concrete filters are always constructed/prepared/kept current (via setDamping()'s own
     // fan-out - see KarplunkVoice.h), so a mid-note switch just leaves the UNSELECTED filter's own
@@ -578,6 +595,7 @@ void KarplunkAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
             v.setPosition(position);
             v.setWaveshapeAmount(waveshape);
             v.setWaveshaperType(waveshaperType);
+            v.setDistortionPosition(distortionPosition);
             v.setRingModAmount(ringModAmount);
             v.setRingModFrequency(ringModFrequency);
             v.setTopology(topology);

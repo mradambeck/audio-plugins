@@ -124,20 +124,26 @@ template <typename Excitation, typename InterpolationType = LinearInterpolator>
 class KarplunkStringLineChannel
 {
 public:
-    static constexpr int kLowestSupportedMidiNote = 21;    // A0, 27.5 Hz
-    static constexpr int kHighestSupportedMidiNote = 108;  // C8 - interpolation-quality ceiling,
-                                                             // not a real-time-safety limit
+    // Range widened at the user's explicit request (their own DAW's note-name display, one octave
+    // below this file's older A0/C8-style comments elsewhere - MIDI note numbers are the same
+    // either way, only the label differs): MIDI 0 ("C-2") to MIDI 84 ("C5"), replacing the
+    // previous MIDI 21-108 span.
+    static constexpr int kLowestSupportedMidiNote = 0;     // ~8.18 Hz
+    static constexpr int kHighestSupportedMidiNote = 84;   // interpolation-quality ceiling, not a
+                                                             // real-time-safety limit
 
-    // capacity = ceil(sampleRate / 27.5 * 1.15) + 8. The x1.15 reserves ~2.5 semitones of
-    // headroom for future downward pitch-drift/bend below A0 (documented, not implemented yet -
-    // see the Delay Tuning row in README.md's swap-in table); +8 covers a future higher-order
-    // (Lagrange-style) interpolator's reach. 44.1kHz -> 1853 samples (~7.4KB); 48kHz -> 2016
-    // (~8.1KB); 96kHz -> 4023 (~16.1KB) - trivial memory, computed once here, never resized after
-    // prepare(). A dual-topology voice needs two of these buffers, not one - still trivial (a
-    // few tens of KB across the whole 8-voice pool at worst).
+    // capacity = ceil(sampleRate / 8.1758 * 1.15) + 8. The x1.15 reserves ~2.5 semitones of
+    // headroom for future downward pitch-drift/bend below the lowest supported note (documented,
+    // not implemented yet - see the Delay Tuning row in README.md's swap-in table); +8 covers a
+    // future higher-order (Lagrange-style) interpolator's reach. 44.1kHz -> 6211 samples
+    // (~24.8KB); 48kHz -> 6761 (~27KB); 96kHz -> 13513 (~54KB) - still trivial memory, computed
+    // once here, never resized after prepare(), even though widening the note range down to
+    // MIDI 0 grew this ~3.4x versus the previous MIDI-21 floor. A dual-topology voice needs two
+    // of these buffers, not one - still trivial (a few hundred KB across the whole 8-voice pool
+    // at worst).
     static int requiredCapacitySamples(double sampleRate) noexcept
     {
-        constexpr double lowestSupportedHz = 27.5;
+        constexpr double lowestSupportedHz = 8.1758; // MIDI note 0
         constexpr double headroomFactor = 1.15;
         constexpr int interpolationPad = 8;
         return (int) std::ceil(sampleRate / lowestSupportedHz * headroomFactor) + interpolationPad;
@@ -543,12 +549,21 @@ public:
         // much less (foldOutputDriveCompensation) by rendering and measuring loudness parity,
         // since output is never fed back and full compensation was measured crushing the fold's
         // own audible character almost to silence at high drive.
-        // Only Fold stays here - it's a deterministic, memoryless function of the SAME
-        // instantaneous signal, so it doesn't disturb the harmonic relationship Position's own
-        // tap-cancellation (below, in positionOutput()) depends on. BitCrush/Ring Mod/Resonance
-        // moved to applyOutputEffects() - see its own comment for why.
+        // Only the IN-LOOP write-back happens here now, unconditionally regardless of
+        // distortionPosition - Fold's own recirculating character is independent of the Pre/Post
+        // Filter control (see setDistortionPosition()'s own comment: that control only reorders
+        // the OUTPUT-only copy relative to the filter, never what's fed back into the string).
+        // The OUTPUT-only copy itself - for EITHER waveshaper, at EITHER Distortion Position - is
+        // entirely handled by applyOutputEffects() now, not here: `forOutput` stays the clean,
+        // unshaped signal unconditionally, so Position's own tap-cancellation (see
+        // positionOutput()'s own comment) always sees the same clean reference regardless of
+        // Distortion Position - the ONLY thing that control changes is where, relative to the
+        // filter, the (always post-Position) distortion lands. Keeping Fold's own output shaping
+        // upstream of Position for Pre Filter specifically was tried first and measured breaking
+        // that invariant (Pre Filter and Post Filter differed even at Loop Filter Type=Two-Point
+        // Average, where there's no filter stage to differ around at all) - moving both
+        // waveshapers' entire output-only behavior into applyOutputEffects() fixed it.
         const auto preWaveshapeSignal = filtered;
-        float waveshapedForOutput = filtered;
         if (waveshaperType == 0 && waveshapeAmount > 0.0f)
         {
             // Knob range compression - the user found the full 0-100% Waveshape turn pushed Fold
@@ -557,29 +572,33 @@ public:
             // rescaled.
             const auto effectiveAmount = waveshapeAmount * foldMaxAmountFraction;
             filtered = waveFolder.process(preWaveshapeSignal, effectiveAmount, 1.0f);
-            waveshapedForOutput = waveFolder.process(preWaveshapeSignal, effectiveAmount, foldOutputDriveCompensation);
-
-            // Attack envelope: crossfades from the unshaped signal up to the full folded result
-            // over the first few ms of a fresh note (reset to 0 at noteOn, see reset()), instead
-            // of applying full drive to the excitation's own near-instant initial transient -
-            // without this, Fold's hard nonlinearity sees a huge sample-to-sample jump right at
-            // the pluck's own attack and produces an audible pop/click there, reported by the
-            // user at higher Waveshape settings. Only affects the very start of a note
-            // (waveshapeAttackEnvelope reaches ~1 within a few time constants and just stays
-            // there) - doesn't touch Fold's own deliberately-strongest-at-the-loud-initial-hit
-            // character once past that opening window.
-            waveshapedForOutput = preWaveshapeSignal + waveshapeAttackEnvelope * (waveshapedForOutput - preWaveshapeSignal);
             filtered = preWaveshapeSignal + waveshapeAttackEnvelope * (filtered - preWaveshapeSignal);
         }
         waveshapeAttackEnvelope += waveshapeAttackCoeff * (1.0f - waveshapeAttackEnvelope);
 
-        return { filtered, waveshapedForOutput };
+        return { filtered, preWaveshapeSignal };
     }
 
-    // Post-Position output-only effects: BitCrush, Ring Mod, and Resonance's own peak coloring
-    // all moved here (out of renderChannelSample()/ChannelResult, applied instead by the
-    // orchestrator to positionOutput()'s own result - see KarplunkVoice::renderNextSample()) after
-    // being measured breaking Position's tap-cancellation design when they ran BEFORE it: Position
+    // Pre/Post Filter - at the user's explicit request ("sometimes you want the distortion to
+    // happen on the filtered signal, sometimes you want the distortion to go through the
+    // filter"): reorders the WAVESHAPER's (Fold or BitCrush, whichever is selected) output-only
+    // copy relative to the Resonant loop filter's own outputColor() coloring, in
+    // applyOutputEffects() below. Purely an output-signal-path reorder - Fold's own IN-LOOP
+    // recirculating contribution (renderChannelSample() above) is completely unaffected either
+    // way, so this doesn't touch Fold's established resonant character or reopen any of the
+    // safety questions that character's own in-loop status was already settled for. 0 = Pre
+    // Filter (distortion first, then filtered - the default), 1 = Post Filter (filtered first,
+    // then distortion applied to the filtered signal). Has no audible effect at Loop Filter Type =
+    // Two-Point Average (there's no filter stage in the output path to be before or after in that
+    // case - both positions literally converge to the same code path, so they're bit-exact there,
+    // not just similar).
+    void setDistortionPosition(int position) noexcept { distortionPosition = position; }
+
+    // Post-Position output-only effects: BOTH waveshapers' entire output-only behavior (not just
+    // BitCrush's, any more - see renderChannelSample()'s own comment for why Fold's moved here
+    // too), Ring Mod, and Resonance's own peak coloring all live here, applied by the orchestrator
+    // to positionOutput()'s own result (see KarplunkVoice::renderNextSample()), after being
+    // measured breaking Position's tap-cancellation design when they ran BEFORE it: Position
     // subtracts a phase-shifted tap of the SAME periodic signal to cancel specific harmonics (see
     // positionOutput()'s own comment) - that cancellation relies on the two things being
     // subtracted staying correlated copies of one periodic waveform. Ring Mod (an independent
@@ -587,7 +606,7 @@ public:
     // designed CANCELLATION into an uncorrelated ADDITION instead - measured making a Ring-
     // Modulated, Position-tapped note up to ~25x louder than the same signal without Position
     // engaged, not quieter as the safety argument ("ring mod can only shrink a signal") assumed in
-    // isolation. Running all three strictly AFTER Position (and after write-back, since none of
+    // isolation. Running all of them strictly AFTER Position (and after write-back, since none of
     // them recirculate any more - see KarplunkLoopFilter.h/KarplunkRingModulator.h's own comments)
     // sidesteps the interaction entirely: Position's cancellation now only ever sees the string's
     // own clean, correlated content, exactly as designed.
@@ -595,25 +614,18 @@ public:
     {
         auto value = positionedOutput;
 
+        auto applyDistortion = [this](float x) noexcept {
+            return waveshaperType == 0 ? applyFoldOutputOnly(x) : applyBitCrush(x);
+        };
+
+        if (distortionPosition == 0 && waveshapeAmount > 0.0f)
+            value = applyDistortion(value);
+
         if (loopFilterType == 1)
             value = loopFilterResonant.outputColor(value);
 
-        if (waveshaperType == 1 && waveshapeAmount > 0.0f)
-        {
-            // BitCrush used to also be written back into the loop (like Fold still is), and was
-            // measured causing real "massive feedback": quantizing the recirculating signal
-            // creates a classic zero-input limit cycle (a well-known failure mode of quantization
-            // inside a feedback loop) - a plucked note that should decay to silence instead
-            // locked into a stable non-decaying buzz, or at higher amounts actively GREW over
-            // time (measured RMS rising from -26dB to -5dB and staying there over a few seconds
-            // at Waveshape=100%, on a single plucked note with no continuous excitation at all).
-            // Now that quantization never re-enters the string, there's no limit-cycle risk left
-            // at any amount - full range restored (bitCrushMaxAmountFraction=1) instead of the
-            // knob-compression workaround this used before that root cause was found.
-            const auto effectiveAmount = waveshapeAmount * bitCrushMaxAmountFraction;
-            bitCrush.updateFilter(value, effectiveAmount);
-            value = bitCrush.process();
-        }
+        if (distortionPosition == 1 && waveshapeAmount > 0.0f)
+            value = applyDistortion(value);
 
         if (ringModAmount > 0.0f)
         {
@@ -622,6 +634,35 @@ public:
         }
 
         return value;
+    }
+
+    // BitCrush used to also be written back into the loop (like Fold still is), and was measured
+    // causing real "massive feedback": quantizing the recirculating signal creates a classic
+    // zero-input limit cycle (a well-known failure mode of quantization inside a feedback loop) -
+    // a plucked note that should decay to silence instead locked into a stable non-decaying buzz,
+    // or at higher amounts actively GREW over time (measured RMS rising from -26dB to -5dB and
+    // staying there over a few seconds at Waveshape=100%, on a single plucked note with no
+    // continuous excitation at all). Now that quantization never re-enters the string, there's no
+    // limit-cycle risk left at any amount - full range restored (bitCrushMaxAmountFraction=1)
+    // instead of the knob-compression workaround this used before that root cause was found.
+    float applyBitCrush(float value) noexcept
+    {
+        const auto effectiveAmount = waveshapeAmount * bitCrushMaxAmountFraction;
+        bitCrush.updateFilter(value, effectiveAmount);
+        return bitCrush.process();
+    }
+
+    // Fold's Post-Filter output-only copy - only called from applyOutputEffects() when
+    // distortionPosition==1 (see setDistortionPosition()'s own comment). Same attack-envelope
+    // crossfade renderChannelSample() applies for the Pre-Filter case, just computed here instead,
+    // against whatever signal (the filtered one) it's handed - waveshapeAttackEnvelope itself is
+    // still only ever advanced once per tick, in renderChannelSample(), so both call sites always
+    // read the same, single, per-tick envelope value.
+    float applyFoldOutputOnly(float value) noexcept
+    {
+        const auto effectiveAmount = waveshapeAmount * foldMaxAmountFraction;
+        const auto folded = waveFolder.process(value, effectiveAmount, foldOutputDriveCompensation);
+        return value + waveshapeAttackEnvelope * (folded - value);
     }
 
     // Writes the (possibly cross-coupled - see KarplunkVoice::renderNextSample()) value back into
@@ -751,6 +792,7 @@ private:
     float structure = 0.0f;
     float waveshapeAmount = 0.0f;
     int waveshaperType = 0; // 0 = Fold, 1 = BitCrush - see setWaveshaperType()
+    int distortionPosition = 0; // 0 = Pre Filter, 1 = Post Filter - see setDistortionPosition()
     float ringModAmount = 0.0f;
     float ringModFrequency = 200.0f; // matches PluginProcessor's own default
 
@@ -852,8 +894,8 @@ public:
     // invariant, not an enforced one) - kept here too since existing call sites (PluginProcessor,
     // every isolated-voice test) reference `Voice::kLowestSupportedMidiNote` directly, not
     // `Voice::Channel::kLowestSupportedMidiNote`.
-    static constexpr int kLowestSupportedMidiNote = 21;
-    static constexpr int kHighestSupportedMidiNote = 108;
+    static constexpr int kLowestSupportedMidiNote = 0;
+    static constexpr int kHighestSupportedMidiNote = 84;
 
     void prepare(double sampleRate) noexcept
     {
@@ -920,6 +962,7 @@ public:
     void setPosition(float amount01) noexcept { lineA.setPosition(amount01); lineB.setPosition(amount01); }
     void setWaveshapeAmount(float amount01) noexcept { lineA.setWaveshapeAmount(amount01); lineB.setWaveshapeAmount(amount01); }
     void setWaveshaperType(int type) noexcept { lineA.setWaveshaperType(type); lineB.setWaveshaperType(type); }
+    void setDistortionPosition(int position) noexcept { lineA.setDistortionPosition(position); lineB.setDistortionPosition(position); }
     void setRingModAmount(float amount01) noexcept { lineA.setRingModAmount(amount01); lineB.setRingModAmount(amount01); }
     void setRingModFrequency(float hz) noexcept { lineA.setRingModFrequency(hz); lineB.setRingModFrequency(hz); }
 
@@ -1190,8 +1233,10 @@ private:
     // levelOutput()'s own comment. A real, measured bug: a rectify-then-one-pole-smooth envelope
     // follower needs a time constant of several PERIODS to properly resolve amplitude (a
     // well-known envelope-follower property, not specific to this codebase) - the flat 15ms was
-    // shorter than a single cycle of this instrument's own lowest supported note (A0, 27.5Hz,
-    // ~36ms/cycle), so fastOutputEnvelope couldn't track low notes at all; instead of settling,
+    // shorter than a single cycle of this instrument's own lowest supported note at the time this
+    // was measured (then MIDI 21, 27.5Hz, ~36ms/cycle - the note range was later widened further
+    // down to MIDI 0, ~8.18Hz, ~122ms/cycle, making the adaptive fix below even more load-bearing
+    // than when it was written), so fastOutputEnvelope couldn't track low notes at all; instead of settling,
     // the fast/slow ratio (levelingGain) went unstable and pinned near its own 3x ceiling for most
     // of the note, producing a real, audible "swell" - reported by the user as low notes "coming
     // up in an unnatural way" as they rang out (and independently observable, smaller, even at
