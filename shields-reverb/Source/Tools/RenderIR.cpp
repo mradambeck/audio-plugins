@@ -18,7 +18,7 @@
 // Usage:
 //   ShieldsRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]
 //                  [--diffusion 0.5] [--feedback 85] [--size 1.0] [--damping 35]
-//                  [--bandwidth 15000] [--bitdepth 16] [--dry 0] [--wet 100] [--wobble 0]
+//                  [--bandwidth 15000] [--lowcut 20] [--bitdepth 16] [--dry 0] [--wet 100] [--wobble 0]
 //
 // Every parameter flag matches the units the plugin's own parameter uses (diffusion 0.3-0.7,
 // feedback/damping/dry/wet as a percentage 0-100 (wet can go to 200), size as a multiplier,
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: ShieldsRenderIR --out <path.wav> [--seconds 4.0] [--sampleRate 44100]\n"
             "                     [--diffusion 0.5] [--feedback 99] [--size 1.0] [--damping 20]\n"
-            "                     [--bandwidth 19000] [--bitdepth 13] [--dry 0] [--wet 100] [--wobble 0]\n");
+            "                     [--bandwidth 19000] [--lowcut 20] [--bitdepth 13] [--dry 0] [--wet 100] [--wobble 0]\n");
         return 1;
     }
 
@@ -83,6 +83,7 @@ int main(int argc, char* argv[])
     setParam(processor, ShieldsAudioProcessor::sizeParamID, getFloatArg(args, "size", 1.0f));
     setParam(processor, ShieldsAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
     setParam(processor, ShieldsAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
+    setParam(processor, ShieldsAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowcut", 20.0f));
     setParam(processor, ShieldsAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
     setParam(processor, ShieldsAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
     setParam(processor, ShieldsAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));

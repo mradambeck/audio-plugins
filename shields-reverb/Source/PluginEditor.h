@@ -52,6 +52,10 @@ private:
     juce::Label dampingLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dampingAttachment;
 
+    juce::Slider lowCutSlider;
+    juce::Label lowCutLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowCutAttachment;
+
     juce::Slider bandwidthSlider;
     juce::Label bandwidthLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bandwidthAttachment;

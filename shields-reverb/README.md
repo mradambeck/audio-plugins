@@ -170,12 +170,12 @@ comment for the mechanism.
 
 The UI is the full hardware-panel treatment (see the `juce-hardware-panel-ui` skill; accent colour
 `#D74377`), built from the approved mockup at `mockups/shields-mockup-v1.html` after the core
-algorithm was validated against the reference IRs. Five sections - Diffusion (Diffusion/Size),
-Decay (Feedback/Damping), Tone (Bandwidth/Bit Depth), Motion (Wobble, a single knob), Mix
-(independent Dry/Wet knobs, matching Caverns' Dry/Wet convention - not a single crossfading Mix
-parameter). `ShieldsLookAndFeel` is a thin subclass of the shared `wildjag::HardwarePanelLookAndFeel`
-supplying Shields's accent pair and the two embedded fonts (shared Oxanium/Oswald from
-`common/Assets/`, no plugin-specific typeface).
+algorithm was validated against the reference IRs. Five sections, in two rows - Diffusion
+(Diffusion/Size), Decay (Feedback/Damping), and Motion (Wobble, a single knob) on top; Tone (Low EQ
+Cutoff/High EQ Cutoff/Bit Depth) and Mix (independent Dry/Wet knobs, matching Caverns' Dry/Wet
+convention - not a single crossfading Mix parameter) below. `ShieldsLookAndFeel` is a thin subclass
+of the shared `wildjag::HardwarePanelLookAndFeel` supplying Shields's accent pair and the two
+embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific typeface).
 
 ## Parameters
 
@@ -185,7 +185,8 @@ supplying Shields's accent pair and the two embedded fonts (shared Oxanium/Oswal
 | Feedback | 0 - 100% | 99% | Decay/tail-length control (internally capped below unity gain) |
 | Size | 0.25x - 4.0x | 1.0x | Scales the burst stage and FDN's delay line lengths - the de facto attack-time control |
 | Damping | 0 - 100% | 20% | Per-line feedback-path one-pole lowpass - controls HF decay rate |
-| Bandwidth | 1kHz - 20kHz | 19kHz | Output lowpass cutoff (lo-fi bandwidth limit) |
+| Low EQ Cutoff | 20Hz - 200Hz | 20Hz | Input highpass (low Q, gentle rolloff), ahead of the diffuser/tank; off (bypassed) at the 20Hz floor |
+| High EQ Cutoff | 1kHz - 20kHz | 19kHz | Output lowpass cutoff (lo-fi bandwidth limit) |
 | Bit Depth | 4 - 16 bit | 13 bit | Output quantization depth (lo-fi grain) |
 | Wobble | 0 - 100% | 0% | Optional main-tank delay-line modulation - blurs resonant peaks into motion; off by default, renders bit-identically to no-Wobble at 0% |
 | Dry | 0 - 100% | 100% | Dry signal gain |

@@ -13,6 +13,7 @@ ShieldsAudioProcessor::ShieldsAudioProcessor()
     sizeParam = apvts.getRawParameterValue(sizeParamID);
     dampingParam = apvts.getRawParameterValue(dampingParamID);
     bandwidthHzParam = apvts.getRawParameterValue(bandwidthHzParamID);
+    lowCutHzParam = apvts.getRawParameterValue(lowCutHzParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
     dryParam = apvts.getRawParameterValue(dryParamID);
     wetParam = apvts.getRawParameterValue(wetParamID);
@@ -98,6 +99,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
         juce::AudioParameterFloatAttributes()
             .withLabel("bit")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " bit"; })));
+
+    // Default 20Hz (0% - the bottom of the range): matches the pattern of every other opt-in
+    // coloration control here (Wobble, etc) - the default sits at the setting that leaves the
+    // signal chain unaffected, so this control changes nothing about the existing sound until a
+    // player actually reaches for it.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{lowCutHzParamID, 1},
+        "Low EQ Cutoff",
+        juce::NormalisableRange<float>(20.0f, 200.0f, 0.1f, 0.5f),
+        20.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("Hz")
+            .withStringFromValueFunction([](float v, int) { return juce::String((int) v) + " Hz"; })));
 
     // Independent Dry/Wet gains (matching Caverns' convention), not a single crossfading Mix
     // knob - Wet gets headroom past unity (up to 200%) so it can be pushed louder than the dry
@@ -200,6 +214,7 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     engine.setSize(sizeParam->load());
     engine.setDamping(dampingParam->load() * 0.01f);
     engine.setBandwidthHz(bandwidthHzParam->load());
+    engine.setLowCutHz(lowCutHzParam->load());
     engine.setBitDepth(bitDepthParam->load());
     engine.setWobble(wobbleParam->load() * 0.01f);
 

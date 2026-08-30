@@ -30,15 +30,22 @@ namespace
                                                // that pushed the footer text low within the combined
                                                // visual gap even though it was centred in its own box
     constexpr int columnGap = 14;
+    constexpr int rowGap = 14;   // gap between the top (Diffusion/Decay/Motion) and bottom
+                                  // (Tone/Mix) rows - same rhythm as the column gap
 
+    // Top row: Diffusion, Decay, Motion.
     constexpr int diffusionColumnWidth = 268;
     constexpr int decayColumnWidth = 268;
-    constexpr int toneColumnWidth = 268;
     constexpr int motionColumnWidth = 160;   // one knob, so meaningfully narrower than the two-knob
                                               // sections - sized to give an 88px knob the same
                                               // generous framing (~24px each side) the Mix knobs get
-    // Mix (the last column) has no named width constant, matching Caverns' own pattern - it just
-    // takes whatever's left in `content` after the other four are removed (~220px).
+    constexpr int topRowWidth = diffusionColumnWidth + columnGap + decayColumnWidth + columnGap + motionColumnWidth;
+
+    // Bottom row: Tone (now 3 knobs: Low EQ Cutoff, High EQ Cutoff, Bit Depth), Mix (Dry/Wet, sized
+    // up - see mixColumnWidth). Chosen so toneColumnWidth + columnGap + mixColumnWidth == topRowWidth,
+    // i.e. the two rows form a single aligned grid rather than mismatched-width shelves.
+    constexpr int mixColumnWidth = 316;
+    constexpr int toneColumnWidth = topRowWidth - columnGap - mixColumnWidth;
 
     constexpr int sectionPaddingTop = 40;   // clearance for the badge (sits inside the border, not
                                              // straddling it - see MOCKUP_GROUND_TRUTH.md)
@@ -46,13 +53,19 @@ namespace
     constexpr int sectionPaddingBottom = 20;
 
     constexpr int defaultKnobSize = 88;
-    constexpr int sizeKnobSize = 112;        // Size reads larger - it's Shields's de facto attack-
-                                              // time control, the closest thing to a "hero" knob
+    constexpr int sizeKnobSize = 112;        // the "hero" knob size - previously Diffusion's Size
+                                              // knob, now used for Mix's Dry/Wet instead (Size was
+                                              // brought down to defaultKnobSize to match Diffusion)
     constexpr int knobNameHeight = 28;
     constexpr int knobTextBoxHeight = 20;
-    // Dry/Wet share defaultKnobSize (not a separate smaller size) - two of these fit side by side
-    // in the Mix column (~196px usable width) since the window is widened by exactly the delta
-    // needed here (1040->1132) so Diffusion/Decay/Tone's own knob spacing is untouched.
+
+    // Row heights: every top-row section now uses defaultKnobSize-based content (Size no longer
+    // reads larger than Diffusion), so all three share one height. Mix's Dry/Wet still use the
+    // larger sizeKnobSize, so the bottom row is sized for that; Tone's own (defaultKnobSize) content
+    // simply leaves some blank space above its section's bottom padding, same as Decay/Tone/Motion
+    // did against Diffusion's taller box before this change.
+    constexpr int topRowHeight = sectionPaddingTop + defaultKnobSize + knobNameHeight + knobTextBoxHeight + sectionPaddingBottom;
+    constexpr int bottomRowHeight = sectionPaddingTop + sizeKnobSize + knobNameHeight + knobTextBoxHeight + sectionPaddingBottom;
 }
 
 void ShieldsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
@@ -106,6 +119,7 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     setupRotarySlider(sizeSlider, sizeLabel, "Size");
     setupRotarySlider(feedbackSlider, feedbackLabel, "Feedback");
     setupRotarySlider(dampingSlider, dampingLabel, "Treble Decay");
+    setupRotarySlider(lowCutSlider, lowCutLabel, "Low EQ Cutoff");
     setupRotarySlider(bandwidthSlider, bandwidthLabel, "High EQ Cutoff");
     setupRotarySlider(bitDepthSlider, bitDepthLabel, "Bit Depth");
     setupRotarySlider(wobbleSlider, wobbleLabel, "Wobble");
@@ -120,6 +134,8 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
         processorRef.apvts, ShieldsAudioProcessor::feedbackParamID, feedbackSlider);
     dampingAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ShieldsAudioProcessor::dampingParamID, dampingSlider);
+    lowCutAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, ShieldsAudioProcessor::lowCutHzParamID, lowCutSlider);
     bandwidthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ShieldsAudioProcessor::bandwidthHzParamID, bandwidthSlider);
     bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -131,7 +147,7 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     wetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ShieldsAudioProcessor::wetParamID, wetSlider);
 
-    setSize(1306, 362);
+    setSize(790, 572);
 }
 
 ShieldsAudioProcessorEditor::~ShieldsAudioProcessorEditor()
@@ -328,15 +344,21 @@ void ShieldsAudioProcessorEditor::resized()
     content.removeFromTop(contentPaddingTop);
     content.removeFromBottom(contentPaddingBottom);
 
-    auto diffusionColumn = content.removeFromLeft(diffusionColumnWidth);
-    content.removeFromLeft(columnGap);
-    auto decayColumn = content.removeFromLeft(decayColumnWidth);
-    content.removeFromLeft(columnGap);
-    auto toneColumn = content.removeFromLeft(toneColumnWidth);
-    content.removeFromLeft(columnGap);
-    auto motionColumn = content.removeFromLeft(motionColumnWidth);
-    content.removeFromLeft(columnGap);
-    auto mixColumn = content;
+    // Top row: Diffusion, Decay, Motion. Bottom row: Tone, Mix - see topRowWidth/toneColumnWidth's
+    // comments for why the two rows come out the same overall width.
+    auto topRow = content.removeFromTop(topRowHeight);
+    content.removeFromTop(rowGap);
+    auto bottomRow = content.removeFromTop(bottomRowHeight);
+
+    auto diffusionColumn = topRow.removeFromLeft(diffusionColumnWidth);
+    topRow.removeFromLeft(columnGap);
+    auto decayColumn = topRow.removeFromLeft(decayColumnWidth);
+    topRow.removeFromLeft(columnGap);
+    auto motionColumn = topRow.removeFromLeft(motionColumnWidth);
+
+    auto toneColumn = bottomRow.removeFromLeft(toneColumnWidth);
+    bottomRow.removeFromLeft(columnGap);
+    auto mixColumn = bottomRow.removeFromLeft(mixColumnWidth);
 
     diffusionSectionBounds = diffusionColumn.toFloat();
     decaySectionBounds = decayColumn.toFloat();
@@ -355,17 +377,17 @@ void ShieldsAudioProcessorEditor::resized()
         nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
     };
 
-    // ---- Diffusion: Diffusion + Size (the larger "hero" knob - Shields's attack-time control). ----
+    // ---- Diffusion: Diffusion + Size, matched knob sizes. ----
     auto diffusionInner = diffusionColumn;
     diffusionInner.removeFromTop(sectionPaddingTop);
     diffusionInner.removeFromLeft(sectionPaddingSide);
     diffusionInner.removeFromRight(sectionPaddingSide);
     diffusionInner.removeFromBottom(sectionPaddingBottom);
 
-    auto diffusionRow = diffusionInner.removeFromTop(sizeKnobSize + knobNameHeight + knobTextBoxHeight);
+    auto diffusionRow = diffusionInner.removeFromTop(defaultKnobSize + knobNameHeight + knobTextBoxHeight);
     const auto diffusionHalfWidth = diffusionRow.getWidth() / 2;
     positionKnob(diffusionRow.removeFromLeft(diffusionHalfWidth), defaultKnobSize, diffusionSlider, diffusionLabel);
-    positionKnob(diffusionRow, sizeKnobSize, sizeSlider, sizeLabel);
+    positionKnob(diffusionRow, defaultKnobSize, sizeSlider, sizeLabel);
 
     // ---- Decay: Feedback + Damping. ----
     auto decayInner = decayColumn;
@@ -379,7 +401,7 @@ void ShieldsAudioProcessorEditor::resized()
     positionKnob(decayRow.removeFromLeft(decayHalfWidth), defaultKnobSize, feedbackSlider, feedbackLabel);
     positionKnob(decayRow, defaultKnobSize, dampingSlider, dampingLabel);
 
-    // ---- Tone: Bandwidth + Bit Depth (the lo-fi coloration controls). ----
+    // ---- Tone: Low EQ Cutoff + High EQ Cutoff + Bit Depth (the lo-fi/tonal-shaping controls). ----
     auto toneInner = toneColumn;
     toneInner.removeFromTop(sectionPaddingTop);
     toneInner.removeFromLeft(sectionPaddingSide);
@@ -387,8 +409,9 @@ void ShieldsAudioProcessorEditor::resized()
     toneInner.removeFromBottom(sectionPaddingBottom);
 
     auto toneRow = toneInner.removeFromTop(defaultKnobSize + knobNameHeight + knobTextBoxHeight);
-    const auto toneHalfWidth = toneRow.getWidth() / 2;
-    positionKnob(toneRow.removeFromLeft(toneHalfWidth), defaultKnobSize, bandwidthSlider, bandwidthLabel);
+    const auto toneThirdWidth = toneRow.getWidth() / 3;
+    positionKnob(toneRow.removeFromLeft(toneThirdWidth), defaultKnobSize, lowCutSlider, lowCutLabel);
+    positionKnob(toneRow.removeFromLeft(toneThirdWidth), defaultKnobSize, bandwidthSlider, bandwidthLabel);
     positionKnob(toneRow, defaultKnobSize, bitDepthSlider, bitDepthLabel);
 
     // ---- Motion: a single Wobble knob (see ShieldsFDNEngine::setWobble()'s comment) - off/0 by
@@ -402,18 +425,18 @@ void ShieldsAudioProcessorEditor::resized()
     auto motionRow = motionInner.removeFromTop(defaultKnobSize + knobNameHeight + knobTextBoxHeight);
     positionKnob(motionRow, defaultKnobSize, wobbleSlider, wobbleLabel);
 
-    // ---- Mix: independent dry/wet, as small knobs side by side (a vertical fader pair, matching
-    // Caverns exactly, was tried first but read poorly at this section's shorter height). ----
+    // ---- Mix: independent dry/wet, side by side, at the larger "hero" knob size (previously
+    // Diffusion's Size knob, freed up when Size was matched to Diffusion's size instead). ----
     auto mixInner = mixColumn;
     mixInner.removeFromTop(sectionPaddingTop);
     mixInner.removeFromLeft(sectionPaddingSide);
     mixInner.removeFromRight(sectionPaddingSide);
     mixInner.removeFromBottom(sectionPaddingBottom);
 
-    auto mixRow = mixInner.removeFromTop(defaultKnobSize + knobNameHeight + knobTextBoxHeight);
+    auto mixRow = mixInner.removeFromTop(sizeKnobSize + knobNameHeight + knobTextBoxHeight);
     const auto mixHalfWidth = mixRow.getWidth() / 2;
-    positionKnob(mixRow.removeFromLeft(mixHalfWidth), defaultKnobSize, drySlider, dryLabel);
-    positionKnob(mixRow, defaultKnobSize, wetSlider, wetLabel);
+    positionKnob(mixRow.removeFromLeft(mixHalfWidth), sizeKnobSize, drySlider, dryLabel);
+    positionKnob(mixRow, sizeKnobSize, wetSlider, wetLabel);
 
     rebuildChassisTexture();
 }

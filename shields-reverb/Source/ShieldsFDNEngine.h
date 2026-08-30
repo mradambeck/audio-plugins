@@ -58,6 +58,13 @@ public:
     // lo-fi character from the spec, kept as a tunable parameter rather than a hardcoded constant.
     void setBandwidthHz(float hz);
 
+    // Resonant highpass cutoff (Hz, 20-200) applied to the DRY input, at the very start of the
+    // signal chain, ahead of the input allpass diffuser and the tank - a low-cut so the player can
+    // trim rumble/mud before it ever reaches the reverb rather than filtering the already-diffused
+    // wet output. Fixed low Q (see lowCutQ) - deliberately overdamped/non-resonant, a gentle broad
+    // rolloff rather than a peaky sweepable-resonance filter.
+    void setLowCutHz(float hz);
+
     // Simulated quantization depth (4-16 bits) applied to the wet stereo output, reintroducing the
     // grain of the original 12-16 bit hardware. 16 is effectively transparent at float32 precision.
     void setBitDepth(float bits);
@@ -160,6 +167,7 @@ private:
         void setLowShelf(float freqHz, float gainDb, double sampleRateHz);
         void setHighShelf(float freqHz, float gainDb, double sampleRateHz);
         void setPeak(float freqHz, float gainDb, float q, double sampleRateHz);
+        void setHighPass(float freqHz, float q, double sampleRateHz);
         void reset();
         float processSample(float x);
     };
@@ -343,6 +351,21 @@ private:
     Biquad lowShelfL, lowShelfR;
     Biquad highShelfL, highShelfR;
     Biquad midPeakL, midPeakR;
+
+    // Fixed Q for the input low-cut (see setLowCutHz()) - low rather than the usual ~0.707
+    // Butterworth value, so sweeping the cutoff up doesn't introduce an audible resonant bump right
+    // at the corner, just a broad, gentle rolloff. Note this Q is low enough that the filter's real
+    // -3dB point sits well above the nominal frequency passed to setHighPass() (the pole pair splits
+    // into two real, well-separated poles rather than a complex-conjugate pair) - by design (a
+    // gradual hardware-style rolloff, not a precise corner), but it means the 20Hz floor is NOT
+    // acoustically transparent the way a Q~0.707 filter at 20Hz would be. lowCutActive exists
+    // because of that: the control is only genuinely a no-op, bit-identical to having no low-cut at
+    // all, when bypassed outright at that floor - same "genuinely off at the default" contract as
+    // Wobble (see setWobble()'s comment).
+    static constexpr float lowCutQ = 0.10f;
+    static constexpr float lowCutFloorHz = 20.0f;
+    bool lowCutActive = false;
+    Biquad lowCutL, lowCutR;
 
     float bitDepthLevels = 32768.0f; // recomputed by setBitDepth() - matches setBitDepth(16.0f)
 
