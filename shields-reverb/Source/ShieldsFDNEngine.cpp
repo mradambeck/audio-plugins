@@ -184,6 +184,28 @@ void ShieldsFDNEngine::Biquad::setPeak(float freqHz, float gainDb, float q, doub
     a2 = rawA2 / rawA0;
 }
 
+void ShieldsFDNEngine::Biquad::setHighPass(float freqHz, float q, double sampleRateHzIn)
+{
+    // RBJ Audio EQ Cookbook 2nd-order highpass.
+    const auto w0 = 2.0f * pi * freqHz / (float) sampleRateHzIn;
+    const auto cosw0 = std::cos(w0);
+    const auto sinw0 = std::sin(w0);
+    const auto alpha = sinw0 / (2.0f * q);
+
+    const auto rawB0 = (1.0f + cosw0) * 0.5f;
+    const auto rawB1 = -(1.0f + cosw0);
+    const auto rawB2 = (1.0f + cosw0) * 0.5f;
+    const auto rawA0 = 1.0f + alpha;
+    const auto rawA1 = -2.0f * cosw0;
+    const auto rawA2 = 1.0f - alpha;
+
+    b0 = rawB0 / rawA0;
+    b1 = rawB1 / rawA0;
+    b2 = rawB2 / rawA0;
+    a1 = rawA1 / rawA0;
+    a2 = rawA2 / rawA0;
+}
+
 void ShieldsFDNEngine::Biquad::reset()
 {
     x1 = x2 = y1 = y2 = 0.0f;
@@ -233,6 +255,7 @@ void ShieldsFDNEngine::prepare(double sampleRate)
     updateLineLengths();
     updateBurstLines();
     setBandwidthHz(15000.0f);
+    setLowCutHz(20.0f);
     lowShelfL.setLowShelf(lowShelfFreqHz, lowShelfGainDb, sampleRateHz);
     lowShelfR.setLowShelf(lowShelfFreqHz, lowShelfGainDb, sampleRateHz);
     highShelfL.setHighShelf(highShelfFreqHz, highShelfGainDb, sampleRateHz);
@@ -268,6 +291,9 @@ void ShieldsFDNEngine::reset()
     highShelfR.reset();
     midPeakL.reset();
     midPeakR.reset();
+
+    lowCutL.reset();
+    lowCutR.reset();
 }
 
 void ShieldsFDNEngine::setDiffusion(float diffusion)
@@ -406,6 +432,17 @@ void ShieldsFDNEngine::setBandwidthHz(float hz)
     bandwidthCoefficient = std::exp(-2.0f * pi * clampedHz / (float) sampleRateHz);
 }
 
+void ShieldsFDNEngine::setLowCutHz(float hz)
+{
+    // See lowCutActive's comment: at the floor, skip the filter entirely rather than run it with a
+    // near-transparent-but-not-quite coefficient - the control must be a genuine no-op there.
+    lowCutActive = hz > lowCutFloorHz;
+
+    const auto clampedHz = std::max(1.0f, std::min((float) (sampleRateHz * 0.45), hz));
+    lowCutL.setHighPass(clampedHz, lowCutQ, sampleRateHz);
+    lowCutR.setHighPass(clampedHz, lowCutQ, sampleRateHz);
+}
+
 void ShieldsFDNEngine::setBitDepth(float bits)
 {
     const auto clampedBits = std::max(4.0f, std::min(16.0f, bits));
@@ -455,11 +492,37 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
             lastAppliedSizeMultiplier = sizeMultiplier;
         }
 
+        // Low-cut first, before anything else in the chain (see setLowCutHz()'s comment). Skipped
+        // entirely at the floor (lowCutActive's comment) - and, when active, explicitly guarded
+        // against a non-finite input: unlike the tank's circular buffers (which self-heal - a
+        // poisoned sample is naturally overwritten once the write position cycles back around),
+        // this biquad carries its own persistent x1/x2/y1/y2 state, so a single NaN/Inf sample would
+        // otherwise poison it FOREVER (every future sample's output depends on that state), silently
+        // deadening the whole plugin - a worse version of the exact bug the tank's own
+        // std::isfinite() re-entry check exists to prevent.
         auto diffusedL = left[n];
+        if (lowCutActive)
+        {
+            diffusedL = lowCutL.processSample(diffusedL);
+            if (! std::isfinite(diffusedL))
+            {
+                diffusedL = 0.0f;
+                lowCutL.reset();
+            }
+        }
         for (auto& stage : allpassL)
             diffusedL = stage.processSample(diffusedL);
 
         auto diffusedR = right[n];
+        if (lowCutActive)
+        {
+            diffusedR = lowCutR.processSample(diffusedR);
+            if (! std::isfinite(diffusedR))
+            {
+                diffusedR = 0.0f;
+                lowCutR.reset();
+            }
+        }
         for (auto& stage : allpassR)
             diffusedR = stage.processSample(diffusedR);
 

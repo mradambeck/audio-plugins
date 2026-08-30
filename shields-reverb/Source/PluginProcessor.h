@@ -48,6 +48,7 @@ public:
     static constexpr auto sizeParamID = "size";
     static constexpr auto dampingParamID = "damping";
     static constexpr auto bandwidthHzParamID = "bandwidthHz";
+    static constexpr auto lowCutHzParamID = "lowCutHz";
     static constexpr auto bitDepthParamID = "bitDepth";
     static constexpr auto dryParamID = "dry";
     static constexpr auto wetParamID = "wet";
@@ -66,6 +67,7 @@ private:
     std::atomic<float>* sizeParam = nullptr;
     std::atomic<float>* dampingParam = nullptr;
     std::atomic<float>* bandwidthHzParam = nullptr;
+    std::atomic<float>* lowCutHzParam = nullptr;
     std::atomic<float>* bitDepthParam = nullptr;
     std::atomic<float>* dryParam = nullptr;
     std::atomic<float>* wetParam = nullptr;
