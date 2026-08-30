@@ -29,6 +29,10 @@ jobs:
             name: Shields
           - dir: intruder-gated-reverb
             name: Intruder
+          - dir: strike-synth
+            name: Strike
+          - dir: strike-synth
+            name: StrikeProcessor
 
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +73,7 @@ jobs:
           - dir: gradient-pitch
           - dir: shields-reverb
           - dir: intruder-gated-reverb
+          - dir: strike-synth
 
     steps:
       - uses: actions/checkout@v4

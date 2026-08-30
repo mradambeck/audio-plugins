@@ -54,7 +54,7 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
-          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch shields-reverb intruder-gated-reverb; do
+          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch shields-reverb intruder-gated-reverb strike-synth; do
             echo "==> Configuring $repo"
             cmake -S "$repo" -B "$repo/build" -G Xcode
             echo "==> Building $repo installer"
@@ -83,7 +83,7 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p release-assets
-          for entry in "caverns-delay:Caverns:Caverns - Delay" "damage-fuzz:Damage:Damage - Fuzz" "corrosion-drive:Corrosion:Corrosion - Overdrive" "flux-phaser:Flux:Flux - Phaser" "alloy-bass:Alloy:Alloy" "gradient-pitch:Gradient:Gradient - Pitch Delay" "shields-reverb:Shields:Shields - Reverb" "intruder-gated-reverb:Intruder:Intruder - Reverb"; do
+          for entry in "caverns-delay:Caverns:Caverns - Delay" "damage-fuzz:Damage:Damage - Fuzz" "corrosion-drive:Corrosion:Corrosion - Overdrive" "flux-phaser:Flux:Flux - Phaser" "alloy-bass:Alloy:Alloy" "gradient-pitch:Gradient:Gradient - Pitch Delay" "shields-reverb:Shields:Shields - Reverb" "intruder-gated-reverb:Intruder:Intruder - Reverb" "strike-synth:Strike:Strike"; do
             IFS=':' read -r repo name product <<< "$entry"
             cp "$repo/installer/output/${name}-Installer.pkg" release-assets/
             ditto -c -k --keepParent \

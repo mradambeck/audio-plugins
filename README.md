@@ -18,6 +18,7 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Gradient | [`gradient-pitch/`](gradient-pitch/) | Pitch-shifting delay |
 | Shields | [`shields-reverb/`](shields-reverb/) | Diffuse algorithmic reverb with a slow-building swell |
 | Intruder | [`intruder-gated-reverb/`](intruder-gated-reverb/) | Non-linear gated reverb modeled on the AMS RMX16's Non-Lin 2 |
+| Strike | [`strike-synth/`](strike-synth/) | Extended Karplus-Strong physical-modeling string synth |
 
 Each plugin has its own README with build/launch instructions specific to that plugin and a
 description of how it works; this README covers everything shared across the whole monorepo.
@@ -38,6 +39,7 @@ audio-plugins/
 ├── gradient-pitch/
 ├── shields-reverb/
 ├── intruder-gated-reverb/
+├── strike-synth/
 ├── installers/               # Combined "install everything" .pkg builder
 ├── scripts/                  # build-all.sh / test-all.sh (loop over all plugins)
 ├── .claude/skills/            # Project-scoped Claude Code skills for this catalog's conventions

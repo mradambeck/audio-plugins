@@ -34,9 +34,9 @@ jobs:
           import re
 
           # Mirrors the hardcoded matrix in build-and-test.yml's `test`/`version-guardrail`
-          # jobs. karplunk-synth has no site card yet -- kept in this list only so a change
+          # jobs. strike-synth has no site card yet -- kept in this list only so a change
           # to it logs an explicit skip instead of being silently ignored; it self-activates
-          # the day a data-plugin="karplunk" card is added, no workflow edit needed.
+          # the day a data-plugin="strike" card is added, no workflow edit needed.
           PLUGIN_DIRS = [
               "caverns-delay",
               "damage-fuzz",
@@ -46,7 +46,7 @@ jobs:
               "gradient-pitch",
               "shields-reverb",
               "intruder-gated-reverb",
-              "karplunk-synth",
+              "strike-synth",
           ]
 
           HTML_PATH = "site/index.html"

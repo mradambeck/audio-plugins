@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>Strike</title>
+    <organization>com.wildjag</organization>
+    <domains enable_currentUserHome="true" enable_localSystem="true" enable_anywhere="false"/>
+    <options customize="always" require-scripts="false"/>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <license file="license.txt" mime-type="text/plain"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <choices-outline>
+        <line choice="choice_au"/>
+        <line choice="choice_vst3"/>
+        <line choice="choice_standalone"/>
+    </choices-outline>
+
+    <choice id="choice_au" title="Audio Unit (AU)" description="Installs Strike.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.au.pkg"/>
+    </choice>
+    <choice id="choice_vst3" title="VST3" description="Installs Strike.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.vst3.pkg"/>
+    </choice>
+    <choice id="choice_standalone" title="Standalone App" description="Installs Strike.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.standalone.pkg"/>
+    </choice>
+
+    <pkg-ref id="com.wildjag.strike.au.pkg" version="__VERSION__" onConclusion="none">Strike-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.strike.vst3.pkg" version="__VERSION__" onConclusion="none">Strike-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.strike.standalone.pkg" version="__VERSION__" onConclusion="none">Strike-Standalone-Component.pkg</pkg-ref>
+</installer-gui-script>
