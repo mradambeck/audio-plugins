@@ -67,7 +67,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Output Level",
         juce::NormalisableRange<float>(-60.0f, 6.0f, 0.01f),
         -6.0f,
-        juce::AudioParameterFloatAttributes().withLabel("dB")));
+        juce::AudioParameterFloatAttributes().withLabel("dB").withStringFromValueFunction(
+            [](float value, int) { return juce::String(value, 1) + " dB"; })));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{brightnessParamID, 1},
@@ -199,7 +200,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Ring Mod Freq",
         ringModFrequencyRange,
         200.0f,
-        juce::AudioParameterFloatAttributes().withLabel("Hz")));
+        juce::AudioParameterFloatAttributes().withLabel("Hz").withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value)) + " Hz"; })));
 
     // The Feedback Topology seam (see KarplunkVoice.h) - a runtime dropdown like Waveshaper Type,
     // at the user's explicit request, so Single and Dual can be A/B'd live. Defaults to Single
@@ -234,7 +236,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Couple Delay",
         juce::NormalisableRange<float>(0.0f, 10.0f, 0.01f),
         0.0f,
-        juce::AudioParameterFloatAttributes().withLabel("ms")));
+        juce::AudioParameterFloatAttributes().withLabel("ms").withStringFromValueFunction(
+            [](float value, int) { return juce::String(value, 1) + " ms"; })));
 
     // Dual-topology only - latched at noteOn (not live), same convention as Brightness, since real
     // unison detuning isn't a performance gesture the way Cross-Couple sweeping might be. 0% = both
@@ -286,7 +289,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Filter Cutoff",
         filterCutoffRange,
         8000.0f,
-        juce::AudioParameterFloatAttributes().withLabel("Hz")));
+        juce::AudioParameterFloatAttributes().withLabel("Hz").withStringFromValueFunction(
+            [](float value, int)
+            {
+                return value >= 1000.0f ? juce::String(value / 1000.0f, 1) + " kHz"
+                                         : juce::String(juce::roundToInt(value)) + " Hz";
+            })));
 
     // Bipolar - see KarplunkLoopFilter.h's own comment for the sweep direction convention. Defaults
     // to 0% (bit-exact no-op: Cutoff stays fixed regardless of the still-running Attack/Decay
@@ -309,14 +317,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout KarplunkAudioProcessor::crea
         "Filter Attack",
         juce::NormalisableRange<float>(1.0f, 1000.0f, 1.0f),
         1.0f,
-        juce::AudioParameterFloatAttributes().withLabel("ms")));
+        juce::AudioParameterFloatAttributes().withLabel("ms").withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value)) + " ms"; })));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{filterDecayParamID, 1},
         "Filter Decay",
         juce::NormalisableRange<float>(5.0f, 5000.0f, 1.0f),
         200.0f,
-        juce::AudioParameterFloatAttributes().withLabel("ms")));
+        juce::AudioParameterFloatAttributes().withLabel("ms").withStringFromValueFunction(
+            [](float value, int) { return juce::String(juce::roundToInt(value)) + " ms"; })));
 
     return { params.begin(), params.end() };
 }

@@ -1,8 +1,14 @@
-#include "PluginEditor.h"
+// Hardware-panel editor, matching the approved mockup at mockups/karplunk-mockup.html pixel-for-
+// pixel (reference screenshot: mockups/karplunk-mockup-reference.png). Adapted from Gradient's
+// reference implementation of the juce-hardware-panel-ui skill (Source/PluginEditor.cpp) -
+// COPY-VERBATIM: rebuildChassisTexture() and the chassis/panel/header-bar/footer-bar chrome inside
+// paint() (drawHardwareSection() has one small PLUGIN-SPECIFIC deviation - see its own comment).
+// PLUGIN-SPECIFIC: the constructor (which controls exist, labels, wordmark/tag text, window size)
+// and resized() (Karplunk's own layout, matched to the approved mockup's rendered geometry).
 
-// Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - a new
-// PluginProcessor-driven test target can link only juce_audio_processors, no editor/LookAndFeel/
-// fonts, matching alloy-bass's KarplunkTests/AlloyTests split (see CMakeLists.txt).
+#include "PluginEditor.h"
+#include "BinaryData.h"
+
 juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 {
     return new KarplunkAudioProcessorEditor(*this);
@@ -10,10 +16,95 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int editorWidth = 1920;
-    constexpr int editorHeight = 260;
-    constexpr int sliderSize = 100;
-    constexpr int labelHeight = 20;
+    constexpr int chassisMargin = 15;
+    constexpr int headerHeight = 64;
+    constexpr int footerHeight = 31;
+
+    constexpr int contentPaddingTop = 18;
+    constexpr int contentPaddingSide = 16;
+    constexpr int contentPaddingBottom = 8;
+    constexpr int rowGap = 12;
+    constexpr int columnGap = 12;
+
+    // Column widths and row heights matched to the approved mockup's rendered layout (six
+    // sections, two rows of three - Strum/Color wider than Output on top, Filter widest on
+    // bottom since it carries the most controls). See mockups/karplunk-mockup.html's CSS flex
+    // ratios (section-narrow: 0.56, #filter-section: 1.1) for where these proportions come from.
+    constexpr int strumWidth = 349;
+    constexpr int colorWidth = 349;
+    constexpr int outputWidth = 196;
+    constexpr int ringModWidth = 188;
+    constexpr int crossCoupleWidth = 336;
+    constexpr int filterWidth = 370;
+    constexpr int row1Height = 398;
+    constexpr int row2Height = 374;
+
+    constexpr int sectionPaddingTop = 44;   // clearance below the badge
+
+    constexpr int defaultKnobSize = 88;
+    constexpr int heroKnobSize = 112;
+    constexpr int knobBlockExtra = 32;      // combined height for the name label + value textbox
+    constexpr int knobNameHeight = 16;
+    constexpr int knobTextBoxHeight = 16;
+    constexpr int knobGap = 22;             // gap between two side-by-side knobs
+    constexpr int filterKnobGap = 17;       // gap between Filter's three side-by-side knobs
+
+    constexpr int smallGap = 14;            // gap between stacked rows within a section
+    constexpr int comboToKnobGap = 6;       // gap between a knob block and its attached combo
+
+    constexpr int buttonRowHeight = 31;
+    constexpr int comboRowHeight = 29;
+    constexpr int noiseColorComboWidth = 124;
+    constexpr int waveshaperComboWidth = 96;
+}
+
+void KarplunkAudioProcessorEditor::setupRotaryKnob(KarplunkRotaryKnob& knob, const juce::String& labelText,
+                                                     const juce::String& paramID)
+{
+    // Slider is a member variable, so it's default-constructed (and builds its internal value
+    // textbox Label via lookAndFeelChanged()) before the editor's own setLookAndFeel() call runs
+    // in the constructor body - Slider has no parentHierarchyChanged() override to rebuild that
+    // textbox once actually parented, so it needs to be told about the real LookAndFeel here.
+    knob.slider.setLookAndFeel(&lookAndFeel);
+    knob.slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    knob.slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, knobTextBoxHeight);
+    // -135deg to +135deg (a 270deg sweep) - matches the mockup's knob generator exactly
+    // (mockups/karplunk-mockup.html's gen_knob.py used START_DEG=-135/END_DEG=135), not
+    // Gradient's own wider 288deg sweep, which was tuned to Gradient's own separate mockup.
+    knob.slider.setRotaryParameters(-juce::MathConstants<float>::pi * 0.75f,
+                                     juce::MathConstants<float>::pi * 0.75f, true);
+    addAndMakeVisible(knob.slider);
+
+    // Not attachToComponent(): the mockup's DOM order inside .knob-cell is knob, then name, then
+    // value - the name sits BELOW the knob (between it and the value textbox), not above like
+    // attachToComponent(..., false) would place it. Positioned manually in resized() instead.
+    knob.nameLabel.setText(labelText.toUpperCase(), juce::dontSendNotification);
+    knob.nameLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(knob.nameLabel);
+
+    knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.apvts, paramID, knob.slider);
+}
+
+void KarplunkAudioProcessorEditor::setupToggle(KarplunkToggle& toggle, const juce::String& buttonText,
+                                                 const juce::String& paramID)
+{
+    toggle.button.setLookAndFeel(&lookAndFeel);
+    toggle.button.setButtonText(buttonText);
+    addAndMakeVisible(toggle.button);
+    toggle.attachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processorRef.apvts, paramID, toggle.button);
+}
+
+void KarplunkAudioProcessorEditor::setupCombo(KarplunkCombo& combo, const juce::StringArray& items,
+                                                const juce::String& paramID)
+{
+    combo.combo.setLookAndFeel(&lookAndFeel);
+    combo.combo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
+    combo.combo.addItemList(items, 1);
+    addAndMakeVisible(combo.combo);
+    combo.attachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processorRef.apvts, paramID, combo.combo);
 }
 
 KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcessor& p)
@@ -21,132 +112,60 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
 {
     setLookAndFeel(&lookAndFeel);
 
-    titleLabel.setText("KARPLUNK", juce::dontSendNotification);
-    titleLabel.setJustificationType(juce::Justification::centred);
-    titleLabel.setFont(juce::Font(juce::FontOptions(24.0f, juce::Font::bold)));
+    titleLabel.setText("STRIKE", juce::dontSendNotification);
+    titleLabel.setJustificationType(juce::Justification::topLeft);
+    titleLabel.setFont(lookAndFeel.getDisplayFont(26.0f).withExtraKerningFactor(0.04f));
+    titleLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6bc490));
     addAndMakeVisible(titleLabel);
 
-    // Temporary build-verification marker (see KarplunkBuildNumber.h) - lets a build be confirmed
-    // as actually loaded rather than a stale cached instance, without needing to reason about it.
-    buildNumberLabel.setText("build " + juce::String(karplunkBuildNumber), juce::dontSendNotification);
-    buildNumberLabel.setJustificationType(juce::Justification::bottomRight);
-    buildNumberLabel.setFont(juce::Font(juce::FontOptions(12.0f)));
-    buildNumberLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
-    addAndMakeVisible(buildNumberLabel);
+    tagLabel.setText(juce::String("String Modeling Synth").toUpperCase(), juce::dontSendNotification);
+    tagLabel.setJustificationType(juce::Justification::topLeft);
+    tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
+    tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
+    addAndMakeVisible(tagLabel);
 
-    setupSlider(dampingSlider, dampingLabel, "Decay");
-    dampingAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::dampingParamID, dampingSlider);
+    setupToggle(monoToggle, "Mono", KarplunkAudioProcessor::monoParamID);
 
-    setupSlider(outputLevelSlider, outputLevelLabel, "Output Level");
-    outputLevelAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::outputLevelParamID, outputLevelSlider);
+    // ---- STRUM ----
+    setupRotaryKnob(decayKnob, "Decay", KarplunkAudioProcessor::dampingParamID);
+    setupRotaryKnob(brightnessKnob, "Brightness", KarplunkAudioProcessor::brightnessParamID);
+    setupRotaryKnob(bowAmountKnob, "Pluck / Bow", KarplunkAudioProcessor::bowAmountParamID);
+    setupRotaryKnob(bowForceKnob, "Bow Force", KarplunkAudioProcessor::bowForceParamID);
+    setupCombo(noiseColorCombo, {"Cold", "Warm", "Dark"}, KarplunkAudioProcessor::noiseColorParamID);
 
-    setupSlider(brightnessSlider, brightnessLabel, "Pluck Brightness");
-    brightnessAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::brightnessParamID, brightnessSlider);
+    // ---- COLOR ----
+    // Off = Pre Filter, On = Post Filter (see PluginProcessor.cpp's distortionPositionParamID) -
+    // an LED toggle rather than a combo, per user request during mockup review.
+    setupToggle(postFilterToggle, "Post Filter", KarplunkAudioProcessor::distortionPositionParamID);
+    setupRotaryKnob(structureKnob, "Structure", KarplunkAudioProcessor::structureParamID);
+    setupRotaryKnob(stringPositionKnob, "Position", KarplunkAudioProcessor::positionParamID);
+    setupRotaryKnob(waveshapeKnob, "Waveshape", KarplunkAudioProcessor::waveshapeParamID);
+    setupCombo(waveshaperTypeCombo, {"Fold", "BitCrush"}, KarplunkAudioProcessor::waveshaperTypeParamID);
 
-    setupSlider(bowAmountSlider, bowAmountLabel, "Pluck / Bow");
-    bowAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::bowAmountParamID, bowAmountSlider);
+    // ---- OUTPUT ----
+    setupRotaryKnob(volumeKnob, "Volume", KarplunkAudioProcessor::outputLevelParamID);
 
-    setupSlider(bowForceSlider, bowForceLabel, "Bow Force");
-    bowForceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::bowForceParamID, bowForceSlider);
+    // ---- RING MOD ----
+    setupRotaryKnob(ringModAmountKnob, "Amount", KarplunkAudioProcessor::ringModAmountParamID);
+    setupRotaryKnob(ringModFrequencyKnob, "Frequency", KarplunkAudioProcessor::ringModFrequencyParamID);
 
-    noiseColorBox.addItem("Cold", 1);
-    noiseColorBox.addItem("Warm", 2);
-    noiseColorBox.addItem("Dark", 3);
-    addAndMakeVisible(noiseColorBox);
-    noiseColorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::noiseColorParamID, noiseColorBox);
+    // ---- CROSS COUPLE ----
+    // Off = Single, On = Dual (see PluginProcessor.cpp's topologyParamID).
+    setupToggle(crossCoupleOnToggle, "On", KarplunkAudioProcessor::topologyParamID);
+    setupRotaryKnob(crossCoupleAmountKnob, "Amount", KarplunkAudioProcessor::crossCoupleParamID);
+    setupRotaryKnob(coupleDelayKnob, "Delay", KarplunkAudioProcessor::coupleDelayParamID);
+    setupRotaryKnob(detuneKnob, "Detune", KarplunkAudioProcessor::detuneParamID);
 
-    setupSlider(structureSlider, structureLabel, "Structure");
-    structureAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::structureParamID, structureSlider);
+    // ---- FILTER ----
+    // Off = Two-Point Average, On = Resonant (see PluginProcessor.cpp's loopFilterTypeParamID).
+    setupToggle(filterOnToggle, "On", KarplunkAudioProcessor::loopFilterTypeParamID);
+    setupRotaryKnob(filterCutoffKnob, "Cutoff", KarplunkAudioProcessor::filterCutoffParamID);
+    setupRotaryKnob(resonanceKnob, "Resonance", KarplunkAudioProcessor::resonanceParamID);
+    setupRotaryKnob(filterAttackKnob, "Attack", KarplunkAudioProcessor::filterAttackParamID);
+    setupRotaryKnob(filterEnvAmountKnob, "Envelope", KarplunkAudioProcessor::filterEnvAmountParamID);
+    setupRotaryKnob(filterDecayKnob, "Decay", KarplunkAudioProcessor::filterDecayParamID);
 
-    setupSlider(positionSlider, positionLabel, "Position");
-    positionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::positionParamID, positionSlider);
-
-    monoButton.setButtonText("Mono");
-    addAndMakeVisible(monoButton);
-    monoAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::monoParamID, monoButton);
-
-    setupSlider(waveshapeSlider, waveshapeLabel, "Waveshape");
-    waveshapeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::waveshapeParamID, waveshapeSlider);
-
-    // The runtime dropdown for the Waveshaper seam's two concrete types (see
-    // KarplunkWaveshaper.h's own comment for why this one seam is a runtime choice rather than a
-    // compile-time template parameter like the other three). Item IDs are 1-based (JUCE
-    // ComboBox convention) and map to AudioParameterChoice's 0-based indices in order - "Fold" is
-    // index 0, "BitCrush" is index 1, matching createParameterLayout()'s own choice list.
-    waveshaperTypeBox.addItem("Fold", 1);
-    waveshaperTypeBox.addItem("BitCrush", 2);
-    addAndMakeVisible(waveshaperTypeBox);
-    waveshaperTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::waveshaperTypeParamID, waveshaperTypeBox);
-
-    setupSlider(ringModAmountSlider, ringModAmountLabel, "Ring Mod");
-    ringModAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::ringModAmountParamID, ringModAmountSlider);
-
-    setupSlider(ringModFrequencySlider, ringModFrequencyLabel, "Ring Mod Freq");
-    ringModFrequencyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::ringModFrequencyParamID, ringModFrequencySlider);
-
-    // The Feedback Topology seam's runtime dropdown (see KarplunkVoice.h's own comment) - "Single"
-    // is index 0, "Dual" is index 1, matching createParameterLayout()'s own choice list.
-    topologyBox.addItem("Single", 1);
-    topologyBox.addItem("Dual", 2);
-    addAndMakeVisible(topologyBox);
-    topologyAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::topologyParamID, topologyBox);
-
-    setupSlider(crossCoupleSlider, crossCoupleLabel, "Cross-Couple");
-    crossCoupleAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::crossCoupleParamID, crossCoupleSlider);
-
-    setupSlider(coupleDelaySlider, coupleDelayLabel, "Couple Delay");
-    coupleDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::coupleDelayParamID, coupleDelaySlider);
-
-    setupSlider(detuneSlider, detuneLabel, "Detune");
-    detuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::detuneParamID, detuneSlider);
-
-    // The Loop Filter seam's runtime dropdown (see KarplunkLoopFilter.h's own comment) -
-    // "Two-Point Average" is index 0, "Resonant" is index 1, matching createParameterLayout()'s
-    // own choice list.
-    loopFilterTypeBox.addItem("Two-Point Average", 1);
-    loopFilterTypeBox.addItem("Resonant", 2);
-    addAndMakeVisible(loopFilterTypeBox);
-    loopFilterTypeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::loopFilterTypeParamID, loopFilterTypeBox);
-
-    setupSlider(resonanceSlider, resonanceLabel, "Resonance");
-    resonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::resonanceParamID, resonanceSlider);
-
-    setupSlider(filterCutoffSlider, filterCutoffLabel, "Filter Cutoff");
-    filterCutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::filterCutoffParamID, filterCutoffSlider);
-
-    setupSlider(filterEnvAmountSlider, filterEnvAmountLabel, "Filter Env");
-    filterEnvAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::filterEnvAmountParamID, filterEnvAmountSlider);
-
-    setupSlider(filterAttackSlider, filterAttackLabel, "Filter Attack");
-    filterAttackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::filterAttackParamID, filterAttackSlider);
-
-    setupSlider(filterDecaySlider, filterDecayLabel, "Filter Decay");
-    filterDecayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, KarplunkAudioProcessor::filterDecayParamID, filterDecaySlider);
-
-    setSize(editorWidth, editorHeight);
+    setSize(980, 935);
 }
 
 KarplunkAudioProcessorEditor::~KarplunkAudioProcessorEditor()
@@ -154,74 +173,357 @@ KarplunkAudioProcessorEditor::~KarplunkAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
-void KarplunkAudioProcessorEditor::setupSlider(juce::Slider& slider, juce::Label& label,
-                                                const juce::String& labelText)
+// COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
+// per-plugin parameters.
+void KarplunkAudioProcessorEditor::rebuildChassisTexture()
 {
-    slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, sliderSize, labelHeight);
-    addAndMakeVisible(slider);
+    const auto w = getWidth();
+    const auto h = getHeight();
+    if (w <= 0 || h <= 0)
+        return;
 
-    label.setText(labelText, juce::dontSendNotification);
-    label.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(label);
+    chassisTexture = juce::Image(juce::Image::ARGB, w, h, true);
+    juce::Graphics tg(chassisTexture);
+
+    constexpr float period = 4.0f;
+    const auto fw = (float) w, fh = (float) h;
+
+    for (float offset = -fh; offset < fw; offset += period)
+    {
+        tg.setColour(juce::Colours::white.withAlpha(0.09f));
+        tg.drawLine(offset, 0.0f, offset + fh, fh, 1.6f);
+        tg.setColour(juce::Colours::black.withAlpha(0.20f));
+        tg.drawLine(offset + 2.0f, 0.0f, offset + 2.0f + fh, fh, 1.6f);
+    }
+    for (float offset = 0.0f; offset < fw + fh; offset += period)
+    {
+        tg.setColour(juce::Colours::white.withAlpha(0.07f));
+        tg.drawLine(offset, 0.0f, offset - fh, fh, 1.6f);
+        tg.setColour(juce::Colours::black.withAlpha(0.16f));
+        tg.drawLine(offset + 2.0f, 0.0f, offset + 2.0f - fh, fh, 1.6f);
+    }
+
+    juce::ColourGradient scuff1(juce::Colours::transparentWhite, 0.0f, 0.0f,
+                                 juce::Colours::transparentWhite, fw, fh, false);
+    scuff1.addColour(0.35, juce::Colours::transparentWhite);
+    scuff1.addColour(0.46, juce::Colours::white.withAlpha(0.035f));
+    scuff1.addColour(0.60, juce::Colours::transparentWhite);
+    tg.setGradientFill(scuff1);
+    tg.fillRect(0, 0, w, h);
+
+    juce::ColourGradient hotspot(juce::Colours::white.withAlpha(0.07f), fw * 0.15f, fh * -0.2f,
+                                  juce::Colours::transparentWhite, fw * 0.15f, fh * 0.7f, true);
+    tg.setGradientFill(hotspot);
+    tg.fillRect(0, 0, w, h);
+}
+
+// Unbroken border + centred badge that hugs its text, sitting inside the border rather than
+// straddling it - matches every other plugin's drawHardwareSection EXCEPT the badge fill colour
+// (see comment below).
+void KarplunkAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+                                                          const juce::String& label)
+{
+    g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
+    g.drawRoundedRectangle(bounds, 7.0f, 3.0f);
+
+    const auto font = lookAndFeel.getDisplayFont(11.5f).withExtraKerningFactor(0.09f);
+    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, label.toUpperCase());
+    constexpr float badgeHeight = 22.0f;
+    const auto badgeBounds = juce::Rectangle<float>(textWidth + 32.0f, badgeHeight)
+                                  .withCentre({bounds.getCentreX(), bounds.getY() + 12.0f + badgeHeight * 0.5f});
+
+    // PLUGIN-SPECIFIC: badges are deliberately brighter than plain accentMuted - the midpoint
+    // between accentMuted and accentBrightLo, per user request during mockup review ("make the
+    // badges a little brighter, halfway between where it currently is and the full highlight
+    // color"). Every other plugin's drawHardwareSection uses lookAndFeel.getAccentColour()
+    // directly for the badge fill; this is Karplunk's one intentional deviation from that.
+    g.setColour(lookAndFeel.getAccentColour().interpolatedWith(juce::Colour{0xff469c6a}, 0.5f));
+    g.fillRoundedRectangle(badgeBounds, 4.0f);
+
+    g.setColour(lookAndFeel.getBadgeInkColour());
+    g.setFont(font);
+    g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
 void KarplunkAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour{0xff1a1a1a});
+    const auto deviceBounds = getLocalBounds().toFloat();
+    juce::Path devicePath;
+    devicePath.addRoundedRectangle(deviceBounds, 16.0f);
+
+    juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 24, {0, 10}).drawForPath(g, devicePath);
+
+    g.saveState();
+    g.reduceClipRegion(devicePath);
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1c1f20), 0.0f, 0.0f,
+                                            juce::Colour(0xff0a0c0d), (float) getWidth(), (float) getHeight(), false));
+    g.fillAll();
+    if (chassisTexture.isValid())
+        g.drawImageAt(chassisTexture, 0, 0);
+
+    g.setColour(juce::Colours::white.withAlpha(0.05f));
+    g.drawLine(deviceBounds.getX() + 14.0f, deviceBounds.getY() + 1.5f, deviceBounds.getRight() - 14.0f, deviceBounds.getY() + 1.5f, 1.5f);
+
+    juce::ColourGradient bottomShadow(juce::Colours::transparentBlack, 0.0f, deviceBounds.getBottom() - 18.0f,
+                                       juce::Colours::black.withAlpha(0.45f), 0.0f, deviceBounds.getBottom(), false);
+    g.setGradientFill(bottomShadow);
+    g.fillRect(deviceBounds.withTop(deviceBounds.getBottom() - 18.0f));
+    g.restoreState();
+
+    const auto fullPanelBounds = deviceBounds.reduced((float) chassisMargin);
+
+    {
+        juce::Path panelClip;
+        panelClip.addRoundedRectangle(fullPanelBounds, 9.0f);
+        g.saveState();
+        g.reduceClipRegion(panelClip);
+
+        juce::ColourGradient panelGradient(juce::Colour(0xff262d2f), fullPanelBounds.getX(), fullPanelBounds.getY(),
+                                            juce::Colour(0xff171c1d), fullPanelBounds.getRight(), fullPanelBounds.getBottom(), false);
+        panelGradient.addColour(0.55, juce::Colour(0xff1d2325));
+        g.setGradientFill(panelGradient);
+        g.fillRect(fullPanelBounds);
+
+        juce::ColourGradient hotspot(juce::Colours::white.withAlpha(0.10f), fullPanelBounds.getX(), fullPanelBounds.getY(),
+                                      juce::Colours::transparentWhite, fullPanelBounds.getCentreX(), fullPanelBounds.getBottom(), true);
+        g.setGradientFill(hotspot);
+        g.fillRect(fullPanelBounds);
+
+        juce::ColourGradient vignette(juce::Colours::transparentBlack, fullPanelBounds.getCentreX(), fullPanelBounds.getCentreY(),
+                                       juce::Colours::black.withAlpha(0.16f), fullPanelBounds.getX(), fullPanelBounds.getY(), true);
+        vignette.addColour(0.82, juce::Colours::transparentBlack);
+        g.setGradientFill(vignette);
+        g.fillRect(fullPanelBounds);
+
+        g.setColour(juce::Colours::white.withAlpha(0.09f));
+        g.drawLine(fullPanelBounds.getX(), fullPanelBounds.getY() + 0.5f, fullPanelBounds.getRight(), fullPanelBounds.getY() + 0.5f, 1.0f);
+
+        auto headerArea = fullPanelBounds.withHeight((float) headerHeight);
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff14181a), headerArea.getTopLeft(),
+                                                juce::Colour(0xff0d1011), headerArea.getBottomLeft(), false));
+        g.fillRect(headerArea);
+        g.setColour(juce::Colour(0xff33393b));
+        g.drawLine(headerArea.getX(), headerArea.getBottom(), headerArea.getRight(), headerArea.getBottom(), 1.0f);
+
+        g.restoreState();
+    }
+
+    // Thin dark seam between the chassis and the panel face, per mockup review.
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.drawRoundedRectangle(fullPanelBounds, 9.0f, 1.0f);
+
+    drawHardwareSection(g, strumSectionBounds, "Strum");
+    drawHardwareSection(g, colorSectionBounds, "Color");
+    drawHardwareSection(g, outputSectionBounds, "Output");
+    drawHardwareSection(g, ringModSectionBounds, "Ring Mod");
+    drawHardwareSection(g, crossCoupleSectionBounds, "Cross Couple");
+    drawHardwareSection(g, filterSectionBounds, "Filter");
+
+    auto footerBoundsCopy = fullPanelBounds;
+    auto footerArea = footerBoundsCopy.removeFromBottom((float) footerHeight).reduced(20.0f, 0.0f);
+
+    g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
+    g.setColour(juce::Colour(0xff586566));
+    g.drawText(juce::String::fromUTF8("STRIKE \xC2\xB7 v") + JucePlugin_VersionString,
+               footerArea.removeFromLeft(180.0f), juce::Justification::topLeft);
+
+    g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
+    g.setColour(juce::Colour(0xff3a4547));
+    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+}
+
+void KarplunkAudioProcessorEditor::positionKnob(juce::Rectangle<int> topLeftCell, int knobSize, KarplunkRotaryKnob& knob)
+{
+    auto knobBounds = topLeftCell.withSize(knobSize, knobSize + knobBlockExtra);
+    knob.slider.setBounds(knobBounds);
+    knob.nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
+}
+
+void KarplunkAudioProcessorEditor::positionToggle(juce::Rectangle<int> cell, KarplunkToggle& toggle)
+{
+    const auto font = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.06f);
+    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, toggle.button.getButtonText().toUpperCase());
+    const auto width = (int) std::ceil(9.0f + 8.0f + textWidth + 24.0f);
+    toggle.button.setBounds(cell.withSizeKeepingCentre(width, buttonRowHeight)
+                                 .expanded((int) KarplunkLookAndFeel::buttonShadowMargin));
 }
 
 void KarplunkAudioProcessorEditor::resized()
 {
-    buildNumberLabel.setBounds(getLocalBounds().removeFromBottom(16).removeFromRight(72).reduced(4, 0));
+    auto panelArea = getLocalBounds().reduced(chassisMargin);
 
-    auto bounds = getLocalBounds().reduced(16);
+    auto header = panelArea.removeFromTop(headerHeight).reduced(20, 0);
 
-    auto titleRow = bounds.removeFromTop(32);
-    monoButton.setBounds(titleRow.removeFromRight(90));
-    titleLabel.setBounds(titleRow);
-    bounds.removeFromTop(12);
+    const auto monoFont = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.06f);
+    const auto monoTextWidth = juce::GlyphArrangement::getStringWidth(monoFont, "MONO");
+    const auto monoWidth = (int) std::ceil(9.0f + 8.0f + monoTextWidth + 24.0f);
+    monoToggle.button.setBounds(header.removeFromRight(monoWidth).withSizeKeepingCentre(monoWidth, buttonRowHeight)
+                                     .expanded((int) KarplunkLookAndFeel::buttonShadowMargin));
 
-    const auto sliderCount = 21;
-    const auto columnWidth = bounds.getWidth() / sliderCount;
+    const auto titleFont = lookAndFeel.getDisplayFont(26.0f).withExtraKerningFactor(0.04f);
+    const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
+    const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, "STRIKE") + 8;
+    const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 
-    auto layoutColumn = [&](juce::Rectangle<int> columnBounds, juce::Label& label, juce::Slider& slider)
+    auto titleBounds = header.removeFromLeft(titleWidth);
+    titleBounds.setY((int) (baselineY - titleFont.getAscent()));
+    titleBounds.setHeight((int) std::ceil(titleFont.getHeight()));
+    titleLabel.setBounds(titleBounds);
+
+    header.removeFromLeft(14);
+    auto tagBounds = header;
+    tagBounds.setY((int) (baselineY - tagFont.getAscent()));
+    tagBounds.setHeight((int) std::ceil(tagFont.getHeight()));
+    tagLabel.setBounds(tagBounds);
+
+    panelArea.removeFromBottom(footerHeight);
+
+    auto content = panelArea;
+    content.removeFromLeft(contentPaddingSide);
+    content.removeFromRight(contentPaddingSide);
+    content.removeFromTop(contentPaddingTop);
+    content.removeFromBottom(contentPaddingBottom);
+
+    auto row1 = content.removeFromTop(row1Height);
+    content.removeFromTop(rowGap);
+    auto row2 = content.removeFromTop(row2Height);
+
+    auto strumColumn = row1.removeFromLeft(strumWidth);
+    row1.removeFromLeft(columnGap);
+    auto colorColumn = row1.removeFromLeft(colorWidth);
+    row1.removeFromLeft(columnGap);
+    auto outputColumn = row1;
+
+    auto ringModColumn = row2.removeFromLeft(ringModWidth);
+    row2.removeFromLeft(columnGap);
+    auto crossCoupleColumn = row2.removeFromLeft(crossCoupleWidth);
+    row2.removeFromLeft(columnGap);
+    auto filterColumn = row2;
+
+    strumSectionBounds = strumColumn.toFloat();
+    colorSectionBounds = colorColumn.toFloat();
+    outputSectionBounds = outputColumn.toFloat();
+    ringModSectionBounds = ringModColumn.toFloat();
+    crossCoupleSectionBounds = crossCoupleColumn.toFloat();
+    filterSectionBounds = filterColumn.toFloat();
+
+    // ---- STRUM: Decay/Brightness, then Pluck-Bow/Bow Force, then Noise Color combo. A hidden
+    // spacer matches Color's toggle row height so both sections' knob rows line up. ----
     {
-        label.setBounds(columnBounds.removeFromTop(labelHeight));
-        slider.setBounds(columnBounds.withSizeKeepingCentre(sliderSize, sliderSize + labelHeight));
-    };
+        auto inner = strumColumn;
+        inner.removeFromTop(sectionPaddingTop);
+        inner.removeFromTop(buttonRowHeight);
+        inner.removeFromTop(smallGap);
 
-    layoutColumn(bounds.removeFromLeft(columnWidth), dampingLabel, dampingSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), outputLevelLabel, outputLevelSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), brightnessLabel, brightnessSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), bowAmountLabel, bowAmountSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), bowForceLabel, bowForceSlider);
+        auto row1Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row1Block = row1Cell.withSizeKeepingCentre(defaultKnobSize * 2 + knobGap, defaultKnobSize + knobBlockExtra);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, decayKnob);
+        row1Block.removeFromLeft(knobGap);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, brightnessKnob);
 
-    auto noiseColorColumn = bounds.removeFromLeft(columnWidth);
-    noiseColorBox.setBounds(noiseColorColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
-    layoutColumn(bounds.removeFromLeft(columnWidth), structureLabel, structureSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), positionLabel, positionSlider);
+        inner.removeFromTop(smallGap);
 
-    auto waveshapeColumn = bounds.removeFromLeft(columnWidth);
-    waveshaperTypeBox.setBounds(waveshapeColumn.removeFromBottom(labelHeight + 4).reduced(4, 2));
-    layoutColumn(waveshapeColumn, waveshapeLabel, waveshapeSlider);
+        auto row2Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row2Block = row2Cell.withSizeKeepingCentre(defaultKnobSize * 2 + knobGap, defaultKnobSize + knobBlockExtra);
+        positionKnob(row2Block.removeFromLeft(defaultKnobSize), defaultKnobSize, bowAmountKnob);
+        row2Block.removeFromLeft(knobGap);
+        positionKnob(row2Block.removeFromLeft(defaultKnobSize), defaultKnobSize, bowForceKnob);
 
-    layoutColumn(bounds.removeFromLeft(columnWidth), ringModAmountLabel, ringModAmountSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), ringModFrequencyLabel, ringModFrequencySlider);
+        inner.removeFromTop(comboToKnobGap);
+        noiseColorCombo.combo.setBounds(inner.removeFromTop(comboRowHeight)
+                                             .withSizeKeepingCentre(noiseColorComboWidth, comboRowHeight));
+    }
 
-    auto topologyColumn = bounds.removeFromLeft(columnWidth);
-    topologyBox.setBounds(topologyColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
+    // ---- COLOR: Post Filter toggle, Structure/Position, then Waveshape + its Fold/BitCrush
+    // combo stacked directly beneath it. ----
+    {
+        auto inner = colorColumn;
+        inner.removeFromTop(sectionPaddingTop);
 
-    layoutColumn(bounds.removeFromLeft(columnWidth), crossCoupleLabel, crossCoupleSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), coupleDelayLabel, coupleDelaySlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), detuneLabel, detuneSlider);
+        positionToggle(inner.removeFromTop(buttonRowHeight), postFilterToggle);
+        inner.removeFromTop(smallGap);
 
-    auto loopFilterTypeColumn = bounds.removeFromLeft(columnWidth);
-    loopFilterTypeBox.setBounds(loopFilterTypeColumn.withSizeKeepingCentre(sliderSize, labelHeight + 4));
+        auto row1Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row1Block = row1Cell.withSizeKeepingCentre(defaultKnobSize * 2 + knobGap, defaultKnobSize + knobBlockExtra);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, structureKnob);
+        row1Block.removeFromLeft(knobGap);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, stringPositionKnob);
 
-    layoutColumn(bounds.removeFromLeft(columnWidth), resonanceLabel, resonanceSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), filterCutoffLabel, filterCutoffSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), filterEnvAmountLabel, filterEnvAmountSlider);
-    layoutColumn(bounds.removeFromLeft(columnWidth), filterAttackLabel, filterAttackSlider);
-    layoutColumn(bounds, filterDecayLabel, filterDecaySlider);
+        inner.removeFromTop(smallGap);
+
+        auto waveshapeCell = inner.removeFromTop(defaultKnobSize + knobBlockExtra)
+                                  .withSizeKeepingCentre(defaultKnobSize, defaultKnobSize + knobBlockExtra);
+        positionKnob(waveshapeCell, defaultKnobSize, waveshapeKnob);
+
+        inner.removeFromTop(comboToKnobGap);
+        waveshaperTypeCombo.combo.setBounds(inner.removeFromTop(comboRowHeight)
+                                                 .withSizeKeepingCentre(waveshaperComboWidth, comboRowHeight));
+    }
+
+    // ---- OUTPUT: single hero Volume knob, centred in the column. ----
+    {
+        auto inner = outputColumn;
+        inner.removeFromTop(sectionPaddingTop);
+        positionKnob(inner.withSizeKeepingCentre(heroKnobSize, heroKnobSize + knobBlockExtra), heroKnobSize, volumeKnob);
+    }
+
+    // ---- RING MOD: Amount above Frequency, each its own row. Hidden spacer matches Cross
+    // Couple/Filter's toggle row height. ----
+    {
+        auto inner = ringModColumn;
+        inner.removeFromTop(sectionPaddingTop);
+        inner.removeFromTop(buttonRowHeight);
+        inner.removeFromTop(smallGap);
+
+        positionKnob(inner.removeFromTop(defaultKnobSize + knobBlockExtra).withSizeKeepingCentre(defaultKnobSize, defaultKnobSize + knobBlockExtra),
+                     defaultKnobSize, ringModAmountKnob);
+        inner.removeFromTop(smallGap);
+        positionKnob(inner.removeFromTop(defaultKnobSize + knobBlockExtra).withSizeKeepingCentre(defaultKnobSize, defaultKnobSize + knobBlockExtra),
+                     defaultKnobSize, ringModFrequencyKnob);
+    }
+
+    // ---- CROSS COUPLE: On toggle, Amount/Delay, then Detune. ----
+    {
+        auto inner = crossCoupleColumn;
+        inner.removeFromTop(sectionPaddingTop);
+
+        positionToggle(inner.removeFromTop(buttonRowHeight), crossCoupleOnToggle);
+        inner.removeFromTop(smallGap);
+
+        auto row1Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row1Block = row1Cell.withSizeKeepingCentre(defaultKnobSize * 2 + knobGap, defaultKnobSize + knobBlockExtra);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, crossCoupleAmountKnob);
+        row1Block.removeFromLeft(knobGap);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, coupleDelayKnob);
+
+        inner.removeFromTop(smallGap);
+        positionKnob(inner.removeFromTop(defaultKnobSize + knobBlockExtra).withSizeKeepingCentre(defaultKnobSize, defaultKnobSize + knobBlockExtra),
+                     defaultKnobSize, detuneKnob);
+    }
+
+    // ---- FILTER: On toggle, Cutoff/Resonance, then Attack/Envelope/Decay (three across). ----
+    {
+        auto inner = filterColumn;
+        inner.removeFromTop(sectionPaddingTop);
+
+        positionToggle(inner.removeFromTop(buttonRowHeight), filterOnToggle);
+        inner.removeFromTop(smallGap);
+
+        auto row1Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row1Block = row1Cell.withSizeKeepingCentre(defaultKnobSize * 2 + knobGap, defaultKnobSize + knobBlockExtra);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, filterCutoffKnob);
+        row1Block.removeFromLeft(knobGap);
+        positionKnob(row1Block.removeFromLeft(defaultKnobSize), defaultKnobSize, resonanceKnob);
+
+        inner.removeFromTop(smallGap);
+        auto row2Cell = inner.removeFromTop(defaultKnobSize + knobBlockExtra);
+        auto row2Block = row2Cell.withSizeKeepingCentre(defaultKnobSize * 3 + filterKnobGap * 2, defaultKnobSize + knobBlockExtra);
+        positionKnob(row2Block.removeFromLeft(defaultKnobSize), defaultKnobSize, filterAttackKnob);
+        row2Block.removeFromLeft(filterKnobGap);
+        positionKnob(row2Block.removeFromLeft(defaultKnobSize), defaultKnobSize, filterEnvAmountKnob);
+        row2Block.removeFromLeft(filterKnobGap);
+        positionKnob(row2Block.removeFromLeft(defaultKnobSize), defaultKnobSize, filterDecayKnob);
+    }
+
+    rebuildChassisTexture();
 }

@@ -2,14 +2,38 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include "KarplunkBuildNumber.h"
 #include "KarplunkLookAndFeel.h"
 #include "PluginProcessor.h"
 
-// Minimal functional editor - plain rotary sliders bound to APVTS, no hardware-panel chassis/
-// mockup pass yet (explicitly out of scope for this base scaffold; see README.md). Still applies
-// KarplunkLookAndFeel so the sliders pick up the plugin's accent colour theme "for free" without
-// custom paint() panel work.
+// Bundles a rotary knob with its own name label and parameter attachment, matching Gradient's
+// GradientRotaryKnob precedent - justified here by Karplunk's own large control count (18 knobs).
+struct KarplunkRotaryKnob
+{
+    juce::Slider slider;
+    juce::Label nameLabel;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+};
+
+struct KarplunkToggle
+{
+    juce::ToggleButton button;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
+};
+
+// No name label - every combo in Karplunk's hardware-panel design (Noise Color, Waveshaper Type)
+// is either self-evident from its own text or paired directly beneath a knob that already has a
+// name label, per the approved mockup (mockups/karplunk-mockup.html).
+struct KarplunkCombo
+{
+    juce::ComboBox combo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment;
+};
+
+// Hardware-panel chassis/section editor, matching the approved mockup at
+// mockups/karplunk-mockup.html pixel-for-pixel (see mockups/karplunk-mockup-reference.png) -
+// replaces the plain-grid base-scaffold editor. Layout/structure follows Gradient's own reference
+// implementation (Source/PluginEditor.h/.cpp) - see that file's header comment for the
+// COPY-VERBATIM/PLUGIN-SPECIFIC split this file follows.
 class KarplunkAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
@@ -20,100 +44,55 @@ public:
     void resized() override;
 
 private:
-    void setupSlider(juce::Slider&, juce::Label&, const juce::String& labelText);
+    void setupRotaryKnob(KarplunkRotaryKnob&, const juce::String& labelText, const juce::String& paramID);
+    void setupToggle(KarplunkToggle&, const juce::String& buttonText, const juce::String& paramID);
+    void setupCombo(KarplunkCombo&, const juce::StringArray& items, const juce::String& paramID);
+    void rebuildChassisTexture();
+    void drawHardwareSection(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& label);
+
+    // Positions a rotary knob + its name label together, matching the mockup's .knob-cell DOM
+    // order (knob, then name, then value).
+    void positionKnob(juce::Rectangle<int> cell, int knobSize, KarplunkRotaryKnob&);
+
+    // Sizes and positions a toggle button from its own button text, matching drawToggleButton's
+    // content layout (LED + gap + text) plus outer padding - so a button's width always matches
+    // what it actually draws rather than a hand-guessed constant.
+    void positionToggle(juce::Rectangle<int> cell, KarplunkToggle&);
 
     KarplunkAudioProcessor& processorRef;
     KarplunkLookAndFeel lookAndFeel;
 
+    juce::Image chassisTexture;
+    juce::Rectangle<float> strumSectionBounds, colorSectionBounds, outputSectionBounds;
+    juce::Rectangle<float> ringModSectionBounds, crossCoupleSectionBounds, filterSectionBounds;
+
     juce::Label titleLabel;
-    juce::Label buildNumberLabel;
+    juce::Label tagLabel;
 
-    juce::Slider dampingSlider;
-    juce::Label dampingLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dampingAttachment;
+    KarplunkToggle monoToggle;
 
-    juce::Slider outputLevelSlider;
-    juce::Label outputLevelLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputLevelAttachment;
+    // ---- STRUM section ----
+    KarplunkRotaryKnob decayKnob, brightnessKnob, bowAmountKnob, bowForceKnob;
+    KarplunkCombo noiseColorCombo;
 
-    juce::Slider brightnessSlider;
-    juce::Label brightnessLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> brightnessAttachment;
+    // ---- COLOR section ----
+    KarplunkToggle postFilterToggle;
+    KarplunkRotaryKnob structureKnob, stringPositionKnob, waveshapeKnob;
+    KarplunkCombo waveshaperTypeCombo;
 
-    juce::Slider bowAmountSlider;
-    juce::Label bowAmountLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowAmountAttachment;
+    // ---- OUTPUT section ----
+    KarplunkRotaryKnob volumeKnob;
 
-    juce::Slider bowForceSlider;
-    juce::Label bowForceLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bowForceAttachment;
+    // ---- RING MOD section ----
+    KarplunkRotaryKnob ringModAmountKnob, ringModFrequencyKnob;
 
-    juce::ComboBox noiseColorBox;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> noiseColorAttachment;
+    // ---- CROSS COUPLE section ----
+    KarplunkToggle crossCoupleOnToggle;
+    KarplunkRotaryKnob crossCoupleAmountKnob, coupleDelayKnob, detuneKnob;
 
-    juce::Slider structureSlider;
-    juce::Label structureLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> structureAttachment;
-
-    juce::Slider positionSlider;
-    juce::Label positionLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
-
-    juce::ToggleButton monoButton;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> monoAttachment;
-
-    juce::Slider waveshapeSlider;
-    juce::Label waveshapeLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> waveshapeAttachment;
-
-    juce::ComboBox waveshaperTypeBox;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveshaperTypeAttachment;
-
-    juce::Slider ringModAmountSlider;
-    juce::Label ringModAmountLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ringModAmountAttachment;
-
-    juce::Slider ringModFrequencySlider;
-    juce::Label ringModFrequencyLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> ringModFrequencyAttachment;
-
-    juce::ComboBox topologyBox;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> topologyAttachment;
-
-    juce::Slider crossCoupleSlider;
-    juce::Label crossCoupleLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> crossCoupleAttachment;
-
-    juce::Slider coupleDelaySlider;
-    juce::Label coupleDelayLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> coupleDelayAttachment;
-
-    juce::Slider detuneSlider;
-    juce::Label detuneLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> detuneAttachment;
-
-    juce::ComboBox loopFilterTypeBox;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> loopFilterTypeAttachment;
-
-    juce::Slider resonanceSlider;
-    juce::Label resonanceLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAttachment;
-
-    juce::Slider filterCutoffSlider;
-    juce::Label filterCutoffLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterCutoffAttachment;
-
-    juce::Slider filterEnvAmountSlider;
-    juce::Label filterEnvAmountLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterEnvAmountAttachment;
-
-    juce::Slider filterAttackSlider;
-    juce::Label filterAttackLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterAttackAttachment;
-
-    juce::Slider filterDecaySlider;
-    juce::Label filterDecayLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterDecayAttachment;
+    // ---- FILTER section ----
+    KarplunkToggle filterOnToggle;
+    KarplunkRotaryKnob filterCutoffKnob, resonanceKnob, filterAttackKnob, filterEnvAmountKnob, filterDecayKnob;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KarplunkAudioProcessorEditor)
 };
