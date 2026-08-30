@@ -16,6 +16,207 @@ namespace
     // of them needed their own bound raised, so this is real headroom the instrument already had,
     // not a value that trades away safety margin elsewhere.
     constexpr float masterPreGain = 1.8415f; // +5.3dB
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes
+    // after normalising, not display percentages) applied in one shot when the preset is
+    // selected - matches Gradient's own FactoryPreset convention exactly. Captured from seven
+    // .aupreset files the user saved via a host's native preset UI (decoded from each preset's
+    // embedded jucePluginState, not hand-tuned).
+    struct FactoryPreset
+    {
+        juce::String name;
+        std::vector<std::pair<juce::String, float>> values;
+    };
+
+    const std::vector<FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<FactoryPreset> presets = {
+            { "A Little Mad Sometimes", {
+                { StrikeAudioProcessor::dampingParamID, 0.0f },
+                { StrikeAudioProcessor::outputLevelParamID, 0.7999986410140991f },
+                { StrikeAudioProcessor::brightnessParamID, 0.8020000457763672f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.0f },
+                { StrikeAudioProcessor::bowForceParamID, 0.0f },
+                { StrikeAudioProcessor::noiseColorParamID, 1.0f },
+                { StrikeAudioProcessor::structureParamID, 0.718000054359436f },
+                { StrikeAudioProcessor::positionParamID, 0.1610000133514404f },
+                { StrikeAudioProcessor::monoParamID, 0.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.0f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 1.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.0f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 20.0f },
+                { StrikeAudioProcessor::topologyParamID, 1.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 1.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 10.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.1280000060796738f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 0.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.0f },
+                { StrikeAudioProcessor::filterCutoffParamID, 20.0f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -1.0f },
+                { StrikeAudioProcessor::filterAttackParamID, 1.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 5.0f },
+            } },
+            { "Drop da Bass", {
+                { StrikeAudioProcessor::dampingParamID, 0.06599999964237213f },
+                { StrikeAudioProcessor::outputLevelParamID, 0.5399986505508423f },
+                { StrikeAudioProcessor::brightnessParamID, 0.3490000069141388f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.0f },
+                { StrikeAudioProcessor::bowForceParamID, 0.0f },
+                { StrikeAudioProcessor::noiseColorParamID, 2.0f },
+                { StrikeAudioProcessor::structureParamID, 0.4510000348091125f },
+                { StrikeAudioProcessor::positionParamID, 0.3710000216960907f },
+                { StrikeAudioProcessor::monoParamID, 0.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.4260000288486481f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 1.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.0f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 200.0f },
+                { StrikeAudioProcessor::topologyParamID, 1.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 1.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 10.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.5480000376701355f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 1.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.101000003516674f },
+                { StrikeAudioProcessor::filterCutoffParamID, 7151.126953125f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -0.6309999823570251f },
+                { StrikeAudioProcessor::filterAttackParamID, 107.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1427.0f },
+            } },
+            { "Game Over", {
+                { StrikeAudioProcessor::dampingParamID, 0.4290000200271606f },
+                { StrikeAudioProcessor::outputLevelParamID, -2.050001382827759f },
+                { StrikeAudioProcessor::brightnessParamID, 0.8170000314712524f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.05100000277161598f },
+                { StrikeAudioProcessor::bowForceParamID, 0.2160000056028366f },
+                { StrikeAudioProcessor::noiseColorParamID, 0.0f },
+                { StrikeAudioProcessor::structureParamID, 0.3380000293254852f },
+                { StrikeAudioProcessor::positionParamID, 0.3040000200271606f },
+                { StrikeAudioProcessor::monoParamID, 0.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.193000003695488f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 1.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.0f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 20.0f },
+                { StrikeAudioProcessor::topologyParamID, 1.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 0.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 0.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.445000022649765f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 0.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.0f },
+                { StrikeAudioProcessor::filterCutoffParamID, 14870.7099609375f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -0.621999979019165f },
+                { StrikeAudioProcessor::filterAttackParamID, 27.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1835.0f },
+            } },
+            { "Lost in Time", {
+                { StrikeAudioProcessor::dampingParamID, 1.0f },
+                { StrikeAudioProcessor::outputLevelParamID, -10.34000110626221f },
+                { StrikeAudioProcessor::brightnessParamID, 0.2790000140666962f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.0f },
+                { StrikeAudioProcessor::bowForceParamID, 0.0f },
+                { StrikeAudioProcessor::noiseColorParamID, 0.0f },
+                { StrikeAudioProcessor::structureParamID, 0.1280000060796738f },
+                { StrikeAudioProcessor::positionParamID, 0.3660000264644623f },
+                { StrikeAudioProcessor::monoParamID, 0.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.05100000277161598f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 0.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.1210000067949295f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 440.0000305175781f },
+                { StrikeAudioProcessor::topologyParamID, 0.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 0.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 0.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.445000022649765f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 0.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.0f },
+                { StrikeAudioProcessor::filterCutoffParamID, 14870.7099609375f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -0.621999979019165f },
+                { StrikeAudioProcessor::filterAttackParamID, 27.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1835.0f },
+            } },
+            { "Make it Work", {
+                { StrikeAudioProcessor::dampingParamID, 0.7120000123977661f },
+                { StrikeAudioProcessor::outputLevelParamID, -12.34000110626221f },
+                { StrikeAudioProcessor::brightnessParamID, 1.0f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.01800000108778477f },
+                { StrikeAudioProcessor::bowForceParamID, 0.6670000553131104f },
+                { StrikeAudioProcessor::noiseColorParamID, 1.0f },
+                { StrikeAudioProcessor::structureParamID, 1.0f },
+                { StrikeAudioProcessor::positionParamID, 0.136000007390976f },
+                { StrikeAudioProcessor::monoParamID, 1.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.0f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 0.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.0f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 200.0f },
+                { StrikeAudioProcessor::topologyParamID, 1.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 0.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 0.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.5480000376701355f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 1.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.0f },
+                { StrikeAudioProcessor::filterCutoffParamID, 7151.126953125f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -0.6639999747276306f },
+                { StrikeAudioProcessor::filterAttackParamID, 151.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1427.0f },
+            } },
+            { "Morphin Time", {
+                { StrikeAudioProcessor::dampingParamID, 0.5670000314712524f },
+                { StrikeAudioProcessor::outputLevelParamID, 1.129998683929443f },
+                { StrikeAudioProcessor::brightnessParamID, 1.0f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.0f },
+                { StrikeAudioProcessor::bowForceParamID, 0.0f },
+                { StrikeAudioProcessor::noiseColorParamID, 0.0f },
+                { StrikeAudioProcessor::structureParamID, 0.2310000061988831f },
+                { StrikeAudioProcessor::positionParamID, 0.1140000075101852f },
+                { StrikeAudioProcessor::monoParamID, 1.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.4740000367164612f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 0.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.4760000109672546f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 200.0f },
+                { StrikeAudioProcessor::topologyParamID, 0.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 0.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 0.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.2850000262260437f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 1.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.1610000133514404f },
+                { StrikeAudioProcessor::filterCutoffParamID, 1133.210083007812f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, 0.03100004978477955f },
+                { StrikeAudioProcessor::filterAttackParamID, 98.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1256.0f },
+            } },
+            { "The Spice Must Flow", {
+                { StrikeAudioProcessor::dampingParamID, 0.4830000102519989f },
+                { StrikeAudioProcessor::outputLevelParamID, 0.5799986720085144f },
+                { StrikeAudioProcessor::brightnessParamID, 0.8170000314712524f },
+                { StrikeAudioProcessor::bowAmountParamID, 0.08400000631809235f },
+                { StrikeAudioProcessor::bowForceParamID, 0.7800000309944153f },
+                { StrikeAudioProcessor::noiseColorParamID, 1.0f },
+                { StrikeAudioProcessor::structureParamID, 1.0f },
+                { StrikeAudioProcessor::positionParamID, 0.07400000095367432f },
+                { StrikeAudioProcessor::monoParamID, 0.0f },
+                { StrikeAudioProcessor::waveshapeParamID, 0.0f },
+                { StrikeAudioProcessor::waveshaperTypeParamID, 0.0f },
+                { StrikeAudioProcessor::distortionPositionParamID, 0.0f },
+                { StrikeAudioProcessor::ringModAmountParamID, 0.1280000060796738f },
+                { StrikeAudioProcessor::ringModFrequencyParamID, 3203.013671875f },
+                { StrikeAudioProcessor::topologyParamID, 1.0f },
+                { StrikeAudioProcessor::crossCoupleParamID, 0.0f },
+                { StrikeAudioProcessor::coupleDelayParamID, 0.0f },
+                { StrikeAudioProcessor::detuneParamID, 0.445000022649765f },
+                { StrikeAudioProcessor::loopFilterTypeParamID, 0.0f },
+                { StrikeAudioProcessor::resonanceParamID, 0.0f },
+                { StrikeAudioProcessor::filterCutoffParamID, 14870.7099609375f },
+                { StrikeAudioProcessor::filterEnvAmountParamID, -0.621999979019165f },
+                { StrikeAudioProcessor::filterAttackParamID, 27.0f },
+                { StrikeAudioProcessor::filterDecayParamID, 1835.0f },
+            } },
+        };
+        return presets;
+    }
+
 }
 
 StrikeAudioProcessor::StrikeAudioProcessor()
@@ -635,10 +836,28 @@ bool StrikeAudioProcessor::producesMidi() const { return false; }
 bool StrikeAudioProcessor::isMidiEffect() const { return false; }
 double StrikeAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
-int StrikeAudioProcessor::getNumPrograms() { return 1; }
-int StrikeAudioProcessor::getCurrentProgram() { return 0; }
-void StrikeAudioProcessor::setCurrentProgram(int) {}
-const juce::String StrikeAudioProcessor::getProgramName(int) { return {}; }
+int StrikeAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
+int StrikeAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
+
+void StrikeAudioProcessor::setCurrentProgram(int index)
+{
+    const auto& presets = getFactoryPresets();
+    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
+        return;
+
+    currentProgramIndex = index;
+
+    for (auto& [paramID, value] : presets[(size_t) index].values)
+        if (auto* param = apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+}
+
+const juce::String StrikeAudioProcessor::getProgramName(int index)
+{
+    const auto& presets = getFactoryPresets();
+    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
+}
+
 void StrikeAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void StrikeAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

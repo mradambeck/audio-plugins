@@ -69,6 +69,7 @@ private:
     juce::Label titleLabel;
     juce::Label tagLabel;
 
+    juce::ComboBox presetCombo;
     StrikeToggle monoToggle;
 
     // ---- STRUM section ----

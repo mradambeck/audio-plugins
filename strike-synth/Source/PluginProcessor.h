@@ -77,6 +77,10 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleMidiMessage(const juce::MidiMessage& message) noexcept;
 
+    // Which factory preset (see PluginProcessor.cpp's getFactoryPresets()) is currently selected -
+    // matches Gradient's own currentProgramIndex convention exactly.
+    int currentProgramIndex = 0;
+
     std::atomic<float>* dampingParam = nullptr;
     std::atomic<float>* outputLevelParam = nullptr;
     std::atomic<float>* brightnessParam = nullptr;

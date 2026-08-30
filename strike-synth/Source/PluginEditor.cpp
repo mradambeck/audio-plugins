@@ -136,6 +136,22 @@ StrikeAudioProcessorEditor::StrikeAudioProcessorEditor(StrikeAudioProcessor& p)
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
+    // Left unselected on startup (rather than showing the first preset's name) so that picking it
+    // is always a real selection change - JUCE's ComboBox doesn't fire onChange when you choose the
+    // item that's already showing, which would otherwise make the first preset unreachable from
+    // this menu once the plugin loads with its own default parameter values rather than the
+    // preset's. Matches Gradient's own presetCombo precedent exactly.
+    presetCombo.setLookAndFeel(&lookAndFeel);
+    presetCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
+    presetCombo.setTextWhenNothingSelected("Preset");
+    for (int i = 0; i < processorRef.getNumPrograms(); ++i)
+        presetCombo.addItem(processorRef.getProgramName(i), i + 1);
+    addAndMakeVisible(presetCombo);
+    presetCombo.onChange = [this]
+    {
+        processorRef.setCurrentProgram(presetCombo.getSelectedItemIndex());
+    };
+
     setupToggle(monoToggle, "Mono", StrikeAudioProcessor::monoParamID);
 
     // ---- STRUM ----
@@ -371,6 +387,12 @@ void StrikeAudioProcessorEditor::resized()
     const auto monoWidth = (int) std::ceil(9.0f + 8.0f + monoTextWidth + 24.0f);
     monoToggle.button.setBounds(header.removeFromRight(monoWidth).withSizeKeepingCentre(monoWidth, buttonRowHeight)
                                      .expanded((int) StrikeLookAndFeel::buttonShadowMargin));
+    header.removeFromRight(scaled(14));
+    // Deliberately not scaled like the other combos - preset names ("A Little Mad Sometimes")
+    // render at the shared, unscaled combo font and need real room, unlike the short "Cold"/"Fold"
+    // labels the other combos show.
+    constexpr int presetComboWidth = 150;
+    presetCombo.setBounds(header.removeFromRight(presetComboWidth).withSizeKeepingCentre(presetComboWidth, comboRowHeight));
 
     const auto titleFont = lookAndFeel.getDisplayFont(20.8f).withExtraKerningFactor(0.04f);
     const auto tagFont = lookAndFeel.getSmallPrintFont(8.8f).withExtraKerningFactor(0.26f);
