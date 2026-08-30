@@ -279,6 +279,68 @@ public:
             expect(std::abs(measuredHz - noteAHz) < 5.0f, "A should have retriggered and be sounding again");
         }
 
+        // A real bug this fixes: StrikeMonoNoteStack::noteOff() used to report "still held" (and a
+        // note to retrigger) whenever ANY note remained held after a release, not just when the
+        // released note was actually the one sounding - so PluginProcessor retriggered the
+        // sounding note on a release of a completely unrelated held note, an audible, unrequested
+        // re-pluck. Proven bit-exact, not just "sounds okay": a reference processor gets the
+        // identical [hold A, hold B] event sequence as the test processor (so excitation/dispersion
+        // noise state, which deliberately persists across notes on the same voice, lines up
+        // exactly - see StrikeExcitation::reset()'s own comment) and then no further events at all;
+        // the test processor gets those same two events plus a release of A (not B, the one
+        // actually sounding). If releasing A still touches B - a retrigger resets the excitation
+        // envelope/loop filter/string content - the two renders diverge; if it's truly a no-op,
+        // they stay bit-identical.
+        beginTest("Mono mode: releasing a note that ISN'T sounding does not retrigger the one that is");
+        {
+            const int settleSamples = (int) (0.2 * sampleRate);
+
+            StrikeAudioProcessor referenceProcessor;
+            referenceProcessor.prepareToPlay(sampleRate, 512);
+            setRaw(referenceProcessor, StrikeAudioProcessor::monoParamID, 1.0f);
+            setRaw(referenceProcessor, StrikeAudioProcessor::dampingParamID, 0.9f);
+            setRaw(referenceProcessor, StrikeAudioProcessor::bowAmountParamID, 1.0f); // continuous tone
+
+            StrikeAudioProcessor testProcessor;
+            testProcessor.prepareToPlay(sampleRate, 512);
+            setRaw(testProcessor, StrikeAudioProcessor::monoParamID, 1.0f);
+            setRaw(testProcessor, StrikeAudioProcessor::dampingParamID, 0.9f);
+            setRaw(testProcessor, StrikeAudioProcessor::bowAmountParamID, 1.0f);
+
+            // Identical [hold A, hold B] event sequence on both processors, so excitation/dispersion
+            // noise state (which deliberately persists across notes on the same voice - see
+            // StrikeExcitation::reset()'s own comment) lines up exactly between the two.
+            juce::AudioBuffer<float> referenceBufferA(2, settleSamples);
+            juce::AudioBuffer<float> testBufferA(2, settleSamples);
+            auto midiA = noteOnBuffer(60, 100);
+            referenceProcessor.processBlock(referenceBufferA, midiA);
+            auto midiA2 = noteOnBuffer(60, 100);
+            testProcessor.processBlock(testBufferA, midiA2); // hold A on both
+
+            juce::AudioBuffer<float> referenceAfterB(2, settleSamples);
+            juce::AudioBuffer<float> testAfterB(2, settleSamples);
+            auto midiB = noteOnBuffer(67, 100);
+            referenceProcessor.processBlock(referenceAfterB, midiB);
+            auto midiB2 = noteOnBuffer(67, 100);
+            testProcessor.processBlock(testAfterB, midiB2); // hold B too, A still physically held on both
+
+            const auto afterBDiff = rmsOfDifference(referenceAfterB.getReadPointer(0), testAfterB.getReadPointer(0), settleSamples);
+            expectEquals(afterBDiff, 0.0f, "sanity check: both renders take the identical [hold A, hold B] path so far");
+
+            // Now they diverge: the reference gets no further events at all; the test releases A -
+            // NOT the note that's sounding (B is).
+            juce::AudioBuffer<float> referenceTail(2, settleSamples);
+            juce::MidiBuffer noMidi;
+            referenceProcessor.processBlock(referenceTail, noMidi);
+
+            juce::AudioBuffer<float> testTail(2, settleSamples);
+            auto midiOffA = noteOffBuffer(60);
+            testProcessor.processBlock(testTail, midiOffA);
+
+            const auto tailDiff = rmsOfDifference(referenceTail.getReadPointer(0), testTail.getReadPointer(0), settleSamples);
+            expectEquals(tailDiff, 0.0f, "releasing A (not the sounding note) must not retrigger or otherwise disturb B");
+        }
+
         // Poly mode (the default) must stay exactly as it was before this feature existed -
         // toggling Mono off (or never touching it) shouldn't change anything about note handling.
         beginTest("Mono defaults to off - Poly behavior is unaffected by the new parameter existing");

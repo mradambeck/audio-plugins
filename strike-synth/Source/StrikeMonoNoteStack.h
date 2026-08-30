@@ -43,18 +43,34 @@ public:
 
     struct NoteOffResult
     {
-        // true: another held note should now sound (retrigger `event`). false: no notes remain
-        // held (the caller should release the voice via its own noteOff()).
-        bool stillHeld = false;
+        // What the caller should do about this note-off. Only the TOP of the stack is ever
+        // audible in this class's last-note-priority model, so releasing anything else can't
+        // change what's currently sounding:
+        //   Retrigger: the released note WAS the one sounding, and another held note takes over -
+        //   fire a fresh pluck for `event`.
+        //   Release: the released note WAS the one sounding, and nothing else is held - release
+        //   the voice.
+        //   NoChange: the released note was NOT the one sounding (a lower held note, or a note not
+        //   held at all) - the caller must do nothing at all. A real bug this fixes: this class
+        //   used to report "still held" (and a note to retrigger) whenever ANY note remained held,
+        //   which made PluginProcessor retrigger the already-sounding note on an unrelated
+        //   note-off - an audible, unrequested re-pluck. See git history/StrikeProcessorTests.cpp's
+        //   own regression test for the fix.
+        enum class Action { NoChange, Retrigger, Release };
+        Action action = Action::NoChange;
         NoteEvent event;
     };
 
     NoteOffResult noteOff(int note) noexcept
     {
+        const auto wasTop = size > 0 && notes[(size_t) size - 1] == note;
         removeIfPresent(note);
+
+        if (!wasTop)
+            return { NoteOffResult::Action::NoChange, {} };
         if (size == 0)
-            return { false, {} };
-        return { true, { notes[(size_t) size - 1], velocities[(size_t) size - 1] } };
+            return { NoteOffResult::Action::Release, {} };
+        return { NoteOffResult::Action::Retrigger, { notes[(size_t) size - 1], velocities[(size_t) size - 1] } };
     }
 
 private:

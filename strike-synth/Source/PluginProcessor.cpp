@@ -641,15 +641,19 @@ void StrikeAudioProcessor::handleMidiMessage(const juce::MidiMessage& message) n
             // The core last-note-priority behavior (see StrikeMonoNoteStack.h's own comment):
             // releasing the currently-sounding note falls back to retriggering whichever
             // still-held note is now on top, rather than just letting it ring out - only release
-            // the voice once nothing at all remains held.
+            // the voice once nothing at all remains held. Releasing a note that ISN'T the one
+            // currently sounding (a lower held note, or a note not held at all) changes nothing -
+            // see NoteOffResult::Action's own comment for the real retrigger bug this distinction
+            // fixes.
+            using Action = StrikeMonoNoteStack<16>::NoteOffResult::Action;
             const auto result = monoNoteStack.noteOff(message.getNoteNumber());
-            if (result.stillHeld)
+            if (result.action == Action::Retrigger)
             {
                 voices[0].setBrightness(brightnessParam->load());
                 voices[0].setDetuneAmount(detuneParam->load());
                 voices[0].noteOn(result.event.note, result.event.velocity01);
             }
-            else
+            else if (result.action == Action::Release)
             {
                 voices[0].noteOff();
             }

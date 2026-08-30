@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 #include "StrikeLoopFilter.h"
@@ -13,6 +14,18 @@
 namespace
 {
     constexpr float pi = 3.14159265358979323846f;
+
+    // Bit-exact float comparison for the cache-invalidation checks below (delaySamplesForPitch(),
+    // levelOutput()) - a plain == is correct here too (an exact-match cache genuinely wants exact
+    // equality, not a tolerance), but trips -Wfloat-equal; comparing raw bit patterns gets the
+    // identical semantics without the warning.
+    [[maybe_unused]] bool floatBitsEqual(float a, float b) noexcept
+    {
+        uint32_t bitsA, bitsB;
+        std::memcpy(&bitsA, &a, sizeof(bitsA));
+        std::memcpy(&bitsB, &b, sizeof(bitsB));
+        return bitsA == bitsB;
+    }
 }
 
 // A generic, reusable cascaded first-order Schroeder allpass primitive - deliberately has no
@@ -743,15 +756,30 @@ private:
     // life between two integer notes while gliding) can be converted every tick, not just at
     // noteOn() - the note-on path clamps to a real MIDI note first (see noteOn()), so this itself
     // doesn't re-clamp the input, only the output (the interpolation-quality floor below).
-    float delaySamplesForPitch(float midiNoteFloat) const noexcept
+    // Called every render tick via the glide step (renderChannelSample()), even when pitch isn't
+    // actively gliding - in which case midiNoteFloat is bit-identical to the previous call's, since
+    // a fixed-point one-pole recurrence (glideCoeff=1, or a converged glide) keeps producing the
+    // exact same value. Cached so the std::pow call only actually runs when the input changes
+    // (gliding, or a fresh note-on/pitch bend), not on every sample of a held, steady-pitch note.
+    float delaySamplesForPitch(float midiNoteFloat) noexcept
     {
+        if (hasCachedDelaySamples && floatBitsEqual(midiNoteFloat, cachedPitchMidi))
+            return cachedDelaySamples;
+
         const auto frequencyHz = 440.0 * std::pow(2.0, ((double) midiNoteFloat - 69.0) / 12.0);
         const auto delaySamples = (float) (sampleRateHz / frequencyHz);
 
         // Clamps interpolation-quality floor above kHighestSupportedMidiNote - not a
         // real-time-safety concern, just protects fractional-delay accuracy at very short delays.
-        return std::max(8.0f, delaySamples);
+        cachedPitchMidi = midiNoteFloat;
+        cachedDelaySamples = std::max(8.0f, delaySamples);
+        hasCachedDelaySamples = true;
+        return cachedDelaySamples;
     }
+
+    float cachedPitchMidi = 0.0f;
+    float cachedDelaySamples = 0.0f;
+    bool hasCachedDelaySamples = false;
 
     Excitation excitation;
     // Runtime-selectable, not a template parameter (see StrikeLoopFilter.h's own comment) -
@@ -900,6 +928,14 @@ public:
     void prepare(double sampleRate) noexcept
     {
         sampleRateHz = sampleRate;
+
+        // slowOutputCoeff depends only on slowOutputTimeSeconds (a compile-time constant) and
+        // sampleRateHz (fixed for the life of the instance once prepare() has run) - it's a true
+        // constant, so it's computed once here rather than every sample in levelOutput(), the same
+        // "precompute a coefficient once in prepare()" pattern StrikeStringLineChannel's own
+        // waveshapeAttackCoeff already uses.
+        slowOutputCoeff = 1.0f - std::exp(-1.0f / (float) (slowOutputTimeSeconds * sampleRateHz));
+
         lineA.prepare(sampleRate);
         lineB.prepare(sampleRate);
 
@@ -1172,12 +1208,19 @@ private:
         // fastOutputTimeSeconds (everything above roughly A2, ~110Hz), and only stretches the
         // window for lower notes where the fixed value would otherwise be too short to resolve a
         // full cycle.
-        const auto periodSeconds = delaySamples / (float) sampleRateHz;
-        const auto effectiveFastOutputTimeSeconds = std::max(fastOutputTimeSeconds, periodSeconds * fastOutputPeriodMultiplier);
-
-        const auto fastOutputCoeff = 1.0f - std::exp(-1.0f / (float) (effectiveFastOutputTimeSeconds * sampleRateHz));
-        const auto slowOutputCoeff = 1.0f - std::exp(-1.0f / (float) (slowOutputTimeSeconds * sampleRateHz));
-        fastOutputEnvelope += fastOutputCoeff * (instantMagnitude - fastOutputEnvelope);
+        // fastOutputCoeff depends only on delaySamples (the note's own period), which is stable
+        // whenever pitch isn't actively gliding/bending (same reasoning as
+        // StrikeStringLineChannel::delaySamplesForPitch()'s own cache) - cached so the std::exp
+        // call only actually runs when the period changes, not on every sample of a held note.
+        if (!hasCachedFastOutputCoeff || !floatBitsEqual(delaySamples, cachedDelaySamplesForFastOutputCoeff))
+        {
+            const auto periodSeconds = delaySamples / (float) sampleRateHz;
+            const auto effectiveFastOutputTimeSeconds = std::max(fastOutputTimeSeconds, periodSeconds * fastOutputPeriodMultiplier);
+            cachedFastOutputCoeff = 1.0f - std::exp(-1.0f / (float) (effectiveFastOutputTimeSeconds * sampleRateHz));
+            cachedDelaySamplesForFastOutputCoeff = delaySamples;
+            hasCachedFastOutputCoeff = true;
+        }
+        fastOutputEnvelope += cachedFastOutputCoeff * (instantMagnitude - fastOutputEnvelope);
         slowOutputEnvelope += slowOutputCoeff * (instantMagnitude - slowOutputEnvelope);
         const auto levelingGain = std::clamp(slowOutputEnvelope / std::max(fastOutputEnvelope, 0.02f),
                                               minLevelingGain, maxLevelingGain);
@@ -1228,6 +1271,15 @@ private:
 
     float fastOutputEnvelope = 0.0f;
     float slowOutputEnvelope = 0.0f;
+
+    // Computed once in prepare() - see that call site's own comment for why this one is a true
+    // constant (unlike fastOutputCoeff, which depends on the note's own period).
+    float slowOutputCoeff = 0.0f;
+
+    // fastOutputCoeff's own cache - see levelOutput()'s own comment.
+    float cachedDelaySamplesForFastOutputCoeff = 0.0f;
+    float cachedFastOutputCoeff = 0.0f;
+    bool hasCachedFastOutputCoeff = false;
 
     // fastOutputTimeSeconds is now a FLOOR, not the actual time constant used - see
     // levelOutput()'s own comment. A real, measured bug: a rectify-then-one-pole-smooth envelope

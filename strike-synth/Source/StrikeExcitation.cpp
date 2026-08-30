@@ -40,7 +40,23 @@ void StrikeExcitation::reset() noexcept
 
 void StrikeExcitation::setBrightness(float amount01) noexcept
 {
-    brightness = amount01;
+    // Computed here, once, rather than every sample in nextNoiseSample() - PluginProcessor only
+    // ever calls this right before noteOn() (see this method's own declaration comment in the
+    // header), so both derived values below are constant for a note's entire life.
+    lowpassAlpha = minLowpassAlpha + amount01 * (1.0f - minLowpassAlpha);
+
+    // Loudness compensation - see this class's own header comment (setBrightness()'s) for why a
+    // real, but not extreme, loudness drop toward Brightness=0 is the desired character (a fully
+    // darkened pluck reading as quieter is physically reasonable; a fully darkened pluck reading
+    // as ~20dB quieter, MEASURED before this compensation existed, is not - reported by the user).
+    // A one-pole lowpass driven by white noise has steady-state RMS gain sqrt(alpha/(2-alpha))
+    // relative to its own input (the standard one-pole-filtered-white-noise variance result) -
+    // brightnessCompensationAmount applies a TUNED FRACTION of the gain that would fully equalize
+    // RMS across the whole Brightness range (1.0 would remove the loudness drop entirely, which
+    // the user did NOT ask for) - 0.8 was measured to bring the full 0-vs-1 gap down from ~20dB to
+    // a modest, still-audible ~4dB. Exactly 1.0 at alpha=1 (Brightness=1) regardless of this
+    // constant, so the existing bit-exact passthrough there is unaffected.
+    brightnessCompensationGain = std::pow((2.0f - lowpassAlpha) / lowpassAlpha, brightnessCompensationAmount * 0.5f);
 }
 
 void StrikeExcitation::setBowAmount(float amount01) noexcept
@@ -111,21 +127,10 @@ float StrikeExcitation::nextNoiseSample() noexcept
                         : noiseColor == 1 ? nextPinkNoiseSample(whiteNoise)
                                           : nextBrownNoiseSample(whiteNoise);
 
-    const auto alpha = minLowpassAlpha + brightness * (1.0f - minLowpassAlpha);
-    lowpassState += alpha * (colored - lowpassState);
-
-    // Loudness compensation - see this class's own header comment (setBrightness()'s) for why a
-    // real, but not extreme, loudness drop toward Brightness=0 is the desired character (a fully
-    // darkened pluck reading as quieter is physically reasonable; a fully darkened pluck reading
-    // as ~20dB quieter, MEASURED before this compensation existed, is not - reported by the user).
-    // A one-pole lowpass driven by white noise has steady-state RMS gain sqrt(alpha/(2-alpha))
-    // relative to its own input (the standard one-pole-filtered-white-noise variance result) -
-    // brightnessCompensationAmount applies a TUNED FRACTION of the gain that would fully equalize
-    // RMS across the whole Brightness range (1.0 would remove the loudness drop entirely, which
-    // the user did NOT ask for) - 0.8 was measured to bring the full 0-vs-1 gap down from ~20dB to
-    // a modest, still-audible ~4dB. Exactly 1.0 at alpha=1 (Brightness=1) regardless of this
-    // constant, so the existing bit-exact passthrough there is unaffected.
-    const auto brightnessCompensationGain = std::pow((2.0f - alpha) / alpha, brightnessCompensationAmount * 0.5f);
+    // lowpassAlpha/brightnessCompensationGain are derived from Brightness and cached in
+    // setBrightness() (constant for a note's whole life - see that method's own comment for the
+    // loudness-compensation rationale), not recomputed here every sample.
+    lowpassState += lowpassAlpha * (colored - lowpassState);
     return lowpassState * brightnessCompensationGain;
 }
 
@@ -185,53 +190,63 @@ float StrikeExcitation::nextExcitationSample(float velocity01, float stringSigna
     if (stage == Stage::Idle)
         return 0.0f;
 
-    // Attack: fastAttackSamples (pluck) -> slowAttackSeconds worth of samples (bow), clamped so a
-    // short (high-pitched) note's attack never eats more than a quarter of its own base duration -
-    // otherwise a high note would land at a lower peak than a low note for the same bowAmount and
-    // velocity, a pitch-dependent artifact the old fixed-length burst never had.
-    const auto slowAttackSamples = (float) (slowAttackSeconds * sampleRateHz);
-    const auto clampedFastAttack = std::min(fastAttackSamples, baseDurationSamples * 0.25f);
-    const auto attackTimeSamples = clampedFastAttack + bowAmount * (slowAttackSamples - clampedFastAttack);
-    const auto attackCoeff = 1.0f - std::exp(-1.0f / attackTimeSamples);
-
-    // Decay-to-sustain: baseDurationSamples * durationMultiplier (pluck) -> slowDecaySeconds worth
-    // of samples (bow), interpolated linearly in TIME, same as attack - deliberately not linearly
-    // in coefficient (see this class's header comment for why that mismatch was the actual bug).
-    const auto baseDecayTimeSamples = baseDurationSamples * durationMultiplier;
-    const auto slowDecaySamples = (float) (slowDecaySeconds * sampleRateHz);
-    const auto decayTimeSamples = baseDecayTimeSamples + bowAmount * (slowDecaySamples - baseDecayTimeSamples);
-    const auto decayCoeff = 1.0f - std::exp(-1.0f / decayTimeSamples);
-
-    // Release: fastReleaseSeconds (pluck) -> slowReleaseSeconds worth of samples (bow), same
-    // linear-in-time interpolation.
-    const auto fastReleaseSamples = fastReleaseSeconds * (float) sampleRateHz;
-    const auto slowReleaseSamples = slowReleaseSeconds * (float) sampleRateHz;
-    const auto releaseTimeSamples = fastReleaseSamples + bowAmount * (slowReleaseSamples - fastReleaseSamples);
-    const auto releaseCoeff = 1.0f - std::exp(-1.0f / releaseTimeSamples);
-
-    // The parameter that actually fixes the loudness-consistency bug: how loud the note stays is
-    // now this one explicit, monotonic value, decoupled from how fast any stage moves.
-    const auto sustainLevel = bowAmount;
-
+    // Each stage's own time-to-coefficient conversion is computed only inside its own case below
+    // (each needs a std::exp call) - only one stage is ever active per tick, so computing the
+    // other two coefficients unconditionally on every call, as this used to do, was pure waste.
     switch (stage)
     {
         case Stage::Attack:
+        {
+            // fastAttackSamples (pluck) -> slowAttackSeconds worth of samples (bow), clamped so a
+            // short (high-pitched) note's attack never eats more than a quarter of its own base
+            // duration - otherwise a high note would land at a lower peak than a low note for the
+            // same bowAmount and velocity, a pitch-dependent artifact the old fixed-length burst
+            // never had.
+            const auto slowAttackSamples = (float) (slowAttackSeconds * sampleRateHz);
+            const auto clampedFastAttack = std::min(fastAttackSamples, baseDurationSamples * 0.25f);
+            const auto attackTimeSamples = clampedFastAttack + bowAmount * (slowAttackSamples - clampedFastAttack);
+            const auto attackCoeff = 1.0f - std::exp(-1.0f / attackTimeSamples);
+
             envelope += attackCoeff * (1.0f - envelope);
             if (envelope > 0.999f)
                 stage = Stage::DecayToSustain;
             break;
+        }
 
         case Stage::DecayToSustain:
-            // Never "finishes" into a separate Sustain stage - a one-pole recurrence naturally
-            // settles at and holds its target, and re-evaluating sustainLevel from bowAmount every
-            // tick means a held note's loudness keeps tracking the knob live, not just at the
-            // instant decay happened to complete.
+        {
+            // baseDurationSamples * durationMultiplier (pluck) -> slowDecaySeconds worth of
+            // samples (bow), interpolated linearly in TIME, same as attack - deliberately not
+            // linearly in coefficient (see this class's header comment for why that mismatch was
+            // the actual bug).
+            const auto baseDecayTimeSamples = baseDurationSamples * durationMultiplier;
+            const auto slowDecaySamples = (float) (slowDecaySeconds * sampleRateHz);
+            const auto decayTimeSamples = baseDecayTimeSamples + bowAmount * (slowDecaySamples - baseDecayTimeSamples);
+            const auto decayCoeff = 1.0f - std::exp(-1.0f / decayTimeSamples);
+
+            // The parameter that actually fixes the loudness-consistency bug: how loud the note
+            // stays is now this one explicit, monotonic value, decoupled from how fast any stage
+            // moves. Never "finishes" into a separate Sustain stage - a one-pole recurrence
+            // naturally settles at and holds its target, and re-evaluating sustainLevel from
+            // bowAmount every tick means a held note's loudness keeps tracking the knob live, not
+            // just at the instant decay happened to complete.
+            const auto sustainLevel = bowAmount;
             envelope += decayCoeff * (sustainLevel - envelope);
             break;
+        }
 
         case Stage::Release:
+        {
+            // fastReleaseSeconds (pluck) -> slowReleaseSeconds worth of samples (bow), same
+            // linear-in-time interpolation.
+            const auto fastReleaseSamples = fastReleaseSeconds * (float) sampleRateHz;
+            const auto slowReleaseSamples = slowReleaseSeconds * (float) sampleRateHz;
+            const auto releaseTimeSamples = fastReleaseSamples + bowAmount * (slowReleaseSamples - fastReleaseSamples);
+            const auto releaseCoeff = 1.0f - std::exp(-1.0f / releaseTimeSamples);
+
             envelope += releaseCoeff * (0.0f - envelope);
             break;
+        }
 
         case Stage::Idle:
             break;

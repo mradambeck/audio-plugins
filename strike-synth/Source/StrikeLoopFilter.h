@@ -2,10 +2,24 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 
 namespace
 {
     constexpr float strikeLoopFilterTwoPi = 6.28318530717958647692f;
+
+    // Bit-exact float comparison for StrikeLowpassFilter::process()'s coefficient-cache check
+    // below - a plain == is correct here too (an exact-match cache genuinely wants exact equality,
+    // not a tolerance), but trips -Wfloat-equal; comparing raw bit patterns gets the identical
+    // semantics without the warning.
+    [[maybe_unused]] bool strikeLoopFilterBitsEqual(float a, float b) noexcept
+    {
+        uint32_t bitsA, bitsB;
+        std::memcpy(&bitsA, &a, sizeof(bitsA));
+        std::memcpy(&bitsB, &b, sizeof(bitsB));
+        return bitsA == bitsB;
+    }
 }
 
 // The Loop Filter seam: "process one sample through the feedback path." Deliberately no JUCE
@@ -94,30 +108,45 @@ public:
     {
         z1 = 0.0f;
         z2 = 0.0f;
+
+        // Invalidates the coefficient cache below (see process()'s own comment) - reset() runs on
+        // every prepare() call (including a sample-rate change, which the cached coefficients
+        // don't otherwise account for) and on every note-on, so this can never reuse coefficients
+        // computed under a stale sample rate.
+        hasCachedCoefficients = false;
     }
 
-    // Recomputes coefficients every call (live-tweakable freqHz/q, same per-sample trig-call cost
-    // category as Structure's own sin/cos/atan2 calls elsewhere in this codebase - not a new
-    // expense tier). Direct-form-II-transposed, 2 floats of state, no allocation ever.
+    // Coefficients are only actually recomputed when freqHz/q differ from the previous call -
+    // live-tweakable (the filter envelope sweeps freqHz continuously during Attack/Decay, same
+    // per-sample trig-call cost category as Structure's own sin/cos/atan2 calls elsewhere in this
+    // codebase while it's genuinely moving), but a held note with a settled envelope and an
+    // untouched Resonance/Cutoff knob calls this with the identical (freqHz, q) every sample, so
+    // caching skips recomputing an identical result. Direct-form-II-transposed, 2 floats of filter
+    // state plus the cache, no allocation ever.
     float process(float x, float freqHz, float q) noexcept
     {
-        const auto w0 = strikeLoopFilterTwoPi * freqHz / (float) sampleRateHz;
-        const auto cosw0 = std::cos(w0);
-        const auto alpha = std::sin(w0) / (2.0f * q);
-        const auto a0 = 1.0f + alpha;
-        const auto b1 = (1.0f - cosw0) / a0;
-        const auto b0 = b1 * 0.5f;
-        const auto b2 = b0;
-        const auto a1 = (-2.0f * cosw0) / a0;
-        const auto a2 = (1.0f - alpha) / a0;
+        if (!hasCachedCoefficients || !strikeLoopFilterBitsEqual(freqHz, cachedFreqHz) || !strikeLoopFilterBitsEqual(q, cachedQ))
+        {
+            const auto w0 = strikeLoopFilterTwoPi * freqHz / (float) sampleRateHz;
+            const auto cosw0 = std::cos(w0);
+            const auto alpha = std::sin(w0) / (2.0f * q);
+            const auto a0 = 1.0f + alpha;
+            cachedB1 = (1.0f - cosw0) / a0;
+            cachedB0 = cachedB1 * 0.5f; // b2 == b0 for this filter, see process() below
+            cachedA1 = (-2.0f * cosw0) / a0;
+            cachedA2 = (1.0f - alpha) / a0;
+            cachedFreqHz = freqHz;
+            cachedQ = q;
+            hasCachedCoefficients = true;
+        }
 
         // Direct-form-II-transposed:
         //   y      = b0*x + z1
         //   z1_new = b1*x - a1*y + z2
-        //   z2_new = b2*x - a2*y
-        const auto y = b0 * x + z1;
-        const auto z1New = b1 * x - a1 * y + z2;
-        const auto z2New = b2 * x - a2 * y;
+        //   z2_new = b2*x - a2*y   (b2 == b0)
+        const auto y = cachedB0 * x + z1;
+        const auto z1New = cachedB1 * x - cachedA1 * y + z2;
+        const auto z2New = cachedB0 * x - cachedA2 * y;
         z1 = z1New;
         z2 = z2New;
         return y;
@@ -127,6 +156,14 @@ private:
     double sampleRateHz = 44100.0;
     float z1 = 0.0f;
     float z2 = 0.0f;
+
+    float cachedFreqHz = 0.0f;
+    float cachedQ = 0.0f;
+    float cachedB0 = 0.0f;
+    float cachedB1 = 0.0f;
+    float cachedA1 = 0.0f;
+    float cachedA2 = 0.0f;
+    bool hasCachedCoefficients = false;
 };
 
 // StrikeResonantLoopFilter: the Loop Filter seam's second concrete implementation, selected at

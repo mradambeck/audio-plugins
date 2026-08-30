@@ -868,6 +868,53 @@ public:
             }
         }
 
+        // Guards specifically against a cache-invalidation bug in levelOutput()'s own
+        // fastOutputCoeff cache (see StrikeVoice.h's own comment): retriggering FROM a high note (a
+        // short period, needing only the 15ms floor) TO the lowest supported note (a long period,
+        // needing the period*8 stretch) must still pick up the new, larger
+        // effectiveFastOutputTimeSeconds, reaching comparable peak loudness to the same low note
+        // played fresh. Measured directly (not just reasoned) against a deliberately broken build
+        // that always reused the FIRST-ever computed coefficient: retriggered-from-high peaked at
+        // ~51% of the fresh low note's own peak there (the leveler's too-fast envelope, stuck at
+        // the high note's 15ms floor, can't track a full low-note cycle and clamps levelingGain
+        // down harder than it should); the real, cache-invalidating implementation measures ~77% -
+        // comfortably above this test's threshold, with a fresh voice's own run-to-run RNG/envelope-
+        // history differences (not a bug) accounting for the remaining gap from 100%.
+        beginTest("A note retriggered down from a high note reaches comparable peak loudness to the same note played fresh (loudness leveling cache regression)");
+        {
+            auto measurePeak = [](bool primeWithHighNote)
+            {
+                Voice voice;
+                voice.prepare(44100.0);
+                voice.setDamping(0.6f);
+                if (primeWithHighNote)
+                {
+                    voice.noteOn(Voice::kHighestSupportedMidiNote, 1.0f); // short period - primes a small cached coefficient
+                    for (int i = 0; i < 2000; ++i)
+                        voice.renderNextSample();
+                }
+                voice.noteOn(Voice::kLowestSupportedMidiNote, 1.0f); // (re)trigger the longest period
+
+                constexpr int skipSamples = 44100 / 5; // 200ms
+                for (int i = 0; i < skipSamples; ++i)
+                    voice.renderNextSample();
+
+                float peak = 0.0f;
+                constexpr int measureSamples = 44100 * 2; // several full periods of the lowest note
+                for (int i = 0; i < measureSamples; ++i)
+                    peak = std::max(peak, std::abs(voice.renderNextSample()));
+                return peak;
+            };
+
+            const auto freshPeak = measurePeak(false);
+            const auto retriggeredPeak = measurePeak(true);
+
+            expect(retriggeredPeak > freshPeak * 0.6f,
+                   "retriggering down to a low note must reach comparable peak loudness to playing it fresh, "
+                   "not be measurably crushed by a stale (too-short) cached leveling coefficient left over "
+                   "from the prior high note");
+        }
+
         beginTest("Structure does not measurably detune the fundamental across the note range");
         {
             // This test exists because of a real, shipped, empirically-measured bug: the

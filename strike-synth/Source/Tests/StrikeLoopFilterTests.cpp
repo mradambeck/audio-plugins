@@ -390,6 +390,53 @@ public:
                    "right after trigger, a positive Envelope Amount should pass more of a high test tone through than once it has decayed back down");
         }
 
+        // Guards specifically against a cache-invalidation bug in StrikeLowpassFilter::process()'s
+        // own biquad coefficient cache (see StrikeLoopFilter.h's own comment): Cutoff/Resonance are
+        // live, every-sample-settable controls, so a knob turn well after the filter envelope has
+        // already settled must still be heard on the very next sample, not stuck serving a
+        // coefficient set computed for the old Cutoff/Resonance.
+        beginTest("A live Cutoff change, well after the envelope has settled, is heard on the very next sample");
+        {
+            StrikeResonantLoopFilter changing;
+            changing.prepare(44100.0);
+            changing.setResonance(0.6f);
+            changing.setCutoffFrequency(300.0f);
+            changing.setEnvelopeAmount(0.0f); // isolate the live knob change from envelope motion
+            changing.reset();
+
+            StrikeResonantLoopFilter reference;
+            reference.prepare(44100.0);
+            reference.setResonance(0.6f);
+            reference.setCutoffFrequency(300.0f);
+            reference.setEnvelopeAmount(0.0f);
+            reference.reset();
+
+            const auto testOmega = 2.0f * 3.14159265358979323846f * 3000.0f / 44100.0f;
+
+            // Both identical so far - run them well past any internal filter transient, keeping
+            // them in lockstep.
+            for (int i = 0; i < 5000; ++i)
+            {
+                changing.outputColor(std::sin((float) i * testOmega));
+                reference.outputColor(std::sin((float) i * testOmega));
+            }
+
+            // Now diverge: `changing` gets a live Cutoff jump well above the test tone (should pass
+            // much more of it through); `reference` keeps the original, much lower Cutoff.
+            changing.setCutoffFrequency(10000.0f);
+
+            double changingSum = 0.0;
+            double referenceSum = 0.0;
+            for (int i = 5000; i < 5200; ++i)
+            {
+                changingSum += (double) std::abs(changing.outputColor(std::sin((float) i * testOmega)));
+                referenceSum += (double) std::abs(reference.outputColor(std::sin((float) i * testOmega)));
+            }
+
+            expect(changingSum > referenceSum * 2.0,
+                   "a live Cutoff change must be heard immediately, not stuck on a coefficient set cached from before the change");
+        }
+
         beginTest("reset() clears both internal filters' history and retriggers the envelope's own Attack stage");
         {
             StrikeResonantLoopFilter filter;

@@ -243,7 +243,13 @@ private:
     // bow character, and why filtering it (real bow surface-noise isn't flat white noise either)
     // was the fix, confirmed by ear.
     float bowNoiseLowpassState = 0.0f;
-    float brightness = 1.0f;
+
+    // Both derived from Brightness, cached in setBrightness() rather than recomputed every sample
+    // in nextNoiseSample() (see that method's own comment) - 1.0/1.0 are Brightness=1.0's own exact
+    // values (a bit-exact passthrough), matching this class's default before setBrightness() is
+    // ever called.
+    float lowpassAlpha = 1.0f;
+    float brightnessCompensationGain = 1.0f;
     float bowAmount = 0.0f;
 
     // STK's own "Bow Pressure" default (slope=3.0, the midpoint of its 1.0-5.0 span) - a real,
