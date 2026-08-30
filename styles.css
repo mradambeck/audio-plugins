@@ -23,6 +23,8 @@
   --shields-muted: #a74467;
   --intruder: #bbc32a;
   --intruder-muted: #a1a45c;
+  --strike: #6bc490;
+  --strike-muted: #469c6a;
 }
 
 * {
@@ -392,6 +394,13 @@ header p.sub {
 .card[data-plugin="intruder"] .btn-accent {
   background: var(--intruder);
   color: #282815;
+}
+.card[data-plugin="strike"] h3 {
+  color: var(--strike);
+}
+.card[data-plugin="strike"] .btn-accent {
+  background: var(--strike);
+  color: #0f2418;
 }
 
 /* Notes */
