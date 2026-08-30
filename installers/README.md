@@ -12,6 +12,7 @@ macOS `.pkg` installers for the Wild Jag plugins:
 | Gradient  | `gradient-pitch/`        | Pitch shifting delay plugin |
 | Shields   | `shields-reverb/`        | Diffuse reverb              |
 | Intruder  | `intruder-gated-reverb/` | Non-linear gated reverb     |
+| Strike    | `strike-synth/`          | Karplus-Strong string synth |
 
 Each plugin builds AU, VST3, and Standalone formats. Every installer (per-plugin and group) lets you choose:
 
@@ -38,7 +39,7 @@ Each plugin repo has its own `installer/` folder:
 To build one:
 
 ```sh
-cd caverns-delay   # or damage-fuzz / corrosion-drive / flux-phaser / alloy-bass / gradient-pitch
+cd caverns-delay   # or damage-fuzz / corrosion-drive / flux-phaser / alloy-bass / gradient-pitch / shields-reverb / intruder-gated-reverb / strike-synth
 ./installer/build.sh
 ```
 
@@ -54,7 +55,7 @@ This builds the plugin in Release, stages its AU/VST3/Standalone artefacts separ
 
 ## Group installer (this folder)
 
-`build-all.sh` rebuilds all six plugins by delegating to each plugin's own `installer/build.sh --component-only`, then wraps all eighteen component packages (6 plugins × 3 formats) into a single distribution. The picker shows a checkbox per plugin that expands into per-format sub-checkboxes (all checked by default, independently toggleable — unchecking a plugin's parent checkbox unchecks its formats, and vice versa):
+`build-all.sh` rebuilds all nine plugins by delegating to each plugin's own `installer/build.sh --component-only`, then wraps all twenty-seven component packages (9 plugins × 3 formats) into a single distribution. The picker shows a checkbox per plugin that expands into per-format sub-checkboxes (all checked by default, independently toggleable — unchecking a plugin's parent checkbox unchecks its formats, and vice versa):
 
 ```sh
 cd installers
@@ -67,7 +68,7 @@ Files:
 
 ```
 installers/
-  build-all.sh        # builds all six plugins and assembles the combined .pkg
+  build-all.sh        # builds all nine plugins and assembles the combined .pkg
   distribution.xml     # productbuild distribution defining the nested plugin/format choices
   Resources/            # welcome.html, license.txt, conclusion.html for the combined installer
   output/                 # (generated) WildJagPlugins-Installer.pkg

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Strike VERSION 0.3.0)
+project(Strike VERSION 0.1.0)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)

@@ -49,6 +49,11 @@
             <line choice="choice_intruder_vst3"/>
             <line choice="choice_intruder_standalone"/>
         </line>
+        <line choice="choice_strike">
+            <line choice="choice_strike_au"/>
+            <line choice="choice_strike_vst3"/>
+            <line choice="choice_strike_standalone"/>
+        </line>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
@@ -139,6 +144,17 @@
         <pkg-ref id="com.wildjag.intruder.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_strike" title="Strike" description="Strike - Karplus-Strong physical-modeling string synth."/>
+    <choice id="choice_strike_au" title="Audio Unit (AU)" description="Installs Strike.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.au.pkg"/>
+    </choice>
+    <choice id="choice_strike_vst3" title="VST3" description="Installs Strike.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.vst3.pkg"/>
+    </choice>
+    <choice id="choice_strike_standalone" title="Standalone App" description="Installs Strike.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.strike.standalone.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -170,4 +186,8 @@
     <pkg-ref id="com.wildjag.intruder.au.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.intruder.vst3.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.intruder.standalone.pkg" version="__INTRUDER_VERSION__" onConclusion="none">Intruder-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.strike.au.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.strike.vst3.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.strike.standalone.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

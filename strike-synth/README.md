@@ -16,9 +16,8 @@ controls, a Poly/Mono switch (`StrikeMonoNoteStack.h`), Mono Glide/portamento, a
 Modulator (`StrikeRingModulator.h`), a Dual Cross-Coupled Feedback Topology (a live "Single/
 Dual" dropdown alongside Cross-Couple, Couple Delay, and Detune controls - see `StrikeVoice.h`),
 and a Resonant Loop Filter (a live "Loop Filter Type" dropdown alongside Resonance and Formant
-Freq controls - see `StrikeLoopFilter.h`) are done. No
-installer, UI polish (mockup-first hardware-panel pass), or preset system yet - all explicitly out
-of scope until asked for.
+Freq controls - see `StrikeLoopFilter.h`) are done, along with the hardware-panel UI, factory
+presets, and the installer.
 
 ## Building
 
