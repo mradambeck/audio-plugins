@@ -16,46 +16,58 @@ juce::AudioProcessorEditor* KarplunkAudioProcessor::createEditor()
 
 namespace
 {
-    constexpr int chassisMargin = 15;
-    constexpr int headerHeight = 64;
-    constexpr int footerHeight = 31;
+    // Everything below is the original approved-mockup geometry scaled by uiScale (0.8x) so the
+    // whole window fits comfortably on smaller screens - per user request, the plugin was too
+    // tall at its original 980x935. Text sizes deliberately are NOT scaled here: the knob-name/
+    // value/combo/button fonts all come from the shared HardwarePanelLookAndFeel (fixed tokens
+    // used across every plugin in the catalog, already close to a legibility floor at their
+    // original sizes) - only the geometry around that fixed-size text shrinks. Title/tag/badge
+    // fonts are the exception, since those are hand-painted directly in this file (no shared-code
+    // conflict) and are scaled a little for overall proportion - see their own font-size literals
+    // in the constructor/drawHardwareSection.
+    constexpr float uiScale = 0.8f;
+    constexpr int scaled(int v) { return (int) (v * uiScale); }
 
-    constexpr int contentPaddingTop = 18;
-    constexpr int contentPaddingSide = 16;
-    constexpr int contentPaddingBottom = 8;
-    constexpr int rowGap = 12;
-    constexpr int columnGap = 12;
+    constexpr int chassisMargin = scaled(15);
+    constexpr int headerHeight = scaled(64);
+    constexpr int footerHeight = scaled(31);
+
+    constexpr int contentPaddingTop = scaled(18);
+    constexpr int contentPaddingSide = scaled(16);
+    constexpr int contentPaddingBottom = scaled(8);
+    constexpr int rowGap = scaled(12);
+    constexpr int columnGap = scaled(12);
 
     // Column widths and row heights matched to the approved mockup's rendered layout (six
     // sections, two rows of three - Strum/Color wider than Output on top, Filter widest on
     // bottom since it carries the most controls). See mockups/karplunk-mockup.html's CSS flex
     // ratios (section-narrow: 0.56, #filter-section: 1.1) for where these proportions come from.
-    constexpr int strumWidth = 349;
-    constexpr int colorWidth = 349;
-    constexpr int outputWidth = 196;
-    constexpr int ringModWidth = 188;
-    constexpr int crossCoupleWidth = 336;
-    constexpr int filterWidth = 370;
-    constexpr int row1Height = 398;
-    constexpr int row2Height = 374;
+    constexpr int strumWidth = scaled(349);
+    constexpr int colorWidth = scaled(349);
+    constexpr int outputWidth = scaled(196);
+    constexpr int ringModWidth = scaled(188);
+    constexpr int crossCoupleWidth = scaled(336);
+    constexpr int filterWidth = scaled(370);
+    constexpr int row1Height = scaled(398);
+    constexpr int row2Height = scaled(374);
 
-    constexpr int sectionPaddingTop = 44;   // clearance below the badge
+    constexpr int sectionPaddingTop = scaled(44);   // clearance below the badge
 
-    constexpr int defaultKnobSize = 88;
-    constexpr int heroKnobSize = 112;
-    constexpr int knobBlockExtra = 32;      // combined height for the name label + value textbox
-    constexpr int knobNameHeight = 16;
-    constexpr int knobTextBoxHeight = 16;
-    constexpr int knobGap = 22;             // gap between two side-by-side knobs
-    constexpr int filterKnobGap = 17;       // gap between Filter's three side-by-side knobs
+    constexpr int defaultKnobSize = scaled(88);
+    constexpr int heroKnobSize = scaled(112);
+    constexpr int knobBlockExtra = scaled(32);      // combined height for the name label + value textbox
+    constexpr int knobNameHeight = scaled(16);
+    constexpr int knobTextBoxHeight = scaled(16);
+    constexpr int knobGap = scaled(22);             // gap between two side-by-side knobs
+    constexpr int filterKnobGap = scaled(17);       // gap between Filter's three side-by-side knobs
 
-    constexpr int smallGap = 14;            // gap between stacked rows within a section
-    constexpr int comboToKnobGap = 6;       // gap between a knob block and its attached combo
+    constexpr int smallGap = scaled(14);            // gap between stacked rows within a section
+    constexpr int comboToKnobGap = scaled(6);       // gap between a knob block and its attached combo
 
-    constexpr int buttonRowHeight = 31;
-    constexpr int comboRowHeight = 29;
-    constexpr int noiseColorComboWidth = 124;
-    constexpr int waveshaperComboWidth = 96;
+    constexpr int buttonRowHeight = scaled(31);
+    constexpr int comboRowHeight = scaled(29);
+    constexpr int noiseColorComboWidth = scaled(124);
+    constexpr int waveshaperComboWidth = scaled(96);
 }
 
 void KarplunkAudioProcessorEditor::setupRotaryKnob(KarplunkRotaryKnob& knob, const juce::String& labelText,
@@ -114,13 +126,13 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
 
     titleLabel.setText("STRIKE", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::topLeft);
-    titleLabel.setFont(lookAndFeel.getDisplayFont(26.0f).withExtraKerningFactor(0.04f));
+    titleLabel.setFont(lookAndFeel.getDisplayFont(20.8f).withExtraKerningFactor(0.04f));
     titleLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6bc490));
     addAndMakeVisible(titleLabel);
 
     tagLabel.setText(juce::String("String Modeling Synth").toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
-    tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
+    tagLabel.setFont(lookAndFeel.getSmallPrintFont(8.8f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
@@ -165,7 +177,7 @@ KarplunkAudioProcessorEditor::KarplunkAudioProcessorEditor(KarplunkAudioProcesso
     setupRotaryKnob(filterEnvAmountKnob, "Envelope", KarplunkAudioProcessor::filterEnvAmountParamID);
     setupRotaryKnob(filterDecayKnob, "Decay", KarplunkAudioProcessor::filterDecayParamID);
 
-    setSize(980, 935);
+    setSize((int) (980 * uiScale), (int) (935 * uiScale));
 }
 
 KarplunkAudioProcessorEditor::~KarplunkAudioProcessorEditor()
@@ -226,11 +238,11 @@ void KarplunkAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
     g.drawRoundedRectangle(bounds, 7.0f, 3.0f);
 
-    const auto font = lookAndFeel.getDisplayFont(11.5f).withExtraKerningFactor(0.09f);
+    const auto font = lookAndFeel.getDisplayFont(9.2f).withExtraKerningFactor(0.09f);
     const auto textWidth = juce::GlyphArrangement::getStringWidth(font, label.toUpperCase());
-    constexpr float badgeHeight = 22.0f;
-    const auto badgeBounds = juce::Rectangle<float>(textWidth + 32.0f, badgeHeight)
-                                  .withCentre({bounds.getCentreX(), bounds.getY() + 12.0f + badgeHeight * 0.5f});
+    constexpr float badgeHeight = 17.6f;
+    const auto badgeBounds = juce::Rectangle<float>(textWidth + 25.6f, badgeHeight)
+                                  .withCentre({bounds.getCentreX(), bounds.getY() + 9.6f + badgeHeight * 0.5f});
 
     // PLUGIN-SPECIFIC: badges are deliberately brighter than plain accentMuted - the midpoint
     // between accentMuted and accentBrightLo, per user request during mockup review ("make the
@@ -360,8 +372,8 @@ void KarplunkAudioProcessorEditor::resized()
     monoToggle.button.setBounds(header.removeFromRight(monoWidth).withSizeKeepingCentre(monoWidth, buttonRowHeight)
                                      .expanded((int) KarplunkLookAndFeel::buttonShadowMargin));
 
-    const auto titleFont = lookAndFeel.getDisplayFont(26.0f).withExtraKerningFactor(0.04f);
-    const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
+    const auto titleFont = lookAndFeel.getDisplayFont(20.8f).withExtraKerningFactor(0.04f);
+    const auto tagFont = lookAndFeel.getSmallPrintFont(8.8f).withExtraKerningFactor(0.26f);
     const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, "STRIKE") + 8;
     const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Karplunk VERSION 0.3.1)
+project(Karplunk VERSION 0.3.2)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
