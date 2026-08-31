@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include "../../common/Presets/FactoryPreset.h"
+
 class DamageAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -59,7 +61,9 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void updateFilters();
 
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
 
     std::atomic<float>* gateParam = nullptr;
     std::atomic<float>* driveParam = nullptr;

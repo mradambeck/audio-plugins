@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Shields VERSION 0.4.0)
+project(Shields VERSION 0.5.0)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)

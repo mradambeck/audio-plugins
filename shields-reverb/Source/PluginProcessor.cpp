@@ -2,11 +2,117 @@
 
 #include <algorithm>
 
+namespace
+{
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected.
+    // Captured from seven .aupreset files the user saved via a host's native preset UI (decoded
+    // from each preset's embedded jucePluginState, not hand-tuned).
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<wildjag::FactoryPreset> presets = {
+            { "Black Mirror", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 12684.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 16.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 76.90000152587891f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.699999988079071f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 100.0f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 90.80000305175781f },
+                { ShieldsAudioProcessor::sizeParamID, 4.0f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 14.0f },
+            } },
+            { "Curb", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 10380.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 14.40000057220459f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 40.10000228881836f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.320000022649765f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 58.10000228881836f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 44.5f },
+                { ShieldsAudioProcessor::sizeParamID, 0.5299999713897705f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 20.39999961853027f },
+            } },
+            { "Freaks", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 10200.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 9.100000381469727f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 98.70000457763672f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.5940000414848328f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 77.30000305175781f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 69.69999694824219f },
+                { ShieldsAudioProcessor::sizeParamID, 1.139999985694885f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 99.59999847412109f },
+            } },
+            { "Geeks", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 2699.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 14.40000057220459f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 56.0f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.3450000286102295f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 65.20000457763672f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 34.5f },
+                { ShieldsAudioProcessor::sizeParamID, 1.100000023841858f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 0.0f },
+            } },
+            { "Scavengers Reign", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 15076.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 10.39999961853027f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 89.30000305175781f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.699999988079071f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 100.0f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 96.80000305175781f },
+                { ShieldsAudioProcessor::sizeParamID, 1.279999971389771f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 48.90000152587891f },
+            } },
+            { "The Wire", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 9999.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 9.899999618530273f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 37.40000152587891f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.699999988079071f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 27.30000114440918f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 61.60000228881836f },
+                { ShieldsAudioProcessor::sizeParamID, 2.119999885559082f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 6.400000095367432f },
+            } },
+            { "Twilight Zone", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 5519.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 16.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 12.5f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.3630000054836273f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 89.59999847412109f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 61.60000228881836f },
+                { ShieldsAudioProcessor::sizeParamID, 2.099999904632568f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 75.90000152587891f },
+            } },
+        };
+        return presets;
+    }
+}
+
 ShieldsAudioProcessor::ShieldsAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     diffusionParam = apvts.getRawParameterValue(diffusionParamID);
     feedbackParam = apvts.getRawParameterValue(feedbackParamID);
@@ -249,10 +355,10 @@ bool ShieldsAudioProcessor::producesMidi() const { return false; }
 bool ShieldsAudioProcessor::isMidiEffect() const { return false; }
 double ShieldsAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
-int ShieldsAudioProcessor::getNumPrograms() { return 1; }
-int ShieldsAudioProcessor::getCurrentProgram() { return 0; }
-void ShieldsAudioProcessor::setCurrentProgram(int) {}
-const juce::String ShieldsAudioProcessor::getProgramName(int) { return {}; }
+int ShieldsAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int ShieldsAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void ShieldsAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String ShieldsAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 void ShieldsAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void ShieldsAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

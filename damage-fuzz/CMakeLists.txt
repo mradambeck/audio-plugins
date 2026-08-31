@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Damage VERSION 0.1.2)
+project(Damage VERSION 0.1.3)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)

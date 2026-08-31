@@ -20,6 +20,8 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 
+#include "../../common/Presets/FactoryPreset.h"
+
 // Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - DamageTests
 // links only PluginProcessor.cpp against juce_audio_processors/juce_dsp, no editor/LookAndFeel/fonts.
 juce::AudioProcessorEditor* DamageAudioProcessor::createEditor()
@@ -158,21 +160,9 @@ DamageAudioProcessorEditor::DamageAudioProcessorEditor(DamageAudioProcessor& p)
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
-    // Left unselected on startup (rather than showing the first preset's name) so that picking it
-    // is always a real selection change - JUCE's ComboBox doesn't fire onChange when you choose the
-    // item that's already showing, which would otherwise make the first preset unreachable from
-    // this menu once the plugin loads with its own default parameter values rather than the
-    // preset's.
-    presetCombo.setLookAndFeel(&lookAndFeel);
-    presetCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
-    presetCombo.setTextWhenNothingSelected("Preset");
-    for (int i = 0; i < processorRef.getNumPrograms(); ++i)
-        presetCombo.addItem(processorRef.getProgramName(i), i + 1);
-    addAndMakeVisible(presetCombo);
-    presetCombo.onChange = [this]
-    {
-        processorRef.setCurrentProgram(presetCombo.getSelectedItemIndex());
-    };
+    // See common/Presets/FactoryPreset.h's setupPresetCombo() for why it's left unselected on
+    // startup rather than showing the first preset's name.
+    wildjag::setupPresetCombo(presetCombo, lookAndFeel, *this, processorRef);
 
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("Bypass");

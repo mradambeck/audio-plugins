@@ -20,6 +20,8 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 
+#include "../../common/Presets/FactoryPreset.h"
+
 // Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - CavernsTests
 // links only PluginProcessor.cpp against juce_audio_processors/juce_dsp, no editor/LookAndFeel/fonts.
 juce::AudioProcessorEditor* CavernsAudioProcessor::createEditor()
@@ -134,25 +136,10 @@ CavernsAudioProcessorEditor::CavernsAudioProcessorEditor(CavernsAudioProcessor& 
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
-    // Left unselected on startup (rather than showing the first preset's name) so that picking it
-    // is always a real selection change - JUCE's ComboBox doesn't fire onChange when you choose the
-    // item that's already showing, which would otherwise make the first preset unreachable from
-    // this menu once the plugin loads with its own default parameter values rather than the
-    // preset's.
-    presetCombo.setLookAndFeel(&lookAndFeel);   // see setupRotarySlider() for why this is necessary
-    // ComboBox's internal text Label only gets ComboBox::textColourId copied onto it inside
-    // ComboBox::colourChanged() -- which only fires from a direct setColour() call on this
-    // specific instance, not from setting the colour on the shared LookAndFeel. Without this the
-    // label falls back to Label::textColourId (a different, dimmer default) instead.
-    presetCombo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
-    presetCombo.setTextWhenNothingSelected("Preset");
-    for (int i = 0; i < processorRef.getNumPrograms(); ++i)
-        presetCombo.addItem(processorRef.getProgramName(i), i + 1);
-    addAndMakeVisible(presetCombo);
-    presetCombo.onChange = [this]
-    {
-        processorRef.setCurrentProgram(presetCombo.getSelectedItemIndex());
-    };
+    // See common/Presets/FactoryPreset.h's setupPresetCombo() for why it's left unselected on
+    // startup rather than showing the first preset's name, and why its text colour is set directly
+    // on the instance rather than via the shared LookAndFeel.
+    wildjag::setupPresetCombo(presetCombo, lookAndFeel, *this, processorRef);
 
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("BYPASS");

@@ -139,15 +139,9 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    struct FactoryPreset
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "Chug Chug Chug", {
                 { FluxAudioProcessor::blendParamID, 54.29999923706055f },
                 { FluxAudioProcessor::brightnessParamID, 21.89999961853027f },
@@ -242,7 +236,8 @@ FluxAudioProcessor::FluxAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     bypassParam = apvts.getRawParameterValue(bypassParamID);
     rateParam = apvts.getRawParameterValue(rateParamID);
@@ -626,27 +621,10 @@ bool FluxAudioProcessor::producesMidi() const { return false; }
 bool FluxAudioProcessor::isMidiEffect() const { return false; }
 double FluxAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int FluxAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int FluxAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void FluxAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String FluxAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int FluxAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int FluxAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void FluxAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String FluxAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void FluxAudioProcessor::changeProgramName(int, const juce::String&) {}
 

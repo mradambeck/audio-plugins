@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "../../common/Presets/FactoryPreset.h"
 #include "ShieldsFDNEngine.h"
 
 // Shoegaze-inspired diffuse reverb built around an 8-line Hadamard-mixed FDN (ShieldsFDNEngine) -
@@ -61,6 +62,12 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    // Built-in factory presets (see PluginProcessor.cpp's getFactoryPresets()) - the
+    // getNumPrograms()/getCurrentProgram()/setCurrentProgram()/getProgramName() overrides above
+    // just forward to this. See common/Presets/FactoryPreset.h for the shared mechanism every Wild
+    // Jag plugin with built-in presets now uses.
+    wildjag::FactoryPresetList factoryPresets;
 
     std::atomic<float>* diffusionParam = nullptr;
     std::atomic<float>* feedbackParam = nullptr;

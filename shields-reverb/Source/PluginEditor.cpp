@@ -3,12 +3,14 @@
 // implementation for the juce-hardware-panel-ui skill. The chassis/panel/header/footer chrome in
 // paint() (before the four drawHardwareSection(...) calls), rebuildChassisTexture(), and
 // drawHardwareSection() are COPY-VERBATIM - see that file's own banner comment. Shields differs from
-// Caverns in having no preset combo (no factory presets exist yet) and no Timer-driven
-// sync/link display logic (none of Shields's parameters are tempo-derived).
+// Caverns in having no Timer-driven sync/link display logic (none of Shields's parameters are
+// tempo-derived).
 // ============================================================================
 
 #include "PluginEditor.h"
 #include "BinaryData.h"
+
+#include "../../common/Presets/FactoryPreset.h"
 
 // Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - ShieldsTests
 // links only ShieldsFDNEngine.cpp against juce_core, no editor/LookAndFeel/fonts.
@@ -32,6 +34,10 @@ namespace
     constexpr int columnGap = 14;
     constexpr int rowGap = 14;   // gap between the top (Diffusion/Decay/Motion) and bottom
                                   // (Tone/Mix) rows - same rhythm as the column gap
+
+    constexpr int comboRowHeight = 28;    // matches bypassButton's fixed height, for header alignment
+    constexpr int presetComboWidth = 150; // preset names ("Scavengers Reign") need real room - same
+                                           // width strike-synth's own presetCombo settled on
 
     // Top row: Diffusion, Decay, Motion.
     constexpr int diffusionColumnWidth = 268;
@@ -108,6 +114,8 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
+
+    wildjag::setupPresetCombo(presetCombo, lookAndFeel, *this, processorRef);
 
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("BYPASS");
@@ -319,6 +327,8 @@ void ShieldsAudioProcessorEditor::resized()
     const auto bypassWidth = (int) std::ceil(9.0f + 8.0f + bypassTextWidth + 24.0f);
     bypassButton.setBounds(header.removeFromRight(bypassWidth).withSizeKeepingCentre(bypassWidth, 28)
                                 .expanded((int) ShieldsLookAndFeel::buttonShadowMargin));
+    header.removeFromRight(14);
+    presetCombo.setBounds(header.removeFromRight(presetComboWidth).withSizeKeepingCentre(presetComboWidth, comboRowHeight));
 
     const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
