@@ -6,8 +6,7 @@
 
 // Hardware-panel UI (see .claude/skills/juce-hardware-panel-ui and
 // common/LookAndFeel/MOCKUP_GROUND_TRUTH.md) built directly from the approved mockup at
-// mockups/shields-mockup-v1.html. No factory presets exist yet (ShieldsAudioProcessor::getNumPrograms()
-// returns 1), so unlike Caverns/Gradient there is no preset combo in the header.
+// mockups/shields-mockup-v1.html.
 class ShieldsAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
@@ -32,6 +31,8 @@ private:
 
     juce::Label titleLabel;
     juce::Label tagLabel;
+
+    juce::ComboBox presetCombo;
 
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;

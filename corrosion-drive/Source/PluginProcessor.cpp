@@ -57,15 +57,9 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    struct FactoryPreset
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "Color Me Radd", {
                 { CorrosionAudioProcessor::biasParamID, -0.3459999561309814f },
                 { CorrosionAudioProcessor::bypassParamID, 0.0f },
@@ -148,7 +142,8 @@ CorrosionAudioProcessor::CorrosionAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     driveParam = apvts.getRawParameterValue(driveParamID);
     toneParam = apvts.getRawParameterValue(toneParamID);
@@ -517,27 +512,10 @@ bool CorrosionAudioProcessor::producesMidi() const { return false; }
 bool CorrosionAudioProcessor::isMidiEffect() const { return false; }
 double CorrosionAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int CorrosionAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int CorrosionAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void CorrosionAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String CorrosionAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int CorrosionAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int CorrosionAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void CorrosionAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String CorrosionAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void CorrosionAudioProcessor::changeProgramName(int, const juce::String&) {}
 

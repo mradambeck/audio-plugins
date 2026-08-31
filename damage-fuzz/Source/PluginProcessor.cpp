@@ -99,15 +99,9 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    struct FactoryPreset
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "Always Leave a Note", {
                 { DamageAudioProcessor::bypassParamID, 0.0f },
                 { DamageAudioProcessor::driveParamID, 52.14999771118164f },
@@ -188,7 +182,8 @@ DamageAudioProcessor::DamageAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     gateParam = apvts.getRawParameterValue(gateParamID);
     driveParam = apvts.getRawParameterValue(driveParamID);
@@ -565,27 +560,10 @@ bool DamageAudioProcessor::producesMidi() const { return false; }
 bool DamageAudioProcessor::isMidiEffect() const { return false; }
 double DamageAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
-int DamageAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int DamageAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void DamageAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String DamageAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int DamageAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int DamageAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void DamageAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String DamageAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void DamageAudioProcessor::changeProgramName(int, const juce::String&) {}
 

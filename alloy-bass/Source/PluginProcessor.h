@@ -4,6 +4,8 @@
 #include <juce_dsp/juce_dsp.h>
 #include <vector>
 
+#include "../../common/Presets/FactoryPreset.h"
+
 // Simple naive (non-band-limited) phase-accumulator oscillator. Aliasing at bass fundamentals
 // is much less audible than at lead-register pitches, and a bit of grit from it actually suits
 // this plugin's industrial/gritty character - band-limiting (BLEP/BLIT) is deliberately not
@@ -272,7 +274,9 @@ private:
     std::atomic<float>* mixOutputParam = nullptr;
     std::atomic<float>* mixAgeParam = nullptr;
 
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
     double sampleRateHz = 44100.0;
 
     // ---- Mono note-stack voice architecture (not juce::Synthesiser - this instrument is

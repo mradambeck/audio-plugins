@@ -108,15 +108,9 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    struct FactoryPreset
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "Carousel", {
                 { CavernsAudioProcessor::bypassParamID, 0.0f },
                 { CavernsAudioProcessor::degradeParamID, 14.40000057220459f },
@@ -263,7 +257,8 @@ CavernsAudioProcessor::CavernsAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     bypassParam = apvts.getRawParameterValue(bypassParamID);
     syncParam = apvts.getRawParameterValue(syncParamID);
@@ -790,27 +785,10 @@ bool CavernsAudioProcessor::producesMidi() const { return false; }
 bool CavernsAudioProcessor::isMidiEffect() const { return false; }
 double CavernsAudioProcessor::getTailLengthSeconds() const { return 4.0; }
 
-int CavernsAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int CavernsAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void CavernsAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String CavernsAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int CavernsAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int CavernsAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void CavernsAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String CavernsAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void CavernsAudioProcessor::changeProgramName(int, const juce::String&) {}
 

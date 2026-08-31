@@ -19,18 +19,11 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes
     // after normalising, not display percentages) applied in one shot when the preset is
-    // selected - matches Gradient's own FactoryPreset convention exactly. Captured from seven
-    // .aupreset files the user saved via a host's native preset UI (decoded from each preset's
-    // embedded jucePluginState, not hand-tuned).
-    struct FactoryPreset
+    // selected. Captured from seven .aupreset files the user saved via a host's native preset UI
+    // (decoded from each preset's embedded jucePluginState, not hand-tuned).
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "A Little Mad Sometimes", {
                 { StrikeAudioProcessor::dampingParamID, 0.0f },
                 { StrikeAudioProcessor::outputLevelParamID, 0.7999986410140991f },
@@ -221,7 +214,8 @@ namespace
 
 StrikeAudioProcessor::StrikeAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     dampingParam = apvts.getRawParameterValue(dampingParamID);
     outputLevelParam = apvts.getRawParameterValue(outputLevelParamID);
@@ -840,27 +834,10 @@ bool StrikeAudioProcessor::producesMidi() const { return false; }
 bool StrikeAudioProcessor::isMidiEffect() const { return false; }
 double StrikeAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
-int StrikeAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int StrikeAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void StrikeAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String StrikeAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int StrikeAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int StrikeAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void StrikeAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String StrikeAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void StrikeAudioProcessor::changeProgramName(int, const juce::String&) {}
 

@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include "../../common/Presets/FactoryPreset.h"
+
 class CavernsAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -84,7 +86,9 @@ private:
     std::atomic<float>* modDepthParam = nullptr;
     std::atomic<float>* degradeParam = nullptr;
 
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
 
     double sampleRateHz = 44100.0;
 

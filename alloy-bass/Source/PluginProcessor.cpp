@@ -163,15 +163,9 @@ namespace
 
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    struct FactoryPreset
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        juce::String name;
-        std::vector<std::pair<juce::String, float>> values;
-    };
-
-    const std::vector<FactoryPreset>& getFactoryPresets()
-    {
-        static const std::vector<FactoryPreset> presets = {
+        static const std::vector<wildjag::FactoryPreset> presets = {
             { "Chant", {
                 { AlloyAudioProcessor::analogAmpAttackParamID, 0.01100000087171793f },
                 { AlloyAudioProcessor::analogAmpDecayParamID, 0.2800000011920929f },
@@ -595,7 +589,8 @@ namespace
 
 AlloyAudioProcessor::AlloyAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     analogWaveformParam = apvts.getRawParameterValue(analogWaveformParamID);
     analogOctaveParam = apvts.getRawParameterValue(analogOctaveParamID);
@@ -1471,27 +1466,10 @@ bool AlloyAudioProcessor::producesMidi() const { return false; }
 bool AlloyAudioProcessor::isMidiEffect() const { return false; }
 double AlloyAudioProcessor::getTailLengthSeconds() const { return 2.0; }
 
-int AlloyAudioProcessor::getNumPrograms() { return (int) getFactoryPresets().size(); }
-int AlloyAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-
-void AlloyAudioProcessor::setCurrentProgram(int index)
-{
-    const auto& presets = getFactoryPresets();
-    if (! juce::isPositiveAndBelow(index, (int) presets.size()))
-        return;
-
-    currentProgramIndex = index;
-
-    for (auto& [paramID, value] : presets[(size_t) index].values)
-        if (auto* param = apvts.getParameter(paramID))
-            param->setValueNotifyingHost(param->convertTo0to1(value));
-}
-
-const juce::String AlloyAudioProcessor::getProgramName(int index)
-{
-    const auto& presets = getFactoryPresets();
-    return juce::isPositiveAndBelow(index, (int) presets.size()) ? presets[(size_t) index].name : juce::String();
-}
+int AlloyAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int AlloyAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void AlloyAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String AlloyAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void AlloyAudioProcessor::changeProgramName(int, const juce::String&) {}
 

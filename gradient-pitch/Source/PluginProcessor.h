@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "../../common/Presets/FactoryPreset.h"
 #include "GradientPitchShiftEngine.h"
 
 // Two-tap crossfading pitch shifter. Dual mode: engineA and engineB are both always constructed;
@@ -144,7 +145,9 @@ private:
 
     std::atomic<float>* bypassParam = nullptr;
 
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
     double sampleRateHz = 44100.0;
 
     GradientPitchShiftEngine engineA;

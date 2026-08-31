@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include "../../common/Presets/FactoryPreset.h"
+
 // A single first-order digital allpass stage (Zölzer/DAFX form): passes every frequency at equal
 // gain, only shifting phase, with a break frequency where the shift crosses 90 degrees. This -
 // not juce::dsp::IIR::Coefficients::makeAllPass, which is a 2nd-order/biquad shape with its own Q -
@@ -110,7 +112,9 @@ private:
     std::atomic<float>* gritParam = nullptr;
     std::atomic<float>* blendParam = nullptr;
 
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
 
     double sampleRateHz = 44100.0;
 

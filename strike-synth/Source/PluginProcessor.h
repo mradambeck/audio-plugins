@@ -3,6 +3,7 @@
 #include <array>
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "../../common/Presets/FactoryPreset.h"
 #include "StrikeExcitation.h"
 #include "StrikeLoopFilter.h"
 #include "StrikeMonoNoteStack.h"
@@ -77,9 +78,9 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleMidiMessage(const juce::MidiMessage& message) noexcept;
 
-    // Which factory preset (see PluginProcessor.cpp's getFactoryPresets()) is currently selected -
-    // matches Gradient's own currentProgramIndex convention exactly.
-    int currentProgramIndex = 0;
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
 
     std::atomic<float>* dampingParam = nullptr;
     std::atomic<float>* outputLevelParam = nullptr;
