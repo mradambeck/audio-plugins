@@ -72,7 +72,7 @@ namespace
     constexpr int waveshaperComboWidth = scaled(96);
 }
 
-void StrikeAudioProcessorEditor::setupRotaryKnob(StrikeRotaryKnob& knob, const juce::String& labelText,
+void StrikeEditorContent::setupRotaryKnob(StrikeRotaryKnob& knob, const juce::String& labelText,
                                                      const juce::String& paramID)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -100,7 +100,7 @@ void StrikeAudioProcessorEditor::setupRotaryKnob(StrikeRotaryKnob& knob, const j
         processorRef.apvts, paramID, knob.slider);
 }
 
-void StrikeAudioProcessorEditor::setupToggle(StrikeToggle& toggle, const juce::String& buttonText,
+void StrikeEditorContent::setupToggle(StrikeToggle& toggle, const juce::String& buttonText,
                                                  const juce::String& paramID)
 {
     toggle.button.setLookAndFeel(&lookAndFeel);
@@ -110,7 +110,7 @@ void StrikeAudioProcessorEditor::setupToggle(StrikeToggle& toggle, const juce::S
         processorRef.apvts, paramID, toggle.button);
 }
 
-void StrikeAudioProcessorEditor::setupCombo(StrikeCombo& combo, const juce::StringArray& items,
+void StrikeEditorContent::setupCombo(StrikeCombo& combo, const juce::StringArray& items,
                                                 const juce::String& paramID)
 {
     combo.combo.setLookAndFeel(&lookAndFeel);
@@ -121,8 +121,8 @@ void StrikeAudioProcessorEditor::setupCombo(StrikeCombo& combo, const juce::Stri
         processorRef.apvts, paramID, combo.combo);
 }
 
-StrikeAudioProcessorEditor::StrikeAudioProcessorEditor(StrikeAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+StrikeEditorContent::StrikeEditorContent(StrikeAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -186,14 +186,14 @@ StrikeAudioProcessorEditor::StrikeAudioProcessorEditor(StrikeAudioProcessor& p)
     setSize((int) (980 * uiScale), (int) (935 * uiScale));
 }
 
-StrikeAudioProcessorEditor::~StrikeAudioProcessorEditor()
+StrikeEditorContent::~StrikeEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void StrikeAudioProcessorEditor::rebuildChassisTexture()
+void StrikeEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -238,7 +238,7 @@ void StrikeAudioProcessorEditor::rebuildChassisTexture()
 // Unbroken border + centred badge that hugs its text, sitting inside the border rather than
 // straddling it - matches every other plugin's drawHardwareSection EXCEPT the badge fill colour
 // (see comment below).
-void StrikeAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void StrikeEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                           const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -263,7 +263,7 @@ void StrikeAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Re
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void StrikeAudioProcessorEditor::paint(juce::Graphics& g)
+void StrikeEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -350,14 +350,14 @@ void StrikeAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void StrikeAudioProcessorEditor::positionKnob(juce::Rectangle<int> topLeftCell, int knobSize, StrikeRotaryKnob& knob)
+void StrikeEditorContent::positionKnob(juce::Rectangle<int> topLeftCell, int knobSize, StrikeRotaryKnob& knob)
 {
     auto knobBounds = topLeftCell.withSize(knobSize, knobSize + knobBlockExtra);
     knob.slider.setBounds(knobBounds);
     knob.nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
 }
 
-void StrikeAudioProcessorEditor::positionToggle(juce::Rectangle<int> cell, StrikeToggle& toggle)
+void StrikeEditorContent::positionToggle(juce::Rectangle<int> cell, StrikeToggle& toggle)
 {
     const auto font = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.06f);
     const auto textWidth = juce::GlyphArrangement::getStringWidth(font, toggle.button.getButtonText().toUpperCase());
@@ -366,7 +366,7 @@ void StrikeAudioProcessorEditor::positionToggle(juce::Rectangle<int> cell, Strik
                                  .expanded((int) StrikeLookAndFeel::buttonShadowMargin));
 }
 
-void StrikeAudioProcessorEditor::resized()
+void StrikeEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -550,4 +550,11 @@ void StrikeAudioProcessorEditor::resized()
     }
 
     rebuildChassisTexture();
+}
+
+StrikeAudioProcessorEditor::StrikeAudioProcessorEditor(StrikeAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p),
+      zoomHandler(*this, content, {(int) (980 * uiScale), (int) (935 * uiScale)})
+{
+    addAndMakeVisible(content);
 }

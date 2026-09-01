@@ -99,7 +99,7 @@ namespace
     }
 }
 
-void DamageAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void DamageEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                    const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -124,7 +124,7 @@ void DamageAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::L
     addAndMakeVisible(label);
 }
 
-void DamageAudioProcessorEditor::setupVerticalSlider(juce::Slider& slider, juce::Label& label,
+void DamageEditorContent::setupVerticalSlider(juce::Slider& slider, juce::Label& label,
                                                      const juce::String& labelText)
 {
     slider.setLookAndFeel(&lookAndFeel);   // see setupRotarySlider() for why this is necessary
@@ -141,8 +141,8 @@ void DamageAudioProcessorEditor::setupVerticalSlider(juce::Slider& slider, juce:
     addAndMakeVisible(label);
 }
 
-DamageAudioProcessorEditor::DamageAudioProcessorEditor(DamageAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+DamageEditorContent::DamageEditorContent(DamageAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -243,12 +243,12 @@ DamageAudioProcessorEditor::DamageAudioProcessorEditor(DamageAudioProcessor& p)
     startTimerHz(30);
 }
 
-DamageAudioProcessorEditor::~DamageAudioProcessorEditor()
+DamageEditorContent::~DamageEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-void DamageAudioProcessorEditor::timerCallback()
+void DamageEditorContent::timerCallback()
 {
     gateSlider.setLevelDb(processorRef.getGateLevelDb());
     gateSlider.repaint();
@@ -261,7 +261,7 @@ void DamageAudioProcessorEditor::timerCallback()
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void DamageAudioProcessorEditor::rebuildChassisTexture()
+void DamageEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -313,7 +313,7 @@ void DamageAudioProcessorEditor::rebuildChassisTexture()
 // the LookAndFeel (getAccentColour()/getBadgeInkColour()) rather than held as separate literals
 // here, so the accent pair only has to change in one place (DamageLookAndFeel.cpp) when this is
 // adapted for a new plugin.
-void DamageAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void DamageEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                      const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -334,7 +334,7 @@ void DamageAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Re
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void DamageAudioProcessorEditor::paint(juce::Graphics& g)
+void DamageEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -432,7 +432,7 @@ void DamageAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void DamageAudioProcessorEditor::resized()
+void DamageEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -567,4 +567,10 @@ void DamageAudioProcessorEditor::resized()
     wetSlider.setBounds(faderSliderPairArea.reduced(0, 2));
 
     rebuildChassisTexture();
+}
+
+DamageAudioProcessorEditor::DamageAudioProcessorEditor(DamageAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {748, 550})
+{
+    addAndMakeVisible(content);
 }

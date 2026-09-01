@@ -74,8 +74,8 @@ namespace
     constexpr int bottomRowHeight = sectionPaddingTop + sizeKnobSize + knobNameHeight + knobTextBoxHeight + sectionPaddingBottom;
 }
 
-void ShieldsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
-                                                    const juce::String& labelText)
+void ShieldsEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+                                              const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (building its internal value
     // textbox Label via lookAndFeelChanged()) before the editor's own setLookAndFeel() call runs
@@ -98,8 +98,8 @@ void ShieldsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::
     addAndMakeVisible(label);
 }
 
-ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+ShieldsEditorContent::ShieldsEditorContent(ShieldsAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -158,14 +158,14 @@ ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& 
     setSize(790, 572);
 }
 
-ShieldsAudioProcessorEditor::~ShieldsAudioProcessorEditor()
+ShieldsEditorContent::~ShieldsEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void ShieldsAudioProcessorEditor::rebuildChassisTexture()
+void ShieldsEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -209,8 +209,8 @@ void ShieldsAudioProcessorEditor::rebuildChassisTexture()
 
 // COPY-VERBATIM (see banner at top of file): unbroken border + centred badge that hugs its text,
 // sitting inside the border rather than straddling it.
-void ShieldsAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
-                                                       const juce::String& label)
+void ShieldsEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+                                                const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
     g.drawRoundedRectangle(bounds, 7.0f, 3.5f);
@@ -229,7 +229,7 @@ void ShieldsAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::R
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void ShieldsAudioProcessorEditor::paint(juce::Graphics& g)
+void ShieldsEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -316,7 +316,7 @@ void ShieldsAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::centredRight);
 }
 
-void ShieldsAudioProcessorEditor::resized()
+void ShieldsEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -449,4 +449,10 @@ void ShieldsAudioProcessorEditor::resized()
     positionKnob(mixRow, sizeKnobSize, wetSlider, wetLabel);
 
     rebuildChassisTexture();
+}
+
+ShieldsAudioProcessorEditor::ShieldsAudioProcessorEditor(ShieldsAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {790, 572})
+{
+    addAndMakeVisible(content);
 }

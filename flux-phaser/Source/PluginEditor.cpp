@@ -61,7 +61,7 @@ namespace
     constexpr int stagesInnerColumnGap = 10;
 }
 
-void FluxAudioProcessorEditor::commitRawRateParam(float hz)
+void FluxEditorContent::commitRawRateParam(float hz)
 {
     // Writes straight to the parameter rather than through its Slider, since Slider::setValue()
     // silently drops the notification whenever the slider's displayed value already matches -
@@ -70,7 +70,7 @@ void FluxAudioProcessorEditor::commitRawRateParam(float hz)
         param->setValueNotifyingHost(param->convertTo0to1(hz));
 }
 
-void FluxAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void FluxEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                   const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -94,7 +94,7 @@ void FluxAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Lab
     addAndMakeVisible(label);
 }
 
-void FluxAudioProcessorEditor::setupShiftButton()
+void FluxEditorContent::setupShiftButton()
 {
     shiftButton.setLookAndFeel(&lookAndFeel);
     // No text - just a small blank pushbutton (see FluxLookAndFeel::drawButtonText, which simply
@@ -115,8 +115,8 @@ void FluxAudioProcessorEditor::setupShiftButton()
     };
 }
 
-FluxAudioProcessorEditor::FluxAudioProcessorEditor(FluxAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+FluxEditorContent::FluxEditorContent(FluxAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -211,12 +211,12 @@ FluxAudioProcessorEditor::FluxAudioProcessorEditor(FluxAudioProcessor& p)
     startTimerHz(30);
 }
 
-FluxAudioProcessorEditor::~FluxAudioProcessorEditor()
+FluxEditorContent::~FluxEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-void FluxAudioProcessorEditor::timerCallback()
+void FluxEditorContent::timerCallback()
 {
     const auto syncOn = syncButton.getToggleState();
 
@@ -238,7 +238,7 @@ void FluxAudioProcessorEditor::timerCallback()
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void FluxAudioProcessorEditor::rebuildChassisTexture()
+void FluxEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -282,7 +282,7 @@ void FluxAudioProcessorEditor::rebuildChassisTexture()
 
 // COPY-VERBATIM (see banner at top of file): unbroken border + centred badge that hugs its
 // text, sitting inside the border rather than straddling it.
-void FluxAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void FluxEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                      const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -307,7 +307,7 @@ void FluxAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rect
 // Static read-only display, not a Component per row - the Shift button (see setupShiftButton())
 // is the only interactive control in this section. An LED lights up next to whichever stage
 // count is currently selected; the rest stay dim.
-void FluxAudioProcessorEditor::drawStageList(juce::Graphics& g, juce::Rectangle<float> bounds)
+void FluxEditorContent::drawStageList(juce::Graphics& g, juce::Rectangle<float> bounds)
 {
     const auto& choices = FluxAudioProcessor::getStageChoices();
     const auto currentIndex = (int) processorRef.apvts.getRawParameterValue(FluxAudioProcessor::stagesParamID)->load();
@@ -340,7 +340,7 @@ void FluxAudioProcessorEditor::drawStageList(juce::Graphics& g, juce::Rectangle<
     }
 }
 
-void FluxAudioProcessorEditor::paint(juce::Graphics& g)
+void FluxEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -427,7 +427,7 @@ void FluxAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void FluxAudioProcessorEditor::resized()
+void FluxEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -562,4 +562,10 @@ void FluxAudioProcessorEditor::resized()
     positionKnob(blendCell, heroKnobSize, blendSlider, blendLabel);
 
     rebuildChassisTexture();
+}
+
+FluxAudioProcessorEditor::FluxAudioProcessorEditor(FluxAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {1100, 500})
+{
+    addAndMakeVisible(content);
 }

@@ -4,6 +4,8 @@
 #include "PluginProcessor.h"
 #include "GradientLookAndFeel.h"
 
+#include "../../common/UI/ResizableZoom.h"
+
 // Bundles a rotary knob with its own name label and parameter attachment - a small abstraction
 // (not present in Caverns, which only has ~9 controls total) justified here by Gradient's much
 // larger control count (~19 knobs across dual A/B units): without it, PluginEditor.h would need
@@ -28,11 +30,14 @@ struct GradientCombo
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment;
 };
 
-class GradientAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see GradientAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
+class GradientEditorContent : public juce::Component, private juce::Timer
 {
 public:
-    explicit GradientAudioProcessorEditor(GradientAudioProcessor&);
-    ~GradientAudioProcessorEditor() override;
+    explicit GradientEditorContent(GradientAudioProcessor&);
+    ~GradientEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -86,6 +91,23 @@ private:
     // ---- DRIFT / OUTPUT section ----
     juce::Label driftOutputUnitTagA, driftOutputUnitTagB;
     GradientRotaryKnob driftKnobA, mixKnobA, outputKnobA, driftKnobB, mixKnobB, outputKnobB;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GradientEditorContent)
+};
+
+// Thin shell around GradientEditorContent: owns the plugin window's actual (resizable/zoomable)
+// size. wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively
+// resizable within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it -
+// corner-grip / window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens
+// at 100% (native size) - the resized size is deliberately not persisted.
+class GradientAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit GradientAudioProcessorEditor(GradientAudioProcessor&);
+
+private:
+    GradientEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GradientAudioProcessorEditor)
 };

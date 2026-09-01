@@ -5,6 +5,8 @@
 #include "StrikeLookAndFeel.h"
 #include "PluginProcessor.h"
 
+#include "../../common/UI/ResizableZoom.h"
+
 // Bundles a rotary knob with its own name label and parameter attachment, matching Gradient's
 // GradientRotaryKnob precedent - justified here by Strike's own large control count (18 knobs).
 struct StrikeRotaryKnob
@@ -34,11 +36,15 @@ struct StrikeCombo
 // replaces the plain-grid base-scaffold editor. Layout/structure follows Gradient's own reference
 // implementation (Source/PluginEditor.h/.cpp) - see that file's header comment for the
 // COPY-VERBATIM/PLUGIN-SPECIFIC split this file follows.
-class StrikeAudioProcessorEditor : public juce::AudioProcessorEditor
+//
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see StrikeAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
+class StrikeEditorContent : public juce::Component
 {
 public:
-    explicit StrikeAudioProcessorEditor(StrikeAudioProcessor&);
-    ~StrikeAudioProcessorEditor() override;
+    explicit StrikeEditorContent(StrikeAudioProcessor&);
+    ~StrikeEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -94,6 +100,23 @@ private:
     // ---- FILTER section ----
     StrikeToggle filterOnToggle;
     StrikeRotaryKnob filterCutoffKnob, resonanceKnob, filterAttackKnob, filterEnvAmountKnob, filterDecayKnob;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StrikeEditorContent)
+};
+
+// Thin shell around StrikeEditorContent: owns the plugin window's actual (resizable/zoomable) size.
+// wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively resizable
+// within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it - corner-grip /
+// window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens at 100% (native
+// size) - the resized size is deliberately not persisted.
+class StrikeAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit StrikeAudioProcessorEditor(StrikeAudioProcessor&);
+
+private:
+    StrikeEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StrikeAudioProcessorEditor)
 };

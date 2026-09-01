@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Corrosion VERSION 0.1.3)
+project(Corrosion VERSION 0.1.4)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)

@@ -55,7 +55,7 @@ namespace
     constexpr int subdivisionComboWidth = 92;
 }
 
-void GradientAudioProcessorEditor::setupRotaryKnob(GradientRotaryKnob& knob, const juce::String& labelText,
+void GradientEditorContent::setupRotaryKnob(GradientRotaryKnob& knob, const juce::String& labelText,
                                                      const juce::String& paramID)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -80,7 +80,7 @@ void GradientAudioProcessorEditor::setupRotaryKnob(GradientRotaryKnob& knob, con
         processorRef.apvts, paramID, knob.slider);
 }
 
-void GradientAudioProcessorEditor::setupToggle(GradientToggle& toggle, const juce::String& labelText,
+void GradientEditorContent::setupToggle(GradientToggle& toggle, const juce::String& labelText,
                                                  const juce::String& paramID)
 {
     toggle.button.setLookAndFeel(&lookAndFeel);
@@ -90,7 +90,7 @@ void GradientAudioProcessorEditor::setupToggle(GradientToggle& toggle, const juc
         processorRef.apvts, paramID, toggle.button);
 }
 
-void GradientAudioProcessorEditor::setupSpliceCombo(GradientCombo& combo, const juce::String& paramID)
+void GradientEditorContent::setupSpliceCombo(GradientCombo& combo, const juce::String& paramID)
 {
     combo.combo.setLookAndFeel(&lookAndFeel);
     combo.combo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
@@ -107,7 +107,7 @@ void GradientAudioProcessorEditor::setupSpliceCombo(GradientCombo& combo, const 
         processorRef.apvts, paramID, combo.combo);
 }
 
-void GradientAudioProcessorEditor::setupSubdivisionCombo(GradientCombo& combo, const juce::String& paramID)
+void GradientEditorContent::setupSubdivisionCombo(GradientCombo& combo, const juce::String& paramID)
 {
     combo.combo.setLookAndFeel(&lookAndFeel);
     combo.combo.setColour(juce::ComboBox::textColourId, juce::Colour(0xffcfe3e0));
@@ -124,8 +124,8 @@ void GradientAudioProcessorEditor::setupSubdivisionCombo(GradientCombo& combo, c
         processorRef.apvts, paramID, combo.combo);
 }
 
-GradientAudioProcessorEditor::GradientAudioProcessorEditor(GradientAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+GradientEditorContent::GradientEditorContent(GradientAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -207,12 +207,12 @@ GradientAudioProcessorEditor::GradientAudioProcessorEditor(GradientAudioProcesso
     startTimerHz(30);
 }
 
-GradientAudioProcessorEditor::~GradientAudioProcessorEditor()
+GradientEditorContent::~GradientEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-void GradientAudioProcessorEditor::timerCallback()
+void GradientEditorContent::timerCallback()
 {
     // Dual Mode gates whether unit B's controls (and the global controls that only matter with a
     // second channel - Link, Cross-feedback, Width) do anything at all, matching Flux's Sync/Rate
@@ -291,7 +291,7 @@ void GradientAudioProcessorEditor::timerCallback()
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void GradientAudioProcessorEditor::rebuildChassisTexture()
+void GradientEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -335,7 +335,7 @@ void GradientAudioProcessorEditor::rebuildChassisTexture()
 
 // COPY-VERBATIM (see banner at top of file): unbroken border + centred badge that hugs its
 // text, sitting inside the border rather than straddling it.
-void GradientAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void GradientEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                           const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -355,7 +355,7 @@ void GradientAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void GradientAudioProcessorEditor::paint(juce::Graphics& g)
+void GradientEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -442,14 +442,14 @@ void GradientAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void GradientAudioProcessorEditor::positionKnob(juce::Rectangle<int> topLeftCell, int knobSize, GradientRotaryKnob& knob)
+void GradientEditorContent::positionKnob(juce::Rectangle<int> topLeftCell, int knobSize, GradientRotaryKnob& knob)
 {
     auto knobBounds = topLeftCell.withSize(knobSize, knobSize + knobBlockExtra);
     knob.slider.setBounds(knobBounds);
     knob.nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
 }
 
-void GradientAudioProcessorEditor::resized()
+void GradientEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -676,4 +676,10 @@ void GradientAudioProcessorEditor::resized()
     }
 
     rebuildChassisTexture();
+}
+
+GradientAudioProcessorEditor::GradientAudioProcessorEditor(GradientAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {880, 853})
+{
+    addAndMakeVisible(content);
 }

@@ -49,7 +49,7 @@ namespace
     constexpr int knobColGap = 20;          // vertical gap between stacked knobs within a section
 }
 
-void IntruderAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void IntruderEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                       const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -72,8 +72,8 @@ void IntruderAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce:
     addAndMakeVisible(label);
 }
 
-IntruderAudioProcessorEditor::IntruderAudioProcessorEditor(IntruderAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+IntruderEditorContent::IntruderEditorContent(IntruderAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -126,14 +126,14 @@ IntruderAudioProcessorEditor::IntruderAudioProcessorEditor(IntruderAudioProcesso
     setSize(634, 500); // +58 over the original 576 for levelsColumnWidth's growth (192 -> 250)
 }
 
-IntruderAudioProcessorEditor::~IntruderAudioProcessorEditor()
+IntruderEditorContent::~IntruderEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void IntruderAudioProcessorEditor::rebuildChassisTexture()
+void IntruderEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -176,7 +176,7 @@ void IntruderAudioProcessorEditor::rebuildChassisTexture()
 }
 
 // COPY-VERBATIM (see banner at top of file).
-void IntruderAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void IntruderEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                         const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -196,7 +196,7 @@ void IntruderAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void IntruderAudioProcessorEditor::paint(juce::Graphics& g)
+void IntruderEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -287,7 +287,7 @@ void IntruderAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerTextArea, juce::Justification::topRight);
 }
 
-void IntruderAudioProcessorEditor::resized()
+void IntruderEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -388,4 +388,10 @@ void IntruderAudioProcessorEditor::resized()
     positionKnob(levelsInner.removeFromTop(heroKnobCellHeight), heroKnobSize, blendSlider, blendLabel);
 
     rebuildChassisTexture();
+}
+
+IntruderAudioProcessorEditor::IntruderAudioProcessorEditor(IntruderAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {634, 500})
+{
+    addAndMakeVisible(content);
 }

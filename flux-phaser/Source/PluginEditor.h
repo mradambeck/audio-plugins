@@ -4,11 +4,16 @@
 #include "PluginProcessor.h"
 #include "FluxLookAndFeel.h"
 
-class FluxAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
+#include "../../common/UI/ResizableZoom.h"
+
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see FluxAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
+class FluxEditorContent : public juce::Component, private juce::Timer
 {
 public:
-    explicit FluxAudioProcessorEditor(FluxAudioProcessor&);
-    ~FluxAudioProcessorEditor() override;
+    explicit FluxEditorContent(FluxAudioProcessor&);
+    ~FluxEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -87,6 +92,23 @@ private:
     juce::Slider blendSlider;
     juce::Label blendLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> blendAttachment;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FluxEditorContent)
+};
+
+// Thin shell around FluxEditorContent: owns the plugin window's actual (resizable/zoomable) size.
+// wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively resizable
+// within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it - corner-grip /
+// window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens at 100% (native
+// size) - the resized size is deliberately not persisted.
+class FluxAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit FluxAudioProcessorEditor(FluxAudioProcessor&);
+
+private:
+    FluxEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FluxAudioProcessorEditor)
 };

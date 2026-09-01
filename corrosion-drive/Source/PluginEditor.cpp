@@ -54,7 +54,7 @@ namespace
     constexpr int knobTextBoxHeight = 20;
 }
 
-void CorrosionAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void CorrosionEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                    const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -79,8 +79,8 @@ void CorrosionAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce
     addAndMakeVisible(label);
 }
 
-CorrosionAudioProcessorEditor::CorrosionAudioProcessorEditor(CorrosionAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+CorrosionEditorContent::CorrosionEditorContent(CorrosionAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -143,14 +143,14 @@ CorrosionAudioProcessorEditor::CorrosionAudioProcessorEditor(CorrosionAudioProce
     setSize(1166, 420);
 }
 
-CorrosionAudioProcessorEditor::~CorrosionAudioProcessorEditor()
+CorrosionEditorContent::~CorrosionEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void CorrosionAudioProcessorEditor::rebuildChassisTexture()
+void CorrosionEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -209,7 +209,7 @@ void CorrosionAudioProcessorEditor::rebuildChassisTexture()
 // the LookAndFeel (getAccentColour()/getBadgeInkColour()) rather than held as separate literals
 // here, so the accent pair only has to change in one place (CorrosionLookAndFeel.cpp) when this
 // is adapted for a new plugin.
-void CorrosionAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void CorrosionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                      const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -229,7 +229,7 @@ void CorrosionAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce:
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void CorrosionAudioProcessorEditor::paint(juce::Graphics& g)
+void CorrosionEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -336,7 +336,7 @@ void CorrosionAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void CorrosionAudioProcessorEditor::resized()
+void CorrosionEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -452,4 +452,10 @@ void CorrosionAudioProcessorEditor::resized()
     positionKnob(wetCell, defaultKnobSize, outputSlider, outputLabel);
 
     rebuildChassisTexture();
+}
+
+CorrosionAudioProcessorEditor::CorrosionAudioProcessorEditor(CorrosionAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {1166, 420})
+{
+    addAndMakeVisible(content);
 }

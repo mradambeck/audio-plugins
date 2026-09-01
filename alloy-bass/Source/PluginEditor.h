@@ -4,14 +4,26 @@
 #include "PluginProcessor.h"
 #include "AlloyLookAndFeel.h"
 
-class AlloyAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
+#include "../../common/UI/ResizableZoom.h"
+
+// All real painting/layout lives here. Unlike every other plugin in this catalog, this content's
+// own native size is NOT fixed forever after construction - see setShowingPageOne() below, and
+// onNativeSizeChanged's comment for how that's reconciled with the resizable/zoom mechanism in
+// common/UI/ResizableZoom.h that AlloyAudioProcessorEditor (below) sets up around this class.
+class AlloyEditorContent : public juce::Component, private juce::Timer
 {
 public:
-    explicit AlloyAudioProcessorEditor(AlloyAudioProcessor&);
-    ~AlloyAudioProcessorEditor() override;
+    explicit AlloyEditorContent(AlloyAudioProcessor&);
+    ~AlloyEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
+
+    // Fired whenever setShowingPageOne() changes this component's own native size (i.e. right after
+    // its own setSize() call) - NOT fired at construction. wildjag::ResizableZoomHandler has no other
+    // way to learn that its "native size" baseline moved, since page-switching (unlike a corner-grip
+    // drag) originates from this content component, not from the host resizing the plugin window.
+    std::function<void(juce::Point<int>)> onNativeSizeChanged;
 
 private:
     void timerCallback() override;
@@ -109,6 +121,25 @@ private:
 
     // ---- Mix ----
     KnobControl mixDrive, mixTone, mixOutput, mixAge;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AlloyEditorContent)
+};
+
+// Thin shell around AlloyEditorContent: owns the plugin window's actual (resizable/zoomable) size.
+// wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively resizable
+// within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it - corner-grip /
+// window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens at 100% (native
+// size) - the resized size is deliberately not persisted. Also re-anchors the "native size" itself
+// (via content.onNativeSizeChanged -> zoomHandler.setNativeSize()) whenever the page switch changes
+// content's own native height, preserving whatever zoom level was already in effect.
+class AlloyAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit AlloyAudioProcessorEditor(AlloyAudioProcessor&);
+
+private:
+    AlloyEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AlloyAudioProcessorEditor)
 };
