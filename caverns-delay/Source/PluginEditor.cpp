@@ -65,7 +65,7 @@ namespace
     constexpr int fieldLabelHeight = 16;
 }
 
-void CavernsAudioProcessorEditor::commitRawTimeParam(const juce::String& paramID, float ms)
+void CavernsEditorContent::commitRawTimeParam(const juce::String& paramID, float ms)
 {
     // Writes straight to the parameter rather than through its Slider, since Slider::setValue()
     // silently drops the notification whenever the slider's displayed value already matches -
@@ -74,7 +74,7 @@ void CavernsAudioProcessorEditor::commitRawTimeParam(const juce::String& paramID
         param->setValueNotifyingHost(param->convertTo0to1(ms));
 }
 
-void CavernsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::Label& label,
+void CavernsEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
                                                       const juce::String& labelText)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -99,7 +99,7 @@ void CavernsAudioProcessorEditor::setupRotarySlider(juce::Slider& slider, juce::
     addAndMakeVisible(label);
 }
 
-void CavernsAudioProcessorEditor::setupVerticalSlider(juce::Slider& slider, juce::Label& label,
+void CavernsEditorContent::setupVerticalSlider(juce::Slider& slider, juce::Label& label,
                                                         const juce::String& labelText)
 {
     slider.setLookAndFeel(&lookAndFeel);   // see setupRotarySlider() for why this is necessary
@@ -117,8 +117,8 @@ void CavernsAudioProcessorEditor::setupVerticalSlider(juce::Slider& slider, juce
     addAndMakeVisible(label);
 }
 
-CavernsAudioProcessorEditor::CavernsAudioProcessorEditor(CavernsAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+CavernsEditorContent::CavernsEditorContent(CavernsAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -248,12 +248,12 @@ CavernsAudioProcessorEditor::CavernsAudioProcessorEditor(CavernsAudioProcessor& 
     startTimerHz(30);
 }
 
-CavernsAudioProcessorEditor::~CavernsAudioProcessorEditor()
+CavernsEditorContent::~CavernsEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-void CavernsAudioProcessorEditor::timerCallback()
+void CavernsEditorContent::timerCallback()
 {
     const auto syncOn = syncButton.getToggleState();
     const auto linkOn = linkButton.getToggleState();
@@ -281,7 +281,7 @@ void CavernsAudioProcessorEditor::timerCallback()
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void CavernsAudioProcessorEditor::rebuildChassisTexture()
+void CavernsEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -340,7 +340,7 @@ void CavernsAudioProcessorEditor::rebuildChassisTexture()
 // the LookAndFeel (getAccentColour()/getBadgeInkColour()) rather than held as separate literals
 // here, so the accent pair only has to change in one place (CavernsLookAndFeel.cpp) when this
 // is adapted for a new plugin.
-void CavernsAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void CavernsEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                         const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -360,7 +360,7 @@ void CavernsAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::R
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void CavernsAudioProcessorEditor::paint(juce::Graphics& g)
+void CavernsEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -469,7 +469,7 @@ void CavernsAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void CavernsAudioProcessorEditor::resized()
+void CavernsEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -624,4 +624,10 @@ void CavernsAudioProcessorEditor::resized()
     wetSlider.setBounds(mixInner.reduced(1, 4));
 
     rebuildChassisTexture();
+}
+
+CavernsAudioProcessorEditor::CavernsAudioProcessorEditor(CavernsAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {1100, 500})
+{
+    addAndMakeVisible(content);
 }

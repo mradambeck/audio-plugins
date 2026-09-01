@@ -4,11 +4,16 @@
 #include "PluginProcessor.h"
 #include "CorrosionLookAndFeel.h"
 
-class CorrosionAudioProcessorEditor : public juce::AudioProcessorEditor
+#include "../../common/UI/ResizableZoom.h"
+
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see CorrosionAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
+class CorrosionEditorContent : public juce::Component
 {
 public:
-    explicit CorrosionAudioProcessorEditor(CorrosionAudioProcessor&);
-    ~CorrosionAudioProcessorEditor() override;
+    explicit CorrosionEditorContent(CorrosionAudioProcessor&);
+    ~CorrosionEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -68,6 +73,23 @@ private:
     juce::Slider outputSlider;
     juce::Label outputLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputAttachment;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CorrosionEditorContent)
+};
+
+// Thin shell around CorrosionEditorContent: owns the plugin window's actual (resizable/zoomable)
+// size. wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively
+// resizable within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it -
+// corner-grip / window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens
+// at 100% (native size) - the resized size is deliberately not persisted.
+class CorrosionAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit CorrosionAudioProcessorEditor(CorrosionAudioProcessor&);
+
+private:
+    CorrosionEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CorrosionAudioProcessorEditor)
 };

@@ -95,7 +95,7 @@ namespace
     constexpr int miniStackGap = 10;
 }
 
-void AlloyAudioProcessorEditor::setupKnob(KnobControl& kc, const juce::String& paramID,
+void AlloyEditorContent::setupKnob(KnobControl& kc, const juce::String& paramID,
                                            const juce::String& labelText, bool mini)
 {
     // Slider is a member variable, so it's default-constructed (and builds its internal value
@@ -118,7 +118,7 @@ void AlloyAudioProcessorEditor::setupKnob(KnobControl& kc, const juce::String& p
         processorRef.apvts, paramID, kc.slider);
 }
 
-void AlloyAudioProcessorEditor::setupCombo(ComboControl& cc, const juce::String& paramID,
+void AlloyEditorContent::setupCombo(ComboControl& cc, const juce::String& paramID,
                                             const juce::String& labelText, const juce::StringArray& choices)
 {
     cc.combo.setLookAndFeel(&lookAndFeel);
@@ -136,7 +136,7 @@ void AlloyAudioProcessorEditor::setupCombo(ComboControl& cc, const juce::String&
         processorRef.apvts, paramID, cc.combo);
 }
 
-void AlloyAudioProcessorEditor::setupLedButton(juce::ToggleButton& button,
+void AlloyEditorContent::setupLedButton(juce::ToggleButton& button,
                                                 std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>& attachment,
                                                 const juce::String& paramID, const juce::String& text)
 {
@@ -147,14 +147,14 @@ void AlloyAudioProcessorEditor::setupLedButton(juce::ToggleButton& button,
         processorRef.apvts, paramID, button);
 }
 
-void AlloyAudioProcessorEditor::setupADSR(std::array<KnobControl, 4>& knobs, const juce::String paramIDs[4], bool mini)
+void AlloyEditorContent::setupADSR(std::array<KnobControl, 4>& knobs, const juce::String paramIDs[4], bool mini)
 {
     static const char* names[4] = { "Attack", "Decay", "Sustain", "Release" };
     for (int i = 0; i < 4; ++i)
         setupKnob(knobs[(size_t) i], paramIDs[i], names[i], mini);
 }
 
-void AlloyAudioProcessorEditor::setupSubLabel(juce::Label& label, const juce::String& text)
+void AlloyEditorContent::setupSubLabel(juce::Label& label, const juce::String& text)
 {
     label.setText(text.toUpperCase(), juce::dontSendNotification);
     label.setJustificationType(juce::Justification::centred);
@@ -163,8 +163,8 @@ void AlloyAudioProcessorEditor::setupSubLabel(juce::Label& label, const juce::St
     addAndMakeVisible(label);
 }
 
-AlloyAudioProcessorEditor::AlloyAudioProcessorEditor(AlloyAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+AlloyEditorContent::AlloyEditorContent(AlloyAudioProcessor& p)
+    : processorRef(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -274,12 +274,12 @@ AlloyAudioProcessorEditor::AlloyAudioProcessorEditor(AlloyAudioProcessor& p)
     startTimerHz(30);
 }
 
-AlloyAudioProcessorEditor::~AlloyAudioProcessorEditor()
+AlloyEditorContent::~AlloyEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-void AlloyAudioProcessorEditor::timerCallback()
+void AlloyEditorContent::timerCallback()
 {
     // Rate is only read by the DSP while Sync is off (see processBlock) - disabling/dimming it
     // while Sync is on makes that inertness visible rather than leaving a live-looking knob that
@@ -290,14 +290,14 @@ void AlloyAudioProcessorEditor::timerCallback()
     arpRate.slider.setAlpha(syncOn ? 0.5f : 1.0f);
 }
 
-int AlloyAudioProcessorEditor::contentHeightForPage(bool pageOne) const
+int AlloyEditorContent::contentHeightForPage(bool pageOne) const
 {
     return chassisMargin * 2 + headerHeight + contentPaddingTop
            + (pageOne ? page1ContentHeight : page2ContentHeight)
            + contentPaddingBottom + footerHeight;
 }
 
-void AlloyAudioProcessorEditor::updatePageVisibility()
+void AlloyEditorContent::updatePageVisibility()
 {
     const auto page1 = showingPageOne;
     const auto page2 = !showingPageOne;
@@ -353,20 +353,24 @@ void AlloyAudioProcessorEditor::updatePageVisibility()
     pageButton.setButtonText(showingPageOne ? "Sub / Arp / Mix" : "Analog / FM");
 }
 
-void AlloyAudioProcessorEditor::setShowingPageOne(bool showPageOne)
+void AlloyEditorContent::setShowingPageOne(bool showPageOne)
 {
     if (showingPageOne == showPageOne)
         return;
 
     showingPageOne = showPageOne;
     updatePageVisibility();
-    setSize(windowContentWidth + contentPaddingSide * 2 + chassisMargin * 2, contentHeightForPage(showingPageOne));
+    const juce::Point<int> newNativeSize(windowContentWidth + contentPaddingSide * 2 + chassisMargin * 2,
+                                          contentHeightForPage(showingPageOne));
+    setSize(newNativeSize.x, newNativeSize.y);
+    if (onNativeSizeChanged)
+        onNativeSizeChanged(newNativeSize);
     repaint();
 }
 
 // COPY-VERBATIM (see banner at top of file): procedural chassis grain, no image assets, no
 // per-plugin parameters.
-void AlloyAudioProcessorEditor::rebuildChassisTexture()
+void AlloyEditorContent::rebuildChassisTexture()
 {
     const auto w = getWidth();
     const auto h = getHeight();
@@ -410,7 +414,7 @@ void AlloyAudioProcessorEditor::rebuildChassisTexture()
 
 // COPY-VERBATIM (see banner at top of file): unbroken border + centred badge that hugs its
 // text, sitting inside the border rather than straddling it.
-void AlloyAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
+void AlloyEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                       const juce::String& label)
 {
     g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
@@ -430,7 +434,7 @@ void AlloyAudioProcessorEditor::drawHardwareSection(juce::Graphics& g, juce::Rec
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
 }
 
-void AlloyAudioProcessorEditor::paint(juce::Graphics& g)
+void AlloyEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
     juce::Path devicePath;
@@ -524,7 +528,7 @@ void AlloyAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
-void AlloyAudioProcessorEditor::positionKnob(juce::Rectangle<int> cell, int size, KnobControl& kc)
+void AlloyEditorContent::positionKnob(juce::Rectangle<int> cell, int size, KnobControl& kc)
 {
     const bool mini = (size != knobSize);
     const auto nameH = mini ? miniKnobNameHeight : knobNameHeight;
@@ -535,7 +539,7 @@ void AlloyAudioProcessorEditor::positionKnob(juce::Rectangle<int> cell, int size
     kc.label.setBounds(unit.getX(), unit.getY() + size, size, nameH);
 }
 
-void AlloyAudioProcessorEditor::positionCombo(juce::Rectangle<int> cell, int width, ComboControl& cc)
+void AlloyEditorContent::positionCombo(juce::Rectangle<int> cell, int width, ComboControl& cc)
 {
     juce::Rectangle<int> unit(cell.getCentreX() - width / 2, cell.getY(), width, comboCellHeight);
     cc.label.setBounds(unit.removeFromTop(comboLabelHeight));
@@ -543,7 +547,7 @@ void AlloyAudioProcessorEditor::positionCombo(juce::Rectangle<int> cell, int wid
     cc.combo.setBounds(unit);
 }
 
-void AlloyAudioProcessorEditor::resized()
+void AlloyEditorContent::resized()
 {
     auto panelArea = getLocalBounds().reduced(chassisMargin);
 
@@ -799,4 +803,15 @@ void AlloyAudioProcessorEditor::resized()
     }
 
     rebuildChassisTexture();
+}
+
+AlloyAudioProcessorEditor::AlloyAudioProcessorEditor(AlloyAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p),
+      zoomHandler(*this, content, {content.getWidth(), content.getHeight()})
+{
+    addAndMakeVisible(content);
+    content.onNativeSizeChanged = [this](juce::Point<int> newNativeSize)
+    {
+        zoomHandler.setNativeSize(newNativeSize);
+    };
 }

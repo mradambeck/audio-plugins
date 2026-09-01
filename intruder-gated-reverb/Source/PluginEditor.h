@@ -4,6 +4,8 @@
 #include "PluginProcessor.h"
 #include "IntruderLookAndFeel.h"
 
+#include "../../common/UI/ResizableZoom.h"
+
 // Hardware-panel styled editor, following the juce-hardware-panel-ui skill / Caverns' canonical
 // PluginEditor.cpp pattern. Three sections (Levels' 3-across small row is a later addition, not in
 // the original approved mockup at mockups/intruder-mockup-v1.html - see Threshold's comment):
@@ -15,11 +17,15 @@
 // (renamed from "Diffusion" 2026-08-29 - Adam's naming call, not a re-scope) - member/variable
 // names weren't renamed to match, same precedent as diffusionSlider already not matching
 // tighterParamID underneath it.
-class IntruderAudioProcessorEditor : public juce::AudioProcessorEditor
+//
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see IntruderAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
+class IntruderEditorContent : public juce::Component
 {
 public:
-    explicit IntruderAudioProcessorEditor(IntruderAudioProcessor&);
-    ~IntruderAudioProcessorEditor() override;
+    explicit IntruderEditorContent(IntruderAudioProcessor&);
+    ~IntruderEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -73,6 +79,23 @@ private:
     juce::Slider blendSlider;
     juce::Label blendLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> blendAttachment;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IntruderEditorContent)
+};
+
+// Thin shell around IntruderEditorContent: owns the plugin window's actual (resizable/zoomable)
+// size. wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively
+// resizable within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it -
+// corner-grip / window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens
+// at 100% (native size) - the resized size is deliberately not persisted.
+class IntruderAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit IntruderAudioProcessorEditor(IntruderAudioProcessor&);
+
+private:
+    IntruderEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IntruderAudioProcessorEditor)
 };

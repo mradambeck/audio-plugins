@@ -4,14 +4,20 @@
 #include "PluginProcessor.h"
 #include "ShieldsLookAndFeel.h"
 
+#include "../../common/UI/ResizableZoom.h"
+
 // Hardware-panel UI (see .claude/skills/juce-hardware-panel-ui and
 // common/LookAndFeel/MOCKUP_GROUND_TRUTH.md) built directly from the approved mockup at
 // mockups/shields-mockup-v1.html.
-class ShieldsAudioProcessorEditor : public juce::AudioProcessorEditor
+//
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see ShieldsAudioProcessorEditor below for why, and
+// common/UI/ZoomControl.h for the zoom mechanism this split exists to support.
+class ShieldsEditorContent : public juce::Component
 {
 public:
-    explicit ShieldsAudioProcessorEditor(ShieldsAudioProcessor&);
-    ~ShieldsAudioProcessorEditor() override;
+    explicit ShieldsEditorContent(ShieldsAudioProcessor&);
+    ~ShieldsEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -82,6 +88,23 @@ private:
     juce::Slider wetSlider;
     juce::Label wetLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> wetAttachment;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShieldsEditorContent)
+};
+
+// Thin shell around ShieldsEditorContent: owns the plugin window's actual (resizable/zoomable) size.
+// wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively resizable
+// within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it - corner-grip /
+// window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens at 100% (native
+// size) - the resized size is deliberately not persisted.
+class ShieldsAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit ShieldsAudioProcessorEditor(ShieldsAudioProcessor&);
+
+private:
+    ShieldsEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShieldsAudioProcessorEditor)
 };
