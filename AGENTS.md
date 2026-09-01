@@ -97,6 +97,28 @@ rather than inventing a meaningless aggregate number.
 - **`.claude/settings.local.json` files** (root and any per-plugin) are personal permission
   allowlists, not shared config — don't treat their contents as project convention.
 
+## ML toolkit
+
+`ml-toolkit/` (repo root, sibling to the plugin folders) is a separate Python/PyTorch project -
+not part of any plugin's CMake build - that fits real-time DSP parameters to captured hardware
+audio (IRs or paired dry/wet) and exports them for a plugin's own `Source/` to consume. `core/` is
+shared and effect-agnostic; `effects/<name>/` composes it for one specific hardware algorithm
+(e.g. `effects/ambience/`, fitting an AMS RMX16 "Ambience" program from 65 IR captures). Build
+only what the current effect needs and leave the rest as known gaps - e.g. `core/dsp_primitives.py`
+currently only has delay/Hadamard-matrix/one-pole-shelf primitives, not fractional delay,
+waveshaping, or pitch tracking, because no effect built against it needs them yet.
+
+Setup: `cd ml-toolkit && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`.
+Run tests with `pytest` from `ml-toolkit/`. See `core/dsp_primitives.py`'s module docstring for why
+FDN rendering is done via frequency-sampling (a closed-form transfer function evaluated at FFT
+bins) rather than a per-sample time-domain simulation - the latter is a real performance trap
+(measured at hours per Adam step), not just a style choice.
+
+An effect's fitted output feeds a plugin's own `Source/<Name>ReferenceData.h` (compile-time
+codegen by default) plus a `common/dsp/FittedCurve1D.h`-based `<Name>ParameterMap`, mirroring
+`intruder-gated-reverb/Source/IntruderReferenceData.h` + `IntruderParameterMap.{h,cpp}`'s existing
+hand-built precedent for exactly this pattern.
+
 ## License
 
 AGPLv3 (see [`LICENSE`](LICENSE)). Don't add code under an incompatible license, and don't assume

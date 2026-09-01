@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml-toolkit"
+version = "0.1.0"
+description = "Shared pipeline for fitting real-time DSP parameters to captured hardware audio, for use in Wild Jag JUCE plugins."
+requires-python = ">=3.9"
+dependencies = [
+    "torch",
+    "numpy",
+    "scipy",
+    "soundfile",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["core*", "effects*"]
