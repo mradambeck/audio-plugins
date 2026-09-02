@@ -1,0 +1,9 @@
+# Python virtualenv for analysis/ scripts - recreate with:
+#   python3 -m venv analysis/venv && source analysis/venv/bin/activate && pip install -r ../../common/tools/requirements.txt
+venv/
+
+# Regenerable renders/plots from validate.py - rerun the script to recreate.
+# validation_results.json and the *.md report ARE committed (small, and the report is the
+# actual documentation deliverable) - same convention as intruder-gated-reverb/analysis/.
+validation_renders/
+validation_plots/

@@ -107,6 +107,40 @@ def envelope_correlation(rmsA, rmsB):
     return float(np.corrcoef(a, b)[0, 1])
 
 
+def crest_factor_db_over_time(data, sampleRate, windowMs=30.0):
+    """Peak/RMS ratio (dB) per window, over time - a reverb that's been squashed (too-dense FDN,
+    too much smoothing) reads as a LOWER, flatter crest factor than the reference even when the
+    RMS envelope shape matches. Promoted from intruder-gated-reverb/analysis/validate.py (2026-09)
+    once a second plugin (Aura) needed it too - see AGENTS.md's LookAndFeel-extension convention
+    for the same "promote once a second consumer needs it" rule applied here to Python tooling."""
+    windowSize = max(1, int(sampleRate * windowMs / 1000.0))
+    numWindows = len(data) // windowSize
+    if numWindows == 0:
+        return np.array([])
+    trimmed = data[: numWindows * windowSize].reshape(numWindows, windowSize).astype(np.float64)
+    peak = np.max(np.abs(trimmed), axis=1)
+    rms = np.sqrt(np.mean(trimmed ** 2, axis=1))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        crest = 20.0 * np.log10(np.where(rms > 1e-9, peak / np.maximum(rms, 1e-12), np.nan))
+    return crest
+
+
+def spectral_flatness_db(segment, sampleRate):
+    """Wiener entropy: geometric_mean(PSD) / arithmetic_mean(PSD), in dB. ~0dB = white-noise-like
+    (flat, diffuse); very negative = tonal/resonant (energy concentrated in a few peaks - comb
+    filtering, insufficient modal density). Promoted alongside crest_factor_db_over_time - see its
+    docstring."""
+    if len(segment) < 64:
+        return None
+    nperseg = min(2048, len(segment))
+    freqs, psd = welch(segment, fs=sampleRate, nperseg=nperseg)
+    psd = psd[freqs > 20.0]
+    psd = np.maximum(psd, 1e-20)
+    geo_mean = np.exp(np.mean(np.log(psd)))
+    arith_mean = np.mean(psd)
+    return float(10.0 * np.log10(geo_mean / arith_mean))
+
+
 def averaged_psd(dataA, dataB, sampleRate, minHz=20.0):
     """Welch-averaged power spectra (many overlapping windows averaged together, not one FFT over
     the whole signal) - smoother and less dependent on exactly where the signal happens to be loud

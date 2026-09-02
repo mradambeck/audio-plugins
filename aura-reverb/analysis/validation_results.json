@@ -1,0 +1,977 @@
+[
+  {
+    "envelope_correlation": 0.901,
+    "log_spectral_distance_db": 2.34,
+    "spectral_band_diff_db": {
+      "low": -0.28,
+      "mid": 0.12,
+      "high": 1.97
+    },
+    "crest_factor_diff_db": -0.54,
+    "spectral_flatness_diff_db": -3.54,
+    "filename": "Ambience_0.1s_+3L-5H.wav",
+    "time": 0.1,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9049,
+    "log_spectral_distance_db": 3.038,
+    "spectral_band_diff_db": {
+      "low": -2.09,
+      "mid": -1.47,
+      "high": 2.9
+    },
+    "crest_factor_diff_db": -0.37,
+    "spectral_flatness_diff_db": -4.48,
+    "filename": "Ambience_0.1s_+5L-8H.wav",
+    "time": 0.1,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9079,
+    "log_spectral_distance_db": 2.338,
+    "spectral_band_diff_db": {
+      "low": -0.29,
+      "mid": 0.12,
+      "high": 1.97
+    },
+    "crest_factor_diff_db": -0.23,
+    "spectral_flatness_diff_db": -6.31,
+    "filename": "Ambience_0.1s_+6L-5H.wav",
+    "time": 0.1,
+    "low": 6,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9017,
+    "log_spectral_distance_db": 2.61,
+    "spectral_band_diff_db": {
+      "low": 2.04,
+      "mid": 2.15,
+      "high": 1.14
+    },
+    "crest_factor_diff_db": -0.02,
+    "spectral_flatness_diff_db": -2.98,
+    "filename": "Ambience_0.1s_-2L-2H.wav",
+    "time": 0.1,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.8984,
+    "log_spectral_distance_db": 3.527,
+    "spectral_band_diff_db": {
+      "low": 4.02,
+      "mid": 3.94,
+      "high": 0.92
+    },
+    "crest_factor_diff_db": 0.46,
+    "spectral_flatness_diff_db": -2.93,
+    "filename": "Ambience_0.1s_-4L0H.wav",
+    "time": 0.1,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9029,
+    "log_spectral_distance_db": 3.472,
+    "spectral_band_diff_db": {
+      "low": 3.93,
+      "mid": 3.87,
+      "high": 0.83
+    },
+    "crest_factor_diff_db": 0.4,
+    "spectral_flatness_diff_db": -1.32,
+    "filename": "Ambience_0.1s_-8L0H.wav",
+    "time": 0.1,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9052,
+    "log_spectral_distance_db": 2.284,
+    "spectral_band_diff_db": {
+      "low": 0.31,
+      "mid": 0.73,
+      "high": 1.77
+    },
+    "crest_factor_diff_db": -0.02,
+    "spectral_flatness_diff_db": -3.97,
+    "filename": "Ambience_0.1s_0L-4H.wav",
+    "time": 0.1,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.8941,
+    "log_spectral_distance_db": 3.039,
+    "spectral_band_diff_db": {
+      "low": -2.09,
+      "mid": -1.48,
+      "high": 2.9
+    },
+    "crest_factor_diff_db": -0.96,
+    "spectral_flatness_diff_db": -1.06,
+    "filename": "Ambience_0.1s_0L-8H.wav",
+    "time": 0.1,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9075,
+    "log_spectral_distance_db": 3.526,
+    "spectral_band_diff_db": {
+      "low": 4.01,
+      "mid": 3.95,
+      "high": 0.91
+    },
+    "crest_factor_diff_db": 0.57,
+    "spectral_flatness_diff_db": -1.31,
+    "filename": "Ambience_0.1s_0L0H.wav",
+    "time": 0.1,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.951,
+    "log_spectral_distance_db": 3.916,
+    "spectral_band_diff_db": {
+      "low": 2.44,
+      "mid": -1.3,
+      "high": 1.63
+    },
+    "crest_factor_diff_db": -3.61,
+    "spectral_flatness_diff_db": -0.15,
+    "filename": "Ambience_0.5s_+3L-5H.wav",
+    "time": 0.5,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9508,
+    "log_spectral_distance_db": 4.487,
+    "spectral_band_diff_db": {
+      "low": 0.76,
+      "mid": -2.54,
+      "high": 2.56
+    },
+    "crest_factor_diff_db": -2.68,
+    "spectral_flatness_diff_db": 0.15,
+    "filename": "Ambience_0.5s_+5L-8H.wav",
+    "time": 0.5,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9497,
+    "log_spectral_distance_db": 3.918,
+    "spectral_band_diff_db": {
+      "low": 2.45,
+      "mid": -1.3,
+      "high": 1.64
+    },
+    "crest_factor_diff_db": -3.64,
+    "spectral_flatness_diff_db": 0.36,
+    "filename": "Ambience_0.5s_+6L-5H.wav",
+    "time": 0.5,
+    "low": 6,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.955,
+    "log_spectral_distance_db": 3.755,
+    "spectral_band_diff_db": {
+      "low": 4.7,
+      "mid": 0.51,
+      "high": 0.65
+    },
+    "crest_factor_diff_db": -4.63,
+    "spectral_flatness_diff_db": -1.42,
+    "filename": "Ambience_0.5s_-2L-2H.wav",
+    "time": 0.5,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.958,
+    "log_spectral_distance_db": 4.551,
+    "spectral_band_diff_db": {
+      "low": 6.67,
+      "mid": 2.22,
+      "high": 0.31
+    },
+    "crest_factor_diff_db": -3.94,
+    "spectral_flatness_diff_db": -2.26,
+    "filename": "Ambience_0.5s_-4L0H.wav",
+    "time": 0.5,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9564,
+    "log_spectral_distance_db": 4.551,
+    "spectral_band_diff_db": {
+      "low": 6.67,
+      "mid": 2.22,
+      "high": 0.31
+    },
+    "crest_factor_diff_db": -4.18,
+    "spectral_flatness_diff_db": -1.56,
+    "filename": "Ambience_0.5s_-8L0H.wav",
+    "time": 0.5,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.951,
+    "log_spectral_distance_db": 3.776,
+    "spectral_band_diff_db": {
+      "low": 2.99,
+      "mid": -0.79,
+      "high": 1.38
+    },
+    "crest_factor_diff_db": -4.14,
+    "spectral_flatness_diff_db": -0.19,
+    "filename": "Ambience_0.5s_0L-4H.wav",
+    "time": 0.5,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.9508,
+    "log_spectral_distance_db": 4.485,
+    "spectral_band_diff_db": {
+      "low": 0.76,
+      "mid": -2.54,
+      "high": 2.56
+    },
+    "crest_factor_diff_db": -2.6,
+    "spectral_flatness_diff_db": 0.16,
+    "filename": "Ambience_0.5s_0L-8H.wav",
+    "time": 0.5,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9568,
+    "log_spectral_distance_db": 4.544,
+    "spectral_band_diff_db": {
+      "low": 6.66,
+      "mid": 2.21,
+      "high": 0.3
+    },
+    "crest_factor_diff_db": -4.12,
+    "spectral_flatness_diff_db": -1.75,
+    "filename": "Ambience_0.5s_0L0H.wav",
+    "time": 0.5,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9218,
+    "log_spectral_distance_db": 5.051,
+    "spectral_band_diff_db": {
+      "low": -1.47,
+      "mid": -4.58,
+      "high": 1.1
+    },
+    "crest_factor_diff_db": 1.34,
+    "spectral_flatness_diff_db": 4.64,
+    "filename": "Ambience_1.1s_+3L-5H.wav",
+    "time": 1.1,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9126,
+    "log_spectral_distance_db": 5.061,
+    "spectral_band_diff_db": {
+      "low": -1.4,
+      "mid": -4.71,
+      "high": 0.94
+    },
+    "crest_factor_diff_db": 0.88,
+    "spectral_flatness_diff_db": 2.8,
+    "filename": "Ambience_1.1s_+5L-8H.wav",
+    "time": 1.1,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.913,
+    "log_spectral_distance_db": 4.949,
+    "spectral_band_diff_db": {
+      "low": -1.12,
+      "mid": -4.52,
+      "high": 0.74
+    },
+    "crest_factor_diff_db": 1.23,
+    "spectral_flatness_diff_db": 3.35,
+    "filename": "Ambience_1.1s_+6L-7H.wav",
+    "time": 1.1,
+    "low": 6,
+    "high": -7
+  },
+  {
+    "envelope_correlation": 0.9314,
+    "log_spectral_distance_db": 4.073,
+    "spectral_band_diff_db": {
+      "low": 2.28,
+      "mid": -1.97,
+      "high": -1.13
+    },
+    "crest_factor_diff_db": -1.76,
+    "spectral_flatness_diff_db": 0.95,
+    "filename": "Ambience_1.1s_-2L-2H.wav",
+    "time": 1.1,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.9387,
+    "log_spectral_distance_db": 3.657,
+    "spectral_band_diff_db": {
+      "low": 4.24,
+      "mid": -0.3,
+      "high": -1.52
+    },
+    "crest_factor_diff_db": -1.64,
+    "spectral_flatness_diff_db": -0.75,
+    "filename": "Ambience_1.1s_-4L0H.wav",
+    "time": 1.1,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9383,
+    "log_spectral_distance_db": 3.657,
+    "spectral_band_diff_db": {
+      "low": 4.24,
+      "mid": -0.3,
+      "high": -1.52
+    },
+    "crest_factor_diff_db": -1.77,
+    "spectral_flatness_diff_db": -0.67,
+    "filename": "Ambience_1.1s_-8L0H.wav",
+    "time": 1.1,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9264,
+    "log_spectral_distance_db": 4.414,
+    "spectral_band_diff_db": {
+      "low": 0.6,
+      "mid": -3.21,
+      "high": -0.36
+    },
+    "crest_factor_diff_db": -0.43,
+    "spectral_flatness_diff_db": 2.09,
+    "filename": "Ambience_1.1s_0L-4H.wav",
+    "time": 1.1,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.91,
+    "log_spectral_distance_db": 5.055,
+    "spectral_band_diff_db": {
+      "low": -1.38,
+      "mid": -4.71,
+      "high": 0.92
+    },
+    "crest_factor_diff_db": 1.0,
+    "spectral_flatness_diff_db": 3.08,
+    "filename": "Ambience_1.1s_0L-8H.wav",
+    "time": 1.1,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9384,
+    "log_spectral_distance_db": 3.656,
+    "spectral_band_diff_db": {
+      "low": 4.24,
+      "mid": -0.3,
+      "high": -1.51
+    },
+    "crest_factor_diff_db": -1.6,
+    "spectral_flatness_diff_db": -0.62,
+    "filename": "Ambience_1.1s_0L0H.wav",
+    "time": 1.1,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9315,
+    "log_spectral_distance_db": 3.605,
+    "spectral_band_diff_db": {
+      "low": -1.23,
+      "mid": -2.72,
+      "high": 0.11
+    },
+    "crest_factor_diff_db": 1.07,
+    "spectral_flatness_diff_db": 1.83,
+    "filename": "Ambience_1.8s_+3L-5H.wav",
+    "time": 1.8,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9157,
+    "log_spectral_distance_db": 4.129,
+    "spectral_band_diff_db": {
+      "low": -2.46,
+      "mid": -3.61,
+      "high": 1.15
+    },
+    "crest_factor_diff_db": 2.58,
+    "spectral_flatness_diff_db": 5.58,
+    "filename": "Ambience_1.8s_+5L-8H.wav",
+    "time": 1.8,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.929,
+    "log_spectral_distance_db": 3.621,
+    "spectral_band_diff_db": {
+      "low": -1.32,
+      "mid": -2.72,
+      "high": 0.12
+    },
+    "crest_factor_diff_db": 1.63,
+    "spectral_flatness_diff_db": 4.24,
+    "filename": "Ambience_1.8s_+6L-5H.wav",
+    "time": 1.8,
+    "low": 6,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9398,
+    "log_spectral_distance_db": 3.167,
+    "spectral_band_diff_db": {
+      "low": 0.86,
+      "mid": -1.21,
+      "high": -0.9
+    },
+    "crest_factor_diff_db": 0.67,
+    "spectral_flatness_diff_db": -4.81,
+    "filename": "Ambience_1.8s_-2L-2H.wav",
+    "time": 1.8,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.9486,
+    "log_spectral_distance_db": 2.943,
+    "spectral_band_diff_db": {
+      "low": 2.93,
+      "mid": 0.46,
+      "high": -1.27
+    },
+    "crest_factor_diff_db": 0.35,
+    "spectral_flatness_diff_db": -6.35,
+    "filename": "Ambience_1.8s_-4L0H.wav",
+    "time": 1.8,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9484,
+    "log_spectral_distance_db": 2.937,
+    "spectral_band_diff_db": {
+      "low": 3.0,
+      "mid": 0.46,
+      "high": -1.27
+    },
+    "crest_factor_diff_db": 0.4,
+    "spectral_flatness_diff_db": -6.1,
+    "filename": "Ambience_1.8s_-8L0H.wav",
+    "time": 1.8,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9312,
+    "log_spectral_distance_db": 3.463,
+    "spectral_band_diff_db": {
+      "low": -0.8,
+      "mid": -2.34,
+      "high": -0.17
+    },
+    "crest_factor_diff_db": 1.2,
+    "spectral_flatness_diff_db": 2.17,
+    "filename": "Ambience_1.8s_0L-4H.wav",
+    "time": 1.8,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.9189,
+    "log_spectral_distance_db": 4.113,
+    "spectral_band_diff_db": {
+      "low": -2.34,
+      "mid": -3.62,
+      "high": 1.14
+    },
+    "crest_factor_diff_db": 1.84,
+    "spectral_flatness_diff_db": 3.91,
+    "filename": "Ambience_1.8s_0L-8H.wav",
+    "time": 1.8,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9473,
+    "log_spectral_distance_db": 2.946,
+    "spectral_band_diff_db": {
+      "low": 2.88,
+      "mid": 0.45,
+      "high": -1.28
+    },
+    "crest_factor_diff_db": 0.46,
+    "spectral_flatness_diff_db": -5.27,
+    "filename": "Ambience_1.8s_0L0H.wav",
+    "time": 1.8,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9525,
+    "log_spectral_distance_db": 3.741,
+    "spectral_band_diff_db": {
+      "low": -3.51,
+      "mid": -3.77,
+      "high": 1.06
+    },
+    "crest_factor_diff_db": 1.53,
+    "spectral_flatness_diff_db": 12.53,
+    "filename": "Ambience_2.3s_+3L-5H.wav",
+    "time": 2.3,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9447,
+    "log_spectral_distance_db": 4.29,
+    "spectral_band_diff_db": {
+      "low": -4.44,
+      "mid": -4.24,
+      "high": 2.12
+    },
+    "crest_factor_diff_db": 2.4,
+    "spectral_flatness_diff_db": 15.78,
+    "filename": "Ambience_2.3s_+5L-8H.wav",
+    "time": 2.3,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9535,
+    "log_spectral_distance_db": 3.8,
+    "spectral_band_diff_db": {
+      "low": -3.72,
+      "mid": -3.76,
+      "high": 1.08
+    },
+    "crest_factor_diff_db": 1.7,
+    "spectral_flatness_diff_db": 13.69,
+    "filename": "Ambience_2.3s_+6L-5H.wav",
+    "time": 2.3,
+    "low": 6,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9533,
+    "log_spectral_distance_db": 2.985,
+    "spectral_band_diff_db": {
+      "low": -1.59,
+      "mid": -2.67,
+      "high": -0.12
+    },
+    "crest_factor_diff_db": 1.0,
+    "spectral_flatness_diff_db": 9.37,
+    "filename": "Ambience_2.3s_-2L-2H.wav",
+    "time": 2.3,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.966,
+    "log_spectral_distance_db": 2.315,
+    "spectral_band_diff_db": {
+      "low": 0.54,
+      "mid": -1.09,
+      "high": -0.74
+    },
+    "crest_factor_diff_db": 0.52,
+    "spectral_flatness_diff_db": 1.73,
+    "filename": "Ambience_2.3s_-4L0H.wav",
+    "time": 2.3,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9651,
+    "log_spectral_distance_db": 2.303,
+    "spectral_band_diff_db": {
+      "low": 0.72,
+      "mid": -1.1,
+      "high": -0.75
+    },
+    "crest_factor_diff_db": 0.4,
+    "spectral_flatness_diff_db": 1.87,
+    "filename": "Ambience_2.3s_-8L0H.wav",
+    "time": 2.3,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9512,
+    "log_spectral_distance_db": 3.532,
+    "spectral_band_diff_db": {
+      "low": -3.13,
+      "mid": -3.56,
+      "high": 0.75
+    },
+    "crest_factor_diff_db": 1.1,
+    "spectral_flatness_diff_db": 10.71,
+    "filename": "Ambience_2.3s_0L-4H.wav",
+    "time": 2.3,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.9443,
+    "log_spectral_distance_db": 4.22,
+    "spectral_band_diff_db": {
+      "low": -4.17,
+      "mid": -4.26,
+      "high": 2.1
+    },
+    "crest_factor_diff_db": 1.86,
+    "spectral_flatness_diff_db": 13.47,
+    "filename": "Ambience_2.3s_0L-8H.wav",
+    "time": 2.3,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9653,
+    "log_spectral_distance_db": 2.323,
+    "spectral_band_diff_db": {
+      "low": 0.43,
+      "mid": -1.09,
+      "high": -0.73
+    },
+    "crest_factor_diff_db": 0.45,
+    "spectral_flatness_diff_db": 1.76,
+    "filename": "Ambience_2.3s_0L0H.wav",
+    "time": 2.3,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9513,
+    "log_spectral_distance_db": 4.2,
+    "spectral_band_diff_db": {
+      "low": -4.57,
+      "mid": -3.59,
+      "high": 2.41
+    },
+    "crest_factor_diff_db": 1.9,
+    "spectral_flatness_diff_db": 8.86,
+    "filename": "Ambience_3.0s_+5L-8H.wav",
+    "time": 3.0,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9477,
+    "log_spectral_distance_db": 3.794,
+    "spectral_band_diff_db": {
+      "low": -4.19,
+      "mid": -3.31,
+      "high": 1.4
+    },
+    "crest_factor_diff_db": 1.44,
+    "spectral_flatness_diff_db": 13.93,
+    "filename": "Ambience_3.0s_+6L-5H.wav",
+    "time": 3.0,
+    "low": 6,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9365,
+    "log_spectral_distance_db": 2.94,
+    "spectral_band_diff_db": {
+      "low": -2.18,
+      "mid": -2.48,
+      "high": 0.21
+    },
+    "crest_factor_diff_db": 0.64,
+    "spectral_flatness_diff_db": 12.09,
+    "filename": "Ambience_3.0s_-2L-2H.wav",
+    "time": 3.0,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.9616,
+    "log_spectral_distance_db": 2.305,
+    "spectral_band_diff_db": {
+      "low": 0.08,
+      "mid": -0.96,
+      "high": -0.47
+    },
+    "crest_factor_diff_db": 0.08,
+    "spectral_flatness_diff_db": 1.05,
+    "filename": "Ambience_3.0s_-4L0H.wav",
+    "time": 3.0,
+    "low": -4,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9615,
+    "log_spectral_distance_db": 2.27,
+    "spectral_band_diff_db": {
+      "low": 0.38,
+      "mid": -0.95,
+      "high": -0.48
+    },
+    "crest_factor_diff_db": 0.06,
+    "spectral_flatness_diff_db": 1.27,
+    "filename": "Ambience_3.0s_-8L0H.wav",
+    "time": 3.0,
+    "low": -8,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9376,
+    "log_spectral_distance_db": 3.543,
+    "spectral_band_diff_db": {
+      "low": -3.67,
+      "mid": -3.19,
+      "high": 1.07
+    },
+    "crest_factor_diff_db": 0.79,
+    "spectral_flatness_diff_db": 11.2,
+    "filename": "Ambience_3.0s_0L-4H.wav",
+    "time": 3.0,
+    "low": 0,
+    "high": -4
+  },
+  {
+    "envelope_correlation": 0.9492,
+    "log_spectral_distance_db": 4.1,
+    "spectral_band_diff_db": {
+      "low": -4.22,
+      "mid": -3.63,
+      "high": 2.37
+    },
+    "crest_factor_diff_db": 1.83,
+    "spectral_flatness_diff_db": 10.94,
+    "filename": "Ambience_3.0s_0L-8H.wav",
+    "time": 3.0,
+    "low": 0,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9608,
+    "log_spectral_distance_db": 2.315,
+    "spectral_band_diff_db": {
+      "low": -0.06,
+      "mid": -0.95,
+      "high": -0.46
+    },
+    "crest_factor_diff_db": 0.14,
+    "spectral_flatness_diff_db": 1.33,
+    "filename": "Ambience_3.0s_0L0H.wav",
+    "time": 3.0,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9562,
+    "log_spectral_distance_db": 4.237,
+    "spectral_band_diff_db": {
+      "low": -5.55,
+      "mid": -3.3,
+      "high": 2.7
+    },
+    "crest_factor_diff_db": 1.86,
+    "spectral_flatness_diff_db": 7.19,
+    "filename": "Ambience_4.5_+5L-8H.wav",
+    "time": 4.5,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9466,
+    "log_spectral_distance_db": 3.75,
+    "spectral_band_diff_db": {
+      "low": -5.03,
+      "mid": -3.17,
+      "high": 1.6
+    },
+    "crest_factor_diff_db": 0.83,
+    "spectral_flatness_diff_db": 6.38,
+    "filename": "Ambience_4.5s_+3L-5H.wav",
+    "time": 4.5,
+    "low": 3,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.9525,
+    "log_spectral_distance_db": 2.537,
+    "spectral_band_diff_db": {
+      "low": -2.81,
+      "mid": -2.19,
+      "high": 0.21
+    },
+    "crest_factor_diff_db": 0.26,
+    "spectral_flatness_diff_db": -2.5,
+    "filename": "Ambience_4.5s_-2L-2H.wav",
+    "time": 4.5,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.9606,
+    "log_spectral_distance_db": 1.892,
+    "spectral_band_diff_db": {
+      "low": -0.56,
+      "mid": -1.01,
+      "high": -0.33
+    },
+    "crest_factor_diff_db": 0.15,
+    "spectral_flatness_diff_db": -0.19,
+    "filename": "Ambience_4.5s_-5L0H.wav",
+    "time": 4.5,
+    "low": -5,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9456,
+    "log_spectral_distance_db": 3.636,
+    "spectral_band_diff_db": {
+      "low": -4.65,
+      "mid": -3.18,
+      "high": 1.58
+    },
+    "crest_factor_diff_db": 0.78,
+    "spectral_flatness_diff_db": 8.4,
+    "filename": "Ambience_4.5s_0L-5H.wav",
+    "time": 4.5,
+    "low": 0,
+    "high": -5
+  },
+  {
+    "envelope_correlation": 0.961,
+    "log_spectral_distance_db": 1.899,
+    "spectral_band_diff_db": {
+      "low": -1.09,
+      "mid": -1.03,
+      "high": -0.32
+    },
+    "crest_factor_diff_db": 0.16,
+    "spectral_flatness_diff_db": -0.78,
+    "filename": "Ambience_4.5s_0L0H.wav",
+    "time": 4.5,
+    "low": 0,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9536,
+    "log_spectral_distance_db": 3.036,
+    "spectral_band_diff_db": {
+      "low": -4.04,
+      "mid": -2.47,
+      "high": 0.76
+    },
+    "crest_factor_diff_db": -0.42,
+    "spectral_flatness_diff_db": -4.62,
+    "filename": "Ambience_5.5s_+2L-3H.wav",
+    "time": 5.5,
+    "low": 2,
+    "high": -3
+  },
+  {
+    "envelope_correlation": 0.962,
+    "log_spectral_distance_db": 4.075,
+    "spectral_band_diff_db": {
+      "low": -5.14,
+      "mid": -2.98,
+      "high": 2.93
+    },
+    "crest_factor_diff_db": 1.54,
+    "spectral_flatness_diff_db": 0.73,
+    "filename": "Ambience_5.5s_+5L-8H.wav",
+    "time": 5.5,
+    "low": 5,
+    "high": -8
+  },
+  {
+    "envelope_correlation": 0.9519,
+    "log_spectral_distance_db": 2.5,
+    "spectral_band_diff_db": {
+      "low": -2.89,
+      "mid": -1.94,
+      "high": 0.24
+    },
+    "crest_factor_diff_db": 0.06,
+    "spectral_flatness_diff_db": -3.89,
+    "filename": "Ambience_5.5s_-2L-2H.wav",
+    "time": 5.5,
+    "low": -2,
+    "high": -2
+  },
+  {
+    "envelope_correlation": 0.9616,
+    "log_spectral_distance_db": 1.852,
+    "spectral_band_diff_db": {
+      "low": -0.94,
+      "mid": -0.85,
+      "high": -0.26
+    },
+    "crest_factor_diff_db": 0.08,
+    "spectral_flatness_diff_db": -0.3,
+    "filename": "Ambience_5.5s_-3L0H.wav",
+    "time": 5.5,
+    "low": -3,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.962,
+    "log_spectral_distance_db": 1.836,
+    "spectral_band_diff_db": {
+      "low": -0.17,
+      "mid": -0.83,
+      "high": -0.27
+    },
+    "crest_factor_diff_db": 0.11,
+    "spectral_flatness_diff_db": -0.49,
+    "filename": "Ambience_5.5s_-7L0H.wav",
+    "time": 5.5,
+    "low": -7,
+    "high": 0
+  },
+  {
+    "envelope_correlation": 0.9617,
+    "log_spectral_distance_db": 1.856,
+    "spectral_band_diff_db": {
+      "low": -1.09,
+      "mid": -0.86,
+      "high": -0.26
+    },
+    "crest_factor_diff_db": 0.17,
+    "spectral_flatness_diff_db": -0.5,
+    "filename": "Ambience_5.5s_0L0H.wav",
+    "time": 5.5,
+    "low": 0,
+    "high": 0
+  }
+]
