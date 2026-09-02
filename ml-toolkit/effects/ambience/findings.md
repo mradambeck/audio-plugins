@@ -121,6 +121,46 @@ feedback gain (applied *inside* the feedback loop, not at the input/output stage
 multiplier instead of an output EQ, so no new `core/dsp_primitives.py` code is needed, only a
 different composition in `model.py`.
 
+## Quantization: unit's own dynamic-range ceiling is visible in the captures, step-lattice is not
+
+Checked whether the RMX16's own digital grain (16-bit converters / 18-bit internal, per Adam's
+spec) survives into the 65 captures, ahead of adding a player-facing Bit Depth control to Aura.
+Two independent measurements on the four longest 0L0H captures (0.1/2.3/4.5/5.5s):
+
+**Lattice test (negative, expected).** Read raw 24-bit integer samples and checked whether every
+value is a multiple of 256 (the signature a literal 16-bit source leaves behind after being
+widened to 24-bit). GCD of nonzero sample values came back 1 for every file/channel - no lattice.
+Expected: these are analog re-captures (through the unit's own D/A, then the recording interface's
+A/D), which destroys a literal digital step pattern even if one existed upstream. This test can't
+see quantization grain here; it isn't evidence grain is absent.
+
+**Floor test (positive).** The decay in every capture follows a clean exponential down to
+essentially the same level - *-89 to -95dB relative to that capture's own peak* - then drops
+sharply to -103..-113dB (the true capture-chain noise floor, confirmed quieter than the -90dB
+plateau, so the plateau isn't just interface hiss):
+
+| Capture | Plateau reached (dB rel. peak) | Where (before the drop to true silence) |
+|---|---|---|
+| 5.5s | -90.1 | t=6.30s |
+| 4.5s | -91.2 to -93.1 | t=5.50-6.00s |
+| 2.3s | -89.7 | t=2.80s |
+| 0.1s | n/a (decay too short to reach a plateau within the capture) |  |
+
+-90dB matches Adam's supplied spec ("~90dB dynamic range") closely, and since the interface can
+clearly go 15-20dB quieter once the real tail ends, this ceiling is a property of the signal
+chain terminating in the unit itself, not the recording setup.
+
+**Reading, and what it means for the Bit Depth control's default:** this measures a broadband
+noise floor / dynamic-range ceiling, not discrete quantization steps (staircasing) - the lattice
+test, the only one that could show true LSD grain, was inconclusive here. So: the *ceiling*
+evidence supports calibrating the default to reproduce a ~90dB effective dynamic range, which is
+what a 16-bit-class converter (Adam's spec) delivers in practice (real 16-bit hardware typically
+achieves ~90-93dB, short of the ~98dB theoretical limit) - **default 16 bit**. Whether the
+*audible character* (stair-step grain on quiet tails) is separately worth modelling can't be
+settled from these captures alone; treat the Bit Depth knob as reproducing the dynamic-range
+ceiling primarily, with the grain as a byproduct of the same mechanism rather than a separately
+verified one.
+
 ## Method notes (empirical-verification catches)
 
 - The initial read of `echo_density_peak_count`/`echo_density_half_rise_time_s` for
