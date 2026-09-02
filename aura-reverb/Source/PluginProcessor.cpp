@@ -142,9 +142,9 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     // ready coefficients - AuraParameterMap converts them via the fitted reference curves
     // (ml-toolkit/effects/ambience/findings.md), kept separate from AuraFDNEngine so the mapping
     // can be refit without touching the DSP (same convention as Intruder).
-    const auto bandGains = AuraParameterMap::mapTimeAndHighToBandGains(timeSecondsParam->load(), highDbParam->load());
-    engine.setBandGains(bandGains.highBandGain, bandGains.lowBandGain);
-    engine.setDampingWeight(bandGains.dampingWeight);
+    const auto decayParams = AuraParameterMap::mapTimeAndHighToDecayParams(timeSecondsParam->load(), highDbParam->load());
+    engine.setBandGains(decayParams.decayGain, decayParams.decayGain);
+    engine.setDampingWeight(decayParams.dampingWeight);
     engine.setInputTilt(AuraParameterMap::mapInputTiltDb(highDbParam->load()));
     engine.setPreDelayMs(preDelayMsParam->load());
 
