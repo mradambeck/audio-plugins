@@ -30,6 +30,9 @@ void AuraFDNEngine::prepare(double sampleRate)
     preDelayBufferL.setSize(maxPreDelaySamples);
     preDelayBufferR.setSize(maxPreDelaySamples);
 
+    inputTiltL.setPivotHz(inputTiltPivotHz, sampleRate);
+    inputTiltR.setPivotHz(inputTiltPivotHz, sampleRate);
+
     prepared = true;
 
     updateLineLengths();
@@ -43,6 +46,8 @@ void AuraFDNEngine::reset()
     for (auto& s : feedbackShelf) s.reset();
     preDelayBufferL.reset();
     preDelayBufferR.reset();
+    inputTiltL.reset();
+    inputTiltR.reset();
 }
 
 void AuraFDNEngine::setPreDelayMs(float ms)
@@ -69,6 +74,12 @@ void AuraFDNEngine::setDampingWeight(float weight)
         f.setWeight(clamped);
 }
 
+void AuraFDNEngine::setInputTilt(float tiltDb)
+{
+    inputTiltL.setTiltDb(tiltDb);
+    inputTiltR.setTiltDb(tiltDb);
+}
+
 void AuraFDNEngine::updateLineLengths()
 {
     for (int i = 0; i < numLines; ++i)
@@ -90,6 +101,12 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
         preDelayBufferR.write(dryR);
         const auto preL = preDelayBufferL.read(preDelaySamples);
         const auto preR = preDelayBufferR.read(preDelaySamples);
+
+        // --- Input tilt (High's onset-tone effect), applied here so it colors EVERYTHING
+        // downstream including the very first tank arrivals - see this file's header comment on
+        // why feedbackShelf alone can't do this.
+        const auto tiltedL = inputTiltL.processSample(preL);
+        const auto tiltedR = inputTiltR.processSample(preR);
 
         // --- FDN tank: read each line, apply per-line HF damping, Hadamard-mix, apply the
         // per-line low/high-band feedback shelf, inject new input, write back. Matches
@@ -116,7 +133,7 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
         for (int i = 0; i < numLines; ++i)
         {
             const auto shelved = feedbackShelf[(size_t) i].processSample(mixed[(size_t) i]);
-            const auto injected = (i % 2 == 0) ? preL : preR;
+            const auto injected = (i % 2 == 0) ? tiltedL : tiltedR;
             const auto lineIn = shelved + injected;
             // NaN/Inf guard at the recirculation point - same convention as ShieldsFDNEngine/
             // IntruderFDNEngine: a poisoned sample must not be allowed to circulate forever.

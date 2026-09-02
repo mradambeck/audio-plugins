@@ -4,6 +4,7 @@
 
 #include "../../common/dsp/CircularDelayBuffer.h"
 #include "../../common/dsp/OnePoleFilter.h"
+#include "../../common/dsp/TiltFilter.h"
 
 // The AMS RMX16 "Ambience" reverb core: an 8-line Hadamard-mixed FDN, direct hand-port of
 // ml-toolkit/effects/ambience/model.py's AmbienceFDN (the model actually fit against 65 real
@@ -60,6 +61,12 @@ public:
     // real-time-engine equivalent.
     void setBandGains(float highBandGain, float lowBandGain);
     void setDampingWeight(float weight);
+
+    // Input-stage tilt (High's onset-tone effect - see the class comment's "Real bug found" note
+    // below). tiltDb is a DSP-ready coefficient (delta from the engine's own neutral baseline,
+    // matching IntruderParameterMap::mapTiltDbFromH's convention exactly), not a raw High value -
+    // AuraParameterMap::mapInputTiltDb() does that mapping.
+    void setInputTilt(float tiltDb);
 
     // In-place stereo process: L/R in, replaced with the wet signal out. Dry/wet mixing and
     // input/output gain happen in the processor, not here - same convention as Shields/Intruder.
@@ -122,6 +129,23 @@ private:
     wildjag::dsp::CircularDelayBuffer preDelayBufferL, preDelayBufferR;
     int preDelaySamples = 0;
     int maxPreDelaySamples = 1;
+
+    // Applied right after pre-delay, before injection into the tank - same placement/reasoning as
+    // IntruderFDNEngine's own input TiltFilter: "colors EVERYTHING downstream, matching
+    // findings.md's measurement that H's effect is present from the very first energy in the
+    // signal, not just the tank's tail." Pivot at 2kHz, matching analyze_irs.py's spectral-tilt
+    // measurement split, so the plugin's tilt lines up with what was actually measured.
+    //
+    // Real bug found via Phase D validation (2026-09-02): feedbackShelf alone produced ZERO
+    // difference in onset tilt between High=0 and High=-8 (measured identical, 9.906dB, on real
+    // renders) - it only touches the signal AFTER at least one feedback round trip, but the
+    // dry input is injected into each line unshelved on its first pass (`shelved + injected`,
+    // shelved comes from reading/processing the PREVIOUS state, injected is added raw). The very
+    // first tank arrivals - which dominate what gets measured as "onset tilt" - are pure unshelved
+    // injected signal, so a purely in-loop tilt mechanism structurally cannot affect onset content
+    // no matter how strong its gains are. This input-stage TiltFilter is the fix.
+    wildjag::dsp::TiltFilter inputTiltL, inputTiltR;
+    static constexpr float inputTiltPivotHz = 2000.0f;
 
     void updateLineLengths();
 };

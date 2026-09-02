@@ -1,5 +1,6 @@
 #include "../AuraParameterMap.h"
 #include "../AuraReferenceData.h"
+#include "../AuraOnsetTiltData.h"
 
 #include <juce_core/juce_core.h>
 
@@ -65,6 +66,48 @@ public:
                         "dampingWeight should stay in a physically sane range even when extrapolating");
                 }
             }
+        }
+
+        beginTest("mapInputTiltDb reproduces the measured points (as a delta from High=0) exactly at each measured High");
+        {
+            const auto neutralOnsetTiltDb = AuraOnsetTiltData::highToOnsetTiltDb.back().onsetTiltDb;
+            for (const auto& point : AuraOnsetTiltData::highToOnsetTiltDb)
+            {
+                bool extrapolated = true;
+                const auto result = AuraParameterMap::mapInputTiltDb(point.highDb, &extrapolated);
+                expectWithinAbsoluteError(result, point.onsetTiltDb - neutralOnsetTiltDb, 1.0e-4f);
+                expect(!extrapolated, "a measured High value should not be reported as extrapolated");
+            }
+
+            expectWithinAbsoluteError(AuraParameterMap::mapInputTiltDb(0.0f), 0.0f, 1.0e-4f,
+                "High=0 should map to exactly zero added coloration");
+        }
+
+        beginTest("mapInputTiltDb interpolates monotonically between measured points");
+        {
+            // AuraOnsetTiltData.h: onset tilt rises monotonically with High across the measured range.
+            float previous = AuraParameterMap::mapInputTiltDb(-8.0f);
+            for (float h = -7.5f; h <= 0.01f; h += 0.5f)
+            {
+                const auto current = AuraParameterMap::mapInputTiltDb(h);
+                expect(current >= previous, "onset tilt should never decrease as High increases");
+                previous = current;
+            }
+        }
+
+        beginTest("mapInputTiltDb flags extrapolation outside the measured -8..0dB range");
+        {
+            bool extrapolated = false;
+            AuraParameterMap::mapInputTiltDb(-12.0f, &extrapolated);
+            expect(extrapolated, "below the lowest measured High should be flagged as extrapolated");
+
+            extrapolated = false;
+            AuraParameterMap::mapInputTiltDb(3.0f, &extrapolated);
+            expect(extrapolated, "above the highest measured High should be flagged as extrapolated");
+
+            extrapolated = true;
+            AuraParameterMap::mapInputTiltDb(-4.0f, &extrapolated);
+            expect(!extrapolated, "within the measured range should not be flagged as extrapolated");
         }
     }
 };

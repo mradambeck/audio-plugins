@@ -157,6 +157,61 @@ public:
             expect(sameWindowWithPreDelay < firstArrivalNoPreDelay * 0.01f,
                 "at 50ms pre-delay, the same ~30ms window should still be essentially silent (first arrival not until ~80ms)");
         }
+
+        beginTest("Input tilt affects onset content, not just the tail (regression test for the Phase D bug)");
+        {
+            // Real bug found via Phase D validation: feedbackShelf alone produced ZERO onset-tilt
+            // difference between settings (measured identical on a real render) because it only
+            // touches the signal after a feedback round trip, while the dry input is injected
+            // unshelved on its first pass. This locks in that setInputTilt() actually reaches the
+            // very first tank arrival - see AuraFDNEngine.h's class comment for the full story.
+            AuraFDNEngine neutralTilt, darkTilt;
+            neutralTilt.prepare(sampleRate);
+            darkTilt.prepare(sampleRate);
+            neutralTilt.setBandGains(0.8f, 0.7f);
+            neutralTilt.setDampingWeight(0.3f);
+            neutralTilt.setInputTilt(0.0f);
+            darkTilt.setBandGains(0.8f, 0.7f);
+            darkTilt.setDampingWeight(0.3f);
+            darkTilt.setInputTilt(-8.0f); // bass up / treble down
+
+            constexpr int numSamples = 4000;
+            std::vector<float> neutralL(numSamples, 0.0f), neutralR(numSamples, 0.0f);
+            std::vector<float> darkL(numSamples, 0.0f), darkR(numSamples, 0.0f);
+            neutralL[0] = 1.0f; neutralR[0] = 1.0f;
+            darkL[0] = 1.0f; darkR[0] = 1.0f;
+            neutralTilt.processStereo(neutralL.data(), neutralR.data(), numSamples);
+            darkTilt.processStereo(darkL.data(), darkR.data(), numSamples);
+
+            // Crude one-pole 2kHz split of the first arrival window, just to confirm the two
+            // renders' bass/treble balance genuinely differs at onset - doesn't need to be exact,
+            // only needs to detect "some difference" vs the pre-fix "exactly zero difference".
+            // Starts at ~30ms (the shortest line's own delay - see the pre-delay test above for
+            // why there is no real tank output at all before that), not sample 0 - an earlier
+            // version of this test measured mostly pre-arrival silence and failed for that
+            // reason, not because the fix didn't work.
+            auto highToLowEnergyRatio = [sampleRate](const std::vector<float>& x)
+            {
+                double loE = 0.0, hiE = 0.0;
+                float lp = 0.0f;
+                const auto w = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi * 2000.0f / (float) sampleRate);
+                const auto start = (int) (0.029 * sampleRate);
+                const auto win = (int) (0.02 * sampleRate);
+                for (int i = start; i < start + win && i < (int) x.size(); ++i)
+                {
+                    lp += w * (x[(size_t) i] - lp);
+                    const auto hi = x[(size_t) i] - lp;
+                    loE += (double) lp * lp;
+                    hiE += (double) hi * hi;
+                }
+                return hiE / (loE + 1.0e-20);
+            };
+
+            const auto neutralRatio = highToLowEnergyRatio(neutralL);
+            const auto darkRatio = highToLowEnergyRatio(darkL);
+            expect(darkRatio < neutralRatio * 0.9,
+                "a -8dB input tilt should measurably darken the very first tank arrival, not just the tail");
+        }
     }
 };
 

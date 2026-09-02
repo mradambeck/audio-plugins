@@ -145,6 +145,7 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     const auto bandGains = AuraParameterMap::mapTimeAndHighToBandGains(timeSecondsParam->load(), highDbParam->load());
     engine.setBandGains(bandGains.highBandGain, bandGains.lowBandGain);
     engine.setDampingWeight(bandGains.dampingWeight);
+    engine.setInputTilt(AuraParameterMap::mapInputTiltDb(highDbParam->load()));
     engine.setPreDelayMs(preDelayMsParam->load());
 
     const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);

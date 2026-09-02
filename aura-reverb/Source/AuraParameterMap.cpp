@@ -1,5 +1,6 @@
 #include "AuraParameterMap.h"
 #include "AuraReferenceData.h"
+#include "AuraOnsetTiltData.h"
 #include "../../common/dsp/FittedCurve1D.h"
 
 namespace
@@ -10,6 +11,15 @@ namespace
         std::array<typename wildjag::dsp::FittedCurve1D<N>::Point, N> pts;
         for (size_t i = 0; i < N; ++i)
             pts[i] = { src[i].x, src[i].y };
+        return wildjag::dsp::FittedCurve1D<N>(pts);
+    }
+
+    template <size_t N>
+    wildjag::dsp::FittedCurve1D<N> toCurve(const std::array<AuraOnsetTiltData::HighToOnsetTiltPoint, N>& src)
+    {
+        std::array<typename wildjag::dsp::FittedCurve1D<N>::Point, N> pts;
+        for (size_t i = 0; i < N; ++i)
+            pts[i] = { src[i].highDb, src[i].onsetTiltDb };
         return wildjag::dsp::FittedCurve1D<N>(pts);
     }
 }
@@ -39,5 +49,15 @@ namespace AuraParameterMap
             *extrapolated = timeExtrapolated || highExtrapolated;
 
         return { highBandGain, lowBandGain, dampingWeight };
+    }
+
+    float mapInputTiltDb(float highDb, bool* extrapolated)
+    {
+        static const auto highToOnsetTilt = toCurve(AuraOnsetTiltData::highToOnsetTiltDb);
+
+        // Delta from the High=0 (neutral) reference point - see this function's declaration
+        // comment for why the absolute measured value can't be fed to TiltFilter directly.
+        const auto neutralOnsetTiltDb = AuraOnsetTiltData::highToOnsetTiltDb.back().onsetTiltDb;
+        return highToOnsetTilt.evaluate(highDb, extrapolated) - neutralOnsetTiltDb;
     }
 }

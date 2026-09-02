@@ -9,9 +9,11 @@
 //
 // Time and High are combined ADDITIVELY: value = timeCurve(time) + highOffsetCurve(high) - i.e.
 // High's effect is treated as a Time-independent offset from the Time curve's own High=0
-// baseline. Only one Time setting (2.3s) had a High sweep in the capture set, so this
-// Time-independence assumption is unconfirmed at other Time settings - see
-// ml-toolkit/effects/ambience/build_curves.py's "combination_model" note.
+// baseline. build_curves.py's curve itself was only built from the Time=2.3s High sweep, but a
+// direct re-check across all 6 available Time settings (2026-09-02) found High's onset-tilt
+// effect highly consistent across Time (std well under 0.05dB at every High - see
+// AuraOnsetTiltData.h) - the Time-independence assumption holds for onset tone. Not re-verified
+// for the band-gain curves' own decay-related Time-independence assumption specifically.
 namespace AuraParameterMap
 {
     struct BandGains
@@ -24,6 +26,14 @@ namespace AuraParameterMap
     // extrapolated, if non-null, is set true if EITHER timeSeconds or highDb fell outside its own
     // measured range (0.1-5.5s for Time, -8..0dB for High).
     BandGains mapTimeAndHighToBandGains(float timeSeconds, float highDb, bool* extrapolated = nullptr);
+
+    // High -> the input-stage TiltFilter coefficient that reproduces the measured onset spectral
+    // tilt (AuraOnsetTiltData.h), as a DELTA from the High=0 reference point - same convention and
+    // reasoning as IntruderParameterMap::mapTiltDbFromH (TiltFilter's own zero-point means "no
+    // added coloration", but the engine's raw signal has real inherent tilt even at High=0, so
+    // feeding it the absolute measured value would double-count that baseline). Separate from
+    // mapTimeAndHighToBandGains() - this drives AuraFDNEngine::setInputTilt(), not setBandGains().
+    float mapInputTiltDb(float highDb, bool* extrapolated = nullptr);
 
     // Low (-8..+6 on the real hardware) is NOT wired to anything below yet - deliberately, not an
     // oversight. The one place the capture grid lets its effect be isolated (Low=+5 vs Low=0,
