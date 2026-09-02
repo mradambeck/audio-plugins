@@ -36,12 +36,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
     // 0.1-5.5s is the measured range (ml-toolkit/effects/ambience/findings.md); extended to 8.0s
-    // for extrapolation headroom the same way Intruder's Decay extends past its own measured
-    // range. Close to literal seconds from ~1.1s up (see findings.md - unlike Intruder's own
-    // heavily-compressed Decay scale on the same hardware unit).
+    // for extrapolation headroom the same way Intruder's own Decay extends past its own measured
+    // range. Close to literal seconds from ~1.1s up (see findings.md). Displayed as "Decay" (Adam,
+    // 2026-09-02) even though the underlying parameter ID stays timeSeconds - unlike Intruder's
+    // OWN "Decay" control, which is a heavily-compressed display scale on the same hardware unit,
+    // Aura's is close to literal seconds; same label, different behavior, don't assume parity
+    // between the two plugins' "Decay" knobs just because they share a name.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{timeSecondsParamID, 1},
-        "Time",
+        "Decay",
         juce::NormalisableRange<float>(0.1f, 8.0f, 0.01f, 0.5f),
         2.0f,
         juce::AudioParameterFloatAttributes()
@@ -132,7 +135,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{inputGainDbParamID, 1},
-        "Gain",
+        "Input Gain",
         juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
         0.0f,
         juce::AudioParameterFloatAttributes()

@@ -17,13 +17,13 @@ namespace
 AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p)
 {
-    setupRotary(timeSlider, timeLabel, "Time", *this);
+    setupRotary(timeSlider, timeLabel, "Decay", *this);
     setupRotary(lowCutSlider, lowCutLabel, "Low Cut", *this);
     setupRotary(highSlider, highLabel, "High", *this);
     setupRotary(preDelaySlider, preDelayLabel, "Pre-Delay", *this);
     setupRotary(bitDepthSlider, bitDepthLabel, "Bit Depth", *this);
     setupRotary(mixSlider, mixLabel, "Blend", *this);
-    setupRotary(inputGainSlider, inputGainLabel, "Gain", *this);
+    setupRotary(inputGainSlider, inputGainLabel, "Input Gain", *this);
     setupRotary(outputGainSlider, outputGainLabel, "Volume", *this);
 
     addAndMakeVisible(bypassButton);

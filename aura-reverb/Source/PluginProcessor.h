@@ -4,8 +4,11 @@
 
 #include "AuraFDNEngine.h"
 
-// AMS RMX16 "Ambience" emulation. Parameter set matches the real unit's control set (Time, Low,
-// High) plus standard Mix/Gain/Pre-Delay/Bypass controls this catalog exposes on every reverb.
+// AMS RMX16 "Ambience" emulation. Decay and High match the real unit's own control set (displayed
+// as "Decay"/"High" - underlying param IDs stay timeSeconds/highDb, see their own comments in
+// createParameterLayout()), plus standard Blend/Input Gain/Volume/Pre-Delay/Bit Depth/Bypass
+// controls this catalog exposes on every reverb. Low Cut is NOT from the real hardware - see
+// AuraFDNEngine.h's setLowCutHz() comment for why the real unit's own "Low" knob was repurposed.
 // All DSP lives in AuraFDNEngine; this class is parameter plumbing and dry/wet mixing.
 class AuraAudioProcessor : public juce::AudioProcessor
 {
