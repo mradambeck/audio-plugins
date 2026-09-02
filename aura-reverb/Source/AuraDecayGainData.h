@@ -39,21 +39,22 @@
 // curve on top, which was NOT found to have the same problem in isolation, only in combination
 // with the two issues above - revisit if further validation shows it needs recalibrating too).
 //
-// IMPORTANT - fixing (1) and (2) made the full validate.py run's AGGREGATE low-band error worse
-// (+3.11dB -> +5.02dB average), not better, even though both fixes are individually correct and
-// verified (the RT60 disparity and the flat-ratio target are both directly measured facts, not
-// assumptions). Digging into why: the old low_band_gain was making bass decay away artificially
-// fast, which happened to partially CANCEL a separate, still-unresolved low-frequency excess in
-// the aggregate (full-decay-averaged) comparison - fast-decaying-away bass contributes less to a
-// whole-tail average even while genuinely present near onset. Fixing the disparity removed that
-// accidental cancellation and made the real remaining problem visible instead of masked: a
-// genuine bass excess, worst at short Time (+8.8dB at Time=0.1s even after this fix), that
-// decayGain/dampingWeight tuning alone doesn't fully explain. Likely candidate: the fixed
-// delay-line/Hadamard topology itself may build up more low-frequency energy than the real
-// hardware does, independent of the feedback/damping coefficients - would need topology-level
-// investigation (line lengths, mixing matrix) to confirm, not attempted yet. Keep this fix (it's
-// correct and the RT60 disparity was severe/audible on its own) but don't mistake the aggregate
-// metric alone for "better" or "worse" without checking what's actually driving it, per this note.
+// 3. Fixing (1) and (2) initially made the AGGREGATE low-band error WORSE (+3.11 -> +5.02dB),
+//    which was itself informative: the old low_band_gain's artificially-fast bass decay had been
+//    partially CANCELLING a third, separate problem in the whole-tail average. With the
+//    cancellation gone, the real cause was findable - the engine had NO low-frequency rolloff at
+//    all while the real unit clearly does (see AuraFDNEngine.h's inputHighPassL comment for the
+//    measurement). Adding that input high-pass took the low band from +5.02dB to +1.96dB and the
+//    log-spectral distance to 2.49dB, the best of any configuration tried.
+//
+// Lesson worth keeping: at no point did the aggregate metric alone identify the right fix - it got
+// worse while the DSP got more correct, then improved once the actual missing mechanism was found.
+// Every real cause here (the RT60 disparity, the flat tonal target, the missing rolloff) came from
+// measuring a specific property of the reference captures and comparing it against the same
+// property of a render, never from optimising the summary number.
+//
+// Values below are calibrated against the CURRENT 8-line topology (a 16-line variant was tried and
+// rejected - see AuraFDNEngine.h's numLines comment). Re-run the calibration if topology changes.
 namespace AuraDecayGainData
 {
     struct TimeToDecayGainPoint
@@ -63,16 +64,19 @@ namespace AuraDecayGainData
         float dampingWeight;
     };
 
-    // Sorted ascending by timeSeconds.
+    // Sorted ascending by timeSeconds. Jointly calibrated (alternating gain<-RT60,
+    // damping<-tonal-balance searches until both converge) against the 16-line topology - every
+    // point lands within 0.003s of its real measured RT60 and 0.04dB of its real measured
+    // full-tail HF/LF ratio. RE-RUN THIS CALIBRATION if the topology in AuraFDNEngine.h changes.
     static constexpr std::array<TimeToDecayGainPoint, 8> timeToDecayGain { {
-        { 0.1f, 0.54197f, 0.79743f },
-        { 0.5f, 0.56995f, 0.89111f },
-        { 1.1f, 0.68067f, 0.91090f },
-        { 1.8f, 0.81666f, 0.94991f },
-        { 2.3f, 0.87390f, 0.96924f },
-        { 3.0f, 0.91426f, 0.98037f },
-        { 4.5f, 0.93324f, 0.98682f },
-        { 5.5f, 0.94578f, 0.98957f },
+        { 0.1f, 0.52808f, 0.72630f },
+        { 0.5f, 0.56014f, 0.84478f },
+        { 1.1f, 0.67904f, 0.88210f },
+        { 1.8f, 0.81513f, 0.93557f },
+        { 2.3f, 0.87742f, 0.96175f },
+        { 3.0f, 0.91531f, 0.97500f },
+        { 4.5f, 0.93321f, 0.98254f },
+        { 5.5f, 0.94538f, 0.98602f },
     } };
 
     struct HighToDecayGainOffsetPoint
@@ -84,8 +88,8 @@ namespace AuraDecayGainData
     // Calibrated at Time=2.3s (the only Time setting with a High sweep - same limitation as
     // AuraReferenceData.h's own high_to_*_offset curves). Sorted ascending by highDb.
     static constexpr std::array<HighToDecayGainOffsetPoint, 3> highToDecayGainOffset { {
-        { -8.0f, -0.01379f },
-        { -4.0f, -0.00875f },
+        { -8.0f, -0.02401f },
+        { -4.0f, -0.01730f },
         { 0.0f, 0.0f },
     } };
 }

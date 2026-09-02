@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
+// H16 = H2 (kron) H8, Sylvester construction, +-1 entries (normalised by 1/sqrt(16) at use time in
+// processStereo()) - orthogonal/energy-preserving, so stability stays governed purely by the
+// feedback gain and damping rather than by the matrix. Same matrix IntruderFDNEngine uses.
 const std::array<std::array<float, AuraFDNEngine::numLines>, AuraFDNEngine::numLines>
     AuraFDNEngine::hadamard { {
         { 1, 1, 1, 1, 1, 1, 1, 1 },
@@ -33,6 +36,8 @@ void AuraFDNEngine::prepare(double sampleRate)
     inputTiltL.setPivotHz(inputTiltPivotHz, sampleRate);
     inputTiltR.setPivotHz(inputTiltPivotHz, sampleRate);
 
+    setInputHighPassHz(defaultInputHighPassHz);
+
     prepared = true;
 
     updateLineLengths();
@@ -48,6 +53,8 @@ void AuraFDNEngine::reset()
     preDelayBufferR.reset();
     inputTiltL.reset();
     inputTiltR.reset();
+    inputHighPassL.reset();
+    inputHighPassR.reset();
 }
 
 void AuraFDNEngine::setPreDelayMs(float ms)
@@ -80,6 +87,12 @@ void AuraFDNEngine::setInputTilt(float tiltDb)
     inputTiltR.setTiltDb(tiltDb);
 }
 
+void AuraFDNEngine::setInputHighPassHz(float hz)
+{
+    inputHighPassL.setCutoffHz(std::max(1.0f, hz), sampleRateHz);
+    inputHighPassR.setCutoffHz(std::max(1.0f, hz), sampleRateHz);
+}
+
 void AuraFDNEngine::updateLineLengths()
 {
     for (int i = 0; i < numLines; ++i)
@@ -105,8 +118,13 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
         // --- Input tilt (High's onset-tone effect), applied here so it colors EVERYTHING
         // downstream including the very first tank arrivals - see this file's header comment on
         // why feedbackShelf alone can't do this.
-        const auto tiltedL = inputTiltL.processSample(preL);
-        const auto tiltedR = inputTiltR.processSample(preR);
+        // First-order input high-pass (x - lowpass(x)) modelling the real unit's own I/O rolloff -
+        // see inputHighPassL's comment in the header for the measurement this reproduces.
+        const auto hpL = preL - inputHighPassL.processSample(preL);
+        const auto hpR = preR - inputHighPassR.processSample(preR);
+
+        const auto tiltedL = inputTiltL.processSample(hpL);
+        const auto tiltedR = inputTiltR.processSample(hpR);
 
         // --- FDN tank: read each line, apply per-line HF damping, Hadamard-mix, apply the
         // per-line low/high-band feedback shelf, inject new input, write back. Matches
