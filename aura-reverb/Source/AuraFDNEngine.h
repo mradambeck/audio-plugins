@@ -62,10 +62,19 @@
 //     possibly the capture chain. The filter stays because it's what measurably matches; only the
 //     stated cause was wrong.
 //
-//   - 16-bit converters, 18-bit quantisation, ~90dB dynamic range. NOT modelled yet. This is a
-//     character feature rather than a response error (it sits near/below the comparison noise
-//     floor, so no validation metric here would show it), and ShieldsFDNEngine's own bit-depth
-//     quantiser is the precedent to copy when it's wanted.
+//   - 16-bit converters, 18-bit quantisation, ~90dB dynamic range. MODELLED as a player-facing
+//     Bit Depth knob (setBitDepth(), 8-24 range, default 16) rather than baked in - copied from
+//     ShieldsFDNEngine's own bit-depth quantiser (same formula, same output-stage placement).
+//     Measured directly against the captures (findings.md's Quantization section, 2026-09-02):
+//     every long-decay capture's exponential tail bottoms out at almost exactly -90dB relative to
+//     its own peak before dropping into the capture chain's own (quieter, confirmed-lower) noise
+//     floor - that ceiling matches the supplied ~90dB spec and is what a real 16-bit-class
+//     converter delivers in practice (short of the ~98dB theoretical limit), hence the default of
+//     16. A literal step-lattice test on the raw 24-bit samples came back negative (GCD=1) - these
+//     are analog re-captures through the unit's own D/A and the interface's own A/D, which erases
+//     a literal digital step pattern even where one existed upstream - so this default is
+//     calibrated to the measured dynamic-range ceiling, not to directly-observed quantization
+//     grain.
 //
 //   - THD <0.03% (about -70dB). NOT modelled. An impulse response barely reveals THD, so there is
 //     nothing in the current capture set to calibrate a saturation stage against.
@@ -101,6 +110,16 @@ public:
     // (see inputHighPassL's comment). Exposed only so the calibration probe can sweep it; the
     // processor never calls this - the default from prepare() is the calibrated value.
     void setInputHighPassHz(float hz);
+
+    // Simulated quantization depth (8-24 bits) applied to the wet stereo output, reproducing the
+    // real unit's measured ~90dB dynamic-range ceiling (see the class comment's "16-bit
+    // converters" note) - same formula and output-stage placement as ShieldsFDNEngine::
+    // setBitDepth(). 24 is a GENUINE bypass (see bitDepthActive's comment), not just a
+    // near-transparent setting - float32's own mantissa is 24 bits, so quantizing to 24 "levels
+    // per bit" is not bit-identical to skipping the stage, and this class guarantees bit-identical
+    // output at the top of the range the same way ShieldsFDNEngine::lowCutActive guarantees a
+    // genuine no-op at its own floor.
+    void setBitDepth(float bits);
 
     // In-place stereo process: L/R in, replaced with the wet signal out. Dry/wet mixing and
     // input/output gain happen in the processor, not here - same convention as Shields/Intruder.
@@ -221,6 +240,18 @@ private:
     // track - that wobble is modal noise in a region where the captures have few modes and little
     // energy, not a shape worth chasing with a higher-order filter.
     static constexpr float defaultInputHighPassHz = 70.0f;
+
+    // Output-stage quantizer (see setBitDepth()'s comment). Deliberately NOT in the feedback loop:
+    // quantizing inside a recirculating path risks limit cycles (a tail settling into a nonzero
+    // ±1-LSB pattern that never reaches true silence instead of decaying away) rather than just
+    // adding grain. The output-only placement still reproduces the audible character, since the
+    // tail decays *through* this stage on its way out and picks up the same LSB structure - see
+    // AuraFDNEngineTests.cpp's "tail still decays to silence" test, which guards this specifically
+    // in case in-loop quantization is ever reconsidered. No dither: an undithered decaying tail is
+    // itself the era-correct grain this control exists to add, and dither wasn't standard practice
+    // on hardware of this vintage.
+    bool bitDepthActive = false;      // false <=> setBitDepth(24) or never called: genuine bypass
+    float bitDepthLevels = 8388608.0f; // 2^(24-1), matches setBitDepth(24.0f)'s levels if ever used
 
     void updateLineLengths();
 };

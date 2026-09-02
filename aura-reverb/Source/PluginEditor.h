@@ -19,12 +19,12 @@ public:
 private:
     AuraAudioProcessor& processorRef;
 
-    juce::Slider timeSlider, lowSlider, highSlider, preDelaySlider, mixSlider, inputGainSlider, outputGainSlider;
-    juce::Label timeLabel, lowLabel, highLabel, preDelayLabel, mixLabel, inputGainLabel, outputGainLabel;
+    juce::Slider timeSlider, lowSlider, highSlider, preDelaySlider, bitDepthSlider, mixSlider, inputGainSlider, outputGainSlider;
+    juce::Label timeLabel, lowLabel, highLabel, preDelayLabel, bitDepthLabel, mixLabel, inputGainLabel, outputGainLabel;
     juce::ToggleButton bypassButton { "Bypass" };
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> timeAttachment, lowAttachment,
-        highAttachment, preDelayAttachment, mixAttachment, inputGainAttachment, outputGainAttachment;
+        highAttachment, preDelayAttachment, bitDepthAttachment, mixAttachment, inputGainAttachment, outputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AuraAudioProcessorEditor)

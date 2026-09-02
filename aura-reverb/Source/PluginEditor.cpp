@@ -21,6 +21,7 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     setupRotary(lowSlider, lowLabel, "Low", *this);
     setupRotary(highSlider, highLabel, "High", *this);
     setupRotary(preDelaySlider, preDelayLabel, "Pre-Delay", *this);
+    setupRotary(bitDepthSlider, bitDepthLabel, "Bit Depth", *this);
     setupRotary(mixSlider, mixLabel, "Blend", *this);
     setupRotary(inputGainSlider, inputGainLabel, "Gain", *this);
     setupRotary(outputGainSlider, outputGainLabel, "Volume", *this);
@@ -32,12 +33,13 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     lowAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::lowDbParamID, lowSlider);
     highAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::highDbParamID, highSlider);
     preDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::preDelayMsParamID, preDelaySlider);
+    bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::bitDepthParamID, bitDepthSlider);
     mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::mixPercentParamID, mixSlider);
     inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::inputGainDbParamID, inputGainSlider);
     outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::outputGainDbParamID, outputGainSlider);
     bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, AuraAudioProcessor::bypassParamID, bypassButton);
 
-    setSize(560, 260);
+    setSize(640, 260);
 }
 
 AuraAudioProcessorEditor::~AuraAudioProcessorEditor() = default;
@@ -54,7 +56,7 @@ void AuraAudioProcessorEditor::paint(juce::Graphics& g)
 void AuraAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds().withTrimmedTop(30).reduced(10);
-    const auto knobWidth = area.getWidth() / 7;
+    const auto knobWidth = area.getWidth() / 8;
 
     auto layoutOne = [&](juce::Slider& slider, juce::Label& label)
     {
@@ -67,6 +69,7 @@ void AuraAudioProcessorEditor::resized()
     layoutOne(lowSlider, lowLabel);
     layoutOne(highSlider, highLabel);
     layoutOne(preDelaySlider, preDelayLabel);
+    layoutOne(bitDepthSlider, bitDepthLabel);
     layoutOne(mixSlider, mixLabel);
     layoutOne(inputGainSlider, inputGainLabel);
     layoutOne(outputGainSlider, outputGainLabel);

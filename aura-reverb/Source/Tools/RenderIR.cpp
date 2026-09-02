@@ -20,7 +20,8 @@
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
 //                [--timeSeconds 2.0] [--lowDb 0] [--highDb 0] [--preDelayMs 0]
-//                [--mixPercent 100] [--inputGainDb 0] [--outputGainDb 0] [--bypass 0]
+//                [--bitDepth 16] [--mixPercent 100] [--inputGainDb 0] [--outputGainDb 0]
+//                [--bypass 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs (PluginProcessor.h) in the plugin's own
 // native units - not normalised 0-1. Mix defaults to 100 (full wet) here, unlike the plugin's own
@@ -62,8 +63,8 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
             "                     [--timeSeconds 2.0] [--lowDb 0] [--highDb 0]\n"
-            "                     [--preDelayMs 0] [--mixPercent 100] [--inputGainDb 0]\n"
-            "                     [--outputGainDb 0] [--bypass 0]\n");
+            "                     [--preDelayMs 0] [--bitDepth 16] [--mixPercent 100]\n"
+            "                     [--inputGainDb 0] [--outputGainDb 0] [--bypass 0]\n");
         return 1;
     }
 
@@ -83,6 +84,7 @@ int main(int argc, char* argv[])
     setParam(processor, AuraAudioProcessor::lowDbParamID, getFloatArg(args, "lowDb", 0.0f));
     setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
     setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
+    setParam(processor, AuraAudioProcessor::bitDepthParamID, getFloatArg(args, "bitDepth", 16.0f));
     setParam(processor, AuraAudioProcessor::mixPercentParamID, getFloatArg(args, "mixPercent", 100.0f));
     setParam(processor, AuraAudioProcessor::inputGainDbParamID, getFloatArg(args, "inputGainDb", 0.0f));
     setParam(processor, AuraAudioProcessor::outputGainDbParamID, getFloatArg(args, "outputGainDb", 0.0f));

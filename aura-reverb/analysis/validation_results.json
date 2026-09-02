@@ -7,7 +7,7 @@
       "mid": 4.89,
       "high": 2.41
     },
-    "crest_factor_diff_db": -0.69,
+    "crest_factor_diff_db": -0.68,
     "spectral_flatness_diff_db": -3.0,
     "filename": "Ambience_0.1s_+3L-5H.wav",
     "time": 0.1,
@@ -23,7 +23,7 @@
       "high": 2.64
     },
     "crest_factor_diff_db": -1.13,
-    "spectral_flatness_diff_db": -5.47,
+    "spectral_flatness_diff_db": -5.46,
     "filename": "Ambience_0.1s_+5L-8H.wav",
     "time": 0.1,
     "low": 5,
@@ -31,14 +31,14 @@
   },
   {
     "envelope_correlation": 0.8804,
-    "log_spectral_distance_db": 5.194,
+    "log_spectral_distance_db": 5.193,
     "spectral_band_diff_db": {
       "low": 6.78,
       "mid": 4.89,
       "high": 2.4
     },
-    "crest_factor_diff_db": -0.22,
-    "spectral_flatness_diff_db": -4.33,
+    "crest_factor_diff_db": -0.24,
+    "spectral_flatness_diff_db": -4.31,
     "filename": "Ambience_0.1s_+6L-5H.wav",
     "time": 0.1,
     "low": 6,
@@ -52,7 +52,7 @@
       "mid": 5.02,
       "high": 2.57
     },
-    "crest_factor_diff_db": 0.89,
+    "crest_factor_diff_db": 0.88,
     "spectral_flatness_diff_db": -0.48,
     "filename": "Ambience_0.1s_-2L-2H.wav",
     "time": 0.1,
@@ -61,13 +61,13 @@
   },
   {
     "envelope_correlation": 0.8752,
-    "log_spectral_distance_db": 4.825,
+    "log_spectral_distance_db": 4.826,
     "spectral_band_diff_db": {
       "low": 5.65,
       "mid": 5.05,
       "high": 2.88
     },
-    "crest_factor_diff_db": 1.81,
+    "crest_factor_diff_db": 1.82,
     "spectral_flatness_diff_db": 0.0,
     "filename": "Ambience_0.1s_-4L0H.wav",
     "time": 0.1,
@@ -97,8 +97,8 @@
       "mid": 4.97,
       "high": 2.43
     },
-    "crest_factor_diff_db": 0.11,
-    "spectral_flatness_diff_db": -2.37,
+    "crest_factor_diff_db": 0.12,
+    "spectral_flatness_diff_db": -2.36,
     "filename": "Ambience_0.1s_0L-4H.wav",
     "time": 0.1,
     "low": 0,
@@ -110,10 +110,10 @@
     "spectral_band_diff_db": {
       "low": 5.88,
       "mid": 4.49,
-      "high": 2.64
+      "high": 2.63
     },
-    "crest_factor_diff_db": -2.22,
-    "spectral_flatness_diff_db": -3.2,
+    "crest_factor_diff_db": -2.21,
+    "spectral_flatness_diff_db": -3.19,
     "filename": "Ambience_0.1s_0L-8H.wav",
     "time": 0.1,
     "low": 0,
@@ -127,8 +127,8 @@
       "mid": 5.09,
       "high": 2.87
     },
-    "crest_factor_diff_db": 1.97,
-    "spectral_flatness_diff_db": 2.74,
+    "crest_factor_diff_db": 1.98,
+    "spectral_flatness_diff_db": 2.73,
     "filename": "Ambience_0.1s_0L0H.wav",
     "time": 0.1,
     "low": 0,
@@ -142,7 +142,7 @@
       "mid": 1.39,
       "high": -0.2
     },
-    "crest_factor_diff_db": -4.28,
+    "crest_factor_diff_db": -4.52,
     "spectral_flatness_diff_db": -0.79,
     "filename": "Ambience_0.5s_+3L-5H.wav",
     "time": 0.5,
@@ -151,14 +151,14 @@
   },
   {
     "envelope_correlation": 0.9493,
-    "log_spectral_distance_db": 3.352,
+    "log_spectral_distance_db": 3.353,
     "spectral_band_diff_db": {
       "low": 4.73,
       "mid": 1.09,
       "high": 0.05
     },
-    "crest_factor_diff_db": -4.06,
-    "spectral_flatness_diff_db": -2.11,
+    "crest_factor_diff_db": -4.35,
+    "spectral_flatness_diff_db": -2.08,
     "filename": "Ambience_0.5s_+5L-8H.wav",
     "time": 0.5,
     "low": 5,
@@ -173,7 +173,7 @@
       "high": -0.19
     },
     "crest_factor_diff_db": -4.35,
-    "spectral_flatness_diff_db": -0.38,
+    "spectral_flatness_diff_db": -0.37,
     "filename": "Ambience_0.5s_+6L-5H.wav",
     "time": 0.5,
     "low": 6,
@@ -181,14 +181,14 @@
   },
   {
     "envelope_correlation": 0.9558,
-    "log_spectral_distance_db": 3.642,
+    "log_spectral_distance_db": 3.643,
     "spectral_band_diff_db": {
       "low": 5.34,
       "mid": 1.42,
       "high": -0.15
     },
-    "crest_factor_diff_db": -4.13,
-    "spectral_flatness_diff_db": 0.3,
+    "crest_factor_diff_db": -2.87,
+    "spectral_flatness_diff_db": 0.31,
     "filename": "Ambience_0.5s_-2L-2H.wav",
     "time": 0.5,
     "low": -2,
@@ -202,8 +202,8 @@
       "mid": 1.43,
       "high": 0.07
     },
-    "crest_factor_diff_db": -2.9,
-    "spectral_flatness_diff_db": 0.88,
+    "crest_factor_diff_db": -1.23,
+    "spectral_flatness_diff_db": 0.89,
     "filename": "Ambience_0.5s_-4L0H.wav",
     "time": 0.5,
     "low": -4,
@@ -217,8 +217,8 @@
       "mid": 1.43,
       "high": 0.07
     },
-    "crest_factor_diff_db": -3.14,
-    "spectral_flatness_diff_db": 1.04,
+    "crest_factor_diff_db": -2.11,
+    "spectral_flatness_diff_db": 1.05,
     "filename": "Ambience_0.5s_-8L0H.wav",
     "time": 0.5,
     "low": -8,
@@ -232,7 +232,7 @@
       "mid": 1.45,
       "high": -0.23
     },
-    "crest_factor_diff_db": -4.54,
+    "crest_factor_diff_db": -4.62,
     "spectral_flatness_diff_db": -0.24,
     "filename": "Ambience_0.5s_0L-4H.wav",
     "time": 0.5,
@@ -247,8 +247,8 @@
       "mid": 1.09,
       "high": 0.05
     },
-    "crest_factor_diff_db": -3.98,
-    "spectral_flatness_diff_db": -2.11,
+    "crest_factor_diff_db": -4.27,
+    "spectral_flatness_diff_db": -2.08,
     "filename": "Ambience_0.5s_0L-8H.wav",
     "time": 0.5,
     "low": 0,
@@ -262,8 +262,8 @@
       "mid": 1.42,
       "high": 0.06
     },
-    "crest_factor_diff_db": -3.1,
-    "spectral_flatness_diff_db": 0.98,
+    "crest_factor_diff_db": -1.85,
+    "spectral_flatness_diff_db": 0.99,
     "filename": "Ambience_0.5s_0L0H.wav",
     "time": 0.5,
     "low": 0,
@@ -277,8 +277,8 @@
       "mid": -1.63,
       "high": -1.1
     },
-    "crest_factor_diff_db": 0.46,
-    "spectral_flatness_diff_db": 2.09,
+    "crest_factor_diff_db": 0.56,
+    "spectral_flatness_diff_db": 2.11,
     "filename": "Ambience_1.1s_+3L-5H.wav",
     "time": 1.1,
     "low": 3,
@@ -292,8 +292,8 @@
       "mid": -0.99,
       "high": -2.09
     },
-    "crest_factor_diff_db": -0.48,
-    "spectral_flatness_diff_db": -1.79,
+    "crest_factor_diff_db": 0.67,
+    "spectral_flatness_diff_db": -1.47,
     "filename": "Ambience_1.1s_+5L-8H.wav",
     "time": 1.1,
     "low": 5,
@@ -303,12 +303,12 @@
     "envelope_correlation": 0.9134,
     "log_spectral_distance_db": 2.84,
     "spectral_band_diff_db": {
-      "low": 2.4,
-      "mid": -0.99,
+      "low": 2.41,
+      "mid": -1.0,
       "high": -2.02
     },
-    "crest_factor_diff_db": -0.07,
-    "spectral_flatness_diff_db": -0.51,
+    "crest_factor_diff_db": -0.02,
+    "spectral_flatness_diff_db": -0.46,
     "filename": "Ambience_1.1s_+6L-7H.wav",
     "time": 1.1,
     "low": 6,
@@ -322,7 +322,7 @@
       "mid": -0.67,
       "high": -2.17
     },
-    "crest_factor_diff_db": -1.73,
+    "crest_factor_diff_db": -1.52,
     "spectral_flatness_diff_db": 0.75,
     "filename": "Ambience_1.1s_-2L-2H.wav",
     "time": 1.1,
@@ -337,8 +337,8 @@
       "mid": -0.67,
       "high": -1.95
     },
-    "crest_factor_diff_db": -1.42,
-    "spectral_flatness_diff_db": 0.15,
+    "crest_factor_diff_db": -0.1,
+    "spectral_flatness_diff_db": 0.16,
     "filename": "Ambience_1.1s_-4L0H.wav",
     "time": 1.1,
     "low": -4,
@@ -352,8 +352,8 @@
       "mid": -0.67,
       "high": -1.96
     },
-    "crest_factor_diff_db": -1.55,
-    "spectral_flatness_diff_db": 0.23,
+    "crest_factor_diff_db": -0.23,
+    "spectral_flatness_diff_db": 0.24,
     "filename": "Ambience_1.1s_-8L0H.wav",
     "time": 1.1,
     "low": -8,
@@ -367,8 +367,8 @@
       "mid": -0.65,
       "high": -2.28
     },
-    "crest_factor_diff_db": -1.05,
-    "spectral_flatness_diff_db": 0.28,
+    "crest_factor_diff_db": -1.15,
+    "spectral_flatness_diff_db": 0.3,
     "filename": "Ambience_1.1s_0L-4H.wav",
     "time": 1.1,
     "low": 0,
@@ -382,23 +382,23 @@
       "mid": -0.99,
       "high": -2.1
     },
-    "crest_factor_diff_db": -0.4,
-    "spectral_flatness_diff_db": -1.48,
+    "crest_factor_diff_db": 0.38,
+    "spectral_flatness_diff_db": -1.34,
     "filename": "Ambience_1.1s_0L-8H.wav",
     "time": 1.1,
     "low": 0,
     "high": -8
   },
   {
-    "envelope_correlation": 0.9255,
+    "envelope_correlation": 0.9256,
     "log_spectral_distance_db": 2.691,
     "spectral_band_diff_db": {
       "low": 1.91,
       "mid": -0.67,
       "high": -1.95
     },
-    "crest_factor_diff_db": -1.37,
-    "spectral_flatness_diff_db": 0.29,
+    "crest_factor_diff_db": -0.18,
+    "spectral_flatness_diff_db": 0.3,
     "filename": "Ambience_1.1s_0L0H.wav",
     "time": 1.1,
     "low": 0,
@@ -412,8 +412,8 @@
       "mid": -0.22,
       "high": -1.73
     },
-    "crest_factor_diff_db": 0.49,
-    "spectral_flatness_diff_db": 4.56,
+    "crest_factor_diff_db": 1.5,
+    "spectral_flatness_diff_db": 5.77,
     "filename": "Ambience_1.8s_+3L-5H.wav",
     "time": 1.8,
     "low": 3,
@@ -427,8 +427,8 @@
       "mid": -0.43,
       "high": -1.65
     },
-    "crest_factor_diff_db": 1.65,
-    "spectral_flatness_diff_db": 4.64,
+    "crest_factor_diff_db": 1.61,
+    "spectral_flatness_diff_db": 4.9,
     "filename": "Ambience_1.8s_+5L-8H.wav",
     "time": 1.8,
     "low": 5,
@@ -442,8 +442,8 @@
       "mid": -0.22,
       "high": -1.72
     },
-    "crest_factor_diff_db": 1.06,
-    "spectral_flatness_diff_db": 5.85,
+    "crest_factor_diff_db": 1.55,
+    "spectral_flatness_diff_db": 5.97,
     "filename": "Ambience_1.8s_+6L-5H.wav",
     "time": 1.8,
     "low": 6,
@@ -457,8 +457,8 @@
       "mid": -0.26,
       "high": -1.54
     },
-    "crest_factor_diff_db": 0.5,
-    "spectral_flatness_diff_db": 2.16,
+    "crest_factor_diff_db": 2.51,
+    "spectral_flatness_diff_db": 3.2,
     "filename": "Ambience_1.8s_-2L-2H.wav",
     "time": 1.8,
     "low": -2,
@@ -466,14 +466,14 @@
   },
   {
     "envelope_correlation": 0.948,
-    "log_spectral_distance_db": 1.769,
+    "log_spectral_distance_db": 1.77,
     "spectral_band_diff_db": {
       "low": 0.71,
       "mid": -0.25,
       "high": -1.36
     },
-    "crest_factor_diff_db": 0.58,
-    "spectral_flatness_diff_db": -0.02,
+    "crest_factor_diff_db": 1.94,
+    "spectral_flatness_diff_db": -0.01,
     "filename": "Ambience_1.8s_-4L0H.wav",
     "time": 1.8,
     "low": -4,
@@ -487,8 +487,8 @@
       "mid": -0.25,
       "high": -1.35
     },
-    "crest_factor_diff_db": 0.65,
-    "spectral_flatness_diff_db": 0.08,
+    "crest_factor_diff_db": 1.99,
+    "spectral_flatness_diff_db": 0.09,
     "filename": "Ambience_1.8s_-8L0H.wav",
     "time": 1.8,
     "low": -8,
@@ -496,14 +496,14 @@
   },
   {
     "envelope_correlation": 0.9353,
-    "log_spectral_distance_db": 2.207,
+    "log_spectral_distance_db": 2.206,
     "spectral_band_diff_db": {
       "low": 2.0,
       "mid": -0.19,
       "high": -1.69
     },
-    "crest_factor_diff_db": 0.79,
-    "spectral_flatness_diff_db": 4.7,
+    "crest_factor_diff_db": 1.63,
+    "spectral_flatness_diff_db": 4.81,
     "filename": "Ambience_1.8s_0L-4H.wav",
     "time": 1.8,
     "low": 0,
@@ -517,8 +517,8 @@
       "mid": -0.44,
       "high": -1.66
     },
-    "crest_factor_diff_db": 0.96,
-    "spectral_flatness_diff_db": 3.84,
+    "crest_factor_diff_db": 1.55,
+    "spectral_flatness_diff_db": 5.11,
     "filename": "Ambience_1.8s_0L-8H.wav",
     "time": 1.8,
     "low": 0,
@@ -528,11 +528,11 @@
     "envelope_correlation": 0.9467,
     "log_spectral_distance_db": 1.769,
     "spectral_band_diff_db": {
-      "low": 0.66,
+      "low": 0.67,
       "mid": -0.26,
       "high": -1.36
     },
-    "crest_factor_diff_db": 0.69,
+    "crest_factor_diff_db": 1.79,
     "spectral_flatness_diff_db": 0.37,
     "filename": "Ambience_1.8s_0L0H.wav",
     "time": 1.8,
@@ -547,8 +547,8 @@
       "mid": -0.09,
       "high": -1.29
     },
-    "crest_factor_diff_db": 0.74,
-    "spectral_flatness_diff_db": 5.24,
+    "crest_factor_diff_db": 1.62,
+    "spectral_flatness_diff_db": 5.98,
     "filename": "Ambience_2.3s_+3L-5H.wav",
     "time": 2.3,
     "low": 3,
@@ -562,8 +562,8 @@
       "mid": -0.2,
       "high": -1.33
     },
-    "crest_factor_diff_db": 1.42,
-    "spectral_flatness_diff_db": 6.27,
+    "crest_factor_diff_db": 2.35,
+    "spectral_flatness_diff_db": 8.94,
     "filename": "Ambience_2.3s_+5L-8H.wav",
     "time": 2.3,
     "low": 5,
@@ -577,23 +577,23 @@
       "mid": -0.08,
       "high": -1.28
     },
-    "crest_factor_diff_db": 0.99,
-    "spectral_flatness_diff_db": 5.95,
+    "crest_factor_diff_db": 1.94,
+    "spectral_flatness_diff_db": 7.38,
     "filename": "Ambience_2.3s_+6L-5H.wav",
     "time": 2.3,
     "low": 6,
     "high": -5
   },
   {
-    "envelope_correlation": 0.9579,
-    "log_spectral_distance_db": 1.386,
+    "envelope_correlation": 0.9578,
+    "log_spectral_distance_db": 1.385,
     "spectral_band_diff_db": {
       "low": 0.22,
       "mid": -0.22,
       "high": -1.09
     },
-    "crest_factor_diff_db": 0.76,
-    "spectral_flatness_diff_db": 4.99,
+    "crest_factor_diff_db": 1.97,
+    "spectral_flatness_diff_db": 5.07,
     "filename": "Ambience_2.3s_-2L-2H.wav",
     "time": 2.3,
     "low": -2,
@@ -607,8 +607,8 @@
       "mid": -0.14,
       "high": -0.99
     },
-    "crest_factor_diff_db": 0.49,
-    "spectral_flatness_diff_db": -0.73,
+    "crest_factor_diff_db": 1.9,
+    "spectral_flatness_diff_db": -0.71,
     "filename": "Ambience_2.3s_-4L0H.wav",
     "time": 2.3,
     "low": -4,
@@ -622,8 +622,8 @@
       "mid": -0.15,
       "high": -1.0
     },
-    "crest_factor_diff_db": 0.42,
-    "spectral_flatness_diff_db": -0.17,
+    "crest_factor_diff_db": 1.62,
+    "spectral_flatness_diff_db": -0.16,
     "filename": "Ambience_2.3s_-8L0H.wav",
     "time": 2.3,
     "low": -8,
@@ -637,8 +637,8 @@
       "mid": -0.09,
       "high": -1.24
     },
-    "crest_factor_diff_db": 0.47,
-    "spectral_flatness_diff_db": 4.37,
+    "crest_factor_diff_db": 1.49,
+    "spectral_flatness_diff_db": 4.74,
     "filename": "Ambience_2.3s_0L-4H.wav",
     "time": 2.3,
     "low": 0,
@@ -652,8 +652,8 @@
       "mid": -0.22,
       "high": -1.35
     },
-    "crest_factor_diff_db": 0.87,
-    "spectral_flatness_diff_db": 4.11,
+    "crest_factor_diff_db": 1.64,
+    "spectral_flatness_diff_db": 6.47,
     "filename": "Ambience_2.3s_0L-8H.wav",
     "time": 2.3,
     "low": 0,
@@ -667,7 +667,7 @@
       "mid": -0.14,
       "high": -0.99
     },
-    "crest_factor_diff_db": 0.45,
+    "crest_factor_diff_db": 1.71,
     "spectral_flatness_diff_db": -0.38,
     "filename": "Ambience_2.3s_0L0H.wav",
     "time": 2.3,
@@ -682,8 +682,8 @@
       "mid": 0.09,
       "high": -1.15
     },
-    "crest_factor_diff_db": 1.23,
-    "spectral_flatness_diff_db": -0.47,
+    "crest_factor_diff_db": 2.08,
+    "spectral_flatness_diff_db": 10.17,
     "filename": "Ambience_3.0s_+5L-8H.wav",
     "time": 3.0,
     "low": 5,
@@ -697,8 +697,8 @@
       "mid": 0.12,
       "high": -0.99
     },
-    "crest_factor_diff_db": 0.88,
-    "spectral_flatness_diff_db": 7.61,
+    "crest_factor_diff_db": 1.79,
+    "spectral_flatness_diff_db": 9.56,
     "filename": "Ambience_3.0s_+6L-5H.wav",
     "time": 3.0,
     "low": 6,
@@ -712,23 +712,23 @@
       "mid": -0.09,
       "high": -0.79
     },
-    "crest_factor_diff_db": 0.46,
-    "spectral_flatness_diff_db": 9.06,
+    "crest_factor_diff_db": 1.39,
+    "spectral_flatness_diff_db": 9.13,
     "filename": "Ambience_3.0s_-2L-2H.wav",
     "time": 3.0,
     "low": -2,
     "high": -2
   },
   {
-    "envelope_correlation": 0.9708,
-    "log_spectral_distance_db": 1.224,
+    "envelope_correlation": 0.9707,
+    "log_spectral_distance_db": 1.223,
     "spectral_band_diff_db": {
       "low": -0.42,
       "mid": 0.02,
       "high": -0.77
     },
-    "crest_factor_diff_db": 0.02,
-    "spectral_flatness_diff_db": -0.22,
+    "crest_factor_diff_db": 1.29,
+    "spectral_flatness_diff_db": -0.21,
     "filename": "Ambience_3.0s_-4L0H.wav",
     "time": 3.0,
     "low": -4,
@@ -736,13 +736,13 @@
   },
   {
     "envelope_correlation": 0.9702,
-    "log_spectral_distance_db": 1.203,
+    "log_spectral_distance_db": 1.202,
     "spectral_band_diff_db": {
       "low": -0.12,
       "mid": 0.04,
       "high": -0.78
     },
-    "crest_factor_diff_db": 0.04,
+    "crest_factor_diff_db": 1.17,
     "spectral_flatness_diff_db": 0.21,
     "filename": "Ambience_3.0s_-8L0H.wav",
     "time": 3.0,
@@ -757,8 +757,8 @@
       "mid": 0.08,
       "high": -0.94
     },
-    "crest_factor_diff_db": 0.32,
-    "spectral_flatness_diff_db": 5.84,
+    "crest_factor_diff_db": 1.27,
+    "spectral_flatness_diff_db": 7.03,
     "filename": "Ambience_3.0s_0L-4H.wav",
     "time": 3.0,
     "low": 0,
@@ -772,8 +772,8 @@
       "mid": 0.06,
       "high": -1.19
     },
-    "crest_factor_diff_db": 1.15,
-    "spectral_flatness_diff_db": 2.04,
+    "crest_factor_diff_db": 1.84,
+    "spectral_flatness_diff_db": 8.97,
     "filename": "Ambience_3.0s_0L-8H.wav",
     "time": 3.0,
     "low": 0,
@@ -787,7 +787,7 @@
       "mid": 0.04,
       "high": -0.76
     },
-    "crest_factor_diff_db": 0.11,
+    "crest_factor_diff_db": 1.13,
     "spectral_flatness_diff_db": 0.36,
     "filename": "Ambience_3.0s_0L0H.wav",
     "time": 3.0,
@@ -802,8 +802,8 @@
       "mid": 0.05,
       "high": -0.89
     },
-    "crest_factor_diff_db": 1.3,
-    "spectral_flatness_diff_db": -0.88,
+    "crest_factor_diff_db": 2.2,
+    "spectral_flatness_diff_db": 12.47,
     "filename": "Ambience_4.5_+5L-8H.wav",
     "time": 4.5,
     "low": 5,
@@ -817,8 +817,8 @@
       "mid": -0.01,
       "high": -0.75
     },
-    "crest_factor_diff_db": 0.29,
-    "spectral_flatness_diff_db": 0.89,
+    "crest_factor_diff_db": 1.46,
+    "spectral_flatness_diff_db": 7.28,
     "filename": "Ambience_4.5s_+3L-5H.wav",
     "time": 4.5,
     "low": 3,
@@ -832,8 +832,8 @@
       "mid": 0.1,
       "high": -0.79
     },
-    "crest_factor_diff_db": 0.06,
-    "spectral_flatness_diff_db": -4.52,
+    "crest_factor_diff_db": 1.03,
+    "spectral_flatness_diff_db": -4.19,
     "filename": "Ambience_4.5s_-2L-2H.wav",
     "time": 4.5,
     "low": -2,
@@ -847,7 +847,7 @@
       "mid": -0.02,
       "high": -0.68
     },
-    "crest_factor_diff_db": 0.16,
+    "crest_factor_diff_db": 1.05,
     "spectral_flatness_diff_db": -0.28,
     "filename": "Ambience_4.5s_-5L0H.wav",
     "time": 4.5,
@@ -862,8 +862,8 @@
       "mid": -0.02,
       "high": -0.77
     },
-    "crest_factor_diff_db": 0.31,
-    "spectral_flatness_diff_db": 3.14,
+    "crest_factor_diff_db": 1.35,
+    "spectral_flatness_diff_db": 7.23,
     "filename": "Ambience_4.5s_0L-5H.wav",
     "time": 4.5,
     "low": 0,
@@ -877,8 +877,8 @@
       "mid": -0.04,
       "high": -0.67
     },
-    "crest_factor_diff_db": 0.19,
-    "spectral_flatness_diff_db": -0.94,
+    "crest_factor_diff_db": 1.17,
+    "spectral_flatness_diff_db": -0.93,
     "filename": "Ambience_4.5s_0L0H.wav",
     "time": 4.5,
     "low": 0,
@@ -892,8 +892,8 @@
       "mid": 0.03,
       "high": -0.6
     },
-    "crest_factor_diff_db": -0.67,
-    "spectral_flatness_diff_db": -7.08,
+    "crest_factor_diff_db": 0.3,
+    "spectral_flatness_diff_db": -4.97,
     "filename": "Ambience_5.5s_+2L-3H.wav",
     "time": 5.5,
     "low": 2,
@@ -907,8 +907,8 @@
       "mid": 0.04,
       "high": -0.64
     },
-    "crest_factor_diff_db": 0.99,
-    "spectral_flatness_diff_db": -6.53,
+    "crest_factor_diff_db": 1.86,
+    "spectral_flatness_diff_db": 11.33,
     "filename": "Ambience_5.5s_+5L-8H.wav",
     "time": 5.5,
     "low": 5,
@@ -922,8 +922,8 @@
       "mid": 0.16,
       "high": -0.71
     },
-    "crest_factor_diff_db": -0.1,
-    "spectral_flatness_diff_db": -5.13,
+    "crest_factor_diff_db": 0.84,
+    "spectral_flatness_diff_db": -4.76,
     "filename": "Ambience_5.5s_-2L-2H.wav",
     "time": 5.5,
     "low": -2,
@@ -937,7 +937,7 @@
       "mid": 0.02,
       "high": -0.62
     },
-    "crest_factor_diff_db": 0.13,
+    "crest_factor_diff_db": 0.07,
     "spectral_flatness_diff_db": 0.1,
     "filename": "Ambience_5.5s_-3L0H.wav",
     "time": 5.5,
@@ -949,10 +949,10 @@
     "log_spectral_distance_db": 1.27,
     "spectral_band_diff_db": {
       "low": -0.21,
-      "mid": 0.04,
+      "mid": 0.05,
       "high": -0.63
     },
-    "crest_factor_diff_db": 0.19,
+    "crest_factor_diff_db": 1.06,
     "spectral_flatness_diff_db": -0.04,
     "filename": "Ambience_5.5s_-7L0H.wav",
     "time": 5.5,
@@ -967,8 +967,8 @@
       "mid": 0.02,
       "high": -0.61
     },
-    "crest_factor_diff_db": 0.23,
-    "spectral_flatness_diff_db": -0.07,
+    "crest_factor_diff_db": 0.67,
+    "spectral_flatness_diff_db": -0.06,
     "filename": "Ambience_5.5s_0L0H.wav",
     "time": 5.5,
     "low": 0,

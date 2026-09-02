@@ -45,6 +45,7 @@ public:
     static constexpr auto lowDbParamID = "lowDb";
     static constexpr auto highDbParamID = "highDb";
     static constexpr auto preDelayMsParamID = "preDelayMs";
+    static constexpr auto bitDepthParamID = "bitDepth";
     static constexpr auto mixPercentParamID = "mixPercent";
     static constexpr auto inputGainDbParamID = "inputGainDb";
     static constexpr auto outputGainDbParamID = "outputGainDb";
@@ -57,6 +58,7 @@ private:
     std::atomic<float>* lowDbParam = nullptr;
     std::atomic<float>* highDbParam = nullptr;
     std::atomic<float>* preDelayMsParam = nullptr;
+    std::atomic<float>* bitDepthParam = nullptr;
     std::atomic<float>* mixPercentParam = nullptr;
     std::atomic<float>* inputGainDbParam = nullptr;
     std::atomic<float>* outputGainDbParam = nullptr;

@@ -70,6 +70,7 @@ def render_plugin(time_seconds, high_db, seconds, out_path):
         "--timeSeconds", str(time_seconds),
         "--highDb", str(high_db),
         "--mixPercent", "100",
+        "--bitDepth", os.environ.get("AURA_VALIDATE_BIT_DEPTH", "16"),
     ]
     subprocess.run(cmd, check=True, capture_output=True)
 

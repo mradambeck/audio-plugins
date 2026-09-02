@@ -212,6 +212,87 @@ public:
             expect(darkRatio < neutralRatio * 0.9,
                 "a -8dB input tilt should measurably darken the very first tank arrival, not just the tail");
         }
+
+        beginTest("Bit Depth at 24 is a genuine bypass (bit-identical output)");
+        {
+            // setBitDepth(24) must not just be "very transparent" - float32's own mantissa is 24
+            // bits, so round(x * 2^23) / 2^23 is NOT bit-identical to skipping the stage near full
+            // scale. This locks in the explicit bitDepthActive bypass (see AuraFDNEngine.h).
+            AuraFDNEngine untouched, explicitOff;
+            untouched.prepare(sampleRate);
+            explicitOff.prepare(sampleRate);
+            untouched.setBandGains(0.9f, 0.85f);
+            untouched.setDampingWeight(0.3f);
+            explicitOff.setBandGains(0.9f, 0.85f);
+            explicitOff.setDampingWeight(0.3f);
+            explicitOff.setBitDepth(24.0f);
+
+            constexpr int numSamples = 4000;
+            std::vector<float> aL(numSamples, 0.0f), aR(numSamples, 0.0f);
+            std::vector<float> bL(numSamples, 0.0f), bR(numSamples, 0.0f);
+            aL[0] = 1.0f; aR[0] = 1.0f;
+            bL[0] = 1.0f; bR[0] = 1.0f;
+            untouched.processStereo(aL.data(), aR.data(), numSamples);
+            explicitOff.processStereo(bL.data(), bR.data(), numSamples);
+
+            float maxAbsDiff = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+                maxAbsDiff = std::max({maxAbsDiff, std::abs(aL[(size_t) i] - bL[(size_t) i]),
+                                        std::abs(aR[(size_t) i] - bR[(size_t) i])});
+            expectEquals(maxAbsDiff, 0.0f, "setBitDepth(24) must render bit-identically to never calling setBitDepth at all");
+        }
+
+        beginTest("Bit Depth below 24 quantizes output onto an exact step lattice");
+        {
+            AuraFDNEngine engine;
+            engine.prepare(sampleRate);
+            engine.setBandGains(0.9f, 0.85f);
+            engine.setDampingWeight(0.3f);
+            engine.setBitDepth(8.0f); // coarse enough that step size is easy to check exactly
+
+            constexpr int numSamples = 4000;
+            const auto envelope = renderImpulseEnvelope(engine, numSamples);
+            expect(!hasNaNOrInf(envelope), "quantized output must stay finite");
+
+            constexpr float levels = 128.0f; // 2^(8-1)
+            constexpr float step = 1.0f / levels;
+            std::vector<float> left(numSamples, 0.0f), right(numSamples, 0.0f);
+            left[0] = 1.0f; right[0] = 1.0f;
+            AuraFDNEngine reQuantized;
+            reQuantized.prepare(sampleRate);
+            reQuantized.setBandGains(0.9f, 0.85f);
+            reQuantized.setDampingWeight(0.3f);
+            reQuantized.setBitDepth(8.0f);
+            reQuantized.processStereo(left.data(), right.data(), numSamples);
+
+            bool allOnLattice = true;
+            for (int i = 0; i < numSamples && allOnLattice; ++i)
+            {
+                const auto steps = left[(size_t) i] / step;
+                allOnLattice = std::abs(steps - std::round(steps)) < 1.0e-4f;
+            }
+            expect(allOnLattice, "every output sample at 8-bit depth must be an exact multiple of 1/128");
+        }
+
+        beginTest("A quantized tail still decays to silence (no limit cycle)");
+        {
+            // Guards against ever moving the quantizer in-loop: quantizing inside the feedback
+            // path risks a tail settling into a nonzero +-1 LSB oscillation instead of reaching
+            // true silence. Placement is output-stage-only today (see AuraFDNEngine.h) - this test
+            // documents why, and would catch a regression if that ever changed.
+            AuraFDNEngine engine;
+            engine.prepare(sampleRate);
+            engine.setBandGains(0.94538f, 0.94538f); // AuraDecayGainData's own Time=5.5s value
+            engine.setDampingWeight(0.98602f);
+            engine.setBitDepth(8.0f); // coarsest available depth - worst case for limit cycles
+
+            constexpr int numSamples = (int) (10.0 * sampleRate);
+            const auto envelope = renderImpulseEnvelope(engine, numSamples);
+            expect(!hasNaNOrInf(envelope), "quantized long tail must stay finite");
+
+            const auto tailPeak = peakInWindow(envelope, 9.75, sampleRate, 0.5);
+            expect(tailPeak < 1.0e-3f, "a 10s render at Time=5.5s settings must have decayed to silence by the last 0.5s, even quantized");
+        }
     }
 };
 

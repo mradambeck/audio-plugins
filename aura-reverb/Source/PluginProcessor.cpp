@@ -22,6 +22,7 @@ AuraAudioProcessor::AuraAudioProcessor()
     lowDbParam = apvts.getRawParameterValue(lowDbParamID);
     highDbParam = apvts.getRawParameterValue(highDbParamID);
     preDelayMsParam = apvts.getRawParameterValue(preDelayMsParamID);
+    bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
     mixPercentParam = apvts.getRawParameterValue(mixPercentParamID);
     inputGainDbParam = apvts.getRawParameterValue(inputGainDbParamID);
     outputGainDbParam = apvts.getRawParameterValue(outputGainDbParamID);
@@ -83,6 +84,39 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
         juce::AudioParameterFloatAttributes()
             .withLabel("ms")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " ms"; })));
+
+    // 8-24, default 16: reproduces the real unit's measured ~90dB dynamic-range ceiling (see
+    // AuraFDNEngine.h's "16-bit converters" note and findings.md's Quantization section,
+    // 2026-09-02 - the captures' own decay tails bottom out at -89..-95dB before the capture
+    // chain's noise floor takes over, matching what a real 16-bit-class converter delivers in
+    // practice). 24 is a GENUINE bypass (AuraFDNEngine::bitDepthActive), matching the
+    // "off at the default" contract ShieldsFDNEngine's own Bit Depth control - and its Low Cut,
+    // Wobble - already establish, except Aura's default sits mid-range rather than at the
+    // transparent end, since 16 is what the real hardware actually measures as.
+    //
+    // Full 65-capture Phase D re-validation at this default vs. bypass (2026-09-02): log-spectral
+    // distance, per-band EQ balance and envelope correlation are all UNCHANGED (2.49dB/+1.96dB/
+    // 0.938 either way - -90dB grain is far below what those whole-tail metrics can resolve).
+    // Crest-factor diff improved (-0.38dB -> +0.26dB, closer to zero). Spectral-flatness diff got
+    // WORSE (+1.06dB -> +1.85dB, i.e. further from matching): undithered quantization adds
+    // broadband (maximally flat) grain to the tail, and the plugin's tail already read flatter/
+    // more diffuse than the real hardware's own more-tonal decay before this was added, so the
+    // grain pushes further the wrong way on that one metric. Unlike ShieldsFDNEngine's default of
+    // 13 (chosen BECAUSE grain measurably improved its LSD match), Aura's default of 16 is NOT a
+    // validation-metric win - it's chosen because it's what the real hardware measures as,
+    // consistent with this project's standing rule that the aggregate metric doesn't get the last
+    // word (see AuraDecayGainData.h's whole "Lesson worth keeping" note). If the flatness
+    // direction ever turns out to matter more than dynamic-range accuracy on further (by-ear)
+    // listening, reconsider the default - not the mechanism.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{bitDepthParamID, 1},
+        "Bit Depth",
+        juce::NormalisableRange<float>(8.0f, 24.0f, 0.1f),
+        16.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("bit")
+            .withStringFromValueFunction([](float v, int) {
+                return v >= 24.0f ? juce::String("Off") : juce::String(v, 1) + " bit"; })));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{mixPercentParamID, 1},
@@ -150,6 +184,7 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setDampingWeight(decayParams.dampingWeight);
     engine.setInputTilt(AuraParameterMap::mapInputTiltDb(highDbParam->load()));
     engine.setPreDelayMs(preDelayMsParam->load());
+    engine.setBitDepth(bitDepthParam->load());
 
     const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);
     const auto outputGain = std::pow(10.0f, outputGainDbParam->load() / 20.0f);

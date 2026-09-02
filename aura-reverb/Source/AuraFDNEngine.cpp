@@ -93,6 +93,13 @@ void AuraFDNEngine::setInputHighPassHz(float hz)
     inputHighPassR.setCutoffHz(std::max(1.0f, hz), sampleRateHz);
 }
 
+void AuraFDNEngine::setBitDepth(float bits)
+{
+    const auto clamped = std::clamp(bits, 8.0f, 24.0f);
+    bitDepthActive = clamped < 24.0f; // see the header's bitDepthActive comment on why this matters
+    bitDepthLevels = std::pow(2.0f, clamped - 1.0f);
+}
+
 void AuraFDNEngine::updateLineLengths()
 {
     for (int i = 0; i < numLines; ++i)
@@ -165,7 +172,18 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
             else tankR += lineOut[(size_t) i];
         }
         constexpr float tankNorm = 0.5f; // 1/sqrt(4) - 4 lines summed per channel
-        left[n] = tankL * tankNorm;
-        right[n] = tankR * tankNorm;
+        auto outL = tankL * tankNorm;
+        auto outR = tankR * tankNorm;
+
+        // --- Output-stage quantization (Bit Depth) - see setBitDepth()'s and bitDepthActive's
+        // comments for why this is a genuine bypass at 24, not just a near-transparent setting.
+        if (bitDepthActive)
+        {
+            outL = std::round(outL * bitDepthLevels) / bitDepthLevels;
+            outR = std::round(outR * bitDepthLevels) / bitDepthLevels;
+        }
+
+        left[n] = outL;
+        right[n] = outR;
     }
 }
