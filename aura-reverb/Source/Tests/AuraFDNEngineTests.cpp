@@ -293,6 +293,87 @@ public:
             const auto tailPeak = peakInWindow(envelope, 9.75, sampleRate, 0.5);
             expect(tailPeak < 1.0e-3f, "a 10s render at Time=5.5s settings must have decayed to silence by the last 0.5s, even quantized");
         }
+
+        beginTest("Low Cut at 0Hz is a genuine bypass (bit-identical output)");
+        {
+            // Mirrors the Bit Depth bypass test: setLowCutHz(0) must not just be "very
+            // transparent" - it must be an explicit no-op (AuraFDNEngine::lowCutActive), not a
+            // filter running with a near-zero coefficient.
+            AuraFDNEngine untouched, explicitOff;
+            untouched.prepare(sampleRate);
+            explicitOff.prepare(sampleRate);
+            untouched.setBandGains(0.9f, 0.85f);
+            untouched.setDampingWeight(0.3f);
+            explicitOff.setBandGains(0.9f, 0.85f);
+            explicitOff.setDampingWeight(0.3f);
+            explicitOff.setLowCutHz(0.0f);
+
+            constexpr int numSamples = 4000;
+            std::vector<float> aL(numSamples, 0.0f), aR(numSamples, 0.0f);
+            std::vector<float> bL(numSamples, 0.0f), bR(numSamples, 0.0f);
+            aL[0] = 1.0f; aR[0] = 1.0f;
+            bL[0] = 1.0f; bR[0] = 1.0f;
+            untouched.processStereo(aL.data(), aR.data(), numSamples);
+            explicitOff.processStereo(bL.data(), bR.data(), numSamples);
+
+            float maxAbsDiff = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+                maxAbsDiff = std::max({maxAbsDiff, std::abs(aL[(size_t) i] - bL[(size_t) i]),
+                                        std::abs(aR[(size_t) i] - bR[(size_t) i])});
+            expectEquals(maxAbsDiff, 0.0f, "setLowCutHz(0) must render bit-identically to never calling setLowCutHz at all");
+        }
+
+        beginTest("Low Cut removes low-frequency content from the very first tank arrival");
+        {
+            // Applied before pre-delay/the tank (see AuraFDNEngine.h's setLowCutHz() comment), so
+            // - unlike the old, in-loop-only feedbackShelf tilt bug this project already hit once
+            // (see the input-tilt regression test above) - this MUST show up at the very first
+            // arrival, not just in the tail.
+            AuraFDNEngine noCut, withCut;
+            noCut.prepare(sampleRate);
+            withCut.prepare(sampleRate);
+            noCut.setBandGains(0.8f, 0.7f);
+            noCut.setDampingWeight(0.3f);
+            withCut.setBandGains(0.8f, 0.7f);
+            withCut.setDampingWeight(0.3f);
+            withCut.setLowCutHz(300.0f); // top of the range - maximum expected attenuation
+
+            constexpr int numSamples = 4000;
+            std::vector<float> noCutL(numSamples, 0.0f), noCutR(numSamples, 0.0f);
+            std::vector<float> withCutL(numSamples, 0.0f), withCutR(numSamples, 0.0f);
+            noCutL[0] = 1.0f; noCutR[0] = 1.0f;
+            withCutL[0] = 1.0f; withCutR[0] = 1.0f;
+            noCut.processStereo(noCutL.data(), noCutR.data(), numSamples);
+            withCut.processStereo(withCutL.data(), withCutR.data(), numSamples);
+
+            // Crude 150Hz one-pole lowpass energy over the first tank arrival window - well below
+            // the 300Hz cutoff, so a real high-pass should leave very little low-band energy there.
+            // Same onset window (~29-49ms) as the input-tilt regression test above.
+            auto lowBandEnergy = [sampleRate](const std::vector<float>& x)
+            {
+                double energy = 0.0;
+                float lp = 0.0f;
+                const auto w = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi * 150.0f / (float) sampleRate);
+                const auto start = (int) (0.029 * sampleRate);
+                const auto win = (int) (0.02 * sampleRate);
+                for (int i = start; i < start + win && i < (int) x.size(); ++i)
+                {
+                    lp += w * (x[(size_t) i] - lp);
+                    energy += (double) lp * lp;
+                }
+                return energy;
+            };
+
+            const auto noCutEnergy = lowBandEnergy(noCutL);
+            const auto withCutEnergy = lowBandEnergy(withCutL);
+            // A crude one-pole energy proxy (like highToLowEnergyRatio above), not a true spectral
+            // filter, and the highpass itself is a gentle first-order (6dB/octave) slope, not a
+            // brickwall - checked directly (0.44 measured here) before picking this threshold, the
+            // same discipline as the input-tilt test above ("detect some difference", not an exact
+            // number).
+            expect(withCutEnergy < noCutEnergy * 0.6,
+                "a 300Hz Low Cut should measurably reduce low-band energy at the very first tank arrival, not just the tail");
+        }
     }
 };
 

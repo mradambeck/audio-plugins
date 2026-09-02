@@ -111,6 +111,23 @@ public:
     // processor never calls this - the default from prepare() is the calibrated value.
     void setInputHighPassHz(float hz);
 
+    // Player-facing "Low Cut" utility control (0-300Hz, default 0 = off) - NOT the fixed algorithm
+    // rolloff above. This used to be the real hardware's own "Low" knob, carried on the plugin
+    // unwired (see findings.md's Low section): direct measurement found it has no onset-tone
+    // effect and only a small, sign-inconsistent decay effect conditional on High, nothing safe to
+    // hardcode into a formula. Repurposed into a genuinely useful control instead. Applied to the
+    // DRY input, before pre-delay and everything else in the tank - see the class comment's
+    // "Signal flow" note - so it trims content before it ever reaches the reverb, same placement
+    // reasoning as ShieldsFDNEngine::setLowCutHz's own "so the player can trim rumble/mud before it
+    // ever reaches the reverb rather than filtering the already-diffused wet output." Reuses the
+    // shared OnePoleFilter's x-lowpass(x) idiom already used for inputHighPassL/R just below,
+    // rather than Shields' resonant Biquad - that low-Q shape was a deliberate tonal-calibration
+    // choice specific to Shields' own algorithm, not a general convention; this is a plain utility
+    // cut with no reference measurement to match. 0Hz is a GENUINE bypass (see lowCutActive's
+    // comment), same explicit-bypass contract as setBitDepth()'s top-of-range and Shields' own
+    // lowCutActive floor.
+    void setLowCutHz(float hz);
+
     // Simulated quantization depth (8-24 bits) applied to the wet stereo output, reproducing the
     // real unit's measured ~90dB dynamic-range ceiling (see the class comment's "16-bit
     // converters" note) - same formula and output-stage placement as ShieldsFDNEngine::
@@ -193,6 +210,15 @@ private:
     std::array<int, numLines> lineDelaySamples {};
     std::array<wildjag::dsp::OnePoleFilter, numLines> dampingFilter;
     std::array<BandShelf, numLines> feedbackShelf;
+
+    // Player Low Cut - see setLowCutHz()'s comment. Applied first, ahead of pre-delay (order vs.
+    // pre-delay is functionally irrelevant for a linear filter and a linear delay - they commute -
+    // but "before the effect chain" reads most naturally as before pre-delay too). lowCutActive
+    // mirrors ShieldsFDNEngine::lowCutActive: skip the filter entirely at 0Hz rather than rely on
+    // the math happening to converge to identity there, guaranteeing a genuine bit-identical
+    // bypass at the default.
+    wildjag::dsp::OnePoleFilter lowCutL, lowCutR;
+    bool lowCutActive = false;
 
     wildjag::dsp::CircularDelayBuffer preDelayBufferL, preDelayBufferR;
     int preDelaySamples = 0;

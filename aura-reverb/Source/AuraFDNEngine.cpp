@@ -49,6 +49,8 @@ void AuraFDNEngine::reset()
     for (auto& buf : lineBuffers) buf.reset();
     for (auto& f : dampingFilter) f.reset();
     for (auto& s : feedbackShelf) s.reset();
+    lowCutL.reset();
+    lowCutR.reset();
     preDelayBufferL.reset();
     preDelayBufferR.reset();
     inputTiltL.reset();
@@ -93,6 +95,17 @@ void AuraFDNEngine::setInputHighPassHz(float hz)
     inputHighPassR.setCutoffHz(std::max(1.0f, hz), sampleRateHz);
 }
 
+void AuraFDNEngine::setLowCutHz(float hz)
+{
+    const auto clamped = std::clamp(hz, 0.0f, 300.0f);
+    lowCutActive = clamped > 0.0f; // see the header's lowCutActive comment on why this matters
+    if (lowCutActive)
+    {
+        lowCutL.setCutoffHz(clamped, sampleRateHz);
+        lowCutR.setCutoffHz(clamped, sampleRateHz);
+    }
+}
+
 void AuraFDNEngine::setBitDepth(float bits)
 {
     const auto clamped = std::clamp(bits, 8.0f, 24.0f);
@@ -113,8 +126,18 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
 
     for (int n = 0; n < numSamples; ++n)
     {
-        const auto dryL = left[n];
-        const auto dryR = right[n];
+        auto dryL = left[n];
+        auto dryR = right[n];
+
+        // --- Player Low Cut (see setLowCutHz()'s comment) - first, before pre-delay and
+        // everything else, so it trims content before it ever reaches the effect. Skipped
+        // entirely when inactive (0Hz, the default) rather than run with a near-zero coefficient,
+        // guaranteeing a bit-identical bypass.
+        if (lowCutActive)
+        {
+            dryL = dryL - lowCutL.processSample(dryL);
+            dryR = dryR - lowCutR.processSample(dryR);
+        }
 
         // --- Pre-delay
         preDelayBufferL.write(dryL);

@@ -121,6 +121,13 @@ feedback gain (applied *inside* the feedback loop, not at the input/output stage
 multiplier instead of an output EQ, so no new `core/dsp_primitives.py` code is needed, only a
 different composition in `model.py`.
 
+**Aura's plugin control repurposed (2026-09-02, post-Phase-D):** the measurements above stayed
+correct and unwired in the shipped plugin for a while (see AuraParameterMap.h's git history), but
+Adam then had the plugin's "Low" control repurposed entirely - it's now a plain 0-300Hz input
+high-pass utility ("Low Cut"), unrelated to the real hardware's Low knob measured in this section.
+This section's findings remain the accurate record of what the real RMX16's Low knob actually does;
+they just no longer describe anything the plugin's own "Low Cut" control does.
+
 ## Quantization: unit's own dynamic-range ceiling is visible in the captures, step-lattice is not
 
 Checked whether the RMX16's own digital grain (16-bit converters / 18-bit internal, per Adam's

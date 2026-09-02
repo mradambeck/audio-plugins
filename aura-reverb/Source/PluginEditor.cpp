@@ -18,7 +18,7 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p)
 {
     setupRotary(timeSlider, timeLabel, "Time", *this);
-    setupRotary(lowSlider, lowLabel, "Low", *this);
+    setupRotary(lowCutSlider, lowCutLabel, "Low Cut", *this);
     setupRotary(highSlider, highLabel, "High", *this);
     setupRotary(preDelaySlider, preDelayLabel, "Pre-Delay", *this);
     setupRotary(bitDepthSlider, bitDepthLabel, "Bit Depth", *this);
@@ -30,7 +30,7 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
 
     auto& apvts = processorRef.apvts;
     timeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::timeSecondsParamID, timeSlider);
-    lowAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::lowDbParamID, lowSlider);
+    lowCutAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::lowCutHzParamID, lowCutSlider);
     highAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::highDbParamID, highSlider);
     preDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::preDelayMsParamID, preDelaySlider);
     bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::bitDepthParamID, bitDepthSlider);
@@ -66,7 +66,7 @@ void AuraAudioProcessorEditor::resized()
     };
 
     layoutOne(timeSlider, timeLabel);
-    layoutOne(lowSlider, lowLabel);
+    layoutOne(lowCutSlider, lowCutLabel);
     layoutOne(highSlider, highLabel);
     layoutOne(preDelaySlider, preDelayLabel);
     layoutOne(bitDepthSlider, bitDepthLabel);

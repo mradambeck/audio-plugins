@@ -19,11 +19,11 @@ public:
 private:
     AuraAudioProcessor& processorRef;
 
-    juce::Slider timeSlider, lowSlider, highSlider, preDelaySlider, bitDepthSlider, mixSlider, inputGainSlider, outputGainSlider;
-    juce::Label timeLabel, lowLabel, highLabel, preDelayLabel, bitDepthLabel, mixLabel, inputGainLabel, outputGainLabel;
+    juce::Slider timeSlider, lowCutSlider, highSlider, preDelaySlider, bitDepthSlider, mixSlider, inputGainSlider, outputGainSlider;
+    juce::Label timeLabel, lowCutLabel, highLabel, preDelayLabel, bitDepthLabel, mixLabel, inputGainLabel, outputGainLabel;
     juce::ToggleButton bypassButton { "Bypass" };
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> timeAttachment, lowAttachment,
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> timeAttachment, lowCutAttachment,
         highAttachment, preDelayAttachment, bitDepthAttachment, mixAttachment, inputGainAttachment, outputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 

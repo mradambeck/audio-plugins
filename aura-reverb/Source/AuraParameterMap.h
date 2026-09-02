@@ -38,15 +38,10 @@ namespace AuraParameterMap
     // mapTimeAndHighToDecayParams() - this drives AuraFDNEngine::setInputTilt().
     float mapInputTiltDb(float highDb, bool* extrapolated = nullptr);
 
-    // Low (-8..+6 on the real hardware) is NOT wired to anything below yet - deliberately, not an
-    // oversight. The one place the capture grid lets its effect be isolated (Low=+5 vs Low=0,
-    // High=-8 fixed, across all 8 Time settings) shows a delta that's negative at short Time
-    // settings and only turns positive at longer ones - no clean sign pattern, not something that
-    // can be hardcoded into a formula without presenting false precision. If wired up later,
-    // calibrate from the one clean direct RT60 measurement (+13.7% at Low=+5, High=-8, Time=2.3s),
-    // not from the automated fit's own low_band_gain parameter - that showed the same
-    // underestimates-a-real-effect pattern the fit's tilt gains did (see AuraOnsetTiltData.h). The
-    // parameter still exists on the plugin (matching the real hardware's control set, and so
-    // presets/automation referencing it don't need to change later) - it just has no measured
-    // effect to apply yet.
+    // No entry here for the plugin's "Low Cut" control (was the real hardware's own "Low" knob,
+    // carried unwired - the capture grid couldn't isolate a usable, sign-consistent effect for it,
+    // see git history for the full story) - it was repurposed into a plain 0-300Hz input high-pass
+    // utility control with no fitted-curve mapping at all, wired directly in
+    // PluginProcessor::processBlock() straight to AuraFDNEngine::setLowCutHz(), the same way
+    // Pre-Delay and Bit Depth are. Nothing for this file to do with it.
 }

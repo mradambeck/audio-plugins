@@ -16,10 +16,13 @@ capture on more than just amplitude/envelope:
 Mapping from a reference filename's (Time, Low, High) to plugin parameters: Time and High map
 directly (Aura's Time parameter IS the hardware's own label - unlike Intruder's Decay, findings.md
 found Time close to literal seconds, so the fitted curves in AuraReferenceData.h are keyed by the
-label value directly, not a measured RT60). Low is passed through for completeness but has NO
-effect on the render (AuraParameterMap deliberately doesn't wire it - see its own comment) - the
-per-file results table flags which captures have nonzero Low so that expected/unmodeled error is
-visible rather than silently averaged away.
+label value directly, not a measured RT60). Low (the real hardware's own Low knob measurement, from
+the filename) is passed through for completeness but has NO effect on the render - the plugin's own
+"Low" control was since repurposed into an unrelated "Low Cut" utility high-pass, which every render
+here leaves at its default (0Hz = off), so the outcome is the same as before (no DSP effect from
+this dimension) even though the reason changed. The per-file results table flags which captures have
+nonzero (hardware) Low so that expected/unmodeled error is visible rather than silently averaged
+away.
 
 Requires the 65 captures in ../../ml-toolkit/effects/ambience/captures/ and a built AuraRenderIR
 (../build/AuraRenderIR_artefacts/Release/AuraRenderIR - build it first, console target only, never

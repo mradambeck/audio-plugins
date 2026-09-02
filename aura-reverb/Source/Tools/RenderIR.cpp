@@ -19,7 +19,7 @@
 //
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
-//                [--timeSeconds 2.0] [--lowDb 0] [--highDb 0] [--preDelayMs 0]
+//                [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0] [--preDelayMs 0]
 //                [--bitDepth 16] [--mixPercent 100] [--inputGainDb 0] [--outputGainDb 0]
 //                [--bypass 0]
 //
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     {
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
-            "                     [--timeSeconds 2.0] [--lowDb 0] [--highDb 0]\n"
+            "                     [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0]\n"
             "                     [--preDelayMs 0] [--bitDepth 16] [--mixPercent 100]\n"
             "                     [--inputGainDb 0] [--outputGainDb 0] [--bypass 0]\n");
         return 1;
@@ -81,7 +81,7 @@ int main(int argc, char* argv[])
     AuraAudioProcessor processor;
 
     setParam(processor, AuraAudioProcessor::timeSecondsParamID, getFloatArg(args, "timeSeconds", 2.0f));
-    setParam(processor, AuraAudioProcessor::lowDbParamID, getFloatArg(args, "lowDb", 0.0f));
+    setParam(processor, AuraAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowCutHz", 0.0f));
     setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
     setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
     setParam(processor, AuraAudioProcessor::bitDepthParamID, getFloatArg(args, "bitDepth", 16.0f));

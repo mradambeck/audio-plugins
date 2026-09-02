@@ -19,7 +19,7 @@ AuraAudioProcessor::AuraAudioProcessor()
       apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
 {
     timeSecondsParam = apvts.getRawParameterValue(timeSecondsParamID);
-    lowDbParam = apvts.getRawParameterValue(lowDbParamID);
+    lowCutHzParam = apvts.getRawParameterValue(lowCutHzParamID);
     highDbParam = apvts.getRawParameterValue(highDbParamID);
     preDelayMsParam = apvts.getRawParameterValue(preDelayMsParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
@@ -48,19 +48,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
             .withLabel("s")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2) + " s"; })));
 
-    // -8..+6dB matches the captured range. NOT wired to any DSP effect yet - see
-    // AuraParameterMap.h's comment on why (the measured Low-attributable delta flips sign
-    // depending on Time, not something safe to hardcode into a formula yet). Still exposed so the
-    // control surface matches the real hardware and presets/automation don't need to change once
-    // it is wired up.
+    // Repurposed from the real hardware's own "Low" knob (was -8..+6dB, unwired - see
+    // AuraFDNEngine.h's setLowCutHz() comment for why: direct measurement found no onset-tone
+    // effect and only a small, sign-inconsistent decay effect conditional on High, nothing safe to
+    // hardcode). Now a plain 0-300Hz utility high-pass on the dry input, ahead of pre-delay and
+    // the whole effect - matches Caverns' own "Low Cut" naming/range-shape convention (though
+    // Caverns filters its wet tap, not the dry input - see AuraFDNEngine.h for why Aura's needs to
+    // sit earlier). Default 0Hz = off, a genuine bypass (AuraFDNEngine::lowCutActive).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{lowDbParamID, 1},
-        "Low",
-        juce::NormalisableRange<float>(-8.0f, 6.0f, 0.1f),
+        juce::ParameterID{lowCutHzParamID, 1},
+        "Low Cut",
+        juce::NormalisableRange<float>(0.0f, 300.0f, 1.0f, 0.5f),
         0.0f,
         juce::AudioParameterFloatAttributes()
-            .withLabel("dB")
-            .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
+            .withLabel("Hz")
+            .withStringFromValueFunction([](float v, int) {
+                return v <= 0.0f ? juce::String("Off") : juce::String(v, 0) + " Hz"; })));
 
     // -8..0dB matches the captured range - see findings.md's "High" section for the broadband
     // tilt (bass up/treble down as this goes negative) plus decay-shortening behavior this drives.
@@ -185,6 +188,7 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setInputTilt(AuraParameterMap::mapInputTiltDb(highDbParam->load()));
     engine.setPreDelayMs(preDelayMsParam->load());
     engine.setBitDepth(bitDepthParam->load());
+    engine.setLowCutHz(lowCutHzParam->load());
 
     const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);
     const auto outputGain = std::pow(10.0f, outputGainDbParam->load() / 20.0f);

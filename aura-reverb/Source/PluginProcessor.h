@@ -42,7 +42,7 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     static constexpr auto timeSecondsParamID = "timeSeconds";
-    static constexpr auto lowDbParamID = "lowDb";
+    static constexpr auto lowCutHzParamID = "lowCutHz";
     static constexpr auto highDbParamID = "highDb";
     static constexpr auto preDelayMsParamID = "preDelayMs";
     static constexpr auto bitDepthParamID = "bitDepth";
@@ -55,7 +55,7 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     std::atomic<float>* timeSecondsParam = nullptr;
-    std::atomic<float>* lowDbParam = nullptr;
+    std::atomic<float>* lowCutHzParam = nullptr;
     std::atomic<float>* highDbParam = nullptr;
     std::atomic<float>* preDelayMsParam = nullptr;
     std::atomic<float>* bitDepthParam = nullptr;
