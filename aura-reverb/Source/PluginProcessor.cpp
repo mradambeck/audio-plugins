@@ -72,10 +72,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
             .withLabel("dB")
             .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
 
+    // 0-200ms matches the real RMX16 Ambience program's own pre-delay range (per Adam, 2026-09-02).
+    // AuraFDNEngine already allocates 200ms of pre-delay buffer headroom, so this needed no engine
+    // change - the parameter was just capped lower than the hardware for no good reason.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{preDelayMsParamID, 1},
         "Pre-Delay",
-        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        juce::NormalisableRange<float>(0.0f, 200.0f, 0.1f),
         0.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("ms")

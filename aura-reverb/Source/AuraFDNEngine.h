@@ -41,6 +41,35 @@
 // in Phase D - if the real plugin's per-channel density reads noticeably sparser than the
 // reference captures, feeding all 8 lines from a mono sum of the dry input (at the cost of stereo
 // width) is the fallback.
+// Real-unit specs (supplied by Adam, 2026-09-02) and what this engine does about each:
+//
+//   - 20Hz-18kHz +-0.25dB, 18kHz audio bandwidth. The 18kHz bandwidth is REAL and measurable in
+//     the captures - relative to their own 1-4kHz level they are flat to ~15kHz then fall -2.3dB
+//     at 17-18k, -3.8dB at 18-19k, -6.5dB at 19-20k and -14.4dB at 20-22k. That cliff is a
+//     converter-grade elliptic response. DELIBERATELY NOT MODELLED: at 44.1kHz you cannot build
+//     it from one-poles (four cascaded at 18kHz gives -12dB AT 18kHz and darkens 6-15kHz by
+//     2-5dB), and a single gentle pole standing in for it was measured to make things worse, not
+//     better - it consumed the last of the in-loop damping headroom, driving Time>=3.0s settings
+//     too dark with damping already pinned at its 0.99 ceiling (tonal balance 8.89dB vs the
+//     9.31dB target at Time=5.5s). Since 18-22kHz is inaudible, paying an audible-band cost to
+//     approximate an inaudible cliff is a bad trade. Doing it properly needs a high-order
+//     elliptic/biquad cascade, which common/dsp/ has no primitive for yet.
+//
+//     Note the +-0.25dB flatness spec ALSO means the low-frequency rolloff modelled by
+//     inputHighPassL below is NOT the unit's I/O response (an earlier version of that comment
+//     claimed it was - wrong, corrected). The rolloff is genuinely present in the captures but
+//     its origin is unconfirmed: most likely the Ambience program's own low-frequency behaviour,
+//     possibly the capture chain. The filter stays because it's what measurably matches; only the
+//     stated cause was wrong.
+//
+//   - 16-bit converters, 18-bit quantisation, ~90dB dynamic range. NOT modelled yet. This is a
+//     character feature rather than a response error (it sits near/below the comparison noise
+//     floor, so no validation metric here would show it), and ShieldsFDNEngine's own bit-depth
+//     quantiser is the precedent to copy when it's wanted.
+//
+//   - THD <0.03% (about -70dB). NOT modelled. An impulse response barely reveals THD, so there is
+//     nothing in the current capture set to calibrate a saturation stage against.
+//
 class AuraFDNEngine
 {
 public:
