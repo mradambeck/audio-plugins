@@ -20,12 +20,13 @@
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
 //                [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0] [--preDelayMs 0]
-//                [--bitDepth 16] [--mixPercent 100] [--inputGainDb 0] [--outputGainDb 0]
+//                [--bitDepth 16] [--inputGainDb 0] [--dry 0] [--wet 100]
 //                [--bypass 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs (PluginProcessor.h) in the plugin's own
-// native units - not normalised 0-1. Mix defaults to 100 (full wet) here, unlike the plugin's own
-// 50% default, so an unqualified run renders the reverb itself rather than a half-dry blend.
+// native units - not normalised 0-1. Dry/Wet default to 0/100 here (pure wet reverb, isolated from
+// the dry tap), unlike the plugin's own 100%/50% defaults, so an unqualified run renders the
+// reverb itself rather than a dry-contaminated blend.
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -63,8 +64,8 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
             "                     [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0]\n"
-            "                     [--preDelayMs 0] [--bitDepth 16] [--mixPercent 100]\n"
-            "                     [--inputGainDb 0] [--outputGainDb 0] [--bypass 0]\n");
+            "                     [--preDelayMs 0] [--bitDepth 16] [--inputGainDb 0]\n"
+            "                     [--dry 0] [--wet 100] [--bypass 0]\n");
         return 1;
     }
 
@@ -85,9 +86,9 @@ int main(int argc, char* argv[])
     setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
     setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
     setParam(processor, AuraAudioProcessor::bitDepthParamID, getFloatArg(args, "bitDepth", 16.0f));
-    setParam(processor, AuraAudioProcessor::mixPercentParamID, getFloatArg(args, "mixPercent", 100.0f));
     setParam(processor, AuraAudioProcessor::inputGainDbParamID, getFloatArg(args, "inputGainDb", 0.0f));
-    setParam(processor, AuraAudioProcessor::outputGainDbParamID, getFloatArg(args, "outputGainDb", 0.0f));
+    setParam(processor, AuraAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
+    setParam(processor, AuraAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
     setParam(processor, AuraAudioProcessor::bypassParamID, getFloatArg(args, "bypass", 0.0f));
 
     constexpr int blockSize = 512;

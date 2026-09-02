@@ -22,9 +22,9 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     setupRotary(highSlider, highLabel, "Color", *this);
     setupRotary(preDelaySlider, preDelayLabel, "Pre-Delay", *this);
     setupRotary(bitDepthSlider, bitDepthLabel, "Bit Depth", *this);
-    setupRotary(mixSlider, mixLabel, "Blend", *this);
-    setupRotary(inputGainSlider, inputGainLabel, "Input Gain", *this);
-    setupRotary(outputGainSlider, outputGainLabel, "Volume", *this);
+    setupRotary(inputGainSlider, inputGainLabel, "Pre-Gain", *this);
+    setupRotary(drySlider, dryLabel, "Dry", *this);
+    setupRotary(wetSlider, wetLabel, "Wet", *this);
 
     addAndMakeVisible(bypassButton);
 
@@ -34,9 +34,9 @@ AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
     highAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::highDbParamID, highSlider);
     preDelayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::preDelayMsParamID, preDelaySlider);
     bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::bitDepthParamID, bitDepthSlider);
-    mixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::mixPercentParamID, mixSlider);
     inputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::inputGainDbParamID, inputGainSlider);
-    outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::outputGainDbParamID, outputGainSlider);
+    dryAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::dryParamID, drySlider);
+    wetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, AuraAudioProcessor::wetParamID, wetSlider);
     bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvts, AuraAudioProcessor::bypassParamID, bypassButton);
 
     setSize(640, 260);
@@ -70,9 +70,9 @@ void AuraAudioProcessorEditor::resized()
     layoutOne(highSlider, highLabel);
     layoutOne(preDelaySlider, preDelayLabel);
     layoutOne(bitDepthSlider, bitDepthLabel);
-    layoutOne(mixSlider, mixLabel);
     layoutOne(inputGainSlider, inputGainLabel);
-    layoutOne(outputGainSlider, outputGainLabel);
+    layoutOne(drySlider, dryLabel);
+    layoutOne(wetSlider, wetLabel);
 
     bypassButton.setBounds(getLocalBounds().removeFromBottom(30).removeFromRight(100).reduced(4));
 }

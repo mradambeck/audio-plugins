@@ -23,9 +23,9 @@ AuraAudioProcessor::AuraAudioProcessor()
     highDbParam = apvts.getRawParameterValue(highDbParamID);
     preDelayMsParam = apvts.getRawParameterValue(preDelayMsParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
-    mixPercentParam = apvts.getRawParameterValue(mixPercentParamID);
+    dryParam = apvts.getRawParameterValue(dryParamID);
+    wetParam = apvts.getRawParameterValue(wetParamID);
     inputGainDbParam = apvts.getRawParameterValue(inputGainDbParamID);
-    outputGainDbParam = apvts.getRawParameterValue(outputGainDbParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
 }
 
@@ -125,32 +125,39 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
             .withStringFromValueFunction([](float v, int) {
                 return v >= 24.0f ? juce::String("Off") : juce::String(v, 1) + " bit"; })));
 
+    // Displayed as "Pre-Gain" (Adam, 2026-09-02) - underlying param ID stays inputGainDb. Applied
+    // to the signal feeding the engine, before the effect - "pre" as in ahead of the reverb, same
+    // sense as Low Cut's own placement, not a reference to Dry/Wet below.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{mixPercentParamID, 1},
-        "Blend",
+        juce::ParameterID{inputGainDbParamID, 1},
+        "Pre-Gain",
+        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
+        0.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("dB")
+            .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
+
+    // Independent Dry/Wet level pair (Adam, 2026-09-02), replacing the old single Blend + Volume
+    // pair - same convention as caverns-delay's own dryParamID/wetParamID (percent, not dB;
+    // multiplicative gain, not a crossfade). Wet goes past 100% (unity) up to 200% so the reverb
+    // can be pushed louder than the dry tap, matching Caverns' own headroom rationale.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{dryParamID, 1},
+        "Dry",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        100.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("%")
+            .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{wetParamID, 1},
+        "Wet",
+        juce::NormalisableRange<float>(0.0f, 200.0f, 0.1f),
         50.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
-            .withStringFromValueFunction([](float v, int) { return juce::String(v, 0) + " %"; })));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{inputGainDbParamID, 1},
-        "Input Gain",
-        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
-        0.0f,
-        juce::AudioParameterFloatAttributes()
-            .withLabel("dB")
-            .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{outputGainDbParamID, 1},
-        "Volume",
-        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
-        0.0f,
-        juce::AudioParameterFloatAttributes()
-            .withLabel("dB")
-            .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
+            .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{bypassParamID, 1}, "Bypass", false));
@@ -195,8 +202,10 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setLowCutHz(lowCutHzParam->load());
 
     const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);
-    const auto outputGain = std::pow(10.0f, outputGainDbParam->load() / 20.0f);
-    const auto mix = std::clamp(mixPercentParam->load() * 0.01f, 0.0f, 1.0f);
+    // Independent Dry/Wet level pair, not a crossfade - see createParameterLayout()'s comment.
+    // Percent-to-linear, matching caverns-delay's own dryGain/wetGain convention exactly.
+    const auto dryGain = dryParam->load() * 0.01f;
+    const auto wetGain = wetParam->load() * 0.01f;
 
     const auto numSamples = buffer.getNumSamples();
     auto* left = buffer.getWritePointer(0);
@@ -216,10 +225,10 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
     for (int n = 0; n < numSamples; ++n)
     {
-        const auto wetL = left[n] * outputGain;
-        const auto wetR = right[n] * outputGain;
-        left[n] = dryL[n] * (1.0f - mix) + wetL * mix;
-        right[n] = dryR[n] * (1.0f - mix) + wetR * mix;
+        const auto wetL = left[n] * wetGain;
+        const auto wetR = right[n] * wetGain;
+        left[n] = dryL[n] * dryGain + wetL;
+        right[n] = dryR[n] * dryGain + wetR;
     }
 }
 
