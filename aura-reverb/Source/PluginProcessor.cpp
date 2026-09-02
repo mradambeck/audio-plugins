@@ -70,9 +70,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
 
     // -8..0dB matches the captured range - see findings.md's "High" section for the broadband
     // tilt (bass up/treble down as this goes negative) plus decay-shortening behavior this drives.
+    // Displayed as "Color" (Adam, 2026-09-02) - underlying param ID stays highDb.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{highDbParamID, 1},
-        "High",
+        "Color",
         juce::NormalisableRange<float>(-8.0f, 0.0f, 0.1f),
         0.0f,
         juce::AudioParameterFloatAttributes()
