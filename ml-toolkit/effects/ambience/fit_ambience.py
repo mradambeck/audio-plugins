@@ -30,9 +30,33 @@ FIT_DURATION_S = 3.5  # covers the median (~2.3s) capture comfortably; longer ca
 # beyond this are truncated for fitting purposes - decay RATE (what build_curves.py needs) is
 # well-determined from an earlier window, and Phase D's validation renders at full length/real
 # sample rate against the real plugin anyway, independent of this fitting-time truncation.
-ITERS = 600  # first-pass fit (~11.6s/step measured on real data -> ~2hrs); extend if B6's
+ITERS = 600  # first-pass fit (~8.9s/step measured on real data -> ~89min); extend if B6's
 # hand-review of the loss curve/fitted values suggests it hasn't converged.
 LR = 0.02
+
+# B6 hand-review of the first fit found high_band_gain/low_band_gain/damping_weight came out
+# clean and monotonic against Time/Low/High (matching findings.md well), but tilt_low_gain/
+# tilt_high_gain/output_gain were noisy and occasionally sign-flipped even at the Time-only
+# (Low=0, High=0) baseline, where they should stay flat. Output tilt and per-line damping can
+# both shape frequency response, so an unregularized fit distributes that ambiguity
+# inconsistently across captures. This pulls the tilt gains toward their neutral (no-op) value
+# of 1.0 unless the loss genuinely needs them to move, without constraining the well-behaved
+# in-loop parameters at all.
+#
+# Weight swept on the Time-only (Low=0, High=0) subset before committing to a full 65-capture
+# run: 0.03 (the first attempt) barely changed anything - tilt_high still sign-flipped negative
+# at some settings. 0.3 was still visibly drifting at longer Time captures. 1.0 held both tilt
+# gains tightly near 1.0 across the whole sweep (as they should be, since Time alone shouldn't
+# move an EQ control) while barely changing the achieved loss (1.117 vs. 1.114 at weight=0.03) -
+# confirming this really is pure degeneracy the main loss doesn't care about resolving on its
+# own, not a real effect fighting the regularizer.
+TILT_REGULARIZATION_WEIGHT = 1.0
+
+
+def tilt_regularization(model: AmbienceFDN) -> torch.Tensor:
+    return TILT_REGULARIZATION_WEIGHT * (
+        ((model.tilt_low_gain - 1.0) ** 2).mean() + ((model.tilt_high_gain - 1.0) ** 2).mean()
+    )
 
 
 def resample_to_fit_rate(x: np.ndarray, sr: int) -> np.ndarray:
@@ -68,7 +92,7 @@ def main() -> None:
     loss_fn = build_loss()
 
     t0 = time.time()
-    result = fit_model(model, targets, loss_fn, iters=ITERS, lr=LR, log_every=50)
+    result = fit_model(model, targets, loss_fn, iters=ITERS, lr=LR, log_every=50, regularization_fn=tilt_regularization)
     elapsed = time.time() - t0
 
     print(f"\nFit finished in {elapsed/60:.1f} min - converged={result.converged} "

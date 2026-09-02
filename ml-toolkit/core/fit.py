@@ -57,7 +57,7 @@ class FitResult:
     diverged_at_step: int | None = None
 
 
-def fit_model(model: torch.nn.Module, target_audio: torch.Tensor, loss_fn, iters: int = 1000, lr: float = 0.02, log_every: int = 100) -> FitResult:
+def fit_model(model: torch.nn.Module, target_audio: torch.Tensor, loss_fn, iters: int = 1000, lr: float = 0.02, log_every: int = 100, regularization_fn=None) -> FitResult:
     """Runs Adam against model's parameters to minimize loss_fn(model(), target_audio).
 
     `model()` (no arguments) must render and return the current [batch, num_samples] waveform
@@ -70,6 +70,13 @@ def fit_model(model: torch.nn.Module, target_audio: torch.Tensor, loss_fn, iters
     codebase's std::isfinite() guard at FDN recirculation points (ShieldsFDNEngine/
     IntruderFDNEngine): abort with a clear diagnostic (via FitResult.diverged_at_step) rather than
     silently returning garbage fitted parameters from a run that blew up.
+
+    `regularization_fn`, if given, is called as regularization_fn(model) -> scalar tensor and
+    added to the loss before backward(). Use it to break genuine degeneracy between parameters
+    that can both explain the same effect (e.g. Ambience's output tilt and per-line damping can
+    both shape frequency response, and an unregularized fit distributed that ambiguity
+    inconsistently across captures - noisy, sometimes even sign-flipped tilt gains, on an
+    otherwise clean fit) by penalizing drift away from a semantically neutral default.
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     loss_curve: list[float] = []
@@ -79,6 +86,8 @@ def fit_model(model: torch.nn.Module, target_audio: torch.Tensor, loss_fn, iters
         optimizer.zero_grad()
         rendered = model()
         loss = loss_fn(rendered, target_audio)
+        if regularization_fn is not None:
+            loss = loss + regularization_fn(model)
 
         if not torch.isfinite(loss):
             diverged_at_step = step

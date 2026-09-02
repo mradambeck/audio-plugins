@@ -57,3 +57,27 @@ def test_held_out_split_sizes_and_disjoint():
 
 def test_held_out_split_empty():
     assert held_out_split([]) == ([], [])
+
+
+def test_fit_model_applies_regularization():
+    torch.manual_seed(0)
+    num_lines = 8
+    num_samples = 4000
+    delays = torch.tensor([37.0, 53.0, 71.0, 97.0, 113.0, 131.0, 151.0, 173.0])
+    H = hadamard_matrix(num_lines)
+    target = render_fdn_impulse_response(
+        delays, torch.tensor([[0.8]]), torch.full((1, num_lines), 0.15), H, num_samples
+    ).detach()
+
+    model = _TinyFDN(delays, H, num_samples)
+    loss_fn = build_loss()
+
+    calls = []
+
+    def reg_fn(m):
+        calls.append(1)
+        return (m.feedback_gain ** 2).sum() * 0.0  # no-op penalty, just proves it's wired up
+
+    result = fit_model(model, target, loss_fn, iters=5, lr=0.03, log_every=0, regularization_fn=reg_fn)
+    assert len(calls) == 5
+    assert result.converged
