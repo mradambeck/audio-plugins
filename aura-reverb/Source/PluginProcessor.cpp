@@ -17,7 +17,13 @@ namespace
     // ~/Library/Audio/Presets/Wild Jag/Aura - Reverb/), same convention as every other Wild Jag
     // plugin's own getFactoryPresets() (see common/Presets/FactoryPreset.h's class comment). Dry/Wet
     // are 0%/100% (pure wet) in every one of these - Adam's own choice for auditioning the reverb
-    // in isolation, not something to "fix" back toward the plugin's own 100%/50% defaults.
+    // in isolation.
+    //
+    // "Default"'s own values are also createParameterLayout()'s actual parameter defaults (Adam,
+    // 2026-09-03: a freshly-instantiated plugin should sound identical to selecting "Default" from
+    // this menu) - kept as an explicit, selectable entry here too (rather than removed as
+    // redundant) so it's still reachable as a genuine "reset to default" menu choice after wandering
+    // to another preset, same as every other plugin's own "Default"/"Init"-style entry.
     const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
         static const std::vector<wildjag::FactoryPreset> presets = {
@@ -143,11 +149,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
     // OWN "Decay" control, which is a heavily-compressed display scale on the same hardware unit,
     // Aura's is close to literal seconds; same label, different behavior, don't assume parity
     // between the two plugins' "Decay" knobs just because they share a name.
+    //
+    // Default 1.31s (Adam, 2026-09-03) matches the "Default" factory preset exactly (see
+    // getFactoryPresets() below) - Adam's explicit request that a freshly-instantiated plugin
+    // sound identical to selecting "Default" from the preset menu, not a separately-chosen value.
+    // Every parameter's default below follows the same rule; see dryParamID's own comment for the
+    // one place that actually changes runtime behavior (Low Cut goes from off to active).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{timeSecondsParamID, 1},
         "Decay",
         juce::NormalisableRange<float>(0.1f, 8.0f, 0.01f, 0.5f),
-        2.0f,
+        1.309999942779541f,
         juce::AudioParameterFloatAttributes()
             .withLabel("s")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2) + " s"; })));
@@ -158,12 +170,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
     // hardcode). Now a plain 0-300Hz utility high-pass on the dry input, ahead of pre-delay and
     // the whole effect - matches Caverns' own "Low Cut" naming/range-shape convention (though
     // Caverns filters its wet tap, not the dry input - see AuraFDNEngine.h for why Aura's needs to
-    // sit earlier). Default 0Hz = off, a genuine bypass (AuraFDNEngine::lowCutActive).
+    // sit earlier). 0Hz is a genuine bypass (AuraFDNEngine::lowCutActive) - still true at 10Hz's
+    // new default below, it's just no longer WHERE the default sits. This is the one parameter
+    // where matching the "Default" preset (see timeSecondsParamID's comment) actually changes
+    // runtime behavior at startup: the filter is now active (10Hz) rather than off by default.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{lowCutHzParamID, 1},
         "Low Cut",
         juce::NormalisableRange<float>(0.0f, 300.0f, 1.0f, 0.5f),
-        0.0f,
+        10.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("Hz")
             .withStringFromValueFunction([](float v, int) {
@@ -183,12 +198,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
 
     // 0-200ms matches the real RMX16 Ambience program's own pre-delay range (per Adam, 2026-09-02).
     // AuraFDNEngine already allocates 200ms of pre-delay buffer headroom, so this needed no engine
-    // change - the parameter was just capped lower than the hardware for no good reason.
+    // change - the parameter was just capped lower than the hardware for no good reason. Default
+    // 32ms matches the "Default" factory preset (see timeSecondsParamID's comment).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{preDelayMsParamID, 1},
         "Pre-Delay",
         juce::NormalisableRange<float>(0.0f, 200.0f, 0.1f),
-        0.0f,
+        32.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("ms")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " ms"; })));
@@ -202,27 +218,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
     // getStageCountForChoiceIndex(). 24 bit is still a GENUINE bypass (AuraFDNEngine::
     // bitDepthActive) - unchanged from the original knob's contract.
     //
-    // Default index 0 (8 bit) is Adam's explicit choice for this 3-position control - a heavier,
-    // deliberately more colored default than the old continuous knob's 16-bit default, which was
-    // chosen instead because it reproduces the real hardware's own measured ~90dB dynamic-range
-    // ceiling (see README.md's "How it works" for that measurement). This control is no longer
-    // trying to default to hardware accuracy; the choice of WHICH default sits at 8/16/24 is a
-    // separate decision from the mechanism, and could change again without touching the DSP.
+    // Default index 2 (24 bit, Adam, 2026-09-03) matches the "Default" factory preset (see
+    // timeSecondsParamID's comment) - supersedes this control's earlier 8-bit default (chosen the
+    // same day, before the preset-matching request) and, before that, the original continuous
+    // knob's 16-bit "matches the real hardware's measured dynamic range" default. The choice of
+    // WHICH bit depth sits at the default is independent of the mechanism and could change again
+    // without touching the DSP.
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{bitDepthParamID, 1},
         "Converter",
         getConverterChoices(),
-        0));
+        2));
 
     // Independent Dry/Wet level pair (Adam, 2026-09-02), replacing the old single Blend + Volume
     // pair - same convention as caverns-delay's own dryParamID/wetParamID (percent, not dB;
     // multiplicative gain, not a crossfade). Wet goes past 100% (unity) up to 200% so the reverb
-    // can be pushed louder than the dry tap, matching Caverns' own headroom rationale.
+    // can be pushed louder than the dry tap, matching Caverns' own headroom rationale. Dry/Wet
+    // default to 0%/100% (pure wet), matching the "Default" factory preset (see
+    // timeSecondsParamID's comment) - supersedes the original 100%/50% (mostly-dry) default.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{dryParamID, 1},
         "Dry",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
-        100.0f,
+        0.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
@@ -231,7 +249,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
         juce::ParameterID{wetParamID, 1},
         "Wet",
         juce::NormalisableRange<float>(0.0f, 200.0f, 0.1f),
-        50.0f,
+        100.0f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
