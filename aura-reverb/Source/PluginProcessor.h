@@ -6,9 +6,11 @@
 
 // AMS RMX16 "Ambience" emulation. Decay and Color match the real unit's own control set (displayed
 // as "Decay"/"Color" - underlying param IDs stay timeSeconds/highDb, see their own comments in
-// createParameterLayout()), plus standard Dry/Wet/Pre-Delay/Bit Depth/Bypass controls this catalog
-// exposes on every reverb (Dry/Wet independent level pair, not a single blend knob - same
-// convention as caverns-delay's own dryParamID/wetParamID). Low Cut is NOT from the real
+// createParameterLayout()), plus standard Dry/Wet/Pre-Delay/Bypass controls this catalog exposes
+// on every reverb (Dry/Wet independent level pair, not a single blend knob - same convention as
+// caverns-delay's own dryParamID/wetParamID), plus a discrete 3-position "Converter" bit-depth
+// selector (button + LED list, underlying param ID stays bitDepth - see createParameterLayout()'s
+// comment). Low Cut is NOT from the real
 // hardware - see AuraFDNEngine.h's setLowCutHz() comment for why the real unit's own "Low" knob
 // was repurposed. All DSP lives in AuraFDNEngine; this class is parameter plumbing and dry/wet
 // mixing.
@@ -45,6 +47,12 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
+
+    // "Converter" (Bit Depth) choices, in the same order as the "bitDepth" AudioParameterChoice
+    // and the editor's 3-LED list - both read this so the mapping only lives in one place. Matches
+    // flux-phaser's own getStageChoices()/getStageCountForChoiceIndex() pattern.
+    static const juce::StringArray& getConverterChoices();
+    static float getBitDepthForChoiceIndex(int index);
 
     static constexpr auto timeSecondsParamID = "timeSeconds";
     static constexpr auto lowCutHzParamID = "lowCutHz";

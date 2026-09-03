@@ -30,6 +30,22 @@ AuraAudioProcessor::AuraAudioProcessor()
 
 AuraAudioProcessor::~AuraAudioProcessor() = default;
 
+const juce::StringArray& AuraAudioProcessor::getConverterChoices()
+{
+    static const juce::StringArray choices { "8 bit", "16 bit", "24 bit" };
+    return choices;
+}
+
+float AuraAudioProcessor::getBitDepthForChoiceIndex(int index)
+{
+    switch (juce::jlimit(0, 2, index))
+    {
+        case 0:  return 8.0f;
+        case 1:  return 16.0f;
+        default: return 24.0f;
+    }
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -91,38 +107,26 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
             .withLabel("ms")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + " ms"; })));
 
-    // 8-24, default 16: reproduces the real unit's measured ~90dB dynamic-range ceiling (see
-    // AuraFDNEngine.h's "16-bit converters" note and findings.md's Quantization section,
-    // 2026-09-02 - the captures' own decay tails bottom out at -89..-95dB before the capture
-    // chain's noise floor takes over, matching what a real 16-bit-class converter delivers in
-    // practice). 24 is a GENUINE bypass (AuraFDNEngine::bitDepthActive), matching the
-    // "off at the default" contract ShieldsFDNEngine's own Bit Depth control - and its Low Cut,
-    // Wobble - already establish, except Aura's default sits mid-range rather than at the
-    // transparent end, since 16 is what the real hardware actually measures as.
+    // "Converter" (Adam, 2026-09-03): a discrete 3-position bit-depth selector - a button that
+    // cycles through 8/16/24 bit, with an LED list on the panel showing which is active (matches
+    // flux-phaser's own Stages Shift-button/LED-list pattern) - replacing the original continuous
+    // 8-24 knob. Underlying param ID stays bitDepth (unchanged since the original knob) -
+    // AuraFDNEngine::setBitDepth still takes a plain bit count; getBitDepthForChoiceIndex() below
+    // maps this choice's index to that value, same split as flux-phaser's stagesParam/
+    // getStageCountForChoiceIndex(). 24 bit is still a GENUINE bypass (AuraFDNEngine::
+    // bitDepthActive) - unchanged from the original knob's contract.
     //
-    // Full 65-capture Phase D re-validation at this default vs. bypass (2026-09-02): log-spectral
-    // distance, per-band EQ balance and envelope correlation are all UNCHANGED (2.49dB/+1.96dB/
-    // 0.938 either way - -90dB grain is far below what those whole-tail metrics can resolve).
-    // Crest-factor diff improved (-0.38dB -> +0.26dB, closer to zero). Spectral-flatness diff got
-    // WORSE (+1.06dB -> +1.85dB, i.e. further from matching): undithered quantization adds
-    // broadband (maximally flat) grain to the tail, and the plugin's tail already read flatter/
-    // more diffuse than the real hardware's own more-tonal decay before this was added, so the
-    // grain pushes further the wrong way on that one metric. Unlike ShieldsFDNEngine's default of
-    // 13 (chosen BECAUSE grain measurably improved its LSD match), Aura's default of 16 is NOT a
-    // validation-metric win - it's chosen because it's what the real hardware measures as,
-    // consistent with this project's standing rule that the aggregate metric doesn't get the last
-    // word (see AuraDecayGainData.h's whole "Lesson worth keeping" note). If the flatness
-    // direction ever turns out to matter more than dynamic-range accuracy on further (by-ear)
-    // listening, reconsider the default - not the mechanism.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+    // Default index 0 (8 bit) is Adam's explicit choice for this 3-position control - a heavier,
+    // deliberately more colored default than the old continuous knob's 16-bit default, which was
+    // chosen instead because it reproduces the real hardware's own measured ~90dB dynamic-range
+    // ceiling (see README.md's "How it works" for that measurement). This control is no longer
+    // trying to default to hardware accuracy; the choice of WHICH default sits at 8/16/24 is a
+    // separate decision from the mechanism, and could change again without touching the DSP.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{bitDepthParamID, 1},
-        "Bit Depth",
-        juce::NormalisableRange<float>(8.0f, 24.0f, 0.1f),
-        16.0f,
-        juce::AudioParameterFloatAttributes()
-            .withLabel("bit")
-            .withStringFromValueFunction([](float v, int) {
-                return v >= 24.0f ? juce::String("Off") : juce::String(v, 1) + " bit"; })));
+        "Converter",
+        getConverterChoices(),
+        0));
 
     // Independent Dry/Wet level pair (Adam, 2026-09-02), replacing the old single Blend + Volume
     // pair - same convention as caverns-delay's own dryParamID/wetParamID (percent, not dB;
@@ -185,7 +189,7 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setDampingWeight(decayParams.dampingWeight);
     engine.setInputTilt(AuraParameterMap::mapInputTiltDb(highDbParam->load()));
     engine.setPreDelayMs(preDelayMsParam->load());
-    engine.setBitDepth(bitDepthParam->load());
+    engine.setBitDepth(getBitDepthForChoiceIndex((int) bitDepthParam->load()));
     engine.setLowCutHz(lowCutHzParam->load());
     engine.setSubBassGain(AuraParameterMap::mapTimeToSubBassGain(timeSecondsParam->load()));
 

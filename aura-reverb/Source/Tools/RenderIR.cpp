@@ -20,7 +20,7 @@
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
 //                [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0] [--preDelayMs 0]
-//                [--bitDepth 16] [--dry 0] [--wet 100]
+//                [--bitDepth 8] [--dry 0] [--wet 100]
 //                [--bypass 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs (PluginProcessor.h) in the plugin's own
@@ -52,6 +52,19 @@ namespace
         if (auto* param = processor.apvts.getParameter(paramID))
             param->setValueNotifyingHost(param->convertTo0to1(rawValue));
     }
+
+    // bitDepthParamID is a 3-choice AudioParameterChoice (index 0/1/2), not a continuous 8-24
+    // range - this flag still takes a plain bit count for CLI convenience and converts to the
+    // nearest choice index here, same convention as PluginProcessor::getBitDepthForChoiceIndex()
+    // in reverse.
+    float bitDepthChoiceIndexFor(float bits)
+    {
+        if (bits >= 20.0f)
+            return 2.0f;
+        if (bits >= 12.0f)
+            return 1.0f;
+        return 0.0f;
+    }
 }
 
 int main(int argc, char* argv[])
@@ -64,7 +77,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
             "                     [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0]\n"
-            "                     [--preDelayMs 0] [--bitDepth 16]\n"
+            "                     [--preDelayMs 0] [--bitDepth 8]\n"
             "                     [--dry 0] [--wet 100] [--bypass 0]\n");
         return 1;
     }
@@ -85,7 +98,8 @@ int main(int argc, char* argv[])
     setParam(processor, AuraAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowCutHz", 0.0f));
     setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
     setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
-    setParam(processor, AuraAudioProcessor::bitDepthParamID, getFloatArg(args, "bitDepth", 16.0f));
+    setParam(processor, AuraAudioProcessor::bitDepthParamID,
+        bitDepthChoiceIndexFor(getFloatArg(args, "bitDepth", 8.0f)));
     setParam(processor, AuraAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
     setParam(processor, AuraAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
     setParam(processor, AuraAudioProcessor::bypassParamID, getFloatArg(args, "bypass", 0.0f));

@@ -10,7 +10,7 @@
 // constructor) that never changes again - see AuraAudioProcessorEditor below for why, and
 // common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
 // Matches caverns-delay's own EditorContent/Editor split - see the juce-hardware-panel-ui skill.
-class AuraEditorContent : public juce::Component
+class AuraEditorContent : public juce::Component, private juce::Timer
 {
 public:
     explicit AuraEditorContent(AuraAudioProcessor&);
@@ -20,10 +20,13 @@ public:
     void resized() override;
 
 private:
+    void timerCallback() override;
     void setupRotarySlider(juce::Slider&, juce::Label&, const juce::String& labelText);
     void setupVerticalSlider(juce::Slider&, juce::Label&, const juce::String& labelText);
+    void setupConverterButton();
     void rebuildChassisTexture();
     void drawHardwareSection(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& label);
+    void drawConverterList(juce::Graphics&, juce::Rectangle<float> bounds);
 
     AuraAudioProcessor& processorRef;
 
@@ -38,14 +41,20 @@ private:
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
-    // TONE section: Low Cut/Bit Depth (regular, top row), Color (hero-sized, bottom row).
+    // TONE section: Low Cut/Converter (regular, top row), Color (hero-sized, bottom row).
     juce::Slider lowCutSlider;
     juce::Label lowCutLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowCutAttachment;
 
-    juce::Slider bitDepthSlider;
-    juce::Label bitDepthLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitDepthAttachment;
+    // Converter: a button that cycles the 3-choice "bitDepth" AudioParameterChoice, plus a
+    // read-only LED list (hand-painted in drawConverterList(), not one Component per row) showing
+    // which of 8/16/24 bit is currently selected - same pattern as flux-phaser's Stages Shift
+    // button + drawStageList(). Repainted from timerCallback() so external changes (host
+    // automation, preset load) update the LEDs too, not just clicks.
+    static constexpr int numConverterChoices = 3;
+    juce::TextButton converterButton;
+    juce::Rectangle<int> converterListBounds;
+    int lastPaintedConverterIndex = -1;
 
     juce::Slider colorSlider;
     juce::Label colorLabel;
