@@ -25,6 +25,8 @@
   --intruder-muted: #a1a45c;
   --strike: #6bc490;
   --strike-muted: #469c6a;
+  --aura: #dcac52;
+  --aura-muted: #9b8150;
 }
 
 * {
@@ -401,6 +403,13 @@ header p.sub {
 .card[data-plugin="strike"] .btn-accent {
   background: var(--strike);
   color: #0f2418;
+}
+.card[data-plugin="aura"] h3 {
+  color: var(--aura);
+}
+.card[data-plugin="aura"] .btn-accent {
+  background: var(--aura);
+  color: #251d0e;
 }
 
 /* Notes */
