@@ -237,8 +237,29 @@ private:
     bool lowCutActive = false;
 
     wildjag::dsp::CircularDelayBuffer preDelayBufferL, preDelayBufferR;
-    int preDelaySamples = 0;
+    float preDelaySamplesTarget = 0.0f;
     int maxPreDelaySamples = 1;
+
+    // Smooths preDelaySamplesTarget into smoothedPreDelaySamples every sample, feeding
+    // CircularDelayBuffer::readInterpolated() rather than the old exact-integer read() - without
+    // this, every knob move (or automation write) jumped the read pointer to a new integer sample
+    // index between one block and the next with zero transition: a textbook delay-line zipper-
+    // noise/discontinuity bug (reported by Adam, 2026-09-03, as "clippy graininess" on Pre-Delay
+    // movement). Same idiom as IntruderFDNEngine::envelopeSmoother - a wildjag::dsp::OnePoleFilter
+    // fed a constant target value every sample, its state IS the smoothed value - not a new
+    // primitive, and deliberately not juce::SmoothedValue (this file has zero JUCE includes; see
+    // CircularDelayBuffer's own "deliberately not juce::dsp::DelayLine" comment for why that stays
+    // true here too).
+    wildjag::dsp::OnePoleFilter preDelaySmoother;
+    // False immediately after reset()/prepare() - true once setPreDelayMs() has been called at
+    // least once since. The FIRST call after a reset snaps preDelaySmoother's state straight to
+    // the target (no glide-in), since prepareToPlay() never calls setPreDelayMs() itself - the
+    // engine only learns the real value on the first live processBlock() (or a test calling it
+    // directly), and gliding UP to that from a stale/zero starting point on every prepare() would
+    // just move the same artifact to plugin-load/preset-recall time instead of fixing it. Every
+    // subsequent call in the same primed lifetime only updates the target and lets the per-sample
+    // smoother glide - that's the actual fix.
+    bool preDelayPrimed = false;
 
     // Applied right after pre-delay, before injection into the tank - same placement/reasoning as
     // IntruderFDNEngine's own input TiltFilter: "colors EVERYTHING downstream, matching
@@ -294,6 +315,16 @@ private:
     // track - that wobble is modal noise in a region where the captures have few modes and little
     // energy, not a shape worth chasing with a higher-order filter.
     static constexpr float defaultInputHighPassHz = 70.0f;
+
+    // preDelaySmoother's cutoff (see its own comment above) - deliberately faster than Caverns'/
+    // Shields' own delay/size glide constants (40-60ms, a deliberate "musical portamento" feel for
+    // THOSE controls) and slower than Intruder's 80Hz envelope declick. Pre-delay is a mostly-
+    // inaudible-as-a-standalone-effect timing offset (0-200ms), not meant to have an audible glide
+    // character of its own: fast enough (tau ~10.6ms) that a knob drag still feels immediate and
+    // doesn't itself sound like a pitch-bend, slow enough relative to a typical ~3-12ms host block
+    // to smear an inter-block integer-sample jump into an inaudible ramp. Starting point, not a
+    // measured value - retune (try 8-20Hz) if a fast drag still grains or a normal one feels laggy.
+    static constexpr float preDelaySmoothingHz = 15.0f;
 
     // Output-stage quantizer (see setBitDepth()'s comment). Deliberately NOT in the feedback loop:
     // quantizing inside a recirculating path risks limit cycles (a tail settling into a nonzero

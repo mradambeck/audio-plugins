@@ -158,6 +158,90 @@ public:
                 "at 50ms pre-delay, the same ~30ms window should still be essentially silent (first arrival not until ~80ms)");
         }
 
+        beginTest("Pre-delay glides smoothly when changed mid-stream (regression test for zipper noise)");
+        {
+            // Real bug found 2026-09-03 (Adam: "clippy graininess" while moving Pre-Delay):
+            // setPreDelayMs() used to write a plain int straight into a non-interpolated buffer
+            // read, so every change - including the once-per-block update PluginProcessor already
+            // does while a knob is being dragged - jumped the read pointer to a new integer sample
+            // index with zero transition. This test drives the engine the same way the real
+            // plugin does (setPreDelayMs() between processStereo() calls, matching one call per
+            // block) and checks the OUTPUT for a discontinuity at the change, not just that the
+            // parameter value itself changed.
+            AuraFDNEngine engine;
+            engine.prepare(sampleRate);
+            // Zero feedback isolates the pre-delay stage's own contribution: with the recirculating
+            // path silenced, the tank's output is dominated by the continuously-injected (tilted/
+            // pre-delayed) input itself, so a discontinuity in the pre-delay read shows up directly
+            // in the output rather than being masked by unrelated tank complexity.
+            engine.setBandGains(0.0f, 0.0f);
+            engine.setDampingWeight(0.0f);
+            engine.setPreDelayMs(50.0f); // primes immediately - no glide-in needed for this first value
+
+            constexpr int chunkSamples = 8000;
+            std::vector<float> left(static_cast<size_t>(chunkSamples) * 2, 0.0f);
+            std::vector<float> right(static_cast<size_t>(chunkSamples) * 2, 0.0f);
+
+            // A continuous, smoothly-varying signal (not an impulse/silence) spanning both chunks
+            // with no discontinuity of its own - any discontinuity found below must come from the
+            // pre-delay read, not from the input signal.
+            constexpr float toneHz = 100.0f;
+            constexpr float amplitude = 0.5f;
+            for (int i = 0; i < chunkSamples * 2; ++i)
+            {
+                const auto sample = amplitude * std::sin(2.0f * juce::MathConstants<float>::pi * toneHz * (float) i / (float) sampleRate);
+                left[(size_t) i] = sample;
+                right[(size_t) i] = sample;
+            }
+
+            // First block at the primed 50ms pre-delay.
+            engine.processStereo(left.data(), right.data(), chunkSamples);
+            // A modest (2ms) jump partway through the stream, exactly how
+            // PluginProcessor::processBlock() calls setPreDelayMs() once per block regardless of
+            // whether the value changed. Deliberately NOT a huge jump (e.g. 50ms->150ms): sweeping
+            // the read tap that far, even smoothly, causes a real, legitimate Doppler-like pitch
+            // bend for the duration of the glide (an unavoidable property of ANY smoothly-varying
+            // delay, not a bug) - large enough on its own to swamp the smaller signal this test is
+            // actually looking for. A small jump keeps the smoothed glide's own induced modulation
+            // negligible against steady-state, while still being large enough (~2ms is ~1/5 of this
+            // tone's own 10ms period) that the OLD, un-interpolated integer jump lands on a clearly
+            // uncorrelated point on the sine and produces an obviously anomalous spike.
+            engine.setPreDelayMs(52.0f);
+            engine.processStereo(left.data() + chunkSamples, right.data() + chunkSamples, chunkSamples);
+
+            expect(!hasNaNOrInf(left), "output must stay finite through a large mid-stream pre-delay change");
+
+            // A jump at the pre-delay READ (sample index `chunkSamples`, where setPreDelayMs() was
+            // called) does NOT show up in the OUTPUT until later: preL/preR only reach the output
+            // by being written into a tank line at that instant and read back out one full line
+            // length afterwards (this engine's 8 lines span ~30-76ms - see AuraFDNEngine.h's
+            // baseLineLengthsMs comment). Search a window covering that whole range, with margin,
+            // AFTER the boundary - not right at it, which would silently miss the effect entirely
+            // (confirmed by first running this test against the pre-fix engine with the naive
+            // right-at-the-boundary window: it passed even with the old, un-interpolated read,
+            // because it was looking in the wrong place).
+            const auto searchStart = chunkSamples + (int) (0.025 * sampleRate);
+            const auto searchEnd = chunkSamples + (int) (0.085 * sampleRate);
+
+            float maxDeltaNearTransition = 0.0f;
+            for (int i = searchStart; i < searchEnd; ++i)
+                maxDeltaNearTransition = std::max(maxDeltaNearTransition, std::abs(left[(size_t) i] - left[(size_t) (i - 1)]));
+
+            // Steady-state region well away from both the startup transient at sample 0 and the
+            // transition-affected window above.
+            float maxDeltaSteadyState = 0.0f;
+            for (int i = 1000; i < chunkSamples - 1000; ++i)
+                maxDeltaSteadyState = std::max(maxDeltaSteadyState, std::abs(left[(size_t) i] - left[(size_t) (i - 1)]));
+
+            expect(maxDeltaSteadyState > 0.0f, "steady-state region should have real, non-silent per-sample variation to compare against");
+            expect(maxDeltaNearTransition < maxDeltaSteadyState * 4.0f,
+                "a 50ms->52ms pre-delay jump between blocks must not produce a sample-to-sample "
+                "delta far larger than normal steady-state variation, once the tank has had time "
+                "to read the jumped pre-delay stage back out - a hard jump in the old "
+                "non-interpolated read could land on an uncorrelated point on the sine and produce "
+                "an anomalous spike well beyond this threshold");
+        }
+
         beginTest("Input tilt affects onset content, not just the tail (regression test for the Phase D bug)");
         {
             // Real bug found via Phase D validation: feedbackShelf alone produced ZERO onset-tilt

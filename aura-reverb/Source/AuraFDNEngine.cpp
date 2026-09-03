@@ -33,6 +33,7 @@ void AuraFDNEngine::prepare(double sampleRate)
     maxPreDelaySamples = (int) std::ceil(0.2 * sampleRate) + 4; // 200ms max pre-delay headroom
     preDelayBufferL.setSize(maxPreDelaySamples);
     preDelayBufferR.setSize(maxPreDelaySamples);
+    preDelaySmoother.setCutoffHz(preDelaySmoothingHz, sampleRate);
 
     inputTiltL.setPivotHz(inputTiltPivotHz, sampleRate);
     inputTiltR.setPivotHz(inputTiltPivotHz, sampleRate);
@@ -55,6 +56,8 @@ void AuraFDNEngine::reset()
     lowCutR.reset();
     preDelayBufferL.reset();
     preDelayBufferR.reset();
+    preDelaySmoother.reset();
+    preDelayPrimed = false;
     inputTiltL.reset();
     inputTiltR.reset();
     inputHighPassL.reset();
@@ -64,7 +67,18 @@ void AuraFDNEngine::reset()
 void AuraFDNEngine::setPreDelayMs(float ms)
 {
     const auto clampedMs = std::max(0.0f, ms);
-    preDelaySamples = std::min((int) std::round(clampedMs * 0.001f * (float) sampleRateHz), maxPreDelaySamples - 1);
+    // readInterpolated() needs delayInSamples within [0, capacity - 2] - stricter than the old
+    // exact-integer read()'s [0, capacity - 1].
+    const auto upperBoundSamples = (float) std::max(0, maxPreDelaySamples - 2);
+    const auto samples = std::clamp(clampedMs * 0.001f * (float) sampleRateHz, 0.0f, upperBoundSamples);
+    preDelaySamplesTarget = samples;
+    if (!preDelayPrimed)
+    {
+        // First call after reset(): snap immediately rather than gliding up from a stale/zero
+        // starting point - see preDelayPrimed's own comment in the header for why.
+        preDelaySmoother.reset(samples);
+        preDelayPrimed = true;
+    }
 }
 
 void AuraFDNEngine::setBandGains(float highBandGain, float lowBandGain)
@@ -151,11 +165,15 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
             dryR = dryR - lowCutR.processSample(dryR);
         }
 
-        // --- Pre-delay
+        // --- Pre-delay. Read position is smoothed (preDelaySmoother) and the buffer read is
+        // linearly interpolated (readInterpolated, not the exact-integer read) - together these
+        // remove the zipper noise a jumping integer read position produced on every Pre-Delay
+        // knob move. See preDelaySmoother's own comment in the header for the full story.
         preDelayBufferL.write(dryL);
         preDelayBufferR.write(dryR);
-        const auto preL = preDelayBufferL.read(preDelaySamples);
-        const auto preR = preDelayBufferR.read(preDelaySamples);
+        const auto smoothedPreDelaySamples = preDelaySmoother.processSample(preDelaySamplesTarget);
+        const auto preL = preDelayBufferL.readInterpolated(smoothedPreDelaySamples);
+        const auto preR = preDelayBufferR.readInterpolated(smoothedPreDelaySamples);
 
         // --- Input tilt (High's onset-tone effect), applied here so it colors EVERYTHING
         // downstream including the very first tank arrivals - see this file's header comment on
