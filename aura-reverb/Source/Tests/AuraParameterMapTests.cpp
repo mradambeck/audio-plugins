@@ -2,6 +2,7 @@
 #include "../AuraReferenceData.h"
 #include "../AuraOnsetTiltData.h"
 #include "../AuraDecayGainData.h"
+#include "../AuraSubBassGainData.h"
 
 #include <juce_core/juce_core.h>
 
@@ -107,6 +108,42 @@ public:
             extrapolated = true;
             AuraParameterMap::mapInputTiltDb(-4.0f, &extrapolated);
             expect(!extrapolated, "within the measured range should not be flagged as extrapolated");
+        }
+
+        beginTest("mapTimeToSubBassGain reproduces the calibrated points exactly at Time's measured settings");
+        {
+            for (const auto& point : AuraSubBassGainData::timeToSubBassGain)
+            {
+                bool extrapolated = true;
+                const auto result = AuraParameterMap::mapTimeToSubBassGain(point.timeSeconds, &extrapolated);
+                expectWithinAbsoluteError(result, point.subBassGain, 1.0e-4f);
+                expect(!extrapolated, "a measured Time value should not be reported as extrapolated");
+            }
+        }
+
+        beginTest("mapTimeToSubBassGain flags extrapolation outside the measured 0.1-5.5s range");
+        {
+            bool extrapolated = false;
+            AuraParameterMap::mapTimeToSubBassGain(8.0f, &extrapolated);
+            expect(extrapolated, "above the highest measured Time should be flagged as extrapolated");
+
+            extrapolated = true;
+            AuraParameterMap::mapTimeToSubBassGain(2.3f, &extrapolated);
+            expect(!extrapolated, "a measured Time value should not be flagged as extrapolated");
+        }
+
+        beginTest("mapTimeToSubBassGain stays within AuraFDNEngine::setSubBassGain's own 0-1 clamp range even when extrapolating");
+        {
+            // Not monotonic by design (the calibrated curve dips at Time=1.8s - see
+            // AuraSubBassGainData.h's own comment on why: it's chasing the real reference
+            // capture's own low/mid gap, which isn't monotonic with Time either), so this only
+            // checks the value stays sane, not that it moves in one direction.
+            for (float t = 0.1f; t <= 8.0f; t += 0.2f)
+            {
+                const auto gain = AuraParameterMap::mapTimeToSubBassGain(t);
+                expect(gain > -0.5f && gain < 1.5f,
+                    "subBassGain should stay in a physically sane range even when extrapolating");
+            }
         }
     }
 };

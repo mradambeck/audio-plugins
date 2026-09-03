@@ -38,6 +38,13 @@ namespace AuraParameterMap
     // mapTimeAndHighToDecayParams() - this drives AuraFDNEngine::setInputTilt().
     float mapInputTiltDb(float highDb, bool* extrapolated = nullptr);
 
+    // Time -> AuraFDNEngine::setSubBassGain() (AuraSubBassGainData.h) - the in-loop 120Hz-pivot
+    // attenuation addressing the sub-bass decay-RATE limit (see that file's own comment for the
+    // full calibration story). Time-only, no High dependence - not measured against a High sweep
+    // at all, unlike decayGain/dampingWeight, since the low/mid decay-rate gap this targets was
+    // only ever characterized at High=0.
+    float mapTimeToSubBassGain(float timeSeconds, bool* extrapolated = nullptr);
+
     // No entry here for the plugin's "Low Cut" control (was the real hardware's own "Low" knob,
     // carried unwired - the capture grid couldn't isolate a usable, sign-consistent effect for it,
     // see git history for the full story) - it was repurposed into a plain 0-300Hz input high-pass

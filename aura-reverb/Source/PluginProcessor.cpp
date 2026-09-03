@@ -200,6 +200,7 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setPreDelayMs(preDelayMsParam->load());
     engine.setBitDepth(bitDepthParam->load());
     engine.setLowCutHz(lowCutHzParam->load());
+    engine.setSubBassGain(AuraParameterMap::mapTimeToSubBassGain(timeSecondsParam->load()));
 
     const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);
     // Independent Dry/Wet level pair, not a crossfade - see createParameterLayout()'s comment.

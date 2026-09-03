@@ -374,6 +374,81 @@ public:
             expect(withCutEnergy < noCutEnergy * 0.6,
                 "a 300Hz Low Cut should measurably reduce low-band energy at the very first tank arrival, not just the tail");
         }
+
+        beginTest("Sub-bass gain at 1.0 is a genuine bypass (bit-identical output)");
+        {
+            // See AuraFDNEngine.h's setSubBassGain() comment - 1.0 must be a true no-op, same
+            // explicit-bypass contract as Bit Depth's 24 and Low Cut's 0Hz.
+            AuraFDNEngine untouched, explicitDefault;
+            untouched.prepare(sampleRate);
+            explicitDefault.prepare(sampleRate);
+            untouched.setBandGains(0.9f, 0.9f);
+            untouched.setDampingWeight(0.9f);
+            explicitDefault.setBandGains(0.9f, 0.9f);
+            explicitDefault.setDampingWeight(0.9f);
+            explicitDefault.setSubBassGain(1.0f);
+
+            constexpr int numSamples = 4000;
+            std::vector<float> aL(numSamples, 0.0f), aR(numSamples, 0.0f);
+            std::vector<float> bL(numSamples, 0.0f), bR(numSamples, 0.0f);
+            aL[0] = 1.0f; aR[0] = 1.0f;
+            bL[0] = 1.0f; bR[0] = 1.0f;
+            untouched.processStereo(aL.data(), aR.data(), numSamples);
+            explicitDefault.processStereo(bL.data(), bR.data(), numSamples);
+
+            float maxAbsDiff = 0.0f;
+            for (int i = 0; i < numSamples; ++i)
+                maxAbsDiff = std::max({maxAbsDiff, std::abs(aL[(size_t) i] - bL[(size_t) i]),
+                                        std::abs(aR[(size_t) i] - bR[(size_t) i])});
+            expectEquals(maxAbsDiff, 0.0f, "setSubBassGain(1.0) must render bit-identically to never calling setSubBassGain at all");
+        }
+
+        beginTest("Reducing sub-bass gain measurably shortens the low band's tail without changing crest factor");
+        {
+            AuraFDNEngine baseline, attenuated;
+            baseline.prepare(sampleRate);
+            attenuated.prepare(sampleRate);
+            baseline.setBandGains(0.9f, 0.9f);
+            baseline.setDampingWeight(0.9f);
+            attenuated.setBandGains(0.9f, 0.9f);
+            attenuated.setDampingWeight(0.9f);
+            attenuated.setSubBassGain(0.9f);
+
+            constexpr int numSamples = (int) (2.0 * sampleRate);
+            const auto baselineEnv = renderImpulseEnvelope(baseline, numSamples);
+            const auto attenuatedEnv = renderImpulseEnvelope(attenuated, numSamples);
+            expect(!hasNaNOrInf(baselineEnv) && !hasNaNOrInf(attenuatedEnv), "output must stay finite with sub-bass gain applied");
+
+            // Late-tail peak (well past onset, where a per-lap attenuation has had time to
+            // compound) should be measurably lower with sub-bass gain reduced.
+            const auto baselineLate = peakInWindow(baselineEnv, 1.8, sampleRate, 0.08);
+            const auto attenuatedLate = peakInWindow(attenuatedEnv, 1.8, sampleRate, 0.08);
+            expect(attenuatedLate < baselineLate * 0.9,
+                "reducing subBassGain should measurably reduce the late-tail level (faster decay), not just leave it unchanged");
+
+            // Crest factor over the same window should be essentially unchanged - this is the
+            // exact property the two rejected "more lines" attempts broke; this mechanism must
+            // not repeat that (see AuraSubBassGainData.h's side-effect-check comment).
+            auto crestFactorDb = [&](const std::vector<float>& env, double centerSeconds)
+            {
+                const auto start = (int) ((centerSeconds - 0.05) * sampleRate);
+                const auto end = (int) ((centerSeconds + 0.05) * sampleRate);
+                double sumSquares = 0.0;
+                float peak = 0.0f;
+                for (int i = std::max(0, start); i < std::min((int) env.size(), end); ++i)
+                {
+                    peak = std::max(peak, env[(size_t) i]);
+                    sumSquares += (double) env[(size_t) i] * env[(size_t) i];
+                }
+                const auto count = std::max(1, std::min((int) env.size(), end) - std::max(0, start));
+                const auto rms = std::sqrt(sumSquares / count);
+                return 20.0f * std::log10((peak + 1.0e-12f) / (float) (rms + 1.0e-12));
+            };
+            const auto baselineCrest = crestFactorDb(baselineEnv, 0.5);
+            const auto attenuatedCrest = crestFactorDb(attenuatedEnv, 0.5);
+            expect(std::abs(baselineCrest - attenuatedCrest) < 1.0f,
+                "reducing subBassGain should not meaningfully change the tank's crest factor / density character");
+        }
     }
 };
 
