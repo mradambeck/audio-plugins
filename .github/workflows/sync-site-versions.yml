@@ -47,6 +47,7 @@ jobs:
               "shields-reverb",
               "intruder-gated-reverb",
               "strike-synth",
+              "aura-reverb",
           ]
 
           HTML_PATH = "site/index.html"
