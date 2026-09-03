@@ -19,6 +19,7 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Shields | [`shields-reverb/`](shields-reverb/) | Diffuse algorithmic reverb with a slow-building swell |
 | Intruder | [`intruder-gated-reverb/`](intruder-gated-reverb/) | Non-linear gated reverb modeled on the AMS RMX16's Non-Lin 2 |
 | Strike | [`strike-synth/`](strike-synth/) | Extended Karplus-Strong physical-modeling string synth |
+| Aura | [`aura-reverb/`](aura-reverb/) | Algorithmic reverb modeled on the AMS RMX16's Ambience program |
 
 Each plugin has its own README with build/launch instructions specific to that plugin and a
 description of how it works; this README covers everything shared across the whole monorepo.

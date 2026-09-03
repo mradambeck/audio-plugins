@@ -1,0 +1,1102 @@
+[
+  {
+    "filename": "Ambience_0.1s_+3L-5H.wav",
+    "params": {
+      "time": 0.1,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.6076216399669647,
+      "low_band_gain": 0.2692335695028305,
+      "damping_weight_mean": 0.3948735296726227
+    },
+    "envelope_correlation": 0.5589620168725422,
+    "ref_full_decay_rt60_s": 0.2296,
+    "rendered_full_decay_rt60_s": 12.4373,
+    "ref_full_decay_r2": 0.7864,
+    "rendered_full_decay_r2": 0.2115,
+    "ref_echo_density_half_rise_s": 0.1946,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_+5L-8H.wav",
+    "params": {
+      "time": 0.1,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.5827823281288147,
+      "low_band_gain": 0.2731320261955261,
+      "damping_weight_mean": 0.3527050018310547
+    },
+    "envelope_correlation": 0.5599521693622085,
+    "ref_full_decay_rt60_s": 0.3389,
+    "rendered_full_decay_rt60_s": 11.775,
+    "ref_full_decay_r2": 0.7644,
+    "rendered_full_decay_r2": 0.2357,
+    "ref_echo_density_half_rise_s": 0.1247,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_+6L-5H.wav",
+    "params": {
+      "time": 0.1,
+      "low": 6,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.6076216399669647,
+      "low_band_gain": 0.2692335695028305,
+      "damping_weight_mean": 0.3948735296726227
+    },
+    "envelope_correlation": 0.5734086334908275,
+    "ref_full_decay_rt60_s": 0.2414,
+    "rendered_full_decay_rt60_s": 12.4373,
+    "ref_full_decay_r2": 0.7917,
+    "rendered_full_decay_r2": 0.2115,
+    "ref_echo_density_half_rise_s": 0.1247,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_-2L-2H.wav",
+    "params": {
+      "time": 0.1,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.6058327257633209,
+      "low_band_gain": 0.26915526390075684,
+      "damping_weight_mean": 0.4369935095310211
+    },
+    "envelope_correlation": 0.5618036073721977,
+    "ref_full_decay_rt60_s": 0.2284,
+    "rendered_full_decay_rt60_s": 13.0485,
+    "ref_full_decay_r2": 0.7736,
+    "rendered_full_decay_r2": 0.1924,
+    "ref_echo_density_half_rise_s": 0.1048,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_-4L0H.wav",
+    "params": {
+      "time": 0.1,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.5957640409469604,
+      "low_band_gain": 0.27037644386291504,
+      "damping_weight_mean": 0.4650573134422302
+    },
+    "envelope_correlation": 0.55290947549246,
+    "ref_full_decay_rt60_s": 0.2293,
+    "rendered_full_decay_rt60_s": 13.45,
+    "ref_full_decay_r2": 0.7612,
+    "rendered_full_decay_r2": 0.1815,
+    "ref_echo_density_half_rise_s": 0.1048,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_-8L0H.wav",
+    "params": {
+      "time": 0.1,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.5957640409469604,
+      "low_band_gain": 0.27037644386291504,
+      "damping_weight_mean": 0.4650573134422302
+    },
+    "envelope_correlation": 0.5304865176303749,
+    "ref_full_decay_rt60_s": 0.2334,
+    "rendered_full_decay_rt60_s": 13.45,
+    "ref_full_decay_r2": 0.7651,
+    "rendered_full_decay_r2": 0.1815,
+    "ref_echo_density_half_rise_s": 0.1048,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_0L-4H.wav",
+    "params": {
+      "time": 0.1,
+      "low": 0,
+      "high": -4
+    },
+    "predicted": {
+      "high_band_gain": 0.6159014105796814,
+      "low_band_gain": 0.26793408393859863,
+      "damping_weight_mean": 0.408929705619812
+    },
+    "envelope_correlation": 0.5697522280414186,
+    "ref_full_decay_rt60_s": 0.2265,
+    "rendered_full_decay_rt60_s": 12.5655,
+    "ref_full_decay_r2": 0.7944,
+    "rendered_full_decay_r2": 0.2069,
+    "ref_echo_density_half_rise_s": 0.1247,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.1s_0L-8H.wav",
+    "params": {
+      "time": 0.1,
+      "low": 0,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.5827823281288147,
+      "low_band_gain": 0.2731320261955261,
+      "damping_weight_mean": 0.3527050018310547
+    },
+    "envelope_correlation": 0.5266014465582024,
+    "ref_full_decay_rt60_s": 0.2324,
+    "rendered_full_decay_rt60_s": 11.775,
+    "ref_full_decay_r2": 0.8156,
+    "rendered_full_decay_r2": 0.2357,
+    "ref_echo_density_half_rise_s": 0.1946,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_0.5s_+3L-5H.wav",
+    "params": {
+      "time": 0.5,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.689097672700882,
+      "low_band_gain": 0.5218204706907272,
+      "damping_weight_mean": 0.6649064719676971
+    },
+    "envelope_correlation": 0.6836129823809217,
+    "ref_full_decay_rt60_s": 0.5092,
+    "rendered_full_decay_rt60_s": 9.2992,
+    "ref_full_decay_r2": 0.9893,
+    "rendered_full_decay_r2": 0.2482,
+    "ref_echo_density_half_rise_s": 0.0798,
+    "rendered_echo_density_half_rise_s": 0.3492
+  },
+  {
+    "filename": "Ambience_0.5s_+5L-8H.wav",
+    "params": {
+      "time": 0.5,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.6642583608627319,
+      "low_band_gain": 0.5257189273834229,
+      "damping_weight_mean": 0.6227379441261292
+    },
+    "envelope_correlation": 0.6796320041190994,
+    "ref_full_decay_rt60_s": 0.4903,
+    "rendered_full_decay_rt60_s": 9.0063,
+    "ref_full_decay_r2": 0.9816,
+    "rendered_full_decay_r2": 0.2733,
+    "ref_echo_density_half_rise_s": 0.2145,
+    "rendered_echo_density_half_rise_s": 0.3442
+  },
+  {
+    "filename": "Ambience_0.5s_+6L-5H.wav",
+    "params": {
+      "time": 0.5,
+      "low": 6,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.689097672700882,
+      "low_band_gain": 0.5218204706907272,
+      "damping_weight_mean": 0.6649064719676971
+    },
+    "envelope_correlation": 0.6818745981195062,
+    "ref_full_decay_rt60_s": 0.5131,
+    "rendered_full_decay_rt60_s": 9.2992,
+    "ref_full_decay_r2": 0.9889,
+    "rendered_full_decay_r2": 0.2482,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.3492
+  },
+  {
+    "filename": "Ambience_0.5s_-2L-2H.wav",
+    "params": {
+      "time": 0.5,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.6873087584972382,
+      "low_band_gain": 0.5217421650886536,
+      "damping_weight_mean": 0.7070264518260956
+    },
+    "envelope_correlation": 0.701973053392917,
+    "ref_full_decay_rt60_s": 0.524,
+    "rendered_full_decay_rt60_s": 9.5365,
+    "ref_full_decay_r2": 0.989,
+    "rendered_full_decay_r2": 0.2284,
+    "ref_echo_density_half_rise_s": 0.2145,
+    "rendered_echo_density_half_rise_s": 0.3243
+  },
+  {
+    "filename": "Ambience_0.5s_-4L0H.wav",
+    "params": {
+      "time": 0.5,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.6772400736808777,
+      "low_band_gain": 0.5229633450508118,
+      "damping_weight_mean": 0.7350902557373047
+    },
+    "envelope_correlation": 0.713242111461589,
+    "ref_full_decay_rt60_s": 0.5307,
+    "rendered_full_decay_rt60_s": 9.7027,
+    "ref_full_decay_r2": 0.9893,
+    "rendered_full_decay_r2": 0.2153,
+    "ref_echo_density_half_rise_s": 0.2295,
+    "rendered_echo_density_half_rise_s": 0.3143
+  },
+  {
+    "filename": "Ambience_0.5s_-8L0H.wav",
+    "params": {
+      "time": 0.5,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.6772400736808777,
+      "low_band_gain": 0.5229633450508118,
+      "damping_weight_mean": 0.7350902557373047
+    },
+    "envelope_correlation": 0.712695346061953,
+    "ref_full_decay_rt60_s": 0.5317,
+    "rendered_full_decay_rt60_s": 9.7027,
+    "ref_full_decay_r2": 0.9888,
+    "rendered_full_decay_r2": 0.2153,
+    "ref_echo_density_half_rise_s": 0.2295,
+    "rendered_echo_density_half_rise_s": 0.3143
+  },
+  {
+    "filename": "Ambience_0.5s_0L-4H.wav",
+    "params": {
+      "time": 0.5,
+      "low": 0,
+      "high": -4
+    },
+    "predicted": {
+      "high_band_gain": 0.6973774433135986,
+      "low_band_gain": 0.5205209851264954,
+      "damping_weight_mean": 0.6789626479148865
+    },
+    "envelope_correlation": 0.6872408945840431,
+    "ref_full_decay_rt60_s": 0.5055,
+    "rendered_full_decay_rt60_s": 9.355,
+    "ref_full_decay_r2": 0.9811,
+    "rendered_full_decay_r2": 0.2418,
+    "ref_echo_density_half_rise_s": 0.0798,
+    "rendered_echo_density_half_rise_s": 0.3492
+  },
+  {
+    "filename": "Ambience_0.5s_0L-8H.wav",
+    "params": {
+      "time": 0.5,
+      "low": 0,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.6642583608627319,
+      "low_band_gain": 0.5257189273834229,
+      "damping_weight_mean": 0.6227379441261292
+    },
+    "envelope_correlation": 0.6819830330774678,
+    "ref_full_decay_rt60_s": 0.489,
+    "rendered_full_decay_rt60_s": 9.0063,
+    "ref_full_decay_r2": 0.9809,
+    "rendered_full_decay_r2": 0.2733,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.3442
+  },
+  {
+    "filename": "Ambience_1.1s_+3L-5H.wav",
+    "params": {
+      "time": 1.1,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.7721327245235443,
+      "low_band_gain": 0.6607360690832138,
+      "damping_weight_mean": 0.7815333902835846
+    },
+    "envelope_correlation": 0.7172932238225999,
+    "ref_full_decay_rt60_s": 0.7554,
+    "rendered_full_decay_rt60_s": 6.6297,
+    "ref_full_decay_r2": 0.991,
+    "rendered_full_decay_r2": 0.3067,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2893
+  },
+  {
+    "filename": "Ambience_1.1s_+5L-8H.wav",
+    "params": {
+      "time": 1.1,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.7472934126853943,
+      "low_band_gain": 0.6646345257759094,
+      "damping_weight_mean": 0.7393648624420166
+    },
+    "envelope_correlation": 0.7126471119896979,
+    "ref_full_decay_rt60_s": 0.7486,
+    "rendered_full_decay_rt60_s": 6.7221,
+    "ref_full_decay_r2": 0.9923,
+    "rendered_full_decay_r2": 0.3337,
+    "ref_echo_density_half_rise_s": 0.0599,
+    "rendered_echo_density_half_rise_s": 0.3991
+  },
+  {
+    "filename": "Ambience_1.1s_+6L-7H.wav",
+    "params": {
+      "time": 1.1,
+      "low": 6,
+      "high": -7
+    },
+    "predicted": {
+      "high_band_gain": 0.755573183298111,
+      "low_band_gain": 0.6633350402116776,
+      "damping_weight_mean": 0.7534210383892059
+    },
+    "envelope_correlation": 0.7045454657981632,
+    "ref_full_decay_rt60_s": 0.7161,
+    "rendered_full_decay_rt60_s": 6.714,
+    "ref_full_decay_r2": 0.9855,
+    "rendered_full_decay_r2": 0.317,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.3991
+  },
+  {
+    "filename": "Ambience_1.1s_-2L-2H.wav",
+    "params": {
+      "time": 1.1,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.7703438103199005,
+      "low_band_gain": 0.6606577634811401,
+      "damping_weight_mean": 0.823653370141983
+    },
+    "envelope_correlation": 0.7323678475967998,
+    "ref_full_decay_rt60_s": 0.7765,
+    "rendered_full_decay_rt60_s": 6.5949,
+    "ref_full_decay_r2": 0.9929,
+    "rendered_full_decay_r2": 0.3106,
+    "ref_echo_density_half_rise_s": 0.0599,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.1s_-4L0H.wav",
+    "params": {
+      "time": 1.1,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.76027512550354,
+      "low_band_gain": 0.6618789434432983,
+      "damping_weight_mean": 0.8517171740531921
+    },
+    "envelope_correlation": 0.753085162978937,
+    "ref_full_decay_rt60_s": 0.8051,
+    "rendered_full_decay_rt60_s": 6.5995,
+    "ref_full_decay_r2": 0.9929,
+    "rendered_full_decay_r2": 0.3114,
+    "ref_echo_density_half_rise_s": 0.0748,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.1s_-8L0H.wav",
+    "params": {
+      "time": 1.1,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.76027512550354,
+      "low_band_gain": 0.6618789434432983,
+      "damping_weight_mean": 0.8517171740531921
+    },
+    "envelope_correlation": 0.7530820549943414,
+    "ref_full_decay_rt60_s": 0.8049,
+    "rendered_full_decay_rt60_s": 6.5995,
+    "ref_full_decay_r2": 0.993,
+    "rendered_full_decay_r2": 0.3114,
+    "ref_echo_density_half_rise_s": 0.0748,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.1s_0L-4H.wav",
+    "params": {
+      "time": 1.1,
+      "low": 0,
+      "high": -4
+    },
+    "predicted": {
+      "high_band_gain": 0.780412495136261,
+      "low_band_gain": 0.6594365835189819,
+      "damping_weight_mean": 0.7955895662307739
+    },
+    "envelope_correlation": 0.7213005438430129,
+    "ref_full_decay_rt60_s": 0.7298,
+    "rendered_full_decay_rt60_s": 6.5824,
+    "ref_full_decay_r2": 0.983,
+    "rendered_full_decay_r2": 0.3101,
+    "ref_echo_density_half_rise_s": 0.0599,
+    "rendered_echo_density_half_rise_s": 0.2844
+  },
+  {
+    "filename": "Ambience_1.1s_0L-8H.wav",
+    "params": {
+      "time": 1.1,
+      "low": 0,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.7472934126853943,
+      "low_band_gain": 0.6646345257759094,
+      "damping_weight_mean": 0.7393648624420166
+    },
+    "envelope_correlation": 0.705036501703723,
+    "ref_full_decay_rt60_s": 0.7371,
+    "rendered_full_decay_rt60_s": 6.7221,
+    "ref_full_decay_r2": 0.9928,
+    "rendered_full_decay_r2": 0.3337,
+    "ref_echo_density_half_rise_s": 0.0599,
+    "rendered_echo_density_half_rise_s": 0.3991
+  },
+  {
+    "filename": "Ambience_1.8s_+3L-5H.wav",
+    "params": {
+      "time": 1.8,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9042054712772369,
+      "low_band_gain": 0.789841815829277,
+      "damping_weight_mean": 0.7985959947109222
+    },
+    "envelope_correlation": 0.8173611406386148,
+    "ref_full_decay_rt60_s": 1.3702,
+    "rendered_full_decay_rt60_s": 4.2749,
+    "ref_full_decay_r2": 0.9948,
+    "rendered_full_decay_r2": 0.5676,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_+5L-8H.wav",
+    "params": {
+      "time": 1.8,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.8793661594390869,
+      "low_band_gain": 0.7937402725219727,
+      "damping_weight_mean": 0.7564274668693542
+    },
+    "envelope_correlation": 0.7818735973921394,
+    "ref_full_decay_rt60_s": 1.3285,
+    "rendered_full_decay_rt60_s": 4.2908,
+    "ref_full_decay_r2": 0.9911,
+    "rendered_full_decay_r2": 0.5584,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.9828
+  },
+  {
+    "filename": "Ambience_1.8s_+6L-5H.wav",
+    "params": {
+      "time": 1.8,
+      "low": 6,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9042054712772369,
+      "low_band_gain": 0.789841815829277,
+      "damping_weight_mean": 0.7985959947109222
+    },
+    "envelope_correlation": 0.8068266574707075,
+    "ref_full_decay_rt60_s": 1.4586,
+    "rendered_full_decay_rt60_s": 4.2749,
+    "ref_full_decay_r2": 0.9935,
+    "rendered_full_decay_r2": 0.5676,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_-2L-2H.wav",
+    "params": {
+      "time": 1.8,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.9024165570735931,
+      "low_band_gain": 0.7897635102272034,
+      "damping_weight_mean": 0.8407159745693207
+    },
+    "envelope_correlation": 0.8379802241743421,
+    "ref_full_decay_rt60_s": 1.3577,
+    "rendered_full_decay_rt60_s": 4.2462,
+    "ref_full_decay_r2": 0.9962,
+    "rendered_full_decay_r2": 0.5788,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_-4L0H.wav",
+    "params": {
+      "time": 1.8,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.8923478722572327,
+      "low_band_gain": 0.7909846901893616,
+      "damping_weight_mean": 0.8687797784805298
+    },
+    "envelope_correlation": 0.8384792106627363,
+    "ref_full_decay_rt60_s": 1.4712,
+    "rendered_full_decay_rt60_s": 4.2776,
+    "ref_full_decay_r2": 0.9966,
+    "rendered_full_decay_r2": 0.579,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_-8L0H.wav",
+    "params": {
+      "time": 1.8,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.8923478722572327,
+      "low_band_gain": 0.7909846901893616,
+      "damping_weight_mean": 0.8687797784805298
+    },
+    "envelope_correlation": 0.8392473059383446,
+    "ref_full_decay_rt60_s": 1.4759,
+    "rendered_full_decay_rt60_s": 4.2776,
+    "ref_full_decay_r2": 0.9966,
+    "rendered_full_decay_r2": 0.579,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_0L-4H.wav",
+    "params": {
+      "time": 1.8,
+      "low": 0,
+      "high": -4
+    },
+    "predicted": {
+      "high_band_gain": 0.9124852418899536,
+      "low_band_gain": 0.7885423302650452,
+      "damping_weight_mean": 0.8126521706581116
+    },
+    "envelope_correlation": 0.8162040858078959,
+    "ref_full_decay_rt60_s": 1.3281,
+    "rendered_full_decay_rt60_s": 4.2385,
+    "ref_full_decay_r2": 0.9956,
+    "rendered_full_decay_r2": 0.5761,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_1.8s_0L-8H.wav",
+    "params": {
+      "time": 1.8,
+      "low": 0,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.8793661594390869,
+      "low_band_gain": 0.7937402725219727,
+      "damping_weight_mean": 0.7564274668693542
+    },
+    "envelope_correlation": 0.7913568569127506,
+    "ref_full_decay_rt60_s": 1.2394,
+    "rendered_full_decay_rt60_s": 4.2908,
+    "ref_full_decay_r2": 0.9915,
+    "rendered_full_decay_r2": 0.5584,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.9828
+  },
+  {
+    "filename": "Ambience_2.3s_+3L-5H.wav",
+    "params": {
+      "time": 2.3,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9106764495372772,
+      "low_band_gain": 0.8404315561056137,
+      "damping_weight_mean": 0.9086407721042633
+    },
+    "envelope_correlation": 0.8792351454260833,
+    "ref_full_decay_rt60_s": 2.1642,
+    "rendered_full_decay_rt60_s": 3.8385,
+    "ref_full_decay_r2": 0.9959,
+    "rendered_full_decay_r2": 0.7268,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.1946
+  },
+  {
+    "filename": "Ambience_2.3s_+5L-8H.wav",
+    "params": {
+      "time": 2.3,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.8858371376991272,
+      "low_band_gain": 0.8443300127983093,
+      "damping_weight_mean": 0.8664722442626953
+    },
+    "envelope_correlation": 0.8570241182222683,
+    "ref_full_decay_rt60_s": 2.2384,
+    "rendered_full_decay_rt60_s": 3.901,
+    "ref_full_decay_r2": 0.9914,
+    "rendered_full_decay_r2": 0.7,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_2.3s_+6L-5H.wav",
+    "params": {
+      "time": 2.3,
+      "low": 6,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9106764495372772,
+      "low_band_gain": 0.8404315561056137,
+      "damping_weight_mean": 0.9086407721042633
+    },
+    "envelope_correlation": 0.8801260158032687,
+    "ref_full_decay_rt60_s": 2.3935,
+    "rendered_full_decay_rt60_s": 3.8385,
+    "ref_full_decay_r2": 0.993,
+    "rendered_full_decay_r2": 0.7268,
+    "ref_echo_density_half_rise_s": 0.0249,
+    "rendered_echo_density_half_rise_s": 0.1946
+  },
+  {
+    "filename": "Ambience_2.3s_-2L-2H.wav",
+    "params": {
+      "time": 2.3,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.9088875353336334,
+      "low_band_gain": 0.84035325050354,
+      "damping_weight_mean": 0.9507607519626617
+    },
+    "envelope_correlation": 0.896272363473833,
+    "ref_full_decay_rt60_s": 2.1108,
+    "rendered_full_decay_rt60_s": 3.7823,
+    "ref_full_decay_r2": 0.9969,
+    "rendered_full_decay_r2": 0.7574,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.1546
+  },
+  {
+    "filename": "Ambience_2.3s_-4L0H.wav",
+    "params": {
+      "time": 2.3,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.898818850517273,
+      "low_band_gain": 0.8415744304656982,
+      "damping_weight_mean": 0.9788245558738708
+    },
+    "envelope_correlation": 0.9062024819006747,
+    "ref_full_decay_rt60_s": 2.2803,
+    "rendered_full_decay_rt60_s": 3.69,
+    "ref_full_decay_r2": 0.9976,
+    "rendered_full_decay_r2": 0.7941,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.1546
+  },
+  {
+    "filename": "Ambience_2.3s_-8L0H.wav",
+    "params": {
+      "time": 2.3,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.898818850517273,
+      "low_band_gain": 0.8415744304656982,
+      "damping_weight_mean": 0.9788245558738708
+    },
+    "envelope_correlation": 0.9055707827158426,
+    "ref_full_decay_rt60_s": 2.2862,
+    "rendered_full_decay_rt60_s": 3.69,
+    "ref_full_decay_r2": 0.9975,
+    "rendered_full_decay_r2": 0.7941,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.1546
+  },
+  {
+    "filename": "Ambience_3.0s_+5L-8H.wav",
+    "params": {
+      "time": 3.0,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.9283652305603027,
+      "low_band_gain": 0.881144106388092,
+      "damping_weight_mean": 0.867158830165863
+    },
+    "envelope_correlation": 0.88281766470052,
+    "ref_full_decay_rt60_s": 3.2296,
+    "rendered_full_decay_rt60_s": 3.6788,
+    "ref_full_decay_r2": 0.9875,
+    "rendered_full_decay_r2": 0.8511,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_3.0s_+6L-5H.wav",
+    "params": {
+      "time": 3.0,
+      "low": 6,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9532045423984528,
+      "low_band_gain": 0.8772456496953964,
+      "damping_weight_mean": 0.909327358007431
+    },
+    "envelope_correlation": 0.9001657171221251,
+    "ref_full_decay_rt60_s": 3.3033,
+    "rendered_full_decay_rt60_s": 3.6997,
+    "ref_full_decay_r2": 0.9908,
+    "rendered_full_decay_r2": 0.8793,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.015
+  },
+  {
+    "filename": "Ambience_3.0s_-2L-2H.wav",
+    "params": {
+      "time": 3.0,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.951415628194809,
+      "low_band_gain": 0.8771673440933228,
+      "damping_weight_mean": 0.9514473378658295
+    },
+    "envelope_correlation": 0.9152184860954177,
+    "ref_full_decay_rt60_s": 2.9967,
+    "rendered_full_decay_rt60_s": 3.7288,
+    "ref_full_decay_r2": 0.9952,
+    "rendered_full_decay_r2": 0.9128,
+    "ref_echo_density_half_rise_s": 0.0299,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_3.0s_-4L0H.wav",
+    "params": {
+      "time": 3.0,
+      "low": -4,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.9413469433784485,
+      "low_band_gain": 0.878388524055481,
+      "damping_weight_mean": 0.9795111417770386
+    },
+    "envelope_correlation": 0.918214587886143,
+    "ref_full_decay_rt60_s": 3.3126,
+    "rendered_full_decay_rt60_s": 3.7936,
+    "ref_full_decay_r2": 0.9961,
+    "rendered_full_decay_r2": 0.939,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_3.0s_-8L0H.wav",
+    "params": {
+      "time": 3.0,
+      "low": -8,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.9413469433784485,
+      "low_band_gain": 0.878388524055481,
+      "damping_weight_mean": 0.9795111417770386
+    },
+    "envelope_correlation": 0.9179990576715568,
+    "ref_full_decay_rt60_s": 3.3225,
+    "rendered_full_decay_rt60_s": 3.7936,
+    "ref_full_decay_r2": 0.996,
+    "rendered_full_decay_r2": 0.939,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_3.0s_0L-4H.wav",
+    "params": {
+      "time": 3.0,
+      "low": 0,
+      "high": -4
+    },
+    "predicted": {
+      "high_band_gain": 0.9614843130111694,
+      "low_band_gain": 0.8759461641311646,
+      "damping_weight_mean": 0.9233835339546204
+    },
+    "envelope_correlation": 0.9043397376092025,
+    "ref_full_decay_rt60_s": 2.9656,
+    "rendered_full_decay_rt60_s": 3.7198,
+    "ref_full_decay_r2": 0.9939,
+    "rendered_full_decay_r2": 0.8985,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.015
+  },
+  {
+    "filename": "Ambience_3.0s_0L-8H.wav",
+    "params": {
+      "time": 3.0,
+      "low": 0,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.9283652305603027,
+      "low_band_gain": 0.881144106388092,
+      "damping_weight_mean": 0.867158830165863
+    },
+    "envelope_correlation": 0.8821919173125136,
+    "ref_full_decay_rt60_s": 2.8301,
+    "rendered_full_decay_rt60_s": 3.6788,
+    "ref_full_decay_r2": 0.9889,
+    "rendered_full_decay_r2": 0.8511,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.2195
+  },
+  {
+    "filename": "Ambience_4.5_+5L-8H.wav",
+    "params": {
+      "time": 4.5,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.9501162171363831,
+      "low_band_gain": 0.9044396877288818,
+      "damping_weight_mean": 0.8696469664573669
+    },
+    "envelope_correlation": 0.8918865726346852,
+    "ref_full_decay_rt60_s": 4.1786,
+    "rendered_full_decay_rt60_s": 3.8511,
+    "ref_full_decay_r2": 0.9877,
+    "rendered_full_decay_r2": 0.9285,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_4.5s_+3L-5H.wav",
+    "params": {
+      "time": 4.5,
+      "low": 3,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9749555289745331,
+      "low_band_gain": 0.9005412310361862,
+      "damping_weight_mean": 0.9118154942989349
+    },
+    "envelope_correlation": 0.9080761241658772,
+    "ref_full_decay_rt60_s": 3.8733,
+    "rendered_full_decay_rt60_s": 3.966,
+    "ref_full_decay_r2": 0.9952,
+    "rendered_full_decay_r2": 0.9495,
+    "ref_echo_density_half_rise_s": 0.0249,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_4.5s_-2L-2H.wav",
+    "params": {
+      "time": 4.5,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.9731666147708893,
+      "low_band_gain": 0.9004629254341125,
+      "damping_weight_mean": 0.9539354741573334
+    },
+    "envelope_correlation": 0.919130548698654,
+    "ref_full_decay_rt60_s": 3.962,
+    "rendered_full_decay_rt60_s": 4.1978,
+    "ref_full_decay_r2": 0.9971,
+    "rendered_full_decay_r2": 0.9659,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_4.5s_-5L0H.wav",
+    "params": {
+      "time": 4.5,
+      "low": -5,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.9630979299545288,
+      "low_band_gain": 0.9016841053962708,
+      "damping_weight_mean": 0.9819992780685425
+    },
+    "envelope_correlation": 0.9234349218681084,
+    "ref_full_decay_rt60_s": 4.2058,
+    "rendered_full_decay_rt60_s": 4.4995,
+    "ref_full_decay_r2": 0.9968,
+    "rendered_full_decay_r2": 0.9735,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_4.5s_0L-5H.wav",
+    "params": {
+      "time": 4.5,
+      "low": 0,
+      "high": -5
+    },
+    "predicted": {
+      "high_band_gain": 0.9749555289745331,
+      "low_band_gain": 0.9005412310361862,
+      "damping_weight_mean": 0.9118154942989349
+    },
+    "envelope_correlation": 0.9076407315883211,
+    "ref_full_decay_rt60_s": 3.7106,
+    "rendered_full_decay_rt60_s": 3.966,
+    "ref_full_decay_r2": 0.9961,
+    "rendered_full_decay_r2": 0.9495,
+    "ref_echo_density_half_rise_s": 0.0249,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_5.5s_+2L-3H.wav",
+    "params": {
+      "time": 5.5,
+      "low": 2,
+      "high": -3
+    },
+    "predicted": {
+      "high_band_gain": 0.9884305447340012,
+      "low_band_gain": 0.9196650385856628,
+      "damping_weight_mean": 0.9413175135850906
+    },
+    "envelope_correlation": 0.91822631545768,
+    "ref_full_decay_rt60_s": 4.9024,
+    "rendered_full_decay_rt60_s": 4.7496,
+    "ref_full_decay_r2": 0.9958,
+    "rendered_full_decay_r2": 0.9747,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_5.5s_+5L-8H.wav",
+    "params": {
+      "time": 5.5,
+      "low": 5,
+      "high": -8
+    },
+    "predicted": {
+      "high_band_gain": 0.9603458046913147,
+      "low_band_gain": 0.9242523908615112,
+      "damping_weight_mean": 0.8710609078407288
+    },
+    "envelope_correlation": 0.8978198780418846,
+    "ref_full_decay_rt60_s": 4.9313,
+    "rendered_full_decay_rt60_s": 4.3082,
+    "ref_full_decay_r2": 0.9892,
+    "rendered_full_decay_r2": 0.9661,
+    "ref_echo_density_half_rise_s": 0.0249,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_5.5s_-2L-2H.wav",
+    "params": {
+      "time": 5.5,
+      "low": -2,
+      "high": -2
+    },
+    "predicted": {
+      "high_band_gain": 0.9833962023258209,
+      "low_band_gain": 0.9202756285667419,
+      "damping_weight_mean": 0.9553494155406952
+    },
+    "envelope_correlation": 0.9256357791789511,
+    "ref_full_decay_rt60_s": 4.9533,
+    "rendered_full_decay_rt60_s": 4.9347,
+    "ref_full_decay_r2": 0.9962,
+    "rendered_full_decay_r2": 0.9743,
+    "ref_echo_density_half_rise_s": 0.0299,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_5.5s_-3L0H.wav",
+    "params": {
+      "time": 5.5,
+      "low": -3,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.9733275175094604,
+      "low_band_gain": 0.9214968085289001,
+      "damping_weight_mean": 0.9834132194519043
+    },
+    "envelope_correlation": 0.9262132253454153,
+    "ref_full_decay_rt60_s": 5.2233,
+    "rendered_full_decay_rt60_s": 5.4602,
+    "ref_full_decay_r2": 0.9953,
+    "rendered_full_decay_r2": 0.9693,
+    "ref_echo_density_half_rise_s": 0.0349,
+    "rendered_echo_density_half_rise_s": 0.01
+  },
+  {
+    "filename": "Ambience_5.5s_-7L0H.wav",
+    "params": {
+      "time": 5.5,
+      "low": -7,
+      "high": 0
+    },
+    "predicted": {
+      "high_band_gain": 0.9733275175094604,
+      "low_band_gain": 0.9214968085289001,
+      "damping_weight_mean": 0.9834132194519043
+    },
+    "envelope_correlation": 0.9253780693459751,
+    "ref_full_decay_rt60_s": 5.2252,
+    "rendered_full_decay_rt60_s": 5.4602,
+    "ref_full_decay_r2": 0.9954,
+    "rendered_full_decay_r2": 0.9693,
+    "ref_echo_density_half_rise_s": 0.0399,
+    "rendered_echo_density_half_rise_s": 0.01
+  }
+]

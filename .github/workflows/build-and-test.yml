@@ -33,6 +33,8 @@ jobs:
             name: Strike
           - dir: strike-synth
             name: StrikeProcessor
+          - dir: aura-reverb
+            name: Aura
 
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +76,7 @@ jobs:
           - dir: shields-reverb
           - dir: intruder-gated-reverb
           - dir: strike-synth
+          - dir: aura-reverb
 
     steps:
       - uses: actions/checkout@v4

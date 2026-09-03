@@ -60,35 +60,6 @@ os.makedirs(RENDER_DIR, exist_ok=True)
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 
-def crest_factor_db_over_time(data, sampleRate, windowMs=30.0):
-    windowSize = max(1, int(sampleRate * windowMs / 1000.0))
-    numWindows = len(data) // windowSize
-    if numWindows == 0:
-        return np.array([])
-    trimmed = data[: numWindows * windowSize].reshape(numWindows, windowSize).astype(np.float64)
-    peak = np.max(np.abs(trimmed), axis=1)
-    rms = np.sqrt(np.mean(trimmed ** 2, axis=1))
-    with np.errstate(divide="ignore", invalid="ignore"):
-        crest = 20.0 * np.log10(np.where(rms > 1e-9, peak / np.maximum(rms, 1e-12), np.nan))
-    return crest
-
-
-def spectral_flatness_db(segment, sampleRate):
-    """Wiener entropy: geometric_mean(PSD) / arithmetic_mean(PSD), in dB. ~0dB = white-noise-like
-    (flat, diffuse); very negative = tonal/resonant (energy concentrated in a few peaks - comb
-    filtering, insufficient modal density)."""
-    if len(segment) < 64:
-        return None
-    from scipy.signal import welch
-    nperseg = min(2048, len(segment))
-    freqs, psd = welch(segment, fs=sampleRate, nperseg=nperseg)
-    psd = psd[freqs > 20.0]
-    psd = np.maximum(psd, 1e-20)
-    geo_mean = np.exp(np.mean(np.log(psd)))
-    arith_mean = np.mean(psd)
-    return float(10.0 * np.log10(geo_mean / arith_mean))
-
-
 def tail_segment(data, sampleRate, startFrac=0.3, endFrac=0.9):
     n = len(data)
     return data[int(n * startFrac) : int(n * endFrac)]
@@ -150,14 +121,14 @@ def compare_pair(ref_path, render_path, sample_rate_hint):
         inBand = (freqs >= lo) & (freqs <= hi)
         bandDiffs[label] = float(np.mean(spectrumDiff[inBand])) if np.any(inBand) else None
 
-    crestRef = crest_factor_db_over_time(refData, targetRate)
-    crestRend = crest_factor_db_over_time(rendDataMatched, targetRate)
+    crestRef = cw.crest_factor_db_over_time(refData, targetRate)
+    crestRend = cw.crest_factor_db_over_time(rendDataMatched, targetRate)
     crestRefMean = float(np.nanmean(crestRef)) if len(crestRef) else None
     crestRendMean = float(np.nanmean(crestRend)) if len(crestRend) else None
     crestDiff = (crestRendMean - crestRefMean) if (crestRef is not None and crestRefMean is not None and crestRendMean is not None) else None
 
-    flatRef = spectral_flatness_db(tail_segment(refData, targetRate), targetRate)
-    flatRend = spectral_flatness_db(tail_segment(rendDataMatched, targetRate), targetRate)
+    flatRef = cw.spectral_flatness_db(tail_segment(refData, targetRate), targetRate)
+    flatRend = cw.spectral_flatness_db(tail_segment(rendDataMatched, targetRate), targetRate)
     flatDiff = (flatRend - flatRef) if (flatRef is not None and flatRend is not None) else None
 
     return {

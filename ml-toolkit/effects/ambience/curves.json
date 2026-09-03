@@ -1,0 +1,163 @@
+{
+  "time_to_high_band_gain": {
+    "points": [
+      [
+        0.1,
+        0.5957640409469604
+      ],
+      [
+        0.5,
+        0.6772400736808777
+      ],
+      [
+        1.1,
+        0.76027512550354
+      ],
+      [
+        1.8,
+        0.8923478722572327
+      ],
+      [
+        2.3,
+        0.898818850517273
+      ],
+      [
+        3.0,
+        0.9413469433784485
+      ],
+      [
+        4.5,
+        0.9630979299545288
+      ],
+      [
+        5.5,
+        0.9733275175094604
+      ]
+    ]
+  },
+  "high_to_high_band_gain_offset": {
+    "points": [
+      [
+        -8.0,
+        -0.012981712818145752
+      ],
+      [
+        -4.0,
+        0.020137369632720947
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_low_band_gain": {
+    "points": [
+      [
+        0.1,
+        0.27037644386291504
+      ],
+      [
+        0.5,
+        0.5229633450508118
+      ],
+      [
+        1.1,
+        0.6618789434432983
+      ],
+      [
+        1.8,
+        0.7909846901893616
+      ],
+      [
+        2.3,
+        0.8415744304656982
+      ],
+      [
+        3.0,
+        0.878388524055481
+      ],
+      [
+        4.5,
+        0.9016841053962708
+      ],
+      [
+        5.5,
+        0.9214968085289001
+      ]
+    ]
+  },
+  "high_to_low_band_gain_offset": {
+    "points": [
+      [
+        -8.0,
+        0.002755582332611084
+      ],
+      [
+        -4.0,
+        -0.0024423599243164062
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_damping_weight_mean": {
+    "points": [
+      [
+        0.1,
+        0.4650573134422302
+      ],
+      [
+        0.5,
+        0.7350902557373047
+      ],
+      [
+        1.1,
+        0.8517171740531921
+      ],
+      [
+        1.8,
+        0.8687797784805298
+      ],
+      [
+        2.3,
+        0.9788245558738708
+      ],
+      [
+        3.0,
+        0.9795111417770386
+      ],
+      [
+        4.5,
+        0.9819992780685425
+      ],
+      [
+        5.5,
+        0.9834132194519043
+      ]
+    ]
+  },
+  "high_to_damping_weight_mean_offset": {
+    "points": [
+      [
+        -8.0,
+        -0.11235231161117554
+      ],
+      [
+        -4.0,
+        -0.05612760782241821
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "_notes": {
+    "low_band": "No Low curve built - findings.md found Low has no measurable onset-tone effect and no measurable decay effect at High=0, but does lengthen decay when High is very negative (one data point: Low=+5 vs Low=0 at High=-8, Time=2.3s, gave full_decay_rt60_s 2.217 vs 1.950). Not enough Low-at-multiple-High captures to fit a trustworthy interaction curve - needs either more targeted captures or by-ear tuning in Phase C, matching how Intruder's own automated fit still needed hand-tuning afterward.",
+    "tilt": "tilt_low_gain/tilt_high_gain excluded - stayed within ~2-3% of neutral (1.0) across all 65 fits (see fitted_raw.json), meaning damping_weight_mean and the high_band_gain/low_band_gain split already explain nearly all measured tonal variation. Fixed at 1.0 in the plugin rather than curve-fit.",
+    "combination_model": "value(Time, High) = time_curve(Time) + high_offset_curve(High), i.e. High's effect is treated as an additive, Time-independent offset from the Time curve's own Low=0/High=0 baseline. Only one Time setting (2.3s) has a High sweep, so this Time-independence assumption is unconfirmed - check in Phase D validation whether predicted values at other Time settings with nonzero High hold up."
+  }
+}
