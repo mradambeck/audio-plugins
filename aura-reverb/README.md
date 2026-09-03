@@ -81,6 +81,8 @@ split across two places:
 
    Writes `analysis/validation_report.md` and per-setting plots under `analysis/validation_plots/`.
    Rerun after any DSP change - that's the point of having it as a script, not a one-off check.
+   `AuraRenderIR`'s flags map 1:1 onto the plugin's own parameter IDs in their native units, plus
+   `--preset "<name>"` for the 7 factory presets (`PluginProcessor.cpp`'s `getFactoryPresets()`).
 3. **`AuraCalibrateProbe`** (a third console app, calibration-only, not part of the shipped
    plugin) - drives `AuraFDNEngine` directly at raw `decayGain`/`dampingWeight`/`subBassGain`,
    bypassing `AuraParameterMap`'s Time/High curves entirely, so the hand-calibrated tables below

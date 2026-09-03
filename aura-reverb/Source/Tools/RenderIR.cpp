@@ -19,6 +19,7 @@
 //
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
+//                [--preset "<factory preset name>"]
 //                [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0] [--preDelayMs 0]
 //                [--bitDepth 8] [--dry 0] [--wet 100]
 //                [--bypass 0]
@@ -27,6 +28,13 @@
 // native units - not normalised 0-1. Dry/Wet default to 0/100 here (pure wet reverb, isolated from
 // the dry tap), unlike the plugin's own 100%/50% defaults, so an unqualified run renders the
 // reverb itself rather than a dry-contaminated blend.
+//
+// --preset applies one of the factory presets first (setCurrentProgram's own
+// setValueNotifyingHost() path, see PluginProcessor.cpp's getFactoryPresets()); any --<paramID>
+// flags explicitly given override individual values on top of it. Without --preset, every param
+// still falls back to this tool's own hardcoded default above (not the plugin's own parameter
+// default) exactly as before - analysis/validate.py relies on those defaults - so omitting
+// --preset leaves existing behavior byte-for-byte unchanged.
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -76,6 +84,7 @@ int main(int argc, char* argv[])
     {
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
+            "                     [--preset \"<name>\"]\n"
             "                     [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0]\n"
             "                     [--preDelayMs 0] [--bitDepth 8]\n"
             "                     [--dry 0] [--wet 100] [--bypass 0]\n");
@@ -94,15 +103,58 @@ int main(int argc, char* argv[])
 
     AuraAudioProcessor processor;
 
-    setParam(processor, AuraAudioProcessor::timeSecondsParamID, getFloatArg(args, "timeSeconds", 2.0f));
-    setParam(processor, AuraAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowCutHz", 0.0f));
-    setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
-    setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
-    setParam(processor, AuraAudioProcessor::bitDepthParamID,
-        bitDepthChoiceIndexFor(getFloatArg(args, "bitDepth", 8.0f)));
-    setParam(processor, AuraAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
-    setParam(processor, AuraAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
-    setParam(processor, AuraAudioProcessor::bypassParamID, getFloatArg(args, "bypass", 0.0f));
+    const auto presetIt = args.find("preset");
+    const bool presetApplied = presetIt != args.end();
+    if (presetApplied)
+    {
+        int foundIndex = -1;
+        for (int i = 0; i < processor.getNumPrograms(); ++i)
+        {
+            if (processor.getProgramName(i) == juce::String(presetIt->second))
+            {
+                foundIndex = i;
+                break;
+            }
+        }
+        if (foundIndex < 0)
+        {
+            std::fprintf(stderr, "Unknown preset \"%s\"\n", presetIt->second.c_str());
+            return 1;
+        }
+        processor.setCurrentProgram(foundIndex);
+    }
+
+    // Each flag below only falls back to this tool's own hardcoded default (not the plugin's own
+    // parameter default) when neither a preset nor the flag itself was given - preserves this
+    // tool's long-standing byte-for-byte behavior when --preset is omitted (analysis/validate.py
+    // relies on exactly these defaults). Once --preset IS given, an unset flag instead leaves the
+    // preset's own value alone - only flags the caller actually passed override it, matching
+    // flux-phaser's own --preset contract.
+    auto applyParam = [&](const char* paramID, const char* flagName, float toolDefault)
+    {
+        const auto it = args.find(flagName);
+        if (it != args.end())
+            setParam(processor, paramID, std::stof(it->second));
+        else if (!presetApplied)
+            setParam(processor, paramID, toolDefault);
+    };
+
+    applyParam(AuraAudioProcessor::timeSecondsParamID, "timeSeconds", 2.0f);
+    applyParam(AuraAudioProcessor::lowCutHzParamID, "lowCutHz", 0.0f);
+    applyParam(AuraAudioProcessor::highDbParamID, "highDb", 0.0f);
+    applyParam(AuraAudioProcessor::preDelayMsParamID, "preDelayMs", 0.0f);
+    {
+        // bitDepth needs its own block: the flag takes a plain bit count, converted to the
+        // 3-choice index setParam() actually needs (see bitDepthChoiceIndexFor()'s comment).
+        const auto it = args.find("bitDepth");
+        if (it != args.end())
+            setParam(processor, AuraAudioProcessor::bitDepthParamID, bitDepthChoiceIndexFor(std::stof(it->second)));
+        else if (!presetApplied)
+            setParam(processor, AuraAudioProcessor::bitDepthParamID, bitDepthChoiceIndexFor(8.0f));
+    }
+    applyParam(AuraAudioProcessor::dryParamID, "dry", 0.0f);
+    applyParam(AuraAudioProcessor::wetParamID, "wet", 100.0f);
+    applyParam(AuraAudioProcessor::bypassParamID, "bypass", 0.0f);
 
     constexpr int blockSize = 512;
     processor.prepareToPlay((double) sampleRate, blockSize);

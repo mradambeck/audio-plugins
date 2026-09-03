@@ -70,6 +70,10 @@ private:
     juce::Label titleLabel;
     juce::Label tagLabel;
 
+    // See common/Presets/FactoryPreset.h's setupPresetCombo() for why it's left unselected on
+    // startup rather than showing the first preset's name.
+    juce::ComboBox presetCombo;
+
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 

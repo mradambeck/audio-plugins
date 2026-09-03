@@ -9,6 +9,8 @@
 #include "PluginEditor.h"
 #include "BinaryData.h"
 
+#include "../../common/Presets/FactoryPreset.h"
+
 // Lives here (not PluginProcessor.cpp) so PluginProcessor.cpp has no GUI dependency - AuraTests
 // links only PluginProcessor.cpp against juce_audio_processors/juce_dsp, no editor/LookAndFeel/fonts.
 juce::AudioProcessorEditor* AuraAudioProcessor::createEditor()
@@ -238,6 +240,10 @@ AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
     addAndMakeVisible(tagLabel);
 
+    // See common/Presets/FactoryPreset.h's setupPresetCombo() for why it's left unselected on
+    // startup rather than showing the first preset's name.
+    wildjag::setupPresetCombo(presetCombo, lookAndFeel, *this, processorRef);
+
     bypassButton.setLookAndFeel(&lookAndFeel);
     bypassButton.setButtonText("BYPASS");
     addAndMakeVisible(bypassButton);
@@ -462,6 +468,8 @@ void AuraEditorContent::resized()
     const auto bypassWidth = (int) std::ceil(9.0f + 8.0f + bypassTextWidth + 24.0f);
     bypassButton.setBounds(header.removeFromRight(bypassWidth).withSizeKeepingCentre(bypassWidth, 28)
                                 .expanded((int) AuraLookAndFeel::buttonShadowMargin));
+    header.removeFromRight(14);
+    presetCombo.setBounds(header.removeFromRight(128).withSizeKeepingCentre(128, 28));
 
     // Baseline-align "AURA" and the tag line (mockup: .brand{align-items:baseline}).
     const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);

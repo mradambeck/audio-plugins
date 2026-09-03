@@ -10,13 +10,99 @@ namespace
     {
         return (v > 0.0f ? juce::String("+") : juce::String()) + juce::String(v, decimals) + " " + unit;
     }
+
+    // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
+    // normalising, not display percentages) applied in one shot when the preset is selected -
+    // decoded directly from .aupreset files Adam saved via Logic's native preset UI (2026-09-03,
+    // ~/Library/Audio/Presets/Wild Jag/Aura - Reverb/), same convention as every other Wild Jag
+    // plugin's own getFactoryPresets() (see common/Presets/FactoryPreset.h's class comment). Dry/Wet
+    // are 0%/100% (pure wet) in every one of these - Adam's own choice for auditioning the reverb
+    // in isolation, not something to "fix" back toward the plugin's own 100%/50% defaults.
+    const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
+    {
+        static const std::vector<wildjag::FactoryPreset> presets = {
+            { "Default", {
+                { AuraAudioProcessor::bitDepthParamID, 2.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, 0.0f },
+                { AuraAudioProcessor::lowCutHzParamID, 10.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 32.0f },
+                { AuraAudioProcessor::timeSecondsParamID, 1.309999942779541f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "Far Out", {
+                { AuraAudioProcessor::bitDepthParamID, 2.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, -2.199999809265137f },
+                { AuraAudioProcessor::lowCutHzParamID, 38.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 46.10000228881836f },
+                { AuraAudioProcessor::timeSecondsParamID, 2.879999876022339f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "It's a Vibe", {
+                { AuraAudioProcessor::bitDepthParamID, 1.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, -4.599999904632568f },
+                { AuraAudioProcessor::lowCutHzParamID, 74.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 14.5f },
+                { AuraAudioProcessor::timeSecondsParamID, 1.870000004768372f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "No Cap", {
+                { AuraAudioProcessor::bitDepthParamID, 0.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, -4.800000190734863f },
+                { AuraAudioProcessor::lowCutHzParamID, 220.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 0.0f },
+                { AuraAudioProcessor::timeSecondsParamID, 4.519999980926514f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "Rizz", {
+                { AuraAudioProcessor::bitDepthParamID, 0.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, 0.0f },
+                { AuraAudioProcessor::lowCutHzParamID, 220.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 0.0f },
+                { AuraAudioProcessor::timeSecondsParamID, 1.649999976158142f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "That's Tight", {
+                { AuraAudioProcessor::bitDepthParamID, 2.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, -5.800000190734863f },
+                { AuraAudioProcessor::lowCutHzParamID, 131.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 55.70000076293945f },
+                { AuraAudioProcessor::timeSecondsParamID, 0.550000011920929f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+            { "Thirst Trap", {
+                { AuraAudioProcessor::bitDepthParamID, 1.0f },
+                { AuraAudioProcessor::bypassParamID, 0.0f },
+                { AuraAudioProcessor::dryParamID, 0.0f },
+                { AuraAudioProcessor::highDbParamID, -1.799999952316284f },
+                { AuraAudioProcessor::lowCutHzParamID, 121.0f },
+                { AuraAudioProcessor::preDelayMsParamID, 20.0f },
+                { AuraAudioProcessor::timeSecondsParamID, 1.039999961853027f },
+                { AuraAudioProcessor::wetParamID, 100.0f },
+            } },
+        };
+
+        return presets;
+    }
 }
 
 AuraAudioProcessor::AuraAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
+      factoryPresets(getFactoryPresets())
 {
     timeSecondsParam = apvts.getRawParameterValue(timeSecondsParamID);
     lowCutHzParam = apvts.getRawParameterValue(lowCutHzParamID);
@@ -232,10 +318,10 @@ bool AuraAudioProcessor::producesMidi() const { return false; }
 bool AuraAudioProcessor::isMidiEffect() const { return false; }
 double AuraAudioProcessor::getTailLengthSeconds() const { return 10.0; }
 
-int AuraAudioProcessor::getNumPrograms() { return 1; }
-int AuraAudioProcessor::getCurrentProgram() { return currentProgramIndex; }
-void AuraAudioProcessor::setCurrentProgram(int) {}
-const juce::String AuraAudioProcessor::getProgramName(int) { return {}; }
+int AuraAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
+int AuraAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
+void AuraAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+const juce::String AuraAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 void AuraAudioProcessor::changeProgramName(int, const juce::String&) {}
 
 void AuraAudioProcessor::getStateInformation(juce::MemoryBlock& destData)

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "../../common/Presets/FactoryPreset.h"
 #include "AuraFDNEngine.h"
 
 // AMS RMX16 "Ambience" emulation. Decay and Color match the real unit's own control set (displayed
@@ -75,10 +76,13 @@ private:
     std::atomic<float>* wetParam = nullptr;
     std::atomic<float>* bypassParam = nullptr;
 
-    int currentProgramIndex = 0;
     double sampleRateHz = 44100.0;
 
     AuraFDNEngine engine;
+
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AuraAudioProcessor)
 };
