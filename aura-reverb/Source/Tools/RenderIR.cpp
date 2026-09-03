@@ -20,7 +20,7 @@
 // Usage:
 //   AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]
 //                [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0] [--preDelayMs 0]
-//                [--bitDepth 16] [--inputGainDb 0] [--dry 0] [--wet 100]
+//                [--bitDepth 16] [--dry 0] [--wet 100]
 //                [--bypass 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs (PluginProcessor.h) in the plugin's own
@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: AuraRenderIR --out <path.wav> [--seconds 3.0] [--sampleRate 44100]\n"
             "                     [--timeSeconds 2.0] [--lowCutHz 0] [--highDb 0]\n"
-            "                     [--preDelayMs 0] [--bitDepth 16] [--inputGainDb 0]\n"
+            "                     [--preDelayMs 0] [--bitDepth 16]\n"
             "                     [--dry 0] [--wet 100] [--bypass 0]\n");
         return 1;
     }
@@ -86,7 +86,6 @@ int main(int argc, char* argv[])
     setParam(processor, AuraAudioProcessor::highDbParamID, getFloatArg(args, "highDb", 0.0f));
     setParam(processor, AuraAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
     setParam(processor, AuraAudioProcessor::bitDepthParamID, getFloatArg(args, "bitDepth", 16.0f));
-    setParam(processor, AuraAudioProcessor::inputGainDbParamID, getFloatArg(args, "inputGainDb", 0.0f));
     setParam(processor, AuraAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
     setParam(processor, AuraAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
     setParam(processor, AuraAudioProcessor::bypassParamID, getFloatArg(args, "bypass", 0.0f));

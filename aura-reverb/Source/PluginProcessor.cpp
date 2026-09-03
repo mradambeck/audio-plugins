@@ -25,7 +25,6 @@ AuraAudioProcessor::AuraAudioProcessor()
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
     dryParam = apvts.getRawParameterValue(dryParamID);
     wetParam = apvts.getRawParameterValue(wetParamID);
-    inputGainDbParam = apvts.getRawParameterValue(inputGainDbParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
 }
 
@@ -125,18 +124,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout AuraAudioProcessor::createPa
             .withStringFromValueFunction([](float v, int) {
                 return v >= 24.0f ? juce::String("Off") : juce::String(v, 1) + " bit"; })));
 
-    // Displayed as "Pre-Gain" (Adam, 2026-09-02) - underlying param ID stays inputGainDb. Applied
-    // to the signal feeding the engine, before the effect - "pre" as in ahead of the reverb, same
-    // sense as Low Cut's own placement, not a reference to Dry/Wet below.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{inputGainDbParamID, 1},
-        "Pre-Gain",
-        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
-        0.0f,
-        juce::AudioParameterFloatAttributes()
-            .withLabel("dB")
-            .withStringFromValueFunction([](float v, int) { return withSign(v, 1, "dB"); })));
-
     // Independent Dry/Wet level pair (Adam, 2026-09-02), replacing the old single Blend + Volume
     // pair - same convention as caverns-delay's own dryParamID/wetParamID (percent, not dB;
     // multiplicative gain, not a crossfade). Wet goes past 100% (unity) up to 200% so the reverb
@@ -202,7 +189,6 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     engine.setLowCutHz(lowCutHzParam->load());
     engine.setSubBassGain(AuraParameterMap::mapTimeToSubBassGain(timeSecondsParam->load()));
 
-    const auto inputGain = std::pow(10.0f, inputGainDbParam->load() / 20.0f);
     // Independent Dry/Wet level pair, not a crossfade - see createParameterLayout()'s comment.
     // Percent-to-linear, matching caverns-delay's own dryGain/wetGain convention exactly.
     const auto dryGain = dryParam->load() * 0.01f;
@@ -218,8 +204,6 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     {
         dryL[n] = left[n];
         dryR[n] = right[n];
-        left[n] *= inputGain;
-        right[n] *= inputGain;
     }
 
     engine.processStereo(left, right, numSamples);

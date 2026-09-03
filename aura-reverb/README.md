@@ -136,8 +136,8 @@ output**, found empirically over the course of Phase D validation:
 The UI is the full hardware-panel treatment (see the `juce-hardware-panel-ui` skill; accent colour
 `#DCAC52`), built from the approved mockup at `mockups/aura-mockup-v1.html`. Three sections - Tone
 (Low Cut/Bit Depth knobs + Color hero knob, stacked), Timing (Pre-Delay + Decay hero knob, stacked,
-matching Tone's two-row shape), Mix (Pre-Gain/Wet/Dry as three independent, full-height vertical
-faders - not knobs, and not a single crossfading Blend control). `AuraLookAndFeel` is a thin
+matching Tone's two-row shape), Mix (Wet/Dry as two independent, full-height vertical faders - not
+knobs, and not a single crossfading Blend control). `AuraLookAndFeel` is a thin
 subclass of the shared `wildjag::HardwarePanelLookAndFeel` supplying Aura's accent pair and the two
 embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific typeface).
 
@@ -150,7 +150,6 @@ embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific 
 | Color | -8 - 0 dB | 0 dB | Broadband bass/treble tilt (the hardware's own control) that also shortens decay as it goes negative |
 | Pre-Delay | 0 - 200 ms | 0 ms | Delay before the reverb signal starts |
 | Bit Depth | 8 - 24 bit | 16 bit | Output quantization depth; 24 is a genuine bypass, see "How it works" |
-| Pre-Gain | -24 - +24 dB | 0 dB | Input trim, applied before the reverb engine |
 | Dry | 0 - 100% | 100% | Dry signal gain |
 | Wet | 0 - 200% | 50% | Wet (processed) signal gain - independent of Dry, can exceed unity |
 | Bypass | on/off | off | |

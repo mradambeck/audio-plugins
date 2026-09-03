@@ -6,9 +6,9 @@
 
 // AMS RMX16 "Ambience" emulation. Decay and Color match the real unit's own control set (displayed
 // as "Decay"/"Color" - underlying param IDs stay timeSeconds/highDb, see their own comments in
-// createParameterLayout()), plus standard Dry/Wet/Pre-Gain/Pre-Delay/Bit Depth/Bypass controls
-// this catalog exposes on every reverb (Dry/Wet independent level pair, not a single blend knob -
-// same convention as caverns-delay's own dryParamID/wetParamID). Low Cut is NOT from the real
+// createParameterLayout()), plus standard Dry/Wet/Pre-Delay/Bit Depth/Bypass controls this catalog
+// exposes on every reverb (Dry/Wet independent level pair, not a single blend knob - same
+// convention as caverns-delay's own dryParamID/wetParamID). Low Cut is NOT from the real
 // hardware - see AuraFDNEngine.h's setLowCutHz() comment for why the real unit's own "Low" knob
 // was repurposed. All DSP lives in AuraFDNEngine; this class is parameter plumbing and dry/wet
 // mixing.
@@ -53,7 +53,6 @@ public:
     static constexpr auto bitDepthParamID = "bitDepth";
     static constexpr auto dryParamID = "dry";
     static constexpr auto wetParamID = "wet";
-    static constexpr auto inputGainDbParamID = "inputGainDb";
     static constexpr auto bypassParamID = "bypass";
 
 private:
@@ -66,7 +65,6 @@ private:
     std::atomic<float>* bitDepthParam = nullptr;
     std::atomic<float>* dryParam = nullptr;
     std::atomic<float>* wetParam = nullptr;
-    std::atomic<float>* inputGainDbParam = nullptr;
     std::atomic<float>* bypassParam = nullptr;
 
     int currentProgramIndex = 0;

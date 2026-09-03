@@ -31,16 +31,17 @@ namespace
     // - see the mockup's own comment on why proportional flex-grow sections were abandoned there.
     // TONE: max(2 regular knobs + gap, 1 hero knob) + side padding. TIMING: 1 hero knob (its own
     // widest row) + side padding. MIX (not given its own constant - sized as the remainder of
-    // setSize()'s total width, same convention as Caverns' own mixColumn): 3 fader cells + 2 gaps
-    // + side padding, ~246px.
+    // setSize()'s total width, same convention as Caverns' own mixColumn): 2 fader cells + 1 gap
+    // + side padding, ~166px (was ~246px/3 lanes before Pre-Gain was removed, 2026-09-03 - see
+    // setSize()'s own comment).
     // Widened from the mockup's own first-pass estimate (222/132) after the mandatory mockup-vs-
     // real-app screenshot comparison (see the juce-hardware-panel-ui skill's Verification
     // methodology) showed Tone/Timing reading visibly more cramped in the real app than in the
     // mockup - real JUCE knob cells reserve knobNameHeight+knobTextBoxHeight (48px) for the name+
     // value stack below each knob, taller than the mockup's own compact ~32px CSS approximation,
     // which changes the section's natural proportions. Mix's fader-cell width deliberately did
-    // NOT shrink to compensate (see mixColumn's own comment) - Pre-Gain's real -24..+24dB range
-    // needs "-24.0 dB"-length value text the mockup's shorter example values didn't exercise.
+    // NOT shrink to compensate (see mixColumn's own comment) - Wet's real 0-200% range needs
+    // "200.0%"-length value text the mockup's shorter example values didn't exercise.
     constexpr int toneColumnWidth = 250;
     constexpr int timingColumnWidth = 150;
 
@@ -57,7 +58,7 @@ namespace
     constexpr int knobTextBoxHeight = 20;
 
     constexpr int fieldNameHeight = 20;      // headroom for a fader's name label, which IS above
-                                              // (Pre-Gain/Wet/Dry match the more usual above-fader
+                                              // (Wet/Dry match the more usual above-fader
                                               // convention, opposite of the knob-name-below rule)
     constexpr int faderGap = 14;             // matches the mockup's tightened fader-row gap
 }
@@ -134,7 +135,6 @@ AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
     setupRotarySlider(colorSlider, colorLabel, "Color");
     setupRotarySlider(preDelaySlider, preDelayLabel, "Pre-Delay");
     setupRotarySlider(decaySlider, decayLabel, "Decay");
-    setupVerticalSlider(preGainSlider, preGainLabel, "Pre-Gain");
     setupVerticalSlider(wetSlider, wetLabel, "Wet");
     setupVerticalSlider(drySlider, dryLabel, "Dry");
 
@@ -148,14 +148,16 @@ AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
         processorRef.apvts, AuraAudioProcessor::preDelayMsParamID, preDelaySlider);
     decayAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, AuraAudioProcessor::timeSecondsParamID, decaySlider);
-    preGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processorRef.apvts, AuraAudioProcessor::inputGainDbParamID, preGainSlider);
     wetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, AuraAudioProcessor::wetParamID, wetSlider);
     dryAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, AuraAudioProcessor::dryParamID, drySlider);
 
-    setSize(764, 529);
+    // Width reduced from 764 to 684 (2026-09-03) when Pre-Gain was removed - Mix went from 3 fader
+    // lanes to 2, shrinking mixColumn's remainder width by exactly one fader cell + one gap
+    // (~80px) so the two remaining lanes keep the same per-lane width as before, rather than
+    // stretching wider to fill the old 3-lane space.
+    setSize(684, 529);
 }
 
 AuraEditorContent::~AuraEditorContent()
@@ -359,8 +361,8 @@ void AuraEditorContent::resized()
     content.removeFromLeft(columnGap);
     // Remainder, not a fixed constant (same convention as Caverns' own mixColumn) - deliberately
     // left generous rather than shrunk to match the mockup's own narrower Mix proportion: the
-    // mockup's example fader values ("0.0 dB") never exercised Pre-Gain's real -24..+24dB range,
-    // and "-24.0 dB" needs meaningfully more textbox width than the mockup's assumption did.
+    // mockup's example fader values ("0.0%") never exercised Wet's real 0-200% range, and
+    // "200.0%" needs meaningfully more textbox width than the mockup's assumption did.
     auto mixColumn = content;
 
     toneSectionBounds = toneColumn.toFloat();
@@ -409,7 +411,7 @@ void AuraEditorContent::resized()
     auto timingRow2 = timingInner.removeFromTop(heroKnobSize + knobNameHeight + knobTextBoxHeight);
     positionKnob(timingRow2, heroKnobSize, decaySlider, decayLabel);
 
-    // ---- Mix: three independent vertical faders. Unlike the rotary knobs above, the mockup's
+    // ---- Mix: two independent vertical faders. Unlike the rotary knobs above, the mockup's
     // fader-cell DOM order is name, THEN track, then value - name above is correct here. Faders
     // fill the section's FULL remaining height (approved mockup revision), not a fixed stub. ----
     auto mixInner = mixColumn;
@@ -419,18 +421,14 @@ void AuraEditorContent::resized()
     mixInner.removeFromBottom(sectionPaddingBottom);
 
     auto mixLabelRow = mixInner.removeFromTop(fieldNameHeight);
-    const auto faderCellWidth = (mixInner.getWidth() - 2 * faderGap) / 3;
-    preGainLabel.setBounds(mixLabelRow.removeFromLeft(faderCellWidth));
-    mixLabelRow.removeFromLeft(faderGap);
+    const auto faderCellWidth = (mixInner.getWidth() - faderGap) / 2;
     wetLabel.setBounds(mixLabelRow.removeFromLeft(faderCellWidth));
     mixLabelRow.removeFromLeft(faderGap);
     dryLabel.setBounds(mixLabelRow);
 
     // Reduced only a little horizontally - the visual track itself stays slim (drawLinearSlider
     // caps it at ~12px regardless of component width), but the built-in value textbox needs the
-    // fuller width or "-24.0 dB"/"100.0%"-style values get silently ellipsized to "...".
-    preGainSlider.setBounds(mixInner.removeFromLeft(faderCellWidth).reduced(1, 4));
-    mixInner.removeFromLeft(faderGap);
+    // fuller width or "200.0%"-style values get silently ellipsized to "...".
     wetSlider.setBounds(mixInner.removeFromLeft(faderCellWidth).reduced(1, 4));
     mixInner.removeFromLeft(faderGap);
     drySlider.setBounds(mixInner.reduced(1, 4));
@@ -439,7 +437,7 @@ void AuraEditorContent::resized()
 }
 
 AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
-    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {764, 529})
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {684, 529})
 {
     addAndMakeVisible(content);
 }

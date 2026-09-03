@@ -60,11 +60,7 @@ private:
     juce::Label decayLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> decayAttachment;
 
-    // MIX section: three independent vertical faders (not knobs), name above each track.
-    juce::Slider preGainSlider;
-    juce::Label preGainLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> preGainAttachment;
-
+    // MIX section: two independent vertical faders (not knobs), name above each track.
     juce::Slider wetSlider;
     juce::Label wetLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> wetAttachment;
