@@ -126,3 +126,27 @@ target_link_libraries(AuraRenderIR
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# Calibration-only probe (not part of the shipped plugin) - drives AuraFDNEngine directly at raw
+# decayGain/dampingWeight, bypassing AuraParameterMap's Time/High curves entirely, so
+# AuraDecayGainData.h's binary-search calibration has something to sweep. See
+# Source/Tools/CalibrateProbe.cpp's own header comment. No BinaryData/LookAndFeel dependency -
+# engine-only, unlike AuraRenderIR.
+juce_add_console_app(AuraCalibrateProbe
+    PRODUCT_NAME "AuraCalibrateProbe"
+)
+
+target_sources(AuraCalibrateProbe
+    PRIVATE
+        Source/AuraFDNEngine.cpp
+        Source/Tools/CalibrateProbe.cpp
+)
+
+target_link_libraries(AuraCalibrateProbe
+    PRIVATE
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)

@@ -259,6 +259,18 @@ private:
     // mode spacing, so the low band's measured decay reflects its longest-lived individual modes
     // rather than the network average. More lines is the known fix and was measured to be a bad
     // trade here (see numLines). Left as a documented limitation rather than papered over.
+    //
+    // SECOND ATTEMPT, ALSO REJECTED (2026-09-02): an asymmetric 16-line topology (original 8 plus
+    // 8 new, longer [91-189ms] lines carrying their own extra damping, meant to add low-frequency
+    // modal density without the short-Time density regression the earlier uniform-doubling
+    // attempt hit). Calibration found a harder problem than density: the new lines' own transit
+    // time put a hard FLOOR on achievable decay time, independent of feedback gain - even at
+    // near-zero gain, measured RT60 couldn't go below ~0.6s, well above the 0.1s setting's own
+    // ~0.5s target, because a single pass through a 189ms line alone takes that long. Reverted
+    // (Source/Tools/CalibrateProbe.cpp, a reusable raw-coefficient calibration probe, was kept -
+    // it isn't specific to this attempt). A real fix would need the extra lines' participation
+    // gated by Time rather than just darkened - a bigger change than a recalibration, not
+    // attempted. Don't re-try longer lines without a plan for that gating.
     wildjag::dsp::OnePoleFilter inputHighPassL, inputHighPassR;
     // 70Hz: best least-squares match to the measured reference shape across the 20-140Hz bands
     // (swept 40/55/70/85/100Hz against it). The reference's own curve is slightly non-monotonic
