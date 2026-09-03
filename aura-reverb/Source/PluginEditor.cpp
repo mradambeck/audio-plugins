@@ -62,12 +62,12 @@ namespace
                                               // convention, opposite of the knob-name-below rule)
     constexpr int faderGap = 14;             // matches the mockup's tightened fader-row gap
 
-    // Converter (Bit Depth) button + LED list, replacing the old Bit Depth knob in the same
-    // top-row cell - see resized()'s own comment for why this is stacked (button above list)
-    // rather than side-by-side like flux-phaser's own wider, dedicated Stages section.
-    constexpr int converterButtonHeight = 22;
-    constexpr int converterButtonListGap = 10;
-    constexpr int converterRowHeight = 20;   // per-LED-row height in the 3-row Converter list
+    // Converter: its own row at the bottom of Tone - a name label (matching Low Cut's/Color's own
+    // knob-name style) above a horizontal row of 3 mutually-exclusive LED buttons (8/16/24 bit).
+    constexpr int converterLabelHeight = 20;
+    constexpr int converterLabelButtonGap = 8;
+    constexpr int converterButtonHeight = 24;
+    constexpr int converterButtonGap = 10;   // horizontal gap between the 3 buttons
 }
 
 void AuraEditorContent::setupRotarySlider(juce::Slider& slider, juce::Label& label,
@@ -112,24 +112,35 @@ void AuraEditorContent::setupVerticalSlider(juce::Slider& slider, juce::Label& l
     addAndMakeVisible(label);
 }
 
-void AuraEditorContent::setupConverterButton()
+void AuraEditorContent::setupConverterButtons()
 {
-    converterButton.setLookAndFeel(&lookAndFeel);
-    converterButton.setButtonText("CONVERTER");
-    addAndMakeVisible(converterButton);
+    converterLabel.setText(juce::String("Converter").toUpperCase(), juce::dontSendNotification);
+    converterLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(converterLabel);
 
-    // Momentary trigger, not a toggle: each click advances to the next bit-depth choice
-    // (AuraAudioProcessor::getConverterChoices(), 8/16/24 bit), wrapping from 24 back to 8 rather
-    // than stopping at either end - same convention as flux-phaser's own Shift button.
-    converterButton.onClick = [this]
+    const auto& choices = AuraAudioProcessor::getConverterChoices();
+    for (int i = 0; i < numConverterChoices; ++i)
     {
-        auto* param = processorRef.apvts.getParameter(AuraAudioProcessor::bitDepthParamID);
-        if (param == nullptr)
-            return;
-        const auto currentIndex = (int) processorRef.apvts.getRawParameterValue(AuraAudioProcessor::bitDepthParamID)->load();
-        const auto nextIndex = (currentIndex + 1) % numConverterChoices;
-        param->setValueNotifyingHost(param->convertTo0to1((float) nextIndex));
-    };
+        auto& button = converterButtons[(size_t) i];
+        button.setLookAndFeel(&lookAndFeel);
+        button.setButtonText(choices[i]);
+        // Radio-grouped (same group ID, all siblings under this Component) so clicking one turns
+        // the other two off automatically - JUCE's own built-in mutual-exclusion mechanism, not a
+        // hand-rolled one.
+        button.setRadioGroupId(converterRadioGroupId);
+        addAndMakeVisible(button);
+
+        // By the time onClick fires, JUCE has already applied the click's toggle-state change
+        // (including turning off this group's other buttons) - this only needs to push the new
+        // choice into the actual "bitDepth" parameter.
+        button.onClick = [this, i]
+        {
+            auto* param = processorRef.apvts.getParameter(AuraAudioProcessor::bitDepthParamID);
+            if (param == nullptr)
+                return;
+            param->setValueNotifyingHost(param->convertTo0to1((float) i));
+        };
+    }
 }
 
 AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
@@ -158,7 +169,7 @@ AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
         processorRef.apvts, AuraAudioProcessor::bypassParamID, bypassButton);
 
     setupRotarySlider(lowCutSlider, lowCutLabel, "Low Cut");
-    setupConverterButton();
+    setupConverterButtons();
     setupRotarySlider(colorSlider, colorLabel, "Color");
     setupRotarySlider(preDelaySlider, preDelayLabel, "Pre-Delay");
     setupRotarySlider(decaySlider, decayLabel, "Decay");
@@ -182,11 +193,14 @@ AuraEditorContent::AuraEditorContent(AuraAudioProcessor& p)
     // lanes to 2, shrinking mixColumn's remainder width by exactly one fader cell + one gap
     // (~80px) so the two remaining lanes keep the same per-lane width as before, rather than
     // stretching wider to fill the old 3-lane space.
-    setSize(684, 529);
+    // Height grown 529 -> 597 (2026-09-03) when Tone became 3 stacked rows (Low Cut, Color,
+    // Converter) instead of 2 - the old height fit exactly 2 rows with no slack, so a 3rd needed
+    // ~68px more (row height + the gap above it) or it wouldn't fit inside the section border.
+    setSize(684, 597);
 
-    // Drives the Converter LED list's repaint-on-change (see timerCallback()) - the LEDs need to
-    // reflect the current choice regardless of source (button click, host automation, preset
-    // load), not just clicks handled locally.
+    // Drives the Converter buttons' resync-on-change (see timerCallback()) - they need to reflect
+    // the current choice regardless of source (button click, host automation, preset load), not
+    // just clicks handled locally.
     startTimerHz(30);
 }
 
@@ -196,15 +210,18 @@ AuraEditorContent::~AuraEditorContent()
     setLookAndFeel(nullptr);
 }
 
-// Repaints the (small) Converter LED list only when the selection actually changes, rather than
-// on every 30Hz tick regardless - matches flux-phaser's own Stages list convention.
+// Re-syncs the 3 Converter buttons' toggle states from the live "bitDepth" parameter only when
+// the selection actually changed, rather than unconditionally on every 30Hz tick. dontSendNotification
+// is required here - sendNotification would re-fire onClick-adjacent listener callbacks and risk
+// a feedback loop with the parameter write that caused this sync in the first place.
 void AuraEditorContent::timerCallback()
 {
     const auto currentIndex = (int) processorRef.apvts.getRawParameterValue(AuraAudioProcessor::bitDepthParamID)->load();
-    if (currentIndex != lastPaintedConverterIndex)
+    if (currentIndex != lastSyncedConverterIndex)
     {
-        lastPaintedConverterIndex = currentIndex;
-        repaint(converterListBounds);
+        lastSyncedConverterIndex = currentIndex;
+        for (int i = 0; i < numConverterChoices; ++i)
+            converterButtons[(size_t) i].setToggleState(i == currentIndex, juce::dontSendNotification);
     }
 }
 
@@ -273,43 +290,6 @@ void AuraEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<f
     g.setColour(lookAndFeel.getBadgeInkColour());
     g.setFont(font);
     g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
-}
-
-// Static read-only display, not a Component per row - the Converter button (see
-// setupConverterButton()) is the only interactive control in this cell. An LED lights up next to
-// whichever bit depth is currently selected; the other two stay dim. Matches flux-phaser's own
-// drawStageList().
-void AuraEditorContent::drawConverterList(juce::Graphics& g, juce::Rectangle<float> bounds)
-{
-    const auto& choices = AuraAudioProcessor::getConverterChoices();
-    const auto currentIndex = (int) processorRef.apvts.getRawParameterValue(AuraAudioProcessor::bitDepthParamID)->load();
-
-    const auto rowHeight = bounds.getHeight() / (float) numConverterChoices;
-    const auto font = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.05f);
-
-    for (int i = 0; i < numConverterChoices; ++i)
-    {
-        auto row = bounds.removeFromTop(rowHeight);
-        const auto isSelected = (i == currentIndex);
-
-        constexpr float ledDiameter = 8.0f;
-        const auto ledBounds = row.removeFromLeft(ledDiameter + 12.0f).withSizeKeepingCentre(ledDiameter, ledDiameter);
-
-        if (isSelected)
-        {
-            // A soft blurred glow, matching drawToggleButton's own LED treatment - not a crisp
-            // ring outline.
-            juce::Path ledPath;
-            ledPath.addEllipse(ledBounds);
-            juce::DropShadow(lookAndFeel.getLedOnColour().withAlpha(0.85f), 6, {0, 0}).drawForPath(g, ledPath);
-        }
-        g.setColour(isSelected ? lookAndFeel.getLedOnColour() : lookAndFeel.getLedOffColour());
-        g.fillEllipse(ledBounds);
-
-        g.setFont(font);
-        g.setColour(juce::Colour(0xffdcece9).withAlpha(isSelected ? 1.0f : 0.6f));
-        g.drawText(choices[i].toUpperCase(), row, juce::Justification::centredLeft);
-    }
 }
 
 void AuraEditorContent::paint(juce::Graphics& g)
@@ -382,7 +362,6 @@ void AuraEditorContent::paint(juce::Graphics& g)
     drawHardwareSection(g, toneSectionBounds, "Tone");
     drawHardwareSection(g, timingSectionBounds, "Timing");
     drawHardwareSection(g, mixSectionBounds, "Mix");
-    drawConverterList(g, converterListBounds.toFloat());
     // --- END PLUGIN-SPECIFIC ---
 
     auto footerBoundsCopy = fullPanelBounds;
@@ -461,10 +440,12 @@ void AuraEditorContent::resized()
         nameLabel.setBounds(knobBounds.getX(), knobBounds.getY() + knobSize, knobSize, knobNameHeight);
     };
 
-    // ---- Tone: Low Cut/Color (regular, top row), Converter button+LED list (bottom row,
-    // centred) - Color moved up to share the top row with Low Cut (Adam, 2026-09-03), no longer
-    // hero-sized now that it's paired rather than solo; Converter took over the solo bottom-row
-    // spot Color's hero knob used to occupy. ----
+    // ---- Tone: Low Cut (regular, own row), Color (hero-sized, own row), Converter (own row -
+    // name label + 3 mutually-exclusive LED buttons) - three stacked rows (Adam, 2026-09-03),
+    // Low Cut and Color each solo in their own row rather than sharing one (Color stayed
+    // hero-sized throughout - a shared row forced it down to regular size, which read as
+    // awkward), Converter picking up its own row below rather than squeezed into either knob's
+    // cell. ----
     auto toneInner = toneColumn;
     toneInner.removeFromTop(sectionPaddingTop);
     toneInner.removeFromLeft(sectionPaddingSide);
@@ -472,33 +453,40 @@ void AuraEditorContent::resized()
     toneInner.removeFromBottom(sectionPaddingBottom);
 
     auto toneRow1 = toneInner.removeFromTop(defaultKnobSize + knobNameHeight + knobTextBoxHeight);
-    const auto toneHalfWidth = toneRow1.getWidth() / 2;
-    positionKnob(toneRow1.removeFromLeft(toneHalfWidth), defaultKnobSize, lowCutSlider, lowCutLabel);
-    positionKnob(toneRow1, defaultKnobSize, colorSlider, colorLabel);
+    positionKnob(toneRow1, defaultKnobSize, lowCutSlider, lowCutLabel);
 
     toneInner.removeFromTop(knobRowVerticalGap);
-    // Row height still matches a hero-knob row (not Converter's own shorter natural content
-    // height) so Tone's total border height keeps matching Timing's, which still has a real hero
-    // knob (Decay) in this same row shape.
     auto toneRow2 = toneInner.removeFromTop(heroKnobSize + knobNameHeight + knobTextBoxHeight);
+    positionKnob(toneRow2, heroKnobSize, colorSlider, colorLabel);
 
-    // Converter: a button + 3-row LED list, matching flux-phaser's own Stages Shift-button/LED-
-    // list pattern in spirit, but stacked (button above list) rather than side-by-side - vertically
-    // centred as one group within the row, the same way positionKnob() centres a knob.
+    toneInner.removeFromTop(knobRowVerticalGap);
+    auto toneRow3 = toneInner.removeFromTop(converterLabelHeight + converterLabelButtonGap + converterButtonHeight);
+    converterLabel.setBounds(toneRow3.removeFromTop(converterLabelHeight));
+    toneRow3.removeFromTop(converterLabelButtonGap);
+
+    // Converter: 3 mutually-exclusive LED buttons (8/16/24 bit), each content-width sized from
+    // its own text - same formula bypassButton's own width uses (LED + gap + text + padding) -
+    // and laid out as a centred horizontal row.
     const auto converterButtonFont = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.06f);
-    const auto converterButtonTextWidth = (int) std::ceil(
-        juce::GlyphArrangement::getStringWidth(converterButtonFont, converterButton.getButtonText()));
-    const auto converterButtonWidth = converterButtonTextWidth + 24;
-    const auto converterListHeight = converterRowHeight * numConverterChoices;
-    const auto converterGroupHeight = converterButtonHeight + converterButtonListGap + converterListHeight;
+    const auto& converterChoices = AuraAudioProcessor::getConverterChoices();
+    std::array<int, numConverterChoices> converterButtonWidths {};
+    int converterRowWidth = converterButtonGap * (numConverterChoices - 1);
+    for (int i = 0; i < numConverterChoices; ++i)
+    {
+        const auto text = converterChoices[i].toUpperCase();
+        const auto textWidth = juce::GlyphArrangement::getStringWidth(converterButtonFont, text);
+        converterButtonWidths[(size_t) i] = (int) std::ceil(9.0f + 8.0f + textWidth + 24.0f);
+        converterRowWidth += converterButtonWidths[(size_t) i];
+    }
 
-    auto converterCell = toneRow2.withSizeKeepingCentre(
-        juce::jmax(converterButtonWidth, 100), converterGroupHeight);
-    converterButton.setBounds(converterCell.removeFromTop(converterButtonHeight)
-                                   .withSizeKeepingCentre(converterButtonWidth, converterButtonHeight)
-                                   .expanded((int) AuraLookAndFeel::buttonShadowMargin));
-    converterCell.removeFromTop(converterButtonListGap);
-    converterListBounds = converterCell;
+    auto converterButtonRow = toneRow3.withSizeKeepingCentre(converterRowWidth, converterButtonHeight);
+    for (int i = 0; i < numConverterChoices; ++i)
+    {
+        auto cell = converterButtonRow.removeFromLeft(converterButtonWidths[(size_t) i]);
+        converterButtons[(size_t) i].setBounds(cell.expanded((int) AuraLookAndFeel::buttonShadowMargin));
+        if (i < numConverterChoices - 1)
+            converterButtonRow.removeFromLeft(converterButtonGap);
+    }
 
     // ---- Timing: Pre-Delay (regular, top row), Decay (hero-sized, bottom row) - same
     // two-row shape as Tone, one knob per row instead of two. ----
@@ -541,7 +529,7 @@ void AuraEditorContent::resized()
 }
 
 AuraAudioProcessorEditor::AuraAudioProcessorEditor(AuraAudioProcessor& p)
-    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {684, 529})
+    : AudioProcessorEditor(&p), content(p), zoomHandler(*this, content, {684, 597})
 {
     addAndMakeVisible(content);
 }

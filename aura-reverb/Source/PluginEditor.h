@@ -6,6 +6,8 @@
 
 #include "../../common/UI/ResizableZoom.h"
 
+#include <array>
+
 // All real painting/layout lives here, at a fixed native size (see the setSize() call in the
 // constructor) that never changes again - see AuraAudioProcessorEditor below for why, and
 // common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
@@ -23,10 +25,9 @@ private:
     void timerCallback() override;
     void setupRotarySlider(juce::Slider&, juce::Label&, const juce::String& labelText);
     void setupVerticalSlider(juce::Slider&, juce::Label&, const juce::String& labelText);
-    void setupConverterButton();
+    void setupConverterButtons();
     void rebuildChassisTexture();
     void drawHardwareSection(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& label);
-    void drawConverterList(juce::Graphics&, juce::Rectangle<float> bounds);
 
     AuraAudioProcessor& processorRef;
 
@@ -41,24 +42,29 @@ private:
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
-    // TONE section: Low Cut/Converter (regular, top row), Color (hero-sized, bottom row).
+    // TONE section: Low Cut (regular, own row), Color (hero-sized, own row), Converter (own row -
+    // a name label matching Low Cut's/Color's own, plus 3 mutually-exclusive LED buttons).
     juce::Slider lowCutSlider;
     juce::Label lowCutLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowCutAttachment;
 
-    // Converter: a button that cycles the 3-choice "bitDepth" AudioParameterChoice, plus a
-    // read-only LED list (hand-painted in drawConverterList(), not one Component per row) showing
-    // which of 8/16/24 bit is currently selected - same pattern as flux-phaser's Stages Shift
-    // button + drawStageList(). Repainted from timerCallback() so external changes (host
-    // automation, preset load) update the LEDs too, not just clicks.
-    static constexpr int numConverterChoices = 3;
-    juce::TextButton converterButton;
-    juce::Rectangle<int> converterListBounds;
-    int lastPaintedConverterIndex = -1;
-
     juce::Slider colorSlider;
     juce::Label colorLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> colorAttachment;
+
+    // Converter: one real juce::ToggleButton per choice (8/16/24 bit) - same flat-pushbutton +
+    // LED chrome as bypassButton (HardwarePanelLookAndFeel::drawToggleButton), radio-grouped so
+    // clicking one turns the other two off, matching the "only one can be selected at a time"
+    // requirement directly rather than hand-painting a selection indicator. There's no
+    // ButtonAttachment for "N buttons standing for one AudioParameterChoice", so this is wired
+    // manually: each button's onClick pushes its own index straight into the bitDepth parameter,
+    // and timerCallback() re-syncs all three buttons' toggle states from the live parameter value
+    // so host automation/preset loads are reflected too, not just clicks.
+    juce::Label converterLabel;
+    static constexpr int numConverterChoices = 3;
+    static constexpr int converterRadioGroupId = 1;
+    std::array<juce::ToggleButton, numConverterChoices> converterButtons;
+    int lastSyncedConverterIndex = -1;
 
     // TIMING section: Pre-Delay (regular, top row), Decay (hero-sized, bottom row).
     juce::Slider preDelaySlider;

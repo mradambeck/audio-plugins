@@ -134,20 +134,11 @@ body { margin:0; background:#000; display:flex; align-items:center; justify-cont
 .knob-svg { display:block; }
 .knob-name { font-family:'Oxanium',sans-serif; font-weight:700; font-size:10.5px; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink); white-space:nowrap; }
 
-/* Converter: a button + 3-row LED list (8/16/24 bit), replacing the old Bit Depth knob - matches
-   flux-phaser's own Stages Shift-button/LED-list pattern in spirit, stacked (button above list)
-   rather than side-by-side since this occupies a single knob-row rather than a dedicated section. */
-.converter-cell { display:flex; flex-direction:column; align-items:center; gap:10px; }
-.converter-button {
-  height:22px; padding:0 12px; border-radius:3px; background:var(--btn-off);
-  box-shadow: 0 3px 6px rgba(0,0,0,0.45); cursor:pointer; user-select:none;
-  font-family:'Oxanium',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; color:#242220;
-  display:flex; align-items:center; justify-content:center; white-space:nowrap;
-}
-.converter-leds { display:flex; flex-direction:column; gap:5px; }
-.converter-led-row { display:flex; align-items:center; gap:7px; }
-.converter-led-row .knob-name { font-size:10px; opacity:0.6; }
-.converter-led-row.on .knob-name { opacity:1; }
+/* Converter: a name label (matching Low Cut's/Color's own .knob-name) above a horizontal row of
+   3 mutually-exclusive LED buttons (8/16/24 bit), replacing the old Bit Depth knob - each choice
+   button reuses .hw-toggle's exact chrome (same recipe as the Bypass button up in the header). */
+.converter-cell { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.converter-choices { display:flex; gap:10px; }
 .knob-value { font-family:'Oxanium',sans-serif; font-weight:700; font-size:10.5px; letter-spacing:0.03em; color:var(--ink-dim); }
 
 /* flex:1 chain (row -> cell -> track-wrap) so the faders fill the section's full available
@@ -184,6 +175,8 @@ body { margin:0; background:#000; display:flex; align-items:center; justify-cont
         <div class="section-badge">Tone</div>
         <div class="knob-row">
           <div class="knob-cell" id="k-lowcut"></div>
+        </div>
+        <div class="knob-row">
           <div class="knob-cell" id="k-color"></div>
         </div>
         <div class="knob-row">
@@ -269,16 +262,15 @@ function makeKnob(id, size, value, name, valueText) {
   el.innerHTML = knobSVG(size, value) + `<div class="knob-name">${name}</div><div class="knob-value">${valueText}</div>`;
 }
 
-// selectedIndex: which of choices[] is lit (0/1/2 for 8/16/24 bit) - matches the real button's
-// cycling behaviour (click -> next choice, wrapping), just static here since the mockup has no
-// interaction.
+// selectedIndex: which of choices[] is the only one lit (radio-exclusive, matches the real
+// buttons' mutual-exclusion behaviour), just static here since the mockup has no interaction.
 function makeConverter(id, choices, selectedIndex) {
   const el = document.getElementById(id);
-  const rows = choices.map((label, i) => {
+  const buttons = choices.map((text, i) => {
     const on = i === selectedIndex ? ' on' : '';
-    return `<div class="converter-led-row${on}"><span class="led${on}"></span><div class="knob-name">${label}</div></div>`;
+    return `<div class="hw-toggle${on}"><span class="led${on}"></span><span>${text.toUpperCase()}</span></div>`;
   }).join('');
-  el.innerHTML = `<div class="converter-button">CONVERTER</div><div class="converter-leds">${rows}</div>`;
+  el.innerHTML = `<div class="knob-name">Converter</div><div class="converter-choices">${buttons}</div>`;
 }
 
 function faderSVG(trackHeight, value) {
@@ -326,7 +318,7 @@ function makeFader(id, value, name, valueText) {
 }
 
 makeKnob('k-lowcut', 88, 0.0, 'Low Cut', 'Off');
-makeKnob('k-color', 88, 1.0, 'Color', '0.0 dB');
+makeKnob('k-color', 112, 1.0, 'Color', '0.0 dB');
 makeConverter('c-converter', ['8 bit', '16 bit', '24 bit'], 0);
 makeKnob('k-predelay', 88, 0.0, 'Pre-Delay', '0.0 ms');
 makeKnob('k-decay', 112, 0.45, 'Decay', '2.00 s');
