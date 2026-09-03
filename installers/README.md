@@ -2,17 +2,18 @@
 
 macOS `.pkg` installers for the Wild Jag plugins:
 
-| Plugin    | Repo                     | Description                 |
-|-----------|--------------------------|-----------------------------|
-| Caverns   | `caverns-delay/`         | Reverb/delay plugin         |
-| Damage    | `damage-fuzz/`           | Fuzz/distortion plugin      |
-| Corrosion | `corrosion-drive/`       | Lo-fi drive plugin          |
-| Flux      | `flux-phaser/`           | Analog phase shifter plugin |
-| Alloy     | `alloy-bass/`            | Industrial bass synth       |
-| Gradient  | `gradient-pitch/`        | Pitch shifting delay plugin |
-| Shields   | `shields-reverb/`        | Diffuse reverb              |
-| Intruder  | `intruder-gated-reverb/` | Non-linear gated reverb     |
-| Strike    | `strike-synth/`          | Karplus-Strong string synth |
+| Plugin    | Repo                     | Description                         |
+|-----------|--------------------------|-------------------------------------|
+| Caverns   | `caverns-delay/`         | Reverb/delay plugin                 |
+| Damage    | `damage-fuzz/`           | Fuzz/distortion plugin              |
+| Corrosion | `corrosion-drive/`       | Lo-fi drive plugin                  |
+| Flux      | `flux-phaser/`           | Analog phase shifter plugin         |
+| Alloy     | `alloy-bass/`            | Industrial bass synth               |
+| Gradient  | `gradient-pitch/`        | Pitch shifting delay plugin         |
+| Shields   | `shields-reverb/`        | Diffuse reverb                      |
+| Intruder  | `intruder-gated-reverb/` | Non-linear gated reverb             |
+| Strike    | `strike-synth/`          | Karplus-Strong string synth         |
+| Aura      | `aura-reverb/`           | AMS RMX16 Ambience reverb emulation |
 
 Each plugin builds AU, VST3, and Standalone formats. Every installer (per-plugin and group) lets you choose:
 

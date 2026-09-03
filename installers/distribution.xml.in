@@ -54,6 +54,11 @@
             <line choice="choice_strike_vst3"/>
             <line choice="choice_strike_standalone"/>
         </line>
+        <line choice="choice_aura">
+            <line choice="choice_aura_au"/>
+            <line choice="choice_aura_vst3"/>
+            <line choice="choice_aura_standalone"/>
+        </line>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
@@ -155,6 +160,17 @@
         <pkg-ref id="com.wildjag.strike.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_aura" title="Aura - Reverb" description="Aura - AMS RMX16 Ambience reverb emulation."/>
+    <choice id="choice_aura_au" title="Audio Unit (AU)" description="Installs Aura - Reverb.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.aura.au.pkg"/>
+    </choice>
+    <choice id="choice_aura_vst3" title="VST3" description="Installs Aura - Reverb.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.aura.vst3.pkg"/>
+    </choice>
+    <choice id="choice_aura_standalone" title="Standalone App" description="Installs Aura - Reverb.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.aura.standalone.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -190,4 +206,7 @@
     <pkg-ref id="com.wildjag.strike.au.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.strike.vst3.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.strike.standalone.pkg" version="__STRIKE_VERSION__" onConclusion="none">Strike-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.aura.au.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.aura.vst3.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.aura.standalone.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

@@ -1,0 +1,4 @@
+# Installer build output
+installer/stage/
+installer/output/
+*.pkg
