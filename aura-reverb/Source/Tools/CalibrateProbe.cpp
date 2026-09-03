@@ -30,9 +30,15 @@
 // stayed useful as a general decayGain/dampingWeight calibration tool independent of that
 // specific attempt, so it was kept.
 //
+// 2026-09-02, later same day: reused for a THIRD sub-bass attempt - AuraFDNEngine::
+// setSubBassGain(), an in-loop 120Hz-pivot attenuation (see that method's own header comment).
+// Unlike the two rejected topology changes, this doesn't add any delay line, so it can't hit a
+// transit-time floor the way the 16-line attempt did - but it does still rebalance the whole
+// tank's energy, so it still needs the same full recalibration this probe exists for.
+//
 // Usage:
 //   AuraCalibrateProbe --out <path.wav> [--seconds 10] [--sampleRate 44100]
-//                       [--decayGain 0.9] [--dampingWeight 0.9]
+//                       [--decayGain 0.9] [--dampingWeight 0.9] [--subBassGain 1.0]
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -63,7 +69,7 @@ int main(int argc, char* argv[])
     {
         std::fprintf(stderr,
             "Usage: AuraCalibrateProbe --out <path.wav> [--seconds 10] [--sampleRate 44100]\n"
-            "                          [--decayGain 0.9] [--dampingWeight 0.9]\n");
+            "                          [--decayGain 0.9] [--dampingWeight 0.9] [--subBassGain 1.0]\n");
         return 1;
     }
 
@@ -73,13 +79,20 @@ int main(int argc, char* argv[])
     const auto totalSamples = (int) (seconds * sampleRate);
     const auto decayGain = getFloatArg(args, "decayGain", 0.9f);
     const auto dampingWeight = getFloatArg(args, "dampingWeight", 0.9f);
+    const auto subBassGain = getFloatArg(args, "subBassGain", 1.0f);
 
     AuraFDNEngine engine;
     engine.prepare((double) sampleRate);
     engine.setBandGains(decayGain, decayGain);
     engine.setDampingWeight(dampingWeight);
+    engine.setSubBassGain(subBassGain);
     engine.setInputTilt(0.0f);
-    engine.setInputHighPassHz(1.0f); // effectively off - see setInputHighPassHz's own clamp
+    // NOT overriding the input high-pass here - prepare() already set it to the real
+    // defaultInputHighPassHz (70Hz), matching production. An earlier version of this probe
+    // explicitly disabled it ("effectively off"), which was wrong: that filter measurably
+    // affects the very sub-bass timing this probe exists to calibrate (found while sanity-
+    // checking setSubBassGain against the full plugin chain, 2026-09-02) - disabling it made the
+    // probe's own baseline measurement not representative of what AuraRenderIR actually produces.
     engine.setLowCutHz(0.0f);
     engine.setBitDepth(24.0f);
     engine.setPreDelayMs(0.0f);

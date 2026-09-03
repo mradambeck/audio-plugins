@@ -100,6 +100,15 @@ public:
     void setBandGains(float highBandGain, float lowBandGain);
     void setDampingWeight(float weight);
 
+    // In-loop, per-lap attenuation below subBassShelfPivotHz (120Hz) ONLY - independent of, and
+    // applied after, feedbackShelf's own 1kHz-pivot low/high split above. Attempt at the sub-bass
+    // decay-RATE limit documented on inputHighPassL below (that filter fixes LEVEL only, being
+    // outside the loop - this is inside the loop specifically so it CAN affect ring time). 1.0 =
+    // no extra attenuation (matches every other "no additional colour at the default" control's
+    // own contract elsewhere in this codebase). Clamped the same way setBandGains() is, for the
+    // same reason.
+    void setSubBassGain(float gain);
+
     // Input-stage tilt (High's onset-tone effect - see the class comment's "Real bug found" note
     // below). tiltDb is a DSP-ready coefficient (delta from the engine's own neutral baseline,
     // matching IntruderParameterMap::mapTiltDbFromH's convention exactly), not a raw High value -
@@ -210,6 +219,13 @@ private:
     std::array<int, numLines> lineDelaySamples {};
     std::array<wildjag::dsp::OnePoleFilter, numLines> dampingFilter;
     std::array<BandShelf, numLines> feedbackShelf;
+
+    // See setSubBassGain()'s comment. Reuses BandShelf (highGain pinned at 1.0 - only the low
+    // side, below subBassShelfPivotHz, is ever attenuated) rather than a new struct - the shape
+    // needed (independent low/high gain, one-pole split) is identical, just a different pivot and
+    // a different place in the chain (applied after feedbackShelf, not instead of it).
+    std::array<BandShelf, numLines> subBassShelf;
+    static constexpr float subBassShelfPivotHz = 120.0f;
 
     // Player Low Cut - see setLowCutHz()'s comment. Applied first, ahead of pre-delay (order vs.
     // pre-delay is functionally irrelevant for a linear filter and a linear delay - they commute -

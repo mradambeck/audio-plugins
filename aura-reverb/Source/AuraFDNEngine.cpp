@@ -27,6 +27,7 @@ void AuraFDNEngine::prepare(double sampleRate)
         const auto maxDelaySamples = (int) std::ceil(baseLineLengthsMs[(size_t) i] * 0.001 * sampleRate) + 4;
         lineBuffers[(size_t) i].setSize(maxDelaySamples);
         feedbackShelf[(size_t) i].setPivotHz(shelfPivotHz, sampleRate);
+        subBassShelf[(size_t) i].setPivotHz(subBassShelfPivotHz, sampleRate);
     }
 
     maxPreDelaySamples = (int) std::ceil(0.2 * sampleRate) + 4; // 200ms max pre-delay headroom
@@ -49,6 +50,7 @@ void AuraFDNEngine::reset()
     for (auto& buf : lineBuffers) buf.reset();
     for (auto& f : dampingFilter) f.reset();
     for (auto& s : feedbackShelf) s.reset();
+    for (auto& s : subBassShelf) s.reset();
     lowCutL.reset();
     lowCutR.reset();
     preDelayBufferL.reset();
@@ -73,6 +75,16 @@ void AuraFDNEngine::setBandGains(float highBandGain, float lowBandGain)
     {
         s.highGain = clampedHigh;
         s.lowGain = clampedLow;
+    }
+}
+
+void AuraFDNEngine::setSubBassGain(float gain)
+{
+    const auto clamped = std::clamp(gain, 0.0f, 1.0f);
+    for (auto& s : subBassShelf)
+    {
+        s.lowGain = clamped;
+        s.highGain = 1.0f; // only the sub-bass side ever gets attenuated - see the header comment
     }
 }
 
@@ -181,8 +193,13 @@ void AuraFDNEngine::processStereo(float* left, float* right, int numSamples)
         for (int i = 0; i < numLines; ++i)
         {
             const auto shelved = feedbackShelf[(size_t) i].processSample(mixed[(size_t) i]);
+            // Extra per-lap sub-bass brake, on top of feedbackShelf's own broader tilt - see
+            // setSubBassGain()'s comment. Applied here (in-loop, after the main shelf) so it
+            // actually shortens ring time, not just level, matching this file's own KNOWN LIMIT
+            // comment on why inputHighPassL (outside the loop) structurally cannot.
+            const auto subBassShaped = subBassShelf[(size_t) i].processSample(shelved);
             const auto injected = (i % 2 == 0) ? tiltedL : tiltedR;
-            const auto lineIn = shelved + injected;
+            const auto lineIn = subBassShaped + injected;
             // NaN/Inf guard at the recirculation point - same convention as ShieldsFDNEngine/
             // IntruderFDNEngine: a poisoned sample must not be allowed to circulate forever.
             lineBuffers[(size_t) i].write(std::isfinite(lineIn) ? lineIn : 0.0f);
