@@ -69,7 +69,6 @@ namespace
     constexpr int converterTickRowHeight = 14;   // the "8  16  24BIT" row painted above the track
     constexpr int converterTrackHeight = 16;
     constexpr int converterSwitchHeight = converterTickRowHeight + converterTrackHeight;
-    constexpr int converterLabelHeight = 20;
     constexpr int converterSwitchLabelGap = 6;
 }
 
@@ -151,7 +150,9 @@ void AuraEditorContent::ConverterSwitch::mouseDown(const juce::MouseEvent& e)
 // Modelled on the cropped Roland RE-501 LEVEL-switch reference photo (see PluginEditor.h's
 // ConverterSwitch comment): a tick-value row ("8   16   24BIT", spaced over the track's own 3
 // segment centres, unit suffix only on the last one - matching the reference's own "-50dB") above
-// a slim recessed track with 2 notch lines and a light, ridged thumb block at the current position.
+// a track matching the Wet/Dry faders' own unfilled-track colours, with a black, ridged thumb
+// block at the current position (Adam, 2026-09-03 - matches the reference photo's own black
+// switch, not the cream/tan a pushbutton LED cap would use).
 void AuraEditorContent::ConverterSwitch::paint(juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
@@ -171,32 +172,45 @@ void AuraEditorContent::ConverterSwitch::paint(juce::Graphics& g)
         g.drawText(tickLabels[i], tickCell, juce::Justification::centred);
     }
 
+    // The track ("the larger unselected box") uses the exact same fill/outline colours as the
+    // Wet/Dry faders' own unfilled track (HardwarePanelLookAndFeel::drawLinearSlider's
+    // faderTrackTop/faderTrackBottom + comboOutline) - not this control's own invented colours,
+    // per Adam's 2026-09-03 request to match the sliders directly.
     constexpr float trackCornerSize = 2.0f;
-    g.setColour(juce::Colour(0xff14191a));
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff14191a), trackBounds.getX(), trackBounds.getY(),
+                                            juce::Colour(0xff1c2224), trackBounds.getX(), trackBounds.getBottom(), false));
     g.fillRoundedRectangle(trackBounds, trackCornerSize);
-    g.setColour(juce::Colours::black.withAlpha(0.5f));
-    g.drawRoundedRectangle(trackBounds, trackCornerSize, 1.0f);
+
+    // Outline only on the bottom/right edges, not a uniform stroke - reads as a 3D inset bevel
+    // with light raking in from the top-left (matching the panel's own established key-light
+    // direction), rather than a flat uniform border.
+    g.setColour(juce::Colour(0xff3a4245));
+    g.drawLine(trackBounds.getX(), trackBounds.getBottom() - 0.5f, trackBounds.getRight(), trackBounds.getBottom() - 0.5f, 1.0f);
+    g.drawLine(trackBounds.getRight() - 0.5f, trackBounds.getY(), trackBounds.getRight() - 0.5f, trackBounds.getBottom(), 1.0f);
 
     // 2 notch lines dividing the track into 3 equal segments.
-    g.setColour(juce::Colours::white.withAlpha(0.12f));
+    g.setColour(juce::Colours::black.withAlpha(0.35f));
     for (int i = 1; i < 3; ++i)
     {
         const auto x = trackBounds.getX() + trackBounds.getWidth() / 3.0f * (float) i;
         g.drawLine(x, trackBounds.getY() + 2.0f, x, trackBounds.getBottom() - 2.0f, 1.0f);
     }
 
-    // The thumb: a light, slightly-inset block filling its own segment, with a few short ridge
-    // lines for grip - matching the reference photo's knurled slider cap, not a plain flat block.
+    // The switch/thumb itself: black, matching the reference photo (not the cream/tan colour a
+    // pushbutton LED cap would use) - a few short ridge lines for grip, same knurled-cap idea as
+    // before, just recoloured.
     const auto thumbBounds = trackBounds
         .withWidth(trackBounds.getWidth() / 3.0f)
         .withX(trackBounds.getX() + trackBounds.getWidth() / 3.0f * (float) value)
         .reduced(1.5f, 1.5f);
 
     juce::DropShadow(juce::Colours::black.withAlpha(0.5f), 3, {0, 1}).drawForRectangle(g, thumbBounds.getSmallestIntegerContainer());
-    g.setColour(juce::Colour(0xffcec8b7));
+    g.setColour(juce::Colour(0xff0c0e0f));
     g.fillRoundedRectangle(thumbBounds, 1.5f);
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.drawRoundedRectangle(thumbBounds, 1.5f, 1.0f);
 
-    g.setColour(juce::Colours::black.withAlpha(0.3f));
+    g.setColour(juce::Colours::white.withAlpha(0.15f));
     const auto ridgeCount = 3;
     for (int i = 1; i <= ridgeCount; ++i)
     {
@@ -514,21 +528,27 @@ void AuraEditorContent::resized()
     const auto toneHalfWidth = toneRow1.getWidth() / 2;
     positionKnob(toneRow1.removeFromLeft(toneHalfWidth), defaultKnobSize, lowCutSlider, lowCutLabel);
 
-    // Converter: the switch + its name label below, vertically centred as one group within the
-    // row - the same way positionKnob() centres Low Cut's knob+name+value stack in its own half.
-    // Cell width comes from whichever of the switch/label is wider (the "CONVERTER" text, measured
-    // rather than guessed, same discipline as bypassButton's own content-driven width).
+    // Converter: the switch + its name label below. The label's Y is taken directly from
+    // lowCutLabel's own Y (set by positionKnob() just above), rather than centring this whole
+    // group independently within the row - Adam's 2026-09-03 request was specifically that
+    // "CONVERTER" line up with "LOW CUT", and reusing the real value here guarantees that exactly
+    // regardless of either control's own vertical-centring math. Cell width comes from whichever
+    // of the switch/label is wider (the "CONVERTER" text, measured rather than guessed, same
+    // discipline as bypassButton's own content-driven width).
     const auto converterLabelFont = lookAndFeel.getDisplayFont(11.0f).withExtraKerningFactor(0.09f);
     const auto converterLabelWidth = (int) std::ceil(
         juce::GlyphArrangement::getStringWidth(converterLabelFont, converterLabel.getText())) + 4;
     const auto converterCellWidth = juce::jmax(converterSwitchWidth, converterLabelWidth);
-    const auto converterGroupHeight = converterSwitchHeight + converterSwitchLabelGap + converterLabelHeight;
 
-    auto converterCell = toneRow1.withSizeKeepingCentre(converterCellWidth, converterGroupHeight);
-    converterSwitch.setBounds(converterCell.removeFromTop(converterSwitchHeight)
-                                   .withSizeKeepingCentre(converterSwitchWidth, converterSwitchHeight));
-    converterCell.removeFromTop(converterSwitchLabelGap);
-    converterLabel.setBounds(converterCell.removeFromTop(converterLabelHeight));
+    auto converterCell = toneRow1.withSizeKeepingCentre(converterCellWidth, toneRow1.getHeight());
+    // Height matches knobNameHeight (lowCutLabel's own height), not a separately-invented value -
+    // both labels use Justification::centred, so matching bounds height (not just Y) is what
+    // actually keeps their text vertically centred on the same line; a shorter height here would
+    // centre "CONVERTER" a few px higher than "LOW CUT" despite sharing the same top Y.
+    converterLabel.setBounds(converterCell.getX(), lowCutLabel.getY(), converterCellWidth, knobNameHeight);
+    converterSwitch.setBounds(converterCell.getX() + (converterCellWidth - converterSwitchWidth) / 2,
+                               converterLabel.getY() - converterSwitchLabelGap - converterSwitchHeight,
+                               converterSwitchWidth, converterSwitchHeight);
 
     toneInner.removeFromTop(knobRowVerticalGap);
     auto toneRow2 = toneInner.removeFromTop(heroKnobSize + knobNameHeight + knobTextBoxHeight);

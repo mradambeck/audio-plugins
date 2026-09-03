@@ -138,26 +138,34 @@ body { margin:0; background:#000; display:flex; align-items:center; justify-cont
    the Roland RE-501 Chorus Echo's own "LEVEL" switch - this whole panel language's hardware
    reference - replacing the earlier Bit Depth knob and, later, a 3-button/LED treatment. Tick
    values ("8 16 24BIT") sit above the track, aligned over its 3 segments; the name label below
-   reuses .knob-name, same as every other control. */
-.converter-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
+   reuses .knob-name, same as every other control. Track fill matches the Wet/Dry faders' own
+   unfilled-track colours exactly (--fader-track-top/bottom), with a bottom/right-only outline in
+   the sliders' own outline colour for a 3D inset bevel (light raking from the top-left, matching
+   the panel's own key-light direction) rather than a flat uniform border. The switch/thumb itself
+   is black (matching the reference photo), not the cream/tan a pushbutton LED cap would use.
+   margin-top approximates the real JUCE layout's exact pixel alignment (CONVERTER's name label
+   lined up with LOW CUT's) - the real app is the actual verification for that, not this mockup. */
+.converter-cell { display:flex; flex-direction:column; align-items:center; gap:3px; margin-top:55px; }
 .converter-ticks { display:flex; width:82px; }
 .converter-tick { flex:1; text-align:center; font-family:'Oxanium',sans-serif; font-weight:700; font-size:9px; letter-spacing:0.02em; color:var(--ink-dim); }
 .converter-tick.on { color:var(--ink); }
 .converter-track {
-  position:relative; width:82px; height:16px; background:#14191a;
-  border:1px solid rgba(0,0,0,0.5); border-radius:2px; box-sizing:border-box;
+  position:relative; width:82px; height:16px;
+  background:linear-gradient(180deg, var(--fader-track-top) 0%, var(--fader-track-bottom) 100%);
+  border-radius:2px; box-sizing:border-box;
+  border-bottom:1px solid #3a4245; border-right:1px solid #3a4245;
 }
 .converter-track::before, .converter-track::after {
-  content:''; position:absolute; top:2px; bottom:2px; width:1px; background:rgba(255,255,255,0.12);
+  content:''; position:absolute; top:2px; bottom:2px; width:1px; background:rgba(0,0,0,0.35);
 }
 .converter-track::before { left:33.333%; }
 .converter-track::after { left:66.666%; }
 .converter-thumb {
   position:absolute; top:1.5px; bottom:1.5px; width:calc(33.333% - 3px);
-  background:#cec8b7; border-radius:1.5px; box-shadow:0 1px 3px rgba(0,0,0,0.5);
+  background:#0c0e0f; border:1px solid rgba(0,0,0,0.6); border-radius:1.5px; box-shadow:0 1px 3px rgba(0,0,0,0.5);
   display:flex; align-items:center; justify-content:center; gap:3px;
 }
-.converter-thumb span { width:1px; height:10px; background:rgba(0,0,0,0.3); }
+.converter-thumb span { width:1px; height:10px; background:rgba(255,255,255,0.15); }
 .knob-value { font-family:'Oxanium',sans-serif; font-weight:700; font-size:10.5px; letter-spacing:0.03em; color:var(--ink-dim); }
 
 /* flex:1 chain (row -> cell -> track-wrap) so the faders fill the section's full available
