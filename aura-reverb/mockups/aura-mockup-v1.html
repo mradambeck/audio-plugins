@@ -134,11 +134,30 @@ body { margin:0; background:#000; display:flex; align-items:center; justify-cont
 .knob-svg { display:block; }
 .knob-name { font-family:'Oxanium',sans-serif; font-weight:700; font-size:10.5px; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink); white-space:nowrap; }
 
-/* Converter: a name label (matching Low Cut's/Color's own .knob-name) above a horizontal row of
-   3 mutually-exclusive LED buttons (8/16/24 bit), replacing the old Bit Depth knob - each choice
-   button reuses .hw-toggle's exact chrome (same recipe as the Bypass button up in the header). */
-.converter-cell { display:flex; flex-direction:column; align-items:center; gap:8px; }
-.converter-choices { display:flex; gap:10px; }
+/* Converter: a small 3-position slide switch, modelled directly on a cropped reference photo of
+   the Roland RE-501 Chorus Echo's own "LEVEL" switch - this whole panel language's hardware
+   reference - replacing the earlier Bit Depth knob and, later, a 3-button/LED treatment. Tick
+   values ("8 16 24BIT") sit above the track, aligned over its 3 segments; the name label below
+   reuses .knob-name, same as every other control. */
+.converter-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.converter-ticks { display:flex; width:82px; }
+.converter-tick { flex:1; text-align:center; font-family:'Oxanium',sans-serif; font-weight:700; font-size:9px; letter-spacing:0.02em; color:var(--ink-dim); }
+.converter-tick.on { color:var(--ink); }
+.converter-track {
+  position:relative; width:82px; height:16px; background:#14191a;
+  border:1px solid rgba(0,0,0,0.5); border-radius:2px; box-sizing:border-box;
+}
+.converter-track::before, .converter-track::after {
+  content:''; position:absolute; top:2px; bottom:2px; width:1px; background:rgba(255,255,255,0.12);
+}
+.converter-track::before { left:33.333%; }
+.converter-track::after { left:66.666%; }
+.converter-thumb {
+  position:absolute; top:1.5px; bottom:1.5px; width:calc(33.333% - 3px);
+  background:#cec8b7; border-radius:1.5px; box-shadow:0 1px 3px rgba(0,0,0,0.5);
+  display:flex; align-items:center; justify-content:center; gap:3px;
+}
+.converter-thumb span { width:1px; height:10px; background:rgba(0,0,0,0.3); }
 .knob-value { font-family:'Oxanium',sans-serif; font-weight:700; font-size:10.5px; letter-spacing:0.03em; color:var(--ink-dim); }
 
 /* flex:1 chain (row -> cell -> track-wrap) so the faders fill the section's full available
@@ -175,12 +194,10 @@ body { margin:0; background:#000; display:flex; align-items:center; justify-cont
         <div class="section-badge">Tone</div>
         <div class="knob-row">
           <div class="knob-cell" id="k-lowcut"></div>
+          <div class="converter-cell" id="c-converter"></div>
         </div>
         <div class="knob-row">
           <div class="knob-cell" id="k-color"></div>
-        </div>
-        <div class="knob-row">
-          <div class="converter-cell" id="c-converter"></div>
         </div>
       </div>
 
@@ -262,15 +279,20 @@ function makeKnob(id, size, value, name, valueText) {
   el.innerHTML = knobSVG(size, value) + `<div class="knob-name">${name}</div><div class="knob-value">${valueText}</div>`;
 }
 
-// selectedIndex: which of choices[] is the only one lit (radio-exclusive, matches the real
-// buttons' mutual-exclusion behaviour), just static here since the mockup has no interaction.
-function makeConverter(id, choices, selectedIndex) {
+// selectedIndex: which of tickLabels[] the thumb sits under - just static here since the mockup
+// has no interaction (the real switch's mouseDown snaps to the nearest of 3 segments on click).
+function makeConverter(id, tickLabels, selectedIndex) {
   const el = document.getElementById(id);
-  const buttons = choices.map((text, i) => {
+  const ticks = tickLabels.map((text, i) => {
     const on = i === selectedIndex ? ' on' : '';
-    return `<div class="hw-toggle${on}"><span class="led${on}"></span><span>${text.toUpperCase()}</span></div>`;
+    return `<div class="converter-tick${on}">${text}</div>`;
   }).join('');
-  el.innerHTML = `<div class="knob-name">Converter</div><div class="converter-choices">${buttons}</div>`;
+  el.innerHTML = `
+    <div class="converter-ticks">${ticks}</div>
+    <div class="converter-track">
+      <div class="converter-thumb" style="left:${selectedIndex * 33.333}%"><span></span><span></span><span></span></div>
+    </div>
+    <div class="knob-name">Converter</div>`;
 }
 
 function faderSVG(trackHeight, value) {
@@ -319,7 +341,7 @@ function makeFader(id, value, name, valueText) {
 
 makeKnob('k-lowcut', 88, 0.0, 'Low Cut', 'Off');
 makeKnob('k-color', 112, 1.0, 'Color', '0.0 dB');
-makeConverter('c-converter', ['8 bit', '16 bit', '24 bit'], 0);
+makeConverter('c-converter', ['8', '16', '24BIT'], 0);
 makeKnob('k-predelay', 88, 0.0, 'Pre-Delay', '0.0 ms');
 makeKnob('k-decay', 112, 0.45, 'Decay', '2.00 s');
 makeFader('f-wet', 0.25, 'Wet', '50.0%');

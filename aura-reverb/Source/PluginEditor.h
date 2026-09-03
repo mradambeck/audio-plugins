@@ -6,8 +6,6 @@
 
 #include "../../common/UI/ResizableZoom.h"
 
-#include <array>
-
 // All real painting/layout lives here, at a fixed native size (see the setSize() call in the
 // constructor) that never changes again - see AuraAudioProcessorEditor below for why, and
 // common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support.
@@ -22,10 +20,43 @@ public:
     void resized() override;
 
 private:
+    // A small 3-position slide switch, modelled directly on a cropped reference photo of the
+    // Roland RE-501 Chorus Echo's own "LEVEL" switch (Adam, 2026-09-03) - this whole panel
+    // language's hardware reference - rather than continuing to invent a Converter treatment from
+    // scratch. Purely local to Aura, not folded into the shared HardwarePanelLookAndFeel since no
+    // other plugin in the catalog uses this control shape yet. Paints its own tick-value row
+    // ("8   16   24BIT") directly above its own track, since those need to align exactly over the
+    // track's own 3 segment centres - not something a separately-positioned Label could do
+    // reliably. The name label ("CONVERTER") below is a normal external juce::Label instead
+    // (AuraEditorContent::converterLabel), matching how every other control's name sits outside
+    // its own paint().
+    class ConverterSwitch : public juce::Component
+    {
+    public:
+        explicit ConverterSwitch(AuraLookAndFeel& lookAndFeelIn) : lookAndFeel(lookAndFeelIn) {}
+
+        void paint(juce::Graphics&) override;
+        void mouseDown(const juce::MouseEvent&) override;
+
+        void setValue(int newValue, juce::NotificationType notify);
+        int getValue() const noexcept { return value; }
+
+        // Fires on a user click, not on setValue()'s own programmatic (dontSendNotification) path
+        // - mirrors juce::Slider's onValueChange/setValue(..., dontSendNotification) contract, so
+        // the owner can safely re-sync from the live parameter without feedback looping.
+        std::function<void(int)> onValueChanged;
+
+    private:
+        AuraLookAndFeel& lookAndFeel;
+        int value = 0;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ConverterSwitch)
+    };
+
     void timerCallback() override;
     void setupRotarySlider(juce::Slider&, juce::Label&, const juce::String& labelText);
     void setupVerticalSlider(juce::Slider&, juce::Label&, const juce::String& labelText);
-    void setupConverterButtons();
+    void setupConverterSwitch();
     void rebuildChassisTexture();
     void drawHardwareSection(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& label);
 
@@ -42,29 +73,24 @@ private:
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
-    // TONE section: Low Cut (regular, own row), Color (hero-sized, own row), Converter (own row -
-    // a name label matching Low Cut's/Color's own, plus 3 mutually-exclusive LED buttons).
+    // TONE section: Low Cut + Converter (regular knob + switch, top row), Color (hero-sized, own
+    // row below).
     juce::Slider lowCutSlider;
     juce::Label lowCutLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lowCutAttachment;
 
+    // Converter: a 3-position ConverterSwitch (see above) plus its own name label below - there's
+    // no Slider/ButtonAttachment shape that fits a hand-painted 3-position switch, so this is
+    // wired manually: ConverterSwitch::onValueChanged pushes the clicked position straight into
+    // the "bitDepth" parameter, and timerCallback() re-syncs the switch's own value from the live
+    // parameter so host automation/preset loads are reflected too, not just clicks.
+    ConverterSwitch converterSwitch { lookAndFeel };
+    juce::Label converterLabel;
+    int lastSyncedConverterIndex = -1;
+
     juce::Slider colorSlider;
     juce::Label colorLabel;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> colorAttachment;
-
-    // Converter: one real juce::ToggleButton per choice (8/16/24 bit) - same flat-pushbutton +
-    // LED chrome as bypassButton (HardwarePanelLookAndFeel::drawToggleButton), radio-grouped so
-    // clicking one turns the other two off, matching the "only one can be selected at a time"
-    // requirement directly rather than hand-painting a selection indicator. There's no
-    // ButtonAttachment for "N buttons standing for one AudioParameterChoice", so this is wired
-    // manually: each button's onClick pushes its own index straight into the bitDepth parameter,
-    // and timerCallback() re-syncs all three buttons' toggle states from the live parameter value
-    // so host automation/preset loads are reflected too, not just clicks.
-    juce::Label converterLabel;
-    static constexpr int numConverterChoices = 3;
-    static constexpr int converterRadioGroupId = 1;
-    std::array<juce::ToggleButton, numConverterChoices> converterButtons;
-    int lastSyncedConverterIndex = -1;
 
     // TIMING section: Pre-Delay (regular, top row), Decay (hero-sized, bottom row).
     juce::Slider preDelaySlider;

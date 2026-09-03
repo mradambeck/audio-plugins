@@ -129,28 +129,31 @@ output**, found empirically over the course of Phase D validation:
   outright into a plain input-stage utility high-pass, applied before pre-delay and the whole
   effect chain.
 - **Converter** (8/16/24 bit, default 8, underlying param ID still `bitDepth`) is a discrete
-  3-position output quantization selector - a name label plus 3 mutually-exclusive LED buttons
-  (same flat-pushbutton + LED chrome as Bypass, radio-grouped so only one can be lit at a time; see
-  "The UI" below). Originally a continuous 8-24 knob defaulting to 16, chosen because it models the
-  real unit's measured ~90dB dynamic-range ceiling (found by fitting a decay-time model to the real
-  captures' own tails, which bottom out at almost exactly -90dB relative to peak, matching what a
-  real 16-bit-class converter delivers in practice - not exactly the theoretical 16-bit limit).
-  Rebuilt as a 3-choice switch (Adam, 2026-09-03) with a deliberately heavier 8-bit default - no
-  longer trying to default to hardware accuracy; 24 bit is still a genuine bypass
-  (`AuraFDNEngine::bitDepthActive`), same contract as the original knob. Quantization is undithered
-  and applied at the output stage only (wet path, after the tank sum) - its dominant audible effect
-  at 8-bit is not broadband grit but the decay tail truncating to hard digital silence well before
-  it would naturally finish decaying, once the signal drops below half the quantization step
-  (`std::round` then snaps permanently to exact zero).
+  3-position output quantization selector - a small hand-painted slide switch (see "The UI" below)
+  modelled directly on a cropped reference photo of the Roland RE-501 Chorus Echo's own "LEVEL"
+  switch, the hardware this whole panel language is based on. Originally a continuous 8-24 knob
+  defaulting to 16, chosen because it models the real unit's measured ~90dB dynamic-range ceiling
+  (found by fitting a decay-time model to the real captures' own tails, which bottom out at almost
+  exactly -90dB relative to peak, matching what a real 16-bit-class converter delivers in practice
+  - not exactly the theoretical 16-bit limit). Rebuilt as a 3-choice switch (Adam, 2026-09-03) with
+  a deliberately heavier 8-bit default - no longer trying to default to hardware accuracy; 24 bit
+  is still a genuine bypass (`AuraFDNEngine::bitDepthActive`), same contract as the original knob.
+  Quantization is undithered and applied at the output stage only (wet path, after the tank sum) -
+  its dominant audible effect at 8-bit is not broadband grit but the decay tail truncating to hard
+  digital silence well before it would naturally finish decaying, once the signal drops below half
+  the quantization step (`std::round` then snaps permanently to exact zero).
 
 The UI is the full hardware-panel treatment (see the `juce-hardware-panel-ui` skill; accent colour
 `#DCAC52`), built from the approved mockup at `mockups/aura-mockup-v1.html`. Three sections - Tone
-(three stacked rows: Low Cut, then Color (hero-sized - each knob solo in its own row, not paired,
-so Color keeps its full hero size), then Converter's name label + 3-button LED row), Timing
+(Low Cut + Converter's slide switch side by side, top row; Color hero knob, own row below - the
+original 2-row shape, Color staying hero-sized since it's solo rather than sharing a row), Timing
 (Pre-Delay + Decay hero knob, stacked), Mix (Wet/Dry as two independent, full-height vertical
 faders - not knobs, and not a single crossfading Blend control). `AuraLookAndFeel` is a thin
 subclass of the shared `wildjag::HardwarePanelLookAndFeel` supplying Aura's accent pair and the two
-embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific typeface).
+embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific typeface). The
+Converter switch itself (`AuraEditorContent::ConverterSwitch`) is a small hand-painted component
+local to Aura, not part of the shared LookAndFeel - no other plugin in the catalog uses this
+control shape yet.
 
 ## Parameters
 
@@ -160,7 +163,7 @@ embedded fonts (shared Oxanium/Oswald from `common/Assets/`, no plugin-specific 
 | Low Cut | 0 - 300 Hz | 0 Hz (off) | Input-stage utility high-pass, before pre-delay/the effect - NOT derived from the hardware, see "How it works" |
 | Color | -8 - 0 dB | 0 dB | Broadband bass/treble tilt (the hardware's own control) that also shortens decay as it goes negative |
 | Pre-Delay | 0 - 200 ms | 0 ms | Delay before the reverb signal starts |
-| Converter | 8 / 16 / 24 bit | 8 bit | Output quantization depth, 3 mutually-exclusive LED buttons; 24 is a genuine bypass, see "How it works" |
+| Converter | 8 / 16 / 24 bit | 8 bit | Output quantization depth, a small 3-position slide switch; 24 is a genuine bypass, see "How it works" |
 | Dry | 0 - 100% | 100% | Dry signal gain |
 | Wet | 0 - 200% | 50% | Wet (processed) signal gain - independent of Dry, can exceed unity |
 | Bypass | on/off | off | |
