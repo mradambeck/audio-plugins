@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Phase B1/B2: inventory + feature extraction over the 65 AMS RMX16 Ambience IR captures.
 
-Mirrors intruder-gated-reverb/analysis/analyze_irs.py's structure, built on core/io.py and
+Mirrors plugins/intruder-gated-reverb/analysis/analyze_irs.py's structure, built on core/io.py and
 core/features.py instead of effect-local copies. Writes features.json (git-tracked) and one
 diagnostic plot per capture under plots/ (gitignored) - hand-review these (findings.md) before
 trusting any number, per the plan's B3 step.

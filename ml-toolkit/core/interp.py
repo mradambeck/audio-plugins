@@ -1,7 +1,7 @@
 """Interpolates a knob value to a fitted DSP parameter, from scattered (knob_value, fitted_value)
 points measured across a capture grid.
 
-Generalizes intruder-gated-reverb/Source/IntruderParameterMap.cpp's hand-written piecewise-linear
+Generalizes plugins/intruder-gated-reverb/Source/IntruderParameterMap.cpp's hand-written piecewise-linear
 interpolation (with linear extrapolation beyond the measured range, flagged via an `extrapolated`
 out-value) into reusable Python machinery that both a) drives Phase B's cross-validation and b)
 feeds core/export.py's codegen, which regenerates the C++ side of the same interpolation.
@@ -60,7 +60,7 @@ class Curve1D:
 def fit_curve(pairs: list[tuple[float, float]]) -> Curve1D:
     """Builds a Curve1D from a list of (knob_value, fitted_value) points - one point per
     distinct knob setting (average duplicate knob values before calling this, the way
-    intruder-gated-reverb/analysis/findings.md averages repeat captures at the same setting)."""
+    plugins/intruder-gated-reverb/analysis/findings.md averages repeat captures at the same setting)."""
     xs = np.array([p[0] for p in pairs], dtype=float)
     ys = np.array([p[1] for p in pairs], dtype=float)
     return Curve1D(xs, ys)

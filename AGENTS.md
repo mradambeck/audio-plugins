@@ -5,22 +5,22 @@ Instructions for any AI coding agent (Claude Code, or otherwise) working in this
 
 ## Repo shape
 
-This is a monorepo of independent JUCE plugins (`caverns-delay`, `damage-fuzz`,
-`corrosion-drive`, `flux-phaser`, `alloy-bass`, `gradient-pitch`, `shields-reverb`,
-`intruder-gated-reverb`, `strike-synth`, `aura-reverb`) plus `common/` (shared
+This is a monorepo of independent JUCE plugins, all under `plugins/` (`caverns-delay`,
+`damage-fuzz`, `corrosion-drive`, `flux-phaser`, `alloy-bass`, `gradient-pitch`, `shields-reverb`,
+`intruder-gated-reverb`, `strike-synth`, `aura-reverb`) plus `plugins/common/` (shared
 LookAndFeel/assets/CMake helpers) and `installers/` (the combined installer). Each plugin folder
-is a fully independent CMake project — `cd <plugin> && cmake -B build` works on its own. Do not
-introduce a unified CMake super-build; per-plugin independence is relied on by the installer
-scripts and by the skills below.
+is a fully independent CMake project — `cd plugins/<plugin> && cmake -B build` works on its own.
+Do not introduce a unified CMake super-build; per-plugin independence is relied on by the
+installer scripts and by the skills below.
 
 ## Build/test commands
 
-- One plugin: `cd <plugin> && cmake -B build -G Xcode && cmake --build build --config Release
-  --target <Name>_All`, then `--target <Name>Tests` + run the resulting binary. See that plugin's
-  own README for exact target names.
+- One plugin: `cd plugins/<plugin> && cmake -B build -G Xcode && cmake --build build --config
+  Release --target <Name>_All`, then `--target <Name>Tests` + run the resulting binary. See that
+  plugin's own README for exact target names.
 - All plugins: `scripts/build-all.sh` / `scripts/test-all.sh` from the repo root.
-- JUCE is fetched automatically (`common/cmake/FetchJUCE.cmake`, pinned to a fixed tag) — never
-  add a manual JUCE clone step back into any instructions or scripts.
+- JUCE is fetched automatically (`plugins/common/cmake/FetchJUCE.cmake`, pinned to a fixed tag) —
+  never add a manual JUCE clone step back into any instructions or scripts.
 
 ## Project skills
 
@@ -34,7 +34,7 @@ conventions — use them rather than re-deriving the patterns from scratch:
   C++) and a strict screenshot-diff verification methodology — follow both; do not skip straight
   to C++, and do not declare a UI "matching" without an actual pixel comparison against a
   baseline screenshot. New plugins subclass the shared `wildjag::HardwarePanelLookAndFeel`
-  (`common/LookAndFeel/`) rather than copying a LookAndFeel file wholesale — see the skill for the
+  (`plugins/common/LookAndFeel/`) rather than copying a LookAndFeel file wholesale — see the skill for the
   extension points (accent theme, rotary-slider overlay, fader thumb width, textbox font/colour).
 - **`wildjag-plugin-installer`** — scaffolds a new plugin's `installer/` folder and registers it
   in the group installer at `installers/`. A new plugin isn't done until both the per-plugin
@@ -77,7 +77,7 @@ rather than inventing a meaningless aggregate number.
   logo variant) in that plugin's own `Source/Assets/`. Don't copy a shared asset back into a
   plugin's local folder.
 - **LookAndFeel changes**: shared rendering logic lives in
-  `common/LookAndFeel/HardwarePanelLookAndFeel.{h,cpp}`. If a change is needed for one plugin only
+  `plugins/common/LookAndFeel/HardwarePanelLookAndFeel.{h,cpp}`. If a change is needed for one plugin only
   (a new accent colour, a font swap), it belongs in that plugin's own `<Plugin>LookAndFeel.cpp`
   theme/overrides, not in the shared base class. If multiple plugins would need the same new
   capability, add a new well-named extension point to the base class (see the existing
@@ -99,7 +99,7 @@ rather than inventing a meaningless aggregate number.
 
 ## ML toolkit
 
-`ml-toolkit/` (repo root, sibling to the plugin folders) is a separate Python/PyTorch project -
+`ml-toolkit/` (repo root, sibling to `plugins/`) is a separate Python/PyTorch project -
 not part of any plugin's CMake build - that fits real-time DSP parameters to captured hardware
 audio (IRs or paired dry/wet) and exports them for a plugin's own `Source/` to consume. `core/` is
 shared and effect-agnostic; `effects/<name>/` composes it for one specific hardware algorithm
@@ -115,8 +115,8 @@ bins) rather than a per-sample time-domain simulation - the latter is a real per
 (measured at hours per Adam step), not just a style choice.
 
 An effect's fitted output feeds a plugin's own `Source/<Name>ReferenceData.h` (compile-time
-codegen by default) plus a `common/dsp/FittedCurve1D.h`-based `<Name>ParameterMap`, mirroring
-`intruder-gated-reverb/Source/IntruderReferenceData.h` + `IntruderParameterMap.{h,cpp}`'s existing
+codegen by default) plus a `plugins/common/dsp/FittedCurve1D.h`-based `<Name>ParameterMap`, mirroring
+`plugins/intruder-gated-reverb/Source/IntruderReferenceData.h` + `IntruderParameterMap.{h,cpp}`'s existing
 hand-built precedent for exactly this pattern.
 
 ## License

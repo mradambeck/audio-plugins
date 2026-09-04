@@ -1,14 +1,14 @@
 ---
 name: wildjag-plugin-installer
-description: Scaffold a macOS .pkg installer for a Wild Jag JUCE plugin, following the exact conventions used across the existing catalog (Caverns, Damage, Corrosion) — per-format (AU/VST3/Standalone) checkboxes plus a system-vs-user install-location choice. Use whenever a new plugin is added under ~/code/audio-plugins, or whenever asked to add/fix installer support for an existing one — including registering it in the shared group installer at ~/code/audio-plugins/installers/, and in the download-counter Worker's PLUGIN_SLUGS allowlist, so it appears in both.
+description: Scaffold a macOS .pkg installer for a Wild Jag JUCE plugin, following the exact conventions used across the existing catalog (Caverns, Damage, Corrosion) — per-format (AU/VST3/Standalone) checkboxes plus a system-vs-user install-location choice. Use whenever a new plugin is added under ~/code/audio-plugins/plugins, or whenever asked to add/fix installer support for an existing one — including registering it in the shared group installer at ~/code/audio-plugins/installers/, and in the download-counter Worker's PLUGIN_SLUGS allowlist, so it appears in both.
 ---
 
 # Wild Jag plugin installer scaffolding
 
-Every plugin under `~/code/audio-plugins/<plugin-repo>/` gets its own
+Every plugin under `~/code/audio-plugins/plugins/<plugin-repo>/` gets its own
 `installer/` folder that builds a double-clickable macOS `.pkg`, and is also
 registered in the shared group installer at `~/code/audio-plugins/installers/`.
-**`caverns-delay/installer/` is the canonical reference implementation** —
+**`plugins/caverns-delay/installer/` is the canonical reference implementation** —
 copy its four files and substitute the per-plugin values below rather than
 re-deriving the scripts from this description.
 `~/code/audio-plugins/installers/README.md` documents the whole system end to
@@ -44,7 +44,7 @@ format checkboxes possible.
 
 ## Step 1 — per-plugin `installer/` folder
 
-Copy from `caverns-delay/installer/` into the new plugin repo:
+Copy from `plugins/caverns-delay/installer/` into the new plugin repo:
 
 ```
 <new-plugin-repo>/installer/
@@ -137,7 +137,7 @@ installer/output/
 Edit four files under `~/code/audio-plugins/installers/` (**not** inside the
 plugin's own repo):
 
-1. **`build-all.sh`** — add `"<plugin-repo>:<Name>"` to the `for entry in
+1. **`build-all.sh`** — add `"plugins/<plugin-repo>:<Name>"` to the `for entry in
    ...` list. The loop already builds `--component-only`, copies all three
    format packages, and extracts that plugin's version (via
    `scripts/plugin-version.sh`) into the `sed_args` array consumed by the next

@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Only the JUCE *source* checkout is cacheable across runs (see common/cmake/FetchJUCE.cmake).
+      # Only the JUCE *source* checkout is cacheable across runs (see plugins/common/cmake/FetchJUCE.cmake).
       - name: Cache JUCE checkout
         uses: actions/cache@v4
         with:
@@ -54,7 +54,7 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
-          for repo in caverns-delay damage-fuzz corrosion-drive flux-phaser alloy-bass gradient-pitch shields-reverb intruder-gated-reverb strike-synth aura-reverb; do
+          for repo in plugins/caverns-delay plugins/damage-fuzz plugins/corrosion-drive plugins/flux-phaser plugins/alloy-bass plugins/gradient-pitch plugins/shields-reverb plugins/intruder-gated-reverb plugins/strike-synth plugins/aura-reverb; do
             echo "==> Configuring $repo"
             cmake -S "$repo" -B "$repo/build" -G Xcode
             echo "==> Building $repo installer"
@@ -83,7 +83,7 @@ jobs:
       - name: Collect release assets
         run: |
           mkdir -p release-assets
-          for entry in "caverns-delay:Caverns:Caverns - Delay" "damage-fuzz:Damage:Damage - Fuzz" "corrosion-drive:Corrosion:Corrosion - Overdrive" "flux-phaser:Flux:Flux - Phaser" "alloy-bass:Alloy:Alloy" "gradient-pitch:Gradient:Gradient - Pitch Delay" "shields-reverb:Shields:Shields - Reverb" "intruder-gated-reverb:Intruder:Intruder - Reverb" "strike-synth:Strike:Strike" "aura-reverb:Aura:Aura - Reverb"; do
+          for entry in "plugins/caverns-delay:Caverns:Caverns - Delay" "plugins/damage-fuzz:Damage:Damage - Fuzz" "plugins/corrosion-drive:Corrosion:Corrosion - Overdrive" "plugins/flux-phaser:Flux:Flux - Phaser" "plugins/alloy-bass:Alloy:Alloy" "plugins/gradient-pitch:Gradient:Gradient - Pitch Delay" "plugins/shields-reverb:Shields:Shields - Reverb" "plugins/intruder-gated-reverb:Intruder:Intruder - Reverb" "plugins/strike-synth:Strike:Strike" "plugins/aura-reverb:Aura:Aura - Reverb"; do
             IFS=':' read -r repo name product <<< "$entry"
             cp "$repo/installer/output/${name}-Installer.pkg" release-assets/
             ditto -c -k --keepParent \

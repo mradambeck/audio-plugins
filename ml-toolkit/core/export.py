@@ -3,7 +3,7 @@
 Two output forms:
   - write_export(): JSON, for inspection/tooling and as the canonical record of a fit.
   - write_cpp_header(): a self-contained C++ header of raw {x, y} reference-point arrays, styled
-    directly on intruder-gated-reverb/Source/IntruderReferenceData.h's "single source of truth"
+    directly on plugins/intruder-gated-reverb/Source/IntruderReferenceData.h's "single source of truth"
     convention (including its static_assert on sort order) - deliberately just data, with no
     dependency on common/dsp/FittedCurve1D.h or any plugin's ParameterMap. A plugin's own
     `<Name>ParameterMap.cpp` (Phase C) is the thin adapter that turns these raw points into

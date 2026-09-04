@@ -17,7 +17,7 @@ comparison: Low=0 vs Low=+5 at High=-8). Rather than inventing precision the dat
 support, this deliberately does NOT build a Low curve - it's left as a documented gap for either
 more targeted captures (ideal) or by-ear tuning during Phase C, the same way Intruder's own
 automated fit needed a hand-tuned tankSustainMultiplier sweep afterward
-(intruder-gated-reverb/analysis/validation_report.md's "Status" section).
+(plugins/intruder-gated-reverb/analysis/validation_report.md's "Status" section).
 
 tilt_low_gain/tilt_high_gain are excluded entirely: B6 found they stayed within ~2-3% of neutral
 (1.0) across all 65 fits even after removing the initial fit's degenerate noise, meaning the
