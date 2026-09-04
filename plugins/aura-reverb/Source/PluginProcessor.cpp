@@ -270,8 +270,11 @@ void AuraAudioProcessor::releaseResources() {}
 
 bool AuraAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo()
-           && layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    return layouts.getMainInputChannelSet() == juce::AudioChannelSet::mono()
+        || layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -305,6 +308,12 @@ void AuraAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     const auto numSamples = buffer.getNumSamples();
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
+
+    // No real second channel - duplicate the mono input onto it before anything reads it, so the
+    // (unmodified) stereo engine below and the dry tap just below both see a correlated L=R input,
+    // same as any stereo effect fed a mono source.
+    if (getTotalNumInputChannels() < 2)
+        buffer.copyFrom(1, 0, buffer, 0, 0, numSamples);
 
     juce::HeapBlock<float> dryL(static_cast<size_t>(numSamples));
     juce::HeapBlock<float> dryR(static_cast<size_t>(numSamples));

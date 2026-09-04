@@ -206,6 +206,55 @@ public:
             expectWithinAbsoluteError(measuredHz, 110.0f, 5.0f);
         }
 
+        beginTest("isBusesLayoutSupported accepts mono and stereo, rejects other channel counts");
+        {
+            AlloyAudioProcessor processor;
+
+            juce::AudioProcessor::BusesLayout monoLayout;
+            monoLayout.outputBuses.add(juce::AudioChannelSet::mono());
+            expect(processor.isBusesLayoutSupported(monoLayout));
+
+            juce::AudioProcessor::BusesLayout stereoLayout;
+            stereoLayout.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.isBusesLayoutSupported(stereoLayout));
+
+            juce::AudioProcessor::BusesLayout lcrLayout;
+            lcrLayout.outputBuses.add(juce::AudioChannelSet::createLCR());
+            expect(! processor.isBusesLayoutSupported(lcrLayout));
+        }
+
+        beginTest("Note On through a mono output bus produces the same tone as stereo (isolated analog VCO)");
+        {
+            const int numSamples = 16384;
+            auto midi = noteOnBuffer(45, 100); // MIDI 45 = A2 = 110Hz
+
+            AlloyAudioProcessor monoProcessor;
+            setupIsolatedAnalogPatch(monoProcessor);
+            monoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> monoBuffer(1, numSamples);
+            monoBuffer.clear();
+            monoProcessor.processBlock(monoBuffer, midi);
+
+            const auto measuredHz = estimateFrequencyByZeroCrossings(
+                monoBuffer.getReadPointer(0) + numSamples / 2, numSamples / 2, sampleRate);
+            expectWithinAbsoluteError(measuredHz, 110.0f, 5.0f);
+
+            // Age is off in the isolated patch, so ageCentsOffset is exactly 0.0f regardless of the
+            // random drift/warble noise generator's state (see the comment at its use site in
+            // PluginProcessor.cpp) - output is otherwise deterministic, so a separately-constructed
+            // stereo instance given the same patch and note should render an identical signal on
+            // channel 0. This pins the fix down to "copy mono into N channels", not a signal change.
+            AlloyAudioProcessor stereoProcessor;
+            setupIsolatedAnalogPatch(stereoProcessor);
+            stereoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> stereoBuffer(2, numSamples);
+            stereoBuffer.clear();
+            stereoProcessor.processBlock(stereoBuffer, midi);
+
+            const auto diff = rmsOfDifference(monoBuffer.getReadPointer(0), stereoBuffer.getReadPointer(0), numSamples);
+            expectWithinAbsoluteError(diff, 0.0f, 1.0e-9f);
+        }
+
         beginTest("Note Off releases the voice toward silence");
         {
             AlloyAudioProcessor processor;

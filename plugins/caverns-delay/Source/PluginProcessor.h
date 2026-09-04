@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include <vector>
+
 #include "../../common/Presets/FactoryPreset.h"
 
 class CavernsAudioProcessor : public juce::AudioProcessor
@@ -148,6 +150,15 @@ private:
     // sample ceiling for how far it's allowed to push the feedback-path flutter at full Degrade.
     double degradeWobblePhase = 0.0;
     float maxDegradeWobbleSamples = 0.0f;
+
+    // Filled from channel 0 whenever the host gives us a mono buffer, so the R-side delay
+    // line/filters in processBlock() - already fully independent of the L side - can keep running
+    // unchanged against a scratch copy of the same input rather than a real channel 1. Only
+    // channel 0 (driven by L Time/L Division, which never reads anything from the R side) is ever
+    // written back to the host in that case - R Time/R Division/Link have no audible effect on a
+    // mono instance. Sized up front in prepareToPlay(), so a mono instance never allocates on the
+    // audio thread.
+    std::vector<float> monoScratchChannel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CavernsAudioProcessor)
 };

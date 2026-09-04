@@ -71,6 +71,71 @@ public:
                     expectWithinAbsoluteError(buffer.getSample(ch, i), reference.getSample(ch, i), 1.0e-9f);
         }
 
+        beginTest("isBusesLayoutSupported accepts matched mono or stereo, rejects mismatches and other channel counts");
+        {
+            FluxAudioProcessor processor;
+
+            juce::AudioProcessor::BusesLayout monoLayout;
+            monoLayout.inputBuses.add(juce::AudioChannelSet::mono());
+            monoLayout.outputBuses.add(juce::AudioChannelSet::mono());
+            expect(processor.isBusesLayoutSupported(monoLayout));
+
+            juce::AudioProcessor::BusesLayout stereoLayout;
+            stereoLayout.inputBuses.add(juce::AudioChannelSet::stereo());
+            stereoLayout.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.isBusesLayoutSupported(stereoLayout));
+
+            juce::AudioProcessor::BusesLayout mismatchedLayout;
+            mismatchedLayout.inputBuses.add(juce::AudioChannelSet::mono());
+            mismatchedLayout.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(! processor.isBusesLayoutSupported(mismatchedLayout));
+
+            juce::AudioProcessor::BusesLayout lcrLayout;
+            lcrLayout.inputBuses.add(juce::AudioChannelSet::createLCR());
+            lcrLayout.outputBuses.add(juce::AudioChannelSet::createLCR());
+            expect(! processor.isBusesLayoutSupported(lcrLayout));
+        }
+
+        beginTest("Mono output bus renders identically to stereo channel 0, feedback/grit/brightness/depth all engaged");
+        {
+            constexpr int numSamples = 8192;
+
+            auto configure = [](FluxAudioProcessor& p)
+            {
+                setRaw(p, FluxAudioProcessor::depthParamID, 70.0f);
+                setRaw(p, FluxAudioProcessor::feedbackParamID, 50.0f);
+                setRaw(p, FluxAudioProcessor::gritParamID, 60.0f);
+                setRaw(p, FluxAudioProcessor::brightnessParamID, 40.0f);
+                setRaw(p, FluxAudioProcessor::blendParamID, 65.0f);
+            };
+
+            FluxAudioProcessor monoProcessor;
+            configure(monoProcessor);
+            monoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> monoBuffer(1, numSamples);
+            fillSine(monoBuffer, 0.5f, 220.0f, sampleRate);
+            juce::MidiBuffer midi;
+            monoProcessor.processBlock(monoBuffer, midi);
+
+            FluxAudioProcessor stereoProcessor;
+            configure(stereoProcessor);
+            stereoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> stereoBuffer(2, numSamples);
+            fillSine(stereoBuffer, 0.5f, 220.0f, sampleRate);
+            stereoProcessor.processBlock(stereoBuffer, midi);
+
+            // Channel 0's whole computation (allpassL, feedbackStateL, the Grit/Brightness filters,
+            // even the stereo-widening freqHzL offset) never reads anything from the R side - see
+            // processBlock()'s per-sample loop - so mono and stereo must render bit-for-bit
+            // identically on channel 0 regardless of what these knobs are set to.
+            const auto diff = rmsOfDifference(monoBuffer.getReadPointer(0), stereoBuffer.getReadPointer(0), numSamples);
+            expectWithinAbsoluteError(diff, 0.0f, 1.0e-9f);
+
+            // And it's not a silent no-op passthrough - the phaser is actually doing something.
+            const auto wetRms = rms(monoBuffer.getReadPointer(0), numSamples);
+            expect(wetRms > 0.01f);
+        }
+
         beginTest("Blend=0% is an exact dry passthrough - the equal-power crossfade's wet gain is exactly zero there");
         {
             FluxAudioProcessor processor;

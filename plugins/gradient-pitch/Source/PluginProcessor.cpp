@@ -504,8 +504,11 @@ double GradientAudioProcessor::getCurrentBpm() const
 
 bool GradientAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo()
-           && layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    return layouts.getMainInputChannelSet() == juce::AudioChannelSet::mono()
+        || layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 void GradientAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -546,6 +549,12 @@ void GradientAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
+
+    // No real second channel - duplicate the mono input onto it before either branch below reads
+    // it, so Dual Mode off (summed to one engine) and Dual Mode on (engineA/engineB, Link, Width,
+    // Cross-feedback) both see a correlated L=R input, same as any stereo effect fed a mono source.
+    if (getTotalNumInputChannels() < 2)
+        buffer.copyFrom(1, 0, buffer, 0, 0, buffer.getNumSamples());
 
     const bool dualMode = dualModeEnabledParam->load() > 0.5f;
 

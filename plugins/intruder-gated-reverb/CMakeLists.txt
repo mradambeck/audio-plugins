@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Intruder VERSION 0.2.1)
+project(Intruder VERSION 0.3.0)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -73,14 +73,22 @@ target_sources(IntruderTests
     PRIVATE
         Source/IntruderFDNEngine.cpp
         Source/IntruderParameterMap.cpp
+        Source/PluginProcessor.cpp
         Source/Tests/IntruderFDNEngineTests.cpp
         Source/Tests/IntruderParameterMapTests.cpp
+        Source/Tests/IntruderProcessorTests.cpp
+        Source/Tests/TestCreateEditorStub.cpp
         Source/Tests/TestRunner.cpp
+)
+
+target_compile_definitions(IntruderTests
+    PRIVATE
+        JucePlugin_Name="Intruder"
 )
 
 target_link_libraries(IntruderTests
     PRIVATE
-        juce::juce_core
+        juce::juce_audio_processors
         juce::juce_dsp
     PUBLIC
         juce::juce_recommended_config_flags

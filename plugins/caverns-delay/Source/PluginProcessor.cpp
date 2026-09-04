@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 
@@ -497,6 +498,8 @@ void CavernsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     feedbackDarkenerR.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, feedbackDarkenerHz);
     feedbackDarkenerR.reset();
 
+    monoScratchChannel.assign((size_t) samplesPerBlock, 0.0f);
+
     const auto maxDegradeWobbleSamplesInt = static_cast<int>(maxDegradeWobbleMs * 0.001 * sampleRate) + 1;
     maxDegradeWobbleSamples = static_cast<float>(maxDegradeWobbleSamplesInt - 1);
     degradeWobblePhase = 0.0;
@@ -545,10 +548,21 @@ double CavernsAudioProcessor::getCurrentBpm() const
 
 bool CavernsAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
-        return false;
+    const auto out = layouts.getMainOutputChannelSet();
+    const auto in = layouts.getMainInputChannelSet();
 
-    return layouts.getMainOutputChannelSet() == layouts.getMainInputChannelSet();
+    // Stereo out accepts either a mono or stereo in - mono-in/stereo-out runs both delay lines
+    // (L Time and R Time) for real off the same mono source, producing genuine stereo width from
+    // a mono track rather than throwing half the plugin's character away.
+    if (out == juce::AudioChannelSet::stereo())
+        return in == juce::AudioChannelSet::mono() || in == juce::AudioChannelSet::stereo();
+
+    // Mono out only pairs with mono in - there's no meaningful way to fold stereo input down to
+    // one output channel here.
+    if (out == juce::AudioChannelSet::mono())
+        return in == juce::AudioChannelSet::mono();
+
+    return false;
 }
 
 void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -559,7 +573,8 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         return;
 
     const auto numSamples = buffer.getNumSamples();
-    if (buffer.getNumChannels() < 2)
+    const auto numChannels = buffer.getNumChannels();
+    if (numChannels < 1)
         return;
 
     const auto syncOn = syncParam->load() > 0.5f;
@@ -648,7 +663,29 @@ void CavernsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     }
 
     auto* left = buffer.getWritePointer(0);
-    auto* right = buffer.getWritePointer(1);
+    float* right;
+    if (numChannels < 2)
+    {
+        // Mono in, mono out - no real second channel at all. The R-side delay line/filters below
+        // keep running unchanged against a private scratch copy of the same input; only channel 0
+        // (driven by L Time/Division, written identically either way) reaches the host.
+        if ((int) monoScratchChannel.size() < numSamples)
+            monoScratchChannel.resize((size_t) numSamples);
+        std::copy(left, left + numSamples, monoScratchChannel.begin());
+        right = monoScratchChannel.data();
+    }
+    else if (getTotalNumInputChannels() < 2)
+    {
+        // Mono in, stereo out - channel 1 is a real output channel but has no real input content.
+        // Duplicate channel 0 into it so both delay lines run for real off the same mono source;
+        // unlike the mono-out case above, both channels are genuine output here.
+        buffer.copyFrom(1, 0, buffer, 0, 0, numSamples);
+        right = buffer.getWritePointer(1);
+    }
+    else
+    {
+        right = buffer.getWritePointer(1);
+    }
 
     // modDepthMs is block-constant; when it's exactly 0 (the default), modOffsetSamples is exactly
     // 0 regardless of sin(modPhase)'s value (sin() is always finite, and finite * 0.0f == 0.0f

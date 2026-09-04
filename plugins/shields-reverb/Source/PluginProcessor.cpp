@@ -288,8 +288,11 @@ void ShieldsAudioProcessor::reset()
 
 bool ShieldsAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo()
-           && layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    return layouts.getMainInputChannelSet() == juce::AudioChannelSet::mono()
+        || layouts.getMainInputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -314,6 +317,12 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     // block is a far better failure than a dropout, and the assertion catches it in a debug build.
     jassert(numSamples <= maxBlockSize);
     const auto samplesToProcess = std::min(numSamples, maxBlockSize);
+
+    // No real second channel - duplicate the mono input onto it before the wetBuffer copy below
+    // reads it, so the (unmodified) stereo engine and the dry mix at the bottom both see a
+    // correlated L=R input, same as any stereo effect fed a mono source.
+    if (getTotalNumInputChannels() < 2)
+        buffer.copyFrom(1, 0, buffer, 0, 0, samplesToProcess);
 
     engine.setDiffusion(diffusionParam->load());
     engine.setFeedback(feedbackParam->load() * 0.01f);
