@@ -37,6 +37,7 @@
 //                    [--dualModeEnabled 0] [--widthPercent 100]
 //                    [--linkEnabled 0] [--linkPitchIntervalSemitones 0] [--linkDelayIntervalMs 0]
 //                    [--crossFeedbackEnabled 0] [--bypass 0]
+//                    [--monoIn 0] [--forceMonoContent 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs (PluginProcessor.h) in the plugin's own
 // native units - not normalised 0-1 - so a value copied from this tool's output maps directly onto
@@ -210,6 +211,32 @@ int main(int argc, char* argv[])
     setParam(processor, GradientAudioProcessor::crossFeedbackEnabledParamID, getFloatArg(args, "crossFeedbackEnabled", 0.0f));
     setParam(processor, GradientAudioProcessor::bypassParamID, getFloatArg(args, "bypass", 0.0f));
 
+    // --monoIn 1: negotiates a mono-input/stereo-output bus layout (as a mono host track would) and
+    // deliberately leaves the render buffer's channel 1 unpopulated below - processBlock() must
+    // derive it from channel 0 itself via getTotalNumInputChannels() < 2, exactly like a real mono
+    // host buffer, not from this tool feeding it real content.
+    //
+    // --forceMonoContent 1: independent of --monoIn - makes the STEREO bus path (the pre-existing,
+    // unmodified-by-the-mono-fix code) receive identical L=R content instead of the normal L!=R test
+    // signal. Pairing `--forceMonoContent 1` (stereo bus) against `--monoIn 1` (mono bus, same other
+    // params) with otherwise-identical settings gives two renders that SHOULD be byte-identical if
+    // the mono-input fix is correct: both ultimately run the same per-sample computation against
+    // identical L=R content, one via real stereo channels and one via the mono-duplication path.
+    const bool monoIn = getFloatArg(args, "monoIn", 0.0f) > 0.5f;
+    const bool forceMonoContent = getFloatArg(args, "forceMonoContent", 0.0f) > 0.5f;
+
+    if (monoIn)
+    {
+        juce::AudioProcessor::BusesLayout monoInStereoOut;
+        monoInStereoOut.inputBuses.add(juce::AudioChannelSet::mono());
+        monoInStereoOut.outputBuses.add(juce::AudioChannelSet::stereo());
+        if (! processor.setBusesLayout(monoInStereoOut))
+        {
+            std::fprintf(stderr, "setBusesLayout(mono-in/stereo-out) was rejected\n");
+            return 1;
+        }
+    }
+
     constexpr int blockSize = 512;
     processor.prepareToPlay((double) sampleRate, blockSize);
 
@@ -235,7 +262,9 @@ int main(int argc, char* argv[])
         const auto thisBlockSize = std::min(blockSize, totalSamples - written);
         block.setSize(2, thisBlockSize, false, false, true);
         block.copyFrom(0, 0, inputSignal, 0, written, thisBlockSize);
-        block.copyFrom(1, 0, inputSignal, 1, written, thisBlockSize);
+        if (! monoIn)
+            block.copyFrom(1, 0, inputSignal, forceMonoContent ? 0 : 1, written, thisBlockSize);
+        // else: monoIn - channel 1 is deliberately left as whatever the buffer already held.
 
         processor.processBlock(block, midi);
 

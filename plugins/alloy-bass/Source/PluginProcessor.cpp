@@ -910,7 +910,8 @@ void AlloyAudioProcessor::releaseResources() {}
 
 bool AlloyAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::mono()
+        || layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
 float AlloyAudioProcessor::frequencyForNote(int midiNoteNumber, int octaveShift) const noexcept
@@ -1117,7 +1118,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
-    if (buffer.getNumChannels() < 2)
+    if (buffer.getNumChannels() < 1)
         return;
 
     if (panicRequested.exchange(false, std::memory_order_relaxed))
@@ -1279,8 +1280,7 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // louder in proportion to voice count.
     const auto unisonGain = 1.0f / std::sqrt((float) unisonVoices);
 
-    auto* left = buffer.getWritePointer(0);
-    auto* right = buffer.getWritePointer(1);
+    const auto numChannels = buffer.getNumChannels();
 
     int midiEventIndex = 0;
     auto midiIterator = midiMessages.cbegin();
@@ -1449,8 +1449,8 @@ void AlloyAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // approximation.
         const auto out = std::abs(withOutputGain) <= 0.0f ? withOutputGain : std::tanh(withOutputGain * mixSafetyDrive) / mixSafetyDrive;
 
-        left[sample] = out;
-        right[sample] = out;
+        for (int channel = 0; channel < numChannels; ++channel)
+            buffer.setSample(channel, sample, out);
     }
 }
 

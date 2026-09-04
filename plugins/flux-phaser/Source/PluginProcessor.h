@@ -3,6 +3,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 
+#include <vector>
+
 #include "../../common/Presets/FactoryPreset.h"
 
 // A single first-order digital allpass stage (Zölzer/DAFX form): passes every frequency at equal
@@ -156,6 +158,12 @@ private:
     // dependency) - recomputed only inside the lastGritAmount cache guard above, so they're now
     // members (read every sample in the per-sample loop) rather than per-block locals.
     float gritK = 0.0f, gritMakeup = 1.0f, gritOutputTrim = 1.0f;
+
+    // Filled from channel 0 whenever the host gives us a mono buffer, so the stereo DSP in
+    // processBlock() - fully symmetric and per-channel-independent - can run completely unchanged
+    // either way; only channel 0 is ever written back to the host when there's no real channel 1.
+    // Sized up front in prepareToPlay(), so a mono instance never allocates on the audio thread.
+    std::vector<float> monoScratchChannel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FluxAudioProcessor)
 };

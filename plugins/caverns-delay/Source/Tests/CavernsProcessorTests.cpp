@@ -46,6 +46,24 @@ namespace
             sum += (double) data[i] * (double) data[i];
         return (float) std::sqrt(sum / (double) numSamples);
     }
+
+    float rmsOfDifference(const float* a, const float* b, int numSamples)
+    {
+        double sum = 0.0;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const auto d = (double) a[i] - (double) b[i];
+            sum += d * d;
+        }
+        return (float) std::sqrt(sum / (double) numSamples);
+    }
+
+    void fillSine(juce::AudioBuffer<float>& buffer, float amplitude, float freqHz, double sampleRate)
+    {
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+                buffer.setSample(ch, i, amplitude * std::sin(juce::MathConstants<float>::twoPi * freqHz * (float) i / (float) sampleRate));
+    }
 }
 
 class CavernsProcessorTests : public juce::UnitTest
@@ -77,6 +95,149 @@ public:
             for (int ch = 0; ch < 2; ++ch)
                 for (int i = 0; i < 512; ++i)
                     expectWithinAbsoluteError(buffer.getSample(ch, i), reference.getSample(ch, i), 1.0e-9f);
+        }
+
+        beginTest("isBusesLayoutSupported accepts mono/mono, stereo/stereo, and mono-in/stereo-out; rejects stereo-in/mono-out and other channel counts");
+        {
+            CavernsAudioProcessor processor;
+
+            juce::AudioProcessor::BusesLayout monoLayout;
+            monoLayout.inputBuses.add(juce::AudioChannelSet::mono());
+            monoLayout.outputBuses.add(juce::AudioChannelSet::mono());
+            expect(processor.isBusesLayoutSupported(monoLayout));
+
+            juce::AudioProcessor::BusesLayout stereoLayout;
+            stereoLayout.inputBuses.add(juce::AudioChannelSet::stereo());
+            stereoLayout.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.isBusesLayoutSupported(stereoLayout));
+
+            juce::AudioProcessor::BusesLayout monoInStereoOut;
+            monoInStereoOut.inputBuses.add(juce::AudioChannelSet::mono());
+            monoInStereoOut.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.isBusesLayoutSupported(monoInStereoOut));
+
+            juce::AudioProcessor::BusesLayout stereoInMonoOut;
+            stereoInMonoOut.inputBuses.add(juce::AudioChannelSet::stereo());
+            stereoInMonoOut.outputBuses.add(juce::AudioChannelSet::mono());
+            expect(! processor.isBusesLayoutSupported(stereoInMonoOut));
+
+            juce::AudioProcessor::BusesLayout lcrLayout;
+            lcrLayout.inputBuses.add(juce::AudioChannelSet::createLCR());
+            lcrLayout.outputBuses.add(juce::AudioChannelSet::createLCR());
+            expect(! processor.isBusesLayoutSupported(lcrLayout));
+        }
+
+        beginTest("Mono-in/stereo-out produces real stereo width - L output follows L Time, R output follows R Time");
+        {
+            CavernsAudioProcessor processor;
+            juce::AudioProcessor::BusesLayout monoInStereoOut;
+            monoInStereoOut.inputBuses.add(juce::AudioChannelSet::mono());
+            monoInStereoOut.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.setBusesLayout(monoInStereoOut));
+
+            setRaw(processor, CavernsAudioProcessor::syncParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::linkParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::leftTimeParamID, 100.0f);
+            setRaw(processor, CavernsAudioProcessor::rightTimeParamID, 250.0f);
+            setRaw(processor, CavernsAudioProcessor::feedbackParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::dryParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::wetParamID, 100.0f);
+            setRaw(processor, CavernsAudioProcessor::degradeParamID, 0.0f);
+            setRaw(processor, CavernsAudioProcessor::lowCutParamID, 20.0f);
+            setRaw(processor, CavernsAudioProcessor::highCutParamID, 20000.0f);
+            // Params set BEFORE prepareToPlay so the delay-time smoothers' initial values already
+            // equal their targets - no 40ms glide to wait out, an exact delay from sample 0.
+            const int numSamples = 16384;
+            processor.prepareToPlay(sampleRate, numSamples);
+
+            // A mono input bus still gets a 2-channel buffer from the host (max(in,out) channels) -
+            // only channel 0 carries real input; channel 1 is left at silence, exactly like a real
+            // mono host buffer, so this actually exercises processBlock()'s duplication.
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            buffer.clear();
+            buffer.setSample(0, 0, 1.0f);
+            juce::MidiBuffer midi;
+            processor.processBlock(buffer, midi);
+
+            const int expectedLeftDelaySamples = (int) std::round(100.0 * 0.001 * sampleRate);
+            const int expectedRightDelaySamples = (int) std::round(250.0 * 0.001 * sampleRate);
+            const int peakL = argMaxAbs(buffer.getReadPointer(0), 1, numSamples);
+            const int peakR = argMaxAbs(buffer.getReadPointer(1), 1, numSamples);
+
+            expectWithinAbsoluteError(peakL, expectedLeftDelaySamples, 5);
+            expectWithinAbsoluteError(peakR, expectedRightDelaySamples, 5);
+            expect(peakAbs(buffer.getReadPointer(0), numSamples) > 0.05f, "L output should not be silent");
+            expect(peakAbs(buffer.getReadPointer(1), numSamples) > 0.05f, "R output should not be silent");
+        }
+
+        beginTest("Mono-in/stereo-out collapses to identical L/R at default settings - L Time and R Time both default to the same value");
+        {
+            // Deliberately does NOT touch leftTimeParamID/rightTimeParamID - unlike the width test
+            // above, this leaves them at their shipped default (350ms both), so this documents that
+            // stereo width from a mono source is opt-in here (the user has to actually set R Time
+            // away from L Time), unlike the reverbs' always-on tank-driven width.
+            CavernsAudioProcessor processor;
+            juce::AudioProcessor::BusesLayout monoInStereoOut;
+            monoInStereoOut.inputBuses.add(juce::AudioChannelSet::mono());
+            monoInStereoOut.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.setBusesLayout(monoInStereoOut));
+
+            constexpr int numSamples = 16384;
+            processor.prepareToPlay(sampleRate, numSamples);
+
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            buffer.clear();
+            fillSine(buffer, 0.5f, 220.0f, sampleRate);
+            for (int i = 0; i < numSamples; ++i)
+                buffer.setSample(1, i, 0.0f);
+            juce::MidiBuffer midi;
+            processor.processBlock(buffer, midi);
+
+            const auto widthRms = rmsOfDifference(buffer.getReadPointer(0), buffer.getReadPointer(1), numSamples);
+            expectWithinAbsoluteError(widthRms, 0.0f, 1.0e-9f);
+        }
+
+        beginTest("Mono output bus renders identically to stereo channel 0, using L Time/Division even with R Time/Link different");
+        {
+            constexpr int numSamples = 16384;
+
+            auto configure = [](CavernsAudioProcessor& p)
+            {
+                setRaw(p, CavernsAudioProcessor::linkParamID, 0.0f);
+                setRaw(p, CavernsAudioProcessor::leftTimeParamID, 180.0f);
+                setRaw(p, CavernsAudioProcessor::rightTimeParamID, 400.0f); // deliberately different from L - should have zero effect on channel 0
+                setRaw(p, CavernsAudioProcessor::feedbackParamID, 40.0f);
+                setRaw(p, CavernsAudioProcessor::wetParamID, 60.0f);
+                setRaw(p, CavernsAudioProcessor::modDepthParamID, 8.0f);
+                setRaw(p, CavernsAudioProcessor::modSpeedParamID, 2.0f);
+                setRaw(p, CavernsAudioProcessor::degradeParamID, 15.0f);
+            };
+
+            CavernsAudioProcessor monoProcessor;
+            configure(monoProcessor);
+            monoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> monoBuffer(1, numSamples);
+            fillSine(monoBuffer, 0.5f, 220.0f, sampleRate);
+            juce::MidiBuffer midi;
+            monoProcessor.processBlock(monoBuffer, midi);
+
+            CavernsAudioProcessor stereoProcessor;
+            configure(stereoProcessor);
+            stereoProcessor.prepareToPlay(sampleRate, numSamples);
+            juce::AudioBuffer<float> stereoBuffer(2, numSamples);
+            fillSine(stereoBuffer, 0.5f, 220.0f, sampleRate);
+            stereoProcessor.processBlock(stereoBuffer, midi);
+
+            // Channel 0's whole computation (delayLineL, feedbackDarkenerL, lowCutFilterL/
+            // highCutFilterL, the degrade waveshapers on the L tap) never reads anything from the R
+            // side - see processBlock()'s per-sample loop - so mono and stereo must render
+            // bit-for-bit identically on channel 0, even with R Time set far away from L Time.
+            const auto diff = rmsOfDifference(monoBuffer.getReadPointer(0), stereoBuffer.getReadPointer(0), numSamples);
+            expectWithinAbsoluteError(diff, 0.0f, 1.0e-9f);
+
+            // And it's not a silent no-op - the delay is actually audible.
+            const auto wetRms = rms(monoBuffer.getReadPointer(0), numSamples);
+            expect(wetRms > 0.01f);
         }
 
         beginTest("An impulse reappears at the delay time set by L Time, not before or after");

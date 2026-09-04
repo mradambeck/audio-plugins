@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Shields VERSION 0.5.1)
+project(Shields VERSION 0.6.0)
 set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -70,13 +70,21 @@ juce_add_console_app(ShieldsTests
 target_sources(ShieldsTests
     PRIVATE
         Source/ShieldsFDNEngine.cpp
+        Source/PluginProcessor.cpp
         Source/Tests/ShieldsFDNEngineTests.cpp
+        Source/Tests/ShieldsProcessorTests.cpp
+        Source/Tests/TestCreateEditorStub.cpp
         Source/Tests/TestRunner.cpp
+)
+
+target_compile_definitions(ShieldsTests
+    PRIVATE
+        JucePlugin_Name="Shields"
 )
 
 target_link_libraries(ShieldsTests
     PRIVATE
-        juce::juce_core
+        juce::juce_audio_processors
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

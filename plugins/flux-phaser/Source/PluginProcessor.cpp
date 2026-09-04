@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iterator>
 
@@ -415,6 +416,8 @@ void FluxAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     lfoPhase = 0.0;
     lastGritAmount = lastBrightnessAmount = -1.0f;
 
+    monoScratchChannel.assign((size_t) samplesPerBlock, 0.0f);
+
     brightnessFilterL.prepare(spec);
     brightnessFilterR.prepare(spec);
     brightnessFilterL.coefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, brightnessMaxHz);
@@ -451,7 +454,8 @@ double FluxAudioProcessor::getCurrentBpm() const
 
 bool FluxAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
+        && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
     return layouts.getMainOutputChannelSet() == layouts.getMainInputChannelSet();
@@ -465,7 +469,8 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         return;
 
     const auto numSamples = buffer.getNumSamples();
-    if (buffer.getNumChannels() < 2)
+    const auto numChannels = buffer.getNumChannels();
+    if (numChannels < 1)
         return;
 
     const auto syncOn = syncParam->load() > 0.5f;
@@ -537,7 +542,21 @@ void FluxAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     const auto wetGain = std::sin(blendRadians);
 
     auto* left = buffer.getWritePointer(0);
-    auto* right = buffer.getWritePointer(1);
+    float* right;
+    if (numChannels >= 2)
+    {
+        right = buffer.getWritePointer(1);
+    }
+    else
+    {
+        // No real second channel - run the stereo DSP below completely unchanged against a
+        // scratch copy of the same input, and simply never write it back; only channel 0
+        // (written identically either way) reaches the host.
+        if ((int) monoScratchChannel.size() < numSamples)
+            monoScratchChannel.resize((size_t) numSamples);
+        std::copy(left, left + numSamples, monoScratchChannel.begin());
+        right = monoScratchChannel.data();
+    }
 
     const auto lowerShapeRegime = shapeAmount <= shapeBreakpoint;
 

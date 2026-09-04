@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Aura VERSION 0.1.0)
+project(Aura VERSION 0.2.0)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning. Beta: the real
     # hardware-panel UI (juce-hardware-panel-ui skill, mockup-approved and screenshot-verified
     # against plugins/aura-reverb/mockups/aura-mockup-v1.html) is in place and Low Cut is wired, but no
@@ -75,14 +75,22 @@ target_sources(AuraTests
     PRIVATE
         Source/AuraFDNEngine.cpp
         Source/AuraParameterMap.cpp
+        Source/PluginProcessor.cpp
         Source/Tests/AuraFDNEngineTests.cpp
         Source/Tests/AuraParameterMapTests.cpp
+        Source/Tests/AuraProcessorTests.cpp
+        Source/Tests/TestCreateEditorStub.cpp
         Source/Tests/TestRunner.cpp
+)
+
+target_compile_definitions(AuraTests
+    PRIVATE
+        JucePlugin_Name="Aura"
 )
 
 target_link_libraries(AuraTests
     PRIVATE
-        juce::juce_core
+        juce::juce_audio_processors
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
