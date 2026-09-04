@@ -19,7 +19,7 @@ def test_full_decay_rt60_recovers_gated_capture():
     t = np.arange(n) / sr
 
     # A short hold near the peak (~0-10dB flat) before the true exponential decay kicks in -
-    # mirrors the "hold near the peak" shape intruder-gated-reverb/analysis/findings.md found in
+    # mirrors the "hold near the peak" shape plugins/intruder-gated-reverb/analysis/findings.md found in
     # every real capture, which is exactly what skews the narrow-window Schroeder fit.
     hold_s = 0.08
     envelope = np.where(t < hold_s, 1.0, np.exp(-(t - hold_s) / tau))
@@ -45,7 +45,7 @@ def test_hilbert_envelope_no_wraparound_artifact():
     """A loud onset followed by a tail that decays to true digital silence (not back up to the
     onset level) creates a large implied discontinuity under the Hilbert transform's FFT
     periodicity assumption - without zero-padding, this leaks into a spurious envelope spike near
-    the buffer's end (the false "trailing blip" intruder-gated-reverb/analysis/findings.md's
+    the buffer's end (the false "trailing blip" plugins/intruder-gated-reverb/analysis/findings.md's
     "Method notes" section describes catching). hilbert_envelope_db pads before transforming;
     an unpadded version should show a materially larger artifact near the end."""
     sr = 44100

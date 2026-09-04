@@ -8,7 +8,7 @@ cmake_install.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
-!common/cmake/*.cmake
+!plugins/common/cmake/*.cmake
 
 # Fetched dependencies (see common/cmake/FetchJUCE.cmake)
 .deps/

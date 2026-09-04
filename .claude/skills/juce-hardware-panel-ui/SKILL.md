@@ -10,10 +10,10 @@ rack-gear hardware (originally developed against a Roland RE-501 Chorus Echo
 reference) rather than a typical flat "modern DAW plugin" look. It was worked
 out over many rounds of visual iteration for the **Caverns** delay plugin,
 then extracted into a shared base class, `wildjag::HardwarePanelLookAndFeel`
-(`common/LookAndFeel/HardwarePanelLookAndFeel.h/.cpp`), once the same chrome
+(`plugins/common/LookAndFeel/HardwarePanelLookAndFeel.h/.cpp`), once the same chrome
 had been proven out (verbatim, not re-derived) across six plugins. That file
-— plus `common/LookAndFeel/HardwarePanelTheme.h` — is the **canonical
-reference implementation**. `caverns-delay/Source/PluginEditor.h/.cpp` is
+— plus `plugins/common/LookAndFeel/HardwarePanelTheme.h` — is the **canonical
+reference implementation**. `plugins/caverns-delay/Source/PluginEditor.h/.cpp` is
 still the reference for the *editor-side* layout/hand-painted chrome pattern
 (sections, badges, chassis texture), since that part stays per-plugin.
 
@@ -60,9 +60,9 @@ and editing marked blocks anymore — you are subclassing the shared base:
      LookAndFeel normally.
 
 If a genuinely new *shared* capability is needed beyond these, that's a
-`common/LookAndFeel/` change (reviewed like shared infra, extending the base
+`plugins/common/LookAndFeel/` change (reviewed like shared infra, extending the base
 class with a new well-named extension point), not a per-plugin copy-paste of
-the whole file. Never touch `common/LookAndFeel/HardwarePanelLookAndFeel.*`
+the whole file. Never touch `plugins/common/LookAndFeel/HardwarePanelLookAndFeel.*`
 for a need that's actually plugin-specific.
 
 `reference/caverns-reference.png` in this skill's own folder is a full-window
@@ -312,7 +312,7 @@ Futura/Century Gothic/etc., and the whole point is a consistent look. Instead:
 
 These tripped up the first implementation — check the actual JUCE version
 before assuming an API exists. JUCE is fetched via CMake `FetchContent`,
-pinned in `common/cmake/FetchJUCE.cmake` (currently tag `9.0.1`); after a
+pinned in `plugins/common/cmake/FetchJUCE.cmake` (currently tag `9.0.1`); after a
 `cmake -B build` configure, the checked-out source is under
 `../.deps/juce-<version>/` relative to the repo root, not a sibling `JUCE/`
 directory:

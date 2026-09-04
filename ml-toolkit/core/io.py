@@ -1,7 +1,7 @@
 """Capture manifest loading: declarative filename parsing + audio loading, generic across effects.
 
 Filename parsing is schema-driven (a regex + per-group transforms) rather than a bespoke parser
-per effect - see intruder-gated-reverb/analysis/inventory.py's hardcoded NAME_RE for the pattern
+per effect - see plugins/intruder-gated-reverb/analysis/inventory.py's hardcoded NAME_RE for the pattern
 this generalizes. Different effects' capture filenames (e.g. Ambience's "Ambience_1.8s_+5L-2H.wav"
 vs Intruder's "NonLin_9.8s_-4H_Tighter.wav") differ enough in shape that hand-writing a new parser
 per effect doesn't scale.

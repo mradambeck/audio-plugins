@@ -2,7 +2,7 @@
 and empirical validation (Phase D) - the same functions are used in both places on purpose, so a
 fitted/rendered result is judged by the identical yardstick used to characterize the real captures.
 
-Ported near-verbatim from intruder-gated-reverb/analysis/analyze_irs.py, with two hard-won fixes
+Ported near-verbatim from plugins/intruder-gated-reverb/analysis/analyze_irs.py, with two hard-won fixes
 kept intact rather than rediscovered:
 
   - full_decay_rt60() uses a wide (-6..-70dB) window, not just Schroeder's narrow -5..-25dB
@@ -15,7 +15,7 @@ kept intact rather than rediscovered:
     by a tail that doesn't return to zero creates a large implied discontinuity under the FFT's
     periodicity assumption, which otherwise leaks into a spurious envelope spike near the buffer's
     end (this produced a false "trailing blip" finding in Intruder's own analysis history - see
-    intruder-gated-reverb/analysis/findings.md's "Method notes").
+    plugins/intruder-gated-reverb/analysis/findings.md's "Method notes").
 
 Plotting is deliberately NOT here (unlike the original analyze_irs.py, which entangled the two) -
 each effect's own analyze.py owns its plot layout, since that's somewhat effect-specific.

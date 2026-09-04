@@ -13,33 +13,33 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dir: caverns-delay
+          - dir: plugins/caverns-delay
             name: Caverns
-          - dir: damage-fuzz
+          - dir: plugins/damage-fuzz
             name: Damage
-          - dir: corrosion-drive
+          - dir: plugins/corrosion-drive
             name: Corrosion
-          - dir: flux-phaser
+          - dir: plugins/flux-phaser
             name: Flux
-          - dir: alloy-bass
+          - dir: plugins/alloy-bass
             name: Alloy
-          - dir: gradient-pitch
+          - dir: plugins/gradient-pitch
             name: Gradient
-          - dir: shields-reverb
+          - dir: plugins/shields-reverb
             name: Shields
-          - dir: intruder-gated-reverb
+          - dir: plugins/intruder-gated-reverb
             name: Intruder
-          - dir: strike-synth
+          - dir: plugins/strike-synth
             name: Strike
-          - dir: strike-synth
+          - dir: plugins/strike-synth
             name: StrikeProcessor
-          - dir: aura-reverb
+          - dir: plugins/aura-reverb
             name: Aura
 
     steps:
       - uses: actions/checkout@v4
 
-      # Only the JUCE *source* checkout is cacheable across runs (see common/cmake/FetchJUCE.cmake) --
+      # Only the JUCE *source* checkout is cacheable across runs (see plugins/common/cmake/FetchJUCE.cmake) --
       # each plugin's own build/ directory is not, since it's a fresh configure per job.
       - name: Cache JUCE checkout
         uses: actions/cache@v4
@@ -67,16 +67,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dir: caverns-delay
-          - dir: damage-fuzz
-          - dir: corrosion-drive
-          - dir: flux-phaser
-          - dir: alloy-bass
-          - dir: gradient-pitch
-          - dir: shields-reverb
-          - dir: intruder-gated-reverb
-          - dir: strike-synth
-          - dir: aura-reverb
+          - dir: plugins/caverns-delay
+          - dir: plugins/damage-fuzz
+          - dir: plugins/corrosion-drive
+          - dir: plugins/flux-phaser
+          - dir: plugins/alloy-bass
+          - dir: plugins/gradient-pitch
+          - dir: plugins/shields-reverb
+          - dir: plugins/intruder-gated-reverb
+          - dir: plugins/strike-synth
+          - dir: plugins/aura-reverb
 
     steps:
       - uses: actions/checkout@v4

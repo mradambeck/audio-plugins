@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "*/CMakeLists.txt"
+      - "plugins/*/CMakeLists.txt"
   workflow_dispatch:
 
 concurrency:
@@ -38,16 +38,16 @@ jobs:
           # to it logs an explicit skip instead of being silently ignored; it self-activates
           # the day a data-plugin="strike" card is added, no workflow edit needed.
           PLUGIN_DIRS = [
-              "caverns-delay",
-              "damage-fuzz",
-              "corrosion-drive",
-              "flux-phaser",
-              "alloy-bass",
-              "gradient-pitch",
-              "shields-reverb",
-              "intruder-gated-reverb",
-              "strike-synth",
-              "aura-reverb",
+              "plugins/caverns-delay",
+              "plugins/damage-fuzz",
+              "plugins/corrosion-drive",
+              "plugins/flux-phaser",
+              "plugins/alloy-bass",
+              "plugins/gradient-pitch",
+              "plugins/shields-reverb",
+              "plugins/intruder-gated-reverb",
+              "plugins/strike-synth",
+              "plugins/aura-reverb",
           ]
 
           HTML_PATH = "site/index.html"
