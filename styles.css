@@ -267,7 +267,7 @@ header p.sub {
   border-radius: 999px;
 }
 
-.card .badge-prerelease {
+.card .badge-wip {
   color: #d9c98a;
   background: rgba(217, 201, 138, 0.14);
   border: 1px solid rgba(217, 201, 138, 0.35);
