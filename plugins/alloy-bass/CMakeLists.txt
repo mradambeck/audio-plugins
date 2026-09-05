@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Alloy VERSION 0.2.0)
-set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
+project(Alloy VERSION 0.2.1)
+set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
