@@ -78,8 +78,9 @@ jobs:
               channel = channel_m.group(1) if channel_m else "stable"
 
               major = int(version.split(".")[0])
-              prerelease = major == 0
               beta = channel == "beta"
+              # A beta build supersedes the WIP badge -- never show both.
+              wip = major == 0 and not beta
 
               # --- Locate this plugin's card, scoped so we can never touch a different card ---
               card_marker = f'data-plugin="{slug}"'
@@ -119,15 +120,15 @@ jobs:
 
               new_lines = lines[:version_idx]
               new_lines.append(f'{indent}<span class="version">v{version}</span>')
-              if prerelease:
-                  new_lines.append(f'{indent}<span class="badge badge-prerelease">Pre-release</span>')
               if beta:
                   new_lines.append(f'{indent}<span class="badge badge-beta">Beta</span>')
+              elif wip:
+                  new_lines.append(f'{indent}<span class="badge badge-wip">WIP</span>')
 
               new_inner = "\n".join(new_lines)
               if new_inner != inner:
                   html = html[:content_start] + new_inner + html[content_end:]
-                  print(f"{dir_name}: {slug} -> v{version} (prerelease={prerelease}, beta={beta})")
+                  print(f"{dir_name}: {slug} -> v{version} (beta={beta}, wip={wip})")
               else:
                   print(f"{dir_name}: {slug} already up to date")
 

@@ -72,8 +72,9 @@ source of truth — don't.
 The marketing site's version badge (`~/code/audio-plugins-site`, a worktree
 checked out to `gh-pages`) is **not** touched here either — once this commit
 reaches `main`, `.github/workflows/sync-site-versions.yml` reads the new
-`CMakeLists.txt` and pushes the matching `.version`/`.badge-prerelease`/
-`.badge-beta` update to `gh-pages` on its own. Don't hand-edit `index.html`
+`CMakeLists.txt` and pushes the matching `.version`/`.badge-wip`/
+`.badge-beta` update to `gh-pages` on its own (a `beta` channel always wins
+over the WIP badge — never both). Don't hand-edit `index.html`
 as part of a version bump; that would just be overwritten (or drift ahead of
 the source of truth) on the next sync run.
 

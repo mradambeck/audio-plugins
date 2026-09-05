@@ -51,7 +51,9 @@ Each plugin's version lives in exactly one place — `project(<Name> VERSION X.Y
 generated from it at build time; don't hardcode a version number anywhere else. A sibling
 `set(WILDJAG_RELEASE_CHANNEL "stable")` line (`stable` | `beta`) is a separate, optional maturity
 flag for explicitly marking a build as an early beta test — it's a manual, human decision, not
-something to infer from a diff.
+something to infer from a diff. The site shows at most one maturity badge per plugin: `beta`
+always wins and displays "Beta"; a pre-1.0 plugin on the `stable` channel displays "WIP" instead.
+Never both on the same card.
 
 All plugins are pre-1.0 (`0.y.z`). Bug fixes / UI-only / installer-only changes bump the patch
 digit; everything else — new parameters, changed defaults, and anything that would normally be a
