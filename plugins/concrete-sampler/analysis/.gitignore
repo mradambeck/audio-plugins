@@ -1,0 +1,3 @@
+# Python virtualenv for analysis/ scripts - recreate with:
+#   python3 -m venv analysis/venv && source analysis/venv/bin/activate && pip install -r ../../common/tools/requirements.txt
+venv/
