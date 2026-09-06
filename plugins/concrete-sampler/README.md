@@ -4,11 +4,12 @@ A vintage sampler emulation instrument (AU / VST3 / Standalone) modeling the pla
 architectures of twelve classic 1980s hardware samplers - the pitch-shifting mechanism,
 quantization scheme, and analog filter behavior of each machine, not just a bitcrusher preset.
 
-**Status: early build-in-progress, not a usable instrument yet.** Phases 0-3 of the 9-phase build
+**Status: early build-in-progress, not a usable instrument yet.** Phases 0-4 of the 9-phase build
 plan are done (scaffold, clean sample playback, the three pitch-engine modes - variable-clock
-zero-order hold, fixed-rate drop-sample decimation, and delta-sigma - and bit-depth reduction plus
-E-mu-style companding). No capture-pass resampling, filter models, real polyphony/voice stealing,
-machine presets, or hardware-panel UI exist yet - see
+zero-order hold, fixed-rate drop-sample decimation, and delta-sigma - bit-depth reduction plus
+E-mu-style companding, and the capture pass: an offline resample/drive/quantize technique modeling
+"pitch the source up before capturing it, then pitch it back down on playback"). No filter models,
+real polyphony/voice stealing, machine presets, or hardware-panel UI exist yet - see
 [`concrete-sampler-plugin-plan.md`](concrete-sampler-plugin-plan.md) for the full plan and current
 progress. The editor is a plain utility panel (load a file, see the waveform, play via MIDI or an
 on-screen keyboard), not the finished UI.
@@ -50,7 +51,11 @@ Load a sample via the Load button or by dragging a WAV/AIFF file onto the wavefo
 it from your MIDI controller or the on-screen keyboard at the bottom of the window. The Pitch
 Engine dropdown and the Base Rate/Coarse Tune/Fine Tune sliders above the waveform switch between
 Phase 2's playback engines; the Bit Depth slider and Quantizer Mode dropdown below them switch
-between Phase 3's bit-depth reduction and companding - see the Parameters table below.
+between Phase 3's bit-depth reduction and companding; the Capture Transpose/Drive sliders and
+Auto-Compensate/Capture Bypass toggles below those control Phase 4's capture pass - see the
+Parameters table below. Capture-pass and quantizer changes trigger a background re-bake of the
+loaded sample (not instant - there's no bake-progress indicator yet, that's Phase 8) rather than
+taking effect on the very next sample the way Phase 2's live pitch controls do.
 
 **The Standalone app remembers whatever you left it at, not the compiled-in defaults.** Every
 plugin in this catalog persists its full state (via the same `getStateInformation()` a DAW session
@@ -67,6 +72,11 @@ the **Reset** button next to the Root Note control - it sets:
 | Fine Tune | 0 |
 | Bit Depth | 16-bit |
 | Quantizer Mode | Linear |
+| Capture Transpose | 5 st |
+| Capture Drive | 0 dB |
+| Capture Auto-Compensate | On |
+| Capture Bypass | On |
+| Capture Iterations | 1 |
 | Root Note | C3 (60) |
 
 Reset doesn't touch the loaded sample. To force a genuinely clean slate (also discards whichever
@@ -126,13 +136,13 @@ test primitives, and one `verify_phaseN.py` script per completed build phase) th
 cd analysis
 python3 -m venv venv && source venv/bin/activate
 pip install -r ../../common/tools/requirements.txt
-python3 verify_phase3.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py
+python3 verify_phase4.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py / verify_phase3.py
 ```
 
 ## Parameters
 
-Only the Phase 2 pitch-engine controls and Phase 3's quantizer exist so far - no capture-pass,
-filter, or machine-preset parameters yet.
+The Phase 2 pitch-engine controls, Phase 3's quantizer, and Phase 4's capture pass exist so far -
+no filter or machine-preset parameters yet.
 
 | Parameter | Range | Default | Description |
 |---|---|---|---|
@@ -140,8 +150,13 @@ filter, or machine-preset parameters yet.
 | Base Rate | 4,000 - 100,000 Hz | 44,100 Hz | The assumed machine capture/effective sampling rate for Modes A/B/C - substitutes for the loaded file's own real sample rate in the pitch calculation (a machine has no way to know what rate a foreign file was really recorded at). Defaults to 44.1kHz so a typical file reproduces its original pitch/tempo at root note out of the box; lower it to emulate a narrower-bandwidth machine on purpose (matches the SP-1200's 26.04kHz, for example), or raise/lower it to intentionally mismatch a specific loaded file's own rate. Has no effect in Reference mode. |
 | Coarse Tune | -24 to +24 semitones | 0 | Added to the note's own transposition from the zone's root note. |
 | Fine Tune | -50 to +50 cents | 0 | Added on top of Coarse Tune. |
-| Bit Depth | 1-16 bit | 16-bit | The storage word width Phase 3's quantizer reduces each sample to - see `ConcreteQuantizer.h`. Applied per-sample to the raw pitch-engine output, before the amp envelope/velocity gain (matches how a real converter quantizes whatever hits it). Defaults to 16-bit, which is transparent (noise floor around -96dBFS); machine presets in Phase 7 will set the real depths (8, 12, 13-bit) from the machine table. |
+| Bit Depth | 1-16 bit | 16-bit | The storage word width the capture pass quantizes each zone's working buffer to - see `ConcreteQuantizer.h`. Baked offline into the working buffer (Phase 4), not applied live - changing it triggers a background re-bake. Defaults to 16-bit, which is transparent (noise floor around -96dBFS); machine presets in Phase 7 will set the real depths (8, 12, 13-bit) from the machine table. Applies regardless of Capture Bypass - some converter is always in the signal path on real hardware. |
 | Quantizer Mode | Linear / Companded | Linear | Linear is direct mid-tread rounding at Bit Depth - a constant quantization step regardless of signal level. Companded compresses (mu-law-shaped) before quantizing and expands after, the E-mu Emulator II/Emax storage scheme - quantization error shrinks at low signal levels at the cost of some full-scale headroom. No dither anywhere in either mode, matching the real machines. |
+| Capture Transpose | 0-24 semitones | 5 | The 33->45rpm-style pitch-up amount applied (per iteration) before "capturing" - see `ConcreteCapturePass.h`. Has no effect while Capture Bypass is on. 5 semitones is the ratio most people actually want once they turn bypass off. |
+| Capture Drive | 0-24 dB | 0 dB | Saturation drive into the capture stage, plus an accompanying high-frequency rolloff that increases with drive (modeling "sampling hot rolled off the top end on playback," e.g. the MPC60). 0dB is a no-op - no added saturation or filtering. |
+| Capture Auto-Compensate | On/Off | On | Subtracts the baked-in Capture Transpose back out at playback, so a note lands at its expected pitch while still carrying the capture pass's artifacts. Off plays the pitched-up/sped-up capture directly. A live toggle - does not trigger a re-bake. |
+| Capture Bypass | On/Off | On | Disables the whole capture pass (resample + drive + quantize) at once, making the working buffer an exact copy of the source - "every preset ships with the capture pass off," per the plan; it's a technique the user applies, not a machine's stock behavior. |
+| Capture Iterations | 1-4 | 1 | Repeats the whole resample -> drive -> quantize chain this many times, for compounding degradation. |
 
 ## Project structure
 
@@ -159,6 +174,7 @@ concrete-sampler/
 │   ├── ConcreteVoice.h/.cpp          # One note's playback: pitch engine + ADSR envelope
 │   ├── ConcretePitchEngine.h/.cpp    # Reference/Mode A/Mode B/Mode C playback engines
 │   ├── ConcreteQuantizer.h           # Linear bit-depth reduction + mu-law compand/expand curve
+│   ├── ConcreteCapturePass.h/.cpp    # Offline resample -> drive -> quantize working-buffer bake
 │   ├── ConcreteVoiceAllocator.h      # Voice-to-note allocation/oldest-voice-stealing for the pool
 │   ├── ConcreteBusRouter.h           # Per-zone output-destination indirection (main bus only so far)
 │   ├── Tests/                        # ConcreteTests (DSP/data seams) + ConcreteProcessorTests

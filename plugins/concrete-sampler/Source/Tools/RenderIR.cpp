@@ -37,7 +37,11 @@
 // them up - matches every other plugin's RenderIR convention in this catalog. Phase 2 adds
 // pitchEngineMode (0=Reference, 1=Mode A, 2=Mode B, 3=Mode C - the same index order as the
 // AudioParameterChoice), baseRate (Hz), coarseTune (semitones), fineTune (cents). Phase 3 adds
-// bitDepth (1-16) and quantizerMode (0=Linear, 1=Companded).
+// bitDepth (1-16) and quantizerMode (0=Linear, 1=Companded). Phase 4 adds captureTranspose
+// (semitones), captureDrive (dB), captureAutoCompensate (0/1), captureBypass (0/1), and
+// captureIterations (1-4). Capture-pass parameters are applied (via setValueNotifyingHost(),
+// same as every other flag here) BEFORE --sample is loaded, so the sample's initial bake already
+// reflects them - see ConcreteAudioProcessor::loadSample().
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -77,6 +81,11 @@ namespace
         ConcreteAudioProcessor::fineTuneParamID,
         ConcreteAudioProcessor::bitDepthParamID,
         ConcreteAudioProcessor::quantizerModeParamID,
+        ConcreteAudioProcessor::captureTransposeParamID,
+        ConcreteAudioProcessor::captureDriveParamID,
+        ConcreteAudioProcessor::captureAutoCompensateParamID,
+        ConcreteAudioProcessor::captureBypassParamID,
+        ConcreteAudioProcessor::captureIterationsParamID,
     };
 
     struct TimedEvent

@@ -4,6 +4,7 @@
 
 #include "../../common/Presets/FactoryPreset.h"
 #include "ConcreteBusRouter.h"
+#include "ConcreteCapturePass.h"
 #include "ConcretePitchEngine.h"
 #include "ConcreteQuantizer.h"
 #include "ConcreteSampleIO.h"
@@ -16,12 +17,15 @@
 // Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
 // behavior. Phase 2 added the three pitch-engine modes (ConcretePitchEngine.h) plus the base-rate/
-// coarse-tune/fine-tune parameters. Phase 3 adds bit-depth reduction and companding
-// (ConcreteQuantizer.h). Still no capture pass or filters yet (Phase 4 onward) - the "working
-// buffer" a voice plays IS the loaded buffer until Phase 4 introduces the capture pass and a
-// separate derived buffer; Phase 3's quantizer runs live per-sample in ConcreteVoice rather than
-// as part of an offline bake, since that offline bake doesn't exist until Phase 4.
-class ConcreteAudioProcessor : public juce::AudioProcessor
+// coarse-tune/fine-tune parameters. Phase 3 added bit-depth reduction and companding
+// (ConcreteQuantizer.h). Phase 4 adds the capture pass (ConcreteCapturePass.h): resample -> drive
+// -> quantize, baked offline into each zone's working buffer rather than applied live - Phase 3's
+// quantizer moved from ConcreteVoice into this bake (see ConcreteCapturePass.h's own comment on
+// why quantization is part of this pipeline even when the resample/drive technique is bypassed).
+// Still no filters yet (Phase 5 onward).
+class ConcreteAudioProcessor : public juce::AudioProcessor,
+                                private juce::Thread,
+                                private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     ConcreteAudioProcessor();
@@ -75,9 +79,14 @@ public:
     bool getEmbedSamplesOverride() const noexcept { return embedSamplesOverride; }
     void setEmbedSamplesOverride(bool shouldForceEmbed) { embedSamplesOverride = shouldForceEmbed; }
 
-    // Thread-safe snapshot of the currently-published sample set, for the editor's waveform
-    // display and for tests. See currentSampleSet's own comment for the locking rationale.
+    // Thread-safe snapshot of the currently-published (capture-pass-baked) sample set, for
+    // playback, the editor's waveform display, and tests. See currentSampleSet's own comment for
+    // the locking rationale.
     ConcreteSampleSet::Ptr getCurrentSampleSet() const;
+
+    // Thread-safe snapshot of the RAW (never capture-pass-baked) sample set - see rawSampleSet's
+    // own comment. Exposed for tests that need to inspect source-space zone metadata directly.
+    ConcreteSampleSet::Ptr getRawSampleSet() const;
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -95,6 +104,25 @@ public:
     static constexpr auto bitDepthParamID = "bitDepth";
     static constexpr auto quantizerModeParamID = "quantizerMode";
 
+    // Phase 4's capture pass (see ConcreteCapturePass.h). captureTranspose is in semitones, 0-24,
+    // default 5 ("the one people actually want," the 33->45rpm-style ratio - though it has no
+    // effect until captureBypass is turned off). captureDrive is in dB, 0-24. captureBypass
+    // defaults to true ("every preset ships with the capture pass off" - it's a technique the user
+    // applies, not part of a machine's stock behavior); captureAutoCompensate defaults to true.
+    // captureIterations is 1-4 (compounding degradation - see ConcreteCapturePass.h).
+    static constexpr auto captureTransposeParamID = "captureTranspose";
+    static constexpr auto captureDriveParamID = "captureDrive";
+    static constexpr auto captureAutoCompensateParamID = "captureAutoCompensate";
+    static constexpr auto captureBypassParamID = "captureBypass";
+    static constexpr auto captureIterationsParamID = "captureIterations";
+
+    // Synchronously re-derives every zone's working buffer from its source buffer using the
+    // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
+    // private juce::Thread override below) runs this same logic asynchronously whenever a capture-
+    // pass parameter changes during normal use; exposed publicly so tests/tooling can force a
+    // deterministic, immediate re-bake instead of waiting on/polling a background thread.
+    void rebakeNow();
+
     // Bound to the editor's on-screen keyboard (Phase 1's temporary playing surface - see
     // concrete-sampler-plugin-plan.md's Phase 1 deliverables; Phase 8 replaces it with the real
     // pad-grid/keyboard trigger surface). processBlock() merges this into the real MIDI buffer
@@ -106,6 +134,31 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleMidiMessage(const juce::MidiMessage& message, const ConcreteSampleSet::Ptr& sampleSet) noexcept;
     void publishSampleSet(ConcreteSampleSet::Ptr newSet);
+
+    // Sets rawSampleSet to newRawSet and re-derives+publishes currentSampleSet from it via
+    // bakeSampleSet() - the only way rawSampleSet should ever change. Every caller that produces a
+    // genuinely new or changed zone list (loadSample, relocateZone, setRootNoteForZone,
+    // setStateInformation) goes through this, never through publishSampleSet() directly, so
+    // rawSampleSet's start/end/loop points always stay in source-buffer terms - see that member's
+    // own comment for why this split exists.
+    void publishRawSampleSet(ConcreteSampleSet::Ptr newRawSet);
+
+    ConcreteCapturePass::Settings currentCapturePassSettings() const;
+
+    // juce::Thread override: waits to be notify()'d (from parameterChanged() below) and then
+    // calls rebakeNow(). Runs for the processor's whole lifetime, started in the constructor and
+    // stopped in the destructor.
+    void run() override;
+
+    // juce::AudioProcessorValueTreeState::Listener override, registered for exactly the six
+    // capture-pass-affecting parameter IDs (bitDepth, quantizerMode, captureTranspose,
+    // captureDrive, captureBypass, captureIterations - NOT captureAutoCompensate, which is read
+    // live at note-on in handleMidiMessage() and never needs a re-bake, see ConcreteVoice.h). May
+    // fire from ANY thread depending on the host (worst case the audio thread itself, if a host
+    // applies automation from inside processBlock()), so this does the absolute minimum: wake the
+    // bake thread. The actual (expensive, allocating) re-bake work always happens on that thread,
+    // never here.
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
 
     // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
     // getProgramName() above just forward to this.
@@ -119,6 +172,14 @@ private:
     std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bitDepthParam = nullptr;
     std::atomic<float>* quantizerModeParam = nullptr;
+    std::atomic<float>* captureTransposeParam = nullptr;
+    std::atomic<float>* captureDriveParam = nullptr;
+    std::atomic<float>* captureAutoCompensateParam = nullptr;
+    std::atomic<float>* captureBypassParam = nullptr;
+    std::atomic<float>* captureIterationsParam = nullptr;
+
+    // Set by parameterChanged(), cleared and acted on by run() - see that function's own comment.
+    std::atomic<bool> bakeRequested { false };
 
     // Fixed at 8 for Phase 1 as a reasonable placeholder - Phase 6 makes this a real, per-machine-
     // preset voice count with tested stealing behavior (see concrete-sampler-plugin-plan.md's
@@ -143,6 +204,20 @@ private:
     // ConcreteSampleSet.h's own comment on treating it as immutable by convention).
     mutable juce::SpinLock sampleSetLock;
     ConcreteSampleSet::Ptr currentSampleSet;
+
+    // The zone list exactly as loaded/relocated/restored, BEFORE any capture-pass bake - its
+    // zones' start/end/loopStart/loopEnd are always expressed in source-buffer terms, never
+    // rescaled. rebakeNow() always re-bakes FROM this (never from currentSampleSet), which is the
+    // fix for a real bug: bakeZone() rescales start/end by (newWorkingLength / sourceLength) each
+    // time it runs, and rescaling AN ALREADY-RESCALED value on every subsequent re-bake compounds
+    // multiplicatively - repeatedly nudging a capture-pass parameter (e.g. Capture Iterations or
+    // Capture Drive, each triggering its own re-bake) would shrink the zone's audible span toward
+    // nothing over several re-bakes, even though the actual audio content baked correctly every
+    // time (only the start/end bookkeeping compounded). Keeping a stable, never-rescaled source-
+    // space zone list for every re-bake to start from eliminates the compounding entirely. Guarded
+    // by the same sampleSetLock as currentSampleSet since the two are always updated together (see
+    // publishRawSampleSet()).
+    ConcreteSampleSet::Ptr rawSampleSet;
 
     // Architecture #2's session-persistence override - see getEmbedSamplesOverride().
     bool embedSamplesOverride = false;

@@ -38,6 +38,7 @@ target_sources(Concrete
         Source/ConcreteLookAndFeel.cpp
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
+        Source/ConcreteCapturePass.cpp
         Source/ConcreteSampleIO.cpp
 )
 
@@ -75,6 +76,7 @@ target_sources(ConcreteTests
     PRIVATE
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
+        Source/ConcreteCapturePass.cpp
         Source/ConcreteSampleIO.cpp
         Source/Tests/ConcreteSampleSetTests.cpp
         Source/Tests/ConcreteBusRouterTests.cpp
@@ -82,6 +84,7 @@ target_sources(ConcreteTests
         Source/Tests/ConcreteVoiceTests.cpp
         Source/Tests/ConcretePitchEngineTests.cpp
         Source/Tests/ConcreteQuantizerTests.cpp
+        Source/Tests/ConcreteCapturePassTests.cpp
         Source/Tests/ConcreteSampleIOTests.cpp
         Source/Tests/TestRunner.cpp
 )
@@ -112,6 +115,7 @@ target_sources(ConcreteProcessorTests
         Source/PluginProcessor.cpp
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
+        Source/ConcreteCapturePass.cpp
         Source/ConcreteSampleIO.cpp
         Source/Tests/TestCreateEditorStub.cpp
         Source/Tests/ConcreteProcessorTests.cpp
@@ -147,6 +151,7 @@ target_sources(ConcreteRenderIR
         Source/PluginProcessor.cpp
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
+        Source/ConcreteCapturePass.cpp
         Source/ConcreteSampleIO.cpp
         Source/Tests/TestCreateEditorStub.cpp
         Source/Tools/RenderIR.cpp

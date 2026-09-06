@@ -27,13 +27,47 @@ namespace
                                          outputBuffer.getNumChannels() - channelOffset,
                                          0, outputBuffer.getNumSamples());
     }
+
+    // Derives one zone's WORKING buffer (see ConcreteSampleZone.h) from its already-loaded SOURCE
+    // buffer via Phase 4's capture pass, and rescales start/end/loop points by however much the
+    // resample step changed the buffer's length - a no-op today (v1 has no trim/loop UI yet, so
+    // start=0/end=full-length always - see Phase 8), but correct once one exists. Zones with no
+    // source (a missing-file zone, Architecture #2) pass through unchanged.
+    ConcreteSampleZone bakeZone(const ConcreteSampleZone& sourceZone, const ConcreteCapturePass::Settings& settings)
+    {
+        auto zone = sourceZone;
+        if (zone.sourceBuffer == nullptr || zone.sourceBuffer->getNumSamples() <= 0)
+            return zone;
+
+        const auto baked = ConcreteCapturePass::apply(*zone.sourceBuffer, zone.sourceSampleRate, settings);
+        const auto scale = (double) baked.buffer->getNumSamples() / (double) zone.sourceBuffer->getNumSamples();
+
+        zone.buffer = baked.buffer;
+        zone.captureTransposeSemitones = baked.captureTransposeSemitones;
+        zone.start = (juce::int64) std::llround((double) zone.start * scale);
+        zone.end = (juce::int64) std::llround((double) zone.end * scale);
+        zone.loopStart = (juce::int64) std::llround((double) zone.loopStart * scale);
+        zone.loopEnd = (juce::int64) std::llround((double) zone.loopEnd * scale);
+        return zone;
+    }
+
+    ConcreteSampleSet::Ptr bakeSampleSet(const ConcreteSampleSet& sourceSet, const ConcreteCapturePass::Settings& settings)
+    {
+        ConcreteSampleSet::Ptr result(new ConcreteSampleSet());
+        result->zones.reserve(sourceSet.zones.size());
+        for (const auto& zone : sourceSet.zones)
+            result->zones.push_back(bakeZone(zone, settings));
+        return result;
+    }
 }
 
 ConcreteAudioProcessor::ConcreteAudioProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      juce::Thread("ConcreteCaptureBake"),
       apvts(*this, nullptr, "PARAMETERS", createParameterLayout()),
       factoryPresets(getFactoryPresets()),
-      currentSampleSet(new ConcreteSampleSet())
+      currentSampleSet(new ConcreteSampleSet()),
+      rawSampleSet(new ConcreteSampleSet())
 {
     formatManager.registerBasicFormats();
 
@@ -43,9 +77,30 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
     fineTuneParam = apvts.getRawParameterValue(fineTuneParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
     quantizerModeParam = apvts.getRawParameterValue(quantizerModeParamID);
+    captureTransposeParam = apvts.getRawParameterValue(captureTransposeParamID);
+    captureDriveParam = apvts.getRawParameterValue(captureDriveParamID);
+    captureAutoCompensateParam = apvts.getRawParameterValue(captureAutoCompensateParamID);
+    captureBypassParam = apvts.getRawParameterValue(captureBypassParamID);
+    captureIterationsParam = apvts.getRawParameterValue(captureIterationsParamID);
+
+    // Only the parameters that actually change what ConcreteCapturePass::apply() produces need to
+    // trigger a re-bake - captureAutoCompensate is deliberately excluded (see its own declaration
+    // comment in PluginProcessor.h).
+    for (auto* paramID : { bitDepthParamID, quantizerModeParamID, captureTransposeParamID,
+                            captureDriveParamID, captureBypassParamID, captureIterationsParamID })
+        apvts.addParameterListener(paramID, this);
+
+    startThread();
 }
 
-ConcreteAudioProcessor::~ConcreteAudioProcessor() = default;
+ConcreteAudioProcessor::~ConcreteAudioProcessor()
+{
+    // Must happen before any of this object's OTHER members (or apvts) start being destroyed -
+    // see run()'s own comment. juce::Thread's own destructor would eventually stop the thread too,
+    // but only AFTER this derived class's members are already gone, which is too late if run() is
+    // still mid-rebakeNow() at that point.
+    stopThread(2000);
+}
 
 namespace
 {
@@ -71,6 +126,49 @@ namespace
         return (int) std::lround(rawIndex) == 1 ? ConcreteQuantizer::Mode::companded
                                                  : ConcreteQuantizer::Mode::linear;
     }
+}
+
+ConcreteCapturePass::Settings ConcreteAudioProcessor::currentCapturePassSettings() const
+{
+    ConcreteCapturePass::Settings settings;
+    settings.bypass = captureBypassParam->load() >= 0.5f;
+    settings.transposeSemitones = (double) captureTransposeParam->load();
+    settings.inputDriveDb = (double) captureDriveParam->load();
+    settings.iterations = (int) std::lround(captureIterationsParam->load());
+    settings.quantizerMode = quantizerModeFromParam(quantizerModeParam->load());
+    settings.bitDepthBits = (int) std::lround(bitDepthParam->load());
+    return settings;
+}
+
+void ConcreteAudioProcessor::rebakeNow()
+{
+    // Always re-bakes from rawSampleSet (never-rescaled, source-space start/end), NOT from
+    // getCurrentSampleSet() - see rawSampleSet's own comment for the compounding-shrink bug that
+    // baking from the previous BAKED result caused.
+    publishSampleSet(bakeSampleSet(*getRawSampleSet(), currentCapturePassSettings()));
+}
+
+void ConcreteAudioProcessor::run()
+{
+    while (!threadShouldExit())
+    {
+        wait(-1);
+        // Re-checks bakeRequested rather than baking once per wait() - a parameterChanged() that
+        // lands WHILE rebakeNow() is already running (e.g. a host smoothing a knob move into many
+        // rapid automation events) must not be missed just because this thread wasn't back at
+        // wait() yet to receive it.
+        while (bakeRequested.exchange(false) && !threadShouldExit())
+            rebakeNow();
+    }
+}
+
+void ConcreteAudioProcessor::parameterChanged(const juce::String&, float)
+{
+    // Deliberately the ENTIRE body - may run on the audio thread (see this method's declaration
+    // comment in PluginProcessor.h), so it must stay lock-free/allocation-free/wait-free. notify()
+    // is a plain juce::WaitableEvent signal under the hood, safe to call from any thread.
+    bakeRequested = true;
+    notify();
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::createParameterLayout()
@@ -141,6 +239,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         juce::ParameterID{quantizerModeParamID, 1},
         "Quantizer Mode",
         juce::StringArray{"Linear", "Companded"}, 0));
+
+    // Phase 4's capture pass (see ConcreteCapturePass.h). Default 5 semitones is "the one people
+    // actually want" (the 33->45rpm ratio) - safe to default on even though captureBypass (below)
+    // defaults to true, since it has no audible effect until bypass is turned off.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{captureTransposeParamID, 1},
+        "Capture Transpose",
+        juce::NormalisableRange<float>(0.0f, 24.0f, 0.01f),
+        5.0f,
+        juce::AudioParameterFloatAttributes().withLabel("st")));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{captureDriveParamID, 1},
+        "Capture Drive",
+        juce::NormalisableRange<float>(0.0f, 24.0f, 0.01f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("dB")));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{captureAutoCompensateParamID, 1},
+        "Capture Auto-Compensate",
+        true));
+
+    // Defaults on (bypassed) - see the plan's Phase 7 machine-table notes: "every preset ships
+    // with the capture pass off - it's a technique the user applies, not part of a machine's stock
+    // behavior."
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{captureBypassParamID, 1},
+        "Capture Bypass",
+        true));
+
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{captureIterationsParamID, 1},
+        "Capture Iterations",
+        1, 4, 1));
 
     return { params.begin(), params.end() };
 }
@@ -251,13 +384,10 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
         const auto effectiveSourceRateHz = mode == ConcretePitchEngine::Mode::reference
             ? zone.sourceSampleRate : (double) baseRateParam->load();
 
-        const auto quantizerMode = quantizerModeFromParam(quantizerModeParam->load());
-        const auto bitDepthBits = (int) std::lround(bitDepthParam->load());
-
         const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, zoneIndex, zone.chokeGroup, isActive);
         voices[(size_t) voiceIndex].startNote(sampleSet, zoneIndex, note, velocity01, mode, effectiveSourceRateHz,
                                                 (int) std::lround(coarseTuneParam->load()), fineTuneParam->load(),
-                                                quantizerMode, bitDepthBits);
+                                                captureAutoCompensateParam->load() >= 0.5f);
     }
     else if (message.isNoteOff())
     {
@@ -274,38 +404,38 @@ bool ConcreteAudioProcessor::loadSample(const juce::File& file)
     if (zone.sourceMissing)
         return false;
 
-    ConcreteSampleSet::Ptr newSet(new ConcreteSampleSet());
-    newSet->zones.push_back(zone);
-    publishSampleSet(newSet);
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones.push_back(zone); // start=0/end=sourceBuffer length - source-space, as required
+    publishRawSampleSet(newRawSet);
     return true;
 }
 
 void ConcreteAudioProcessor::setRootNoteForZone(int zoneIndex, int newRootNote)
 {
-    const auto existing = getCurrentSampleSet();
-    if (!juce::isPositiveAndBelow(zoneIndex, (int) existing->zones.size()))
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
         return;
 
-    ConcreteSampleSet::Ptr newSet(new ConcreteSampleSet());
-    newSet->zones = existing->zones;
-    newSet->zones[(size_t) zoneIndex].rootNote = newRootNote;
-    publishSampleSet(newSet);
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].rootNote = newRootNote;
+    publishRawSampleSet(newRawSet);
 }
 
 bool ConcreteAudioProcessor::relocateZone(int zoneIndex, const juce::File& newFile)
 {
-    const auto existing = getCurrentSampleSet();
-    if (!juce::isPositiveAndBelow(zoneIndex, (int) existing->zones.size()))
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
         return false;
 
-    auto relocated = ConcreteSampleIO::relocateZone(existing->zones[(size_t) zoneIndex], formatManager, newFile);
+    auto relocated = ConcreteSampleIO::relocateZone(existingRaw->zones[(size_t) zoneIndex], formatManager, newFile);
     if (relocated.sourceMissing)
         return false;
 
-    ConcreteSampleSet::Ptr newSet(new ConcreteSampleSet());
-    newSet->zones = existing->zones;
-    newSet->zones[(size_t) zoneIndex] = relocated;
-    publishSampleSet(newSet);
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex] = relocated; // source-space, from ConcreteSampleIO::relocateZone()
+    publishRawSampleSet(newRawSet);
     return true;
 }
 
@@ -315,10 +445,27 @@ void ConcreteAudioProcessor::publishSampleSet(ConcreteSampleSet::Ptr newSet)
     currentSampleSet = newSet;
 }
 
+void ConcreteAudioProcessor::publishRawSampleSet(ConcreteSampleSet::Ptr newRawSet)
+{
+    // Baked BEFORE taking the lock - bakeSampleSet() can be expensive (resampling/quantizing a
+    // real buffer) and must never run while holding a lock the audio thread might also want (see
+    // sampleSetLock's own comment on why it's never held during rendering).
+    const auto baked = bakeSampleSet(*newRawSet, currentCapturePassSettings());
+    const juce::SpinLock::ScopedLockType lock(sampleSetLock);
+    rawSampleSet = newRawSet;
+    currentSampleSet = baked;
+}
+
 ConcreteSampleSet::Ptr ConcreteAudioProcessor::getCurrentSampleSet() const
 {
     const juce::SpinLock::ScopedLockType lock(sampleSetLock);
     return currentSampleSet;
+}
+
+ConcreteSampleSet::Ptr ConcreteAudioProcessor::getRawSampleSet() const
+{
+    const juce::SpinLock::ScopedLockType lock(sampleSetLock);
+    return rawSampleSet;
 }
 
 bool ConcreteAudioProcessor::hasEditor() const { return true; }
@@ -343,8 +490,15 @@ void ConcreteAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     if (auto state = apvts.copyState(); state.isValid())
     {
-        const auto sampleSet = getCurrentSampleSet();
-        state.appendChild(ConcreteSampleIO::sampleSetToValueTree(*sampleSet, embedSamplesOverride), nullptr);
+        // The RAW set, not the baked one - sampleSetToValueTree()/zoneToValueTree() persist each
+        // zone's start/end/loop points alongside its embedded sourceBuffer audio, and those points
+        // must stay in the SAME (source-buffer) terms as what's embedded. The baked set's start/
+        // end are rescaled to the WORKING buffer's length (see ConcreteCapturePass.h), which can
+        // differ from the embedded source's own length whenever a non-trivial capture transpose is
+        // active - persisting those would restore a zone whose start/end don't match its own
+        // audio.
+        const auto rawSet = getRawSampleSet();
+        state.appendChild(ConcreteSampleIO::sampleSetToValueTree(*rawSet, embedSamplesOverride), nullptr);
 
         if (auto xml = state.createXml())
             copyXmlToBinary(*xml, destData);
@@ -363,7 +517,11 @@ void ConcreteAudioProcessor::setStateInformation(const void* data, int sizeInByt
     apvts.replaceState(restoredState);
 
     embedSamplesOverride = (bool) zonesTree.getProperty(ConcreteZoneIDs::embedOverride, false);
-    publishSampleSet(ConcreteSampleIO::valueTreeToSampleSet(zonesTree, formatManager));
+    // The working buffer is never persisted (Architecture #2) - valueTreeToSampleSet() restores
+    // only each zone's sourceBuffer with source-space start/end, which becomes the new raw set;
+    // publishRawSampleSet() re-derives and publishes the baked working buffer from it using
+    // whatever capture-pass parameter values apvts.replaceState() just restored above.
+    publishRawSampleSet(ConcreteSampleIO::valueTreeToSampleSet(zonesTree, formatManager));
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

@@ -1,6 +1,9 @@
 #include "../PluginProcessor.h"
 
+#include <atomic>
 #include <cmath>
+#include <map>
+#include <thread>
 
 // Drives the real ConcreteAudioProcessor - the exact class the plugin ships - through
 // prepareToPlay()/processBlock()/getStateInformation()/loadSample(), the same path a host and its
@@ -361,6 +364,165 @@ public:
             expect(!relocatedSet->zones[0].sourceMissing, "after relocating, the zone should no longer be missing");
 
             newFile.deleteFile();
+        }
+
+        beginTest("Hammering capture-pass parameter changes on another thread while 8 voices are actively "
+                  "rendering produces no crashes, no NaN/inf output, and no audio-thread allocation bugs "
+                  "(see the plan's Phase 4 thread-safety Analysis - build with -fsanitize=thread to catch "
+                  "genuine data races, which this test alone cannot detect)");
+        {
+            const auto file = writeTempSineWav(500.0, 2.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file), "test file must load for this stress test to mean anything");
+
+            std::atomic<bool> keepGoing { true };
+            std::thread paramThread([&]
+            {
+                juce::Random rng(1234);
+                // Every parameter that's a re-bake trigger (see PluginProcessor.h's
+                // parameterChanged() comment) - hammered simultaneously and as fast as possible,
+                // which is the scenario the plan calls out ("automate capture transpose").
+                const char* paramIDs[] = {
+                    ConcreteAudioProcessor::bitDepthParamID,
+                    ConcreteAudioProcessor::quantizerModeParamID,
+                    ConcreteAudioProcessor::captureTransposeParamID,
+                    ConcreteAudioProcessor::captureDriveParamID,
+                    ConcreteAudioProcessor::captureBypassParamID,
+                    ConcreteAudioProcessor::captureIterationsParamID,
+                };
+                while (keepGoing.load(std::memory_order_relaxed))
+                    for (auto* paramID : paramIDs)
+                        if (auto* param = processor.apvts.getParameter(paramID))
+                            param->setValueNotifyingHost(rng.nextFloat());
+            });
+
+            juce::MidiBuffer chordOn;
+            for (int n = 0; n < 8; ++n)
+                chordOn.addEvent(juce::MidiMessage::noteOn(1, 60 + n, (juce::uint8) 100), 0);
+
+            juce::AudioBuffer<float> block(2, 512);
+            constexpr int numBlocks = 200; // ~2.3s at 512 samples/44.1kHz - close to the file's own 2s length
+            for (int i = 0; i < numBlocks; ++i)
+            {
+                block.clear();
+                auto midi = (i == 0) ? chordOn : juce::MidiBuffer();
+                processor.processBlock(block, midi);
+
+                for (int ch = 0; ch < block.getNumChannels(); ++ch)
+                    for (int s = 0; s < block.getNumSamples(); ++s)
+                        expect(std::isfinite(block.getSample(ch, s)),
+                               "output must stay finite even while a re-bake races with playback");
+            }
+
+            keepGoing = false;
+            paramThread.join();
+
+            file.deleteFile();
+        }
+
+        beginTest("Repeated re-bakes with changing capture-pass settings don't compound-shrink the "
+                  "zone (regression test for a real reported bug)");
+        {
+            // Bug: bakeZone() rescales start/end by (newWorkingLength / sourceLength) - re-baking
+            // from the previously-BAKED result (whose start/end were already rescaled once) instead
+            // of from a stable, never-rescaled raw zone list compounded that rescale on every
+            // subsequent re-bake, shrinking the zone toward nothing after enough of them. Fixed by
+            // always re-baking from rawSampleSet - see that member's own comment.
+            const auto file = writeTempSineWav(500.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            processor.loadSample(file);
+
+            auto* transpose = processor.apvts.getParameter(ConcreteAudioProcessor::captureTransposeParamID);
+            auto* bypass = processor.apvts.getParameter(ConcreteAudioProcessor::captureBypassParamID);
+            auto* iterations = processor.apvts.getParameter(ConcreteAudioProcessor::captureIterationsParamID);
+            auto* drive = processor.apvts.getParameter(ConcreteAudioProcessor::captureDriveParamID);
+
+            bypass->setValueNotifyingHost(0.0f); // engage the capture pass
+            transpose->setValueNotifyingHost(transpose->convertTo0to1(5.0f)); // a fixed, non-zero transpose throughout
+            processor.rebakeNow();
+
+            const auto firstBake = processor.getCurrentSampleSet();
+            const auto firstSpan = firstBake->zones[0].end - firstBake->zones[0].start;
+            expect(firstSpan > 0, "the zone must have a real, non-empty span after the first bake");
+
+            // Repeatedly nudge Capture Drive - which changes sample VALUES, not buffer LENGTH -
+            // and force a re-bake each time, exactly like a user dragging that control around.
+            // Transpose and iterations are unchanged throughout, so the resulting span must stay
+            // the SAME every time, never shrinking further with each additional re-bake.
+            for (int i = 0; i < 10; ++i)
+            {
+                drive->setValueNotifyingHost((float) i / 10.0f);
+                processor.rebakeNow();
+
+                const auto span = processor.getCurrentSampleSet()->zones[0].end - processor.getCurrentSampleSet()->zones[0].start;
+                expect(span == firstSpan,
+                       "the zone's span must not shrink (or grow) across repeated re-bakes at a fixed transpose/iterations");
+            }
+
+            // Capture Iterations legitimately changes the working buffer's length by design (more
+            // iterations compounds the resample ratio - see ConcreteCapturePass.h) - cycling it
+            // through several values and back should reproduce the EXACT SAME span each time a
+            // given iteration count recurs, proving there's no hidden accumulation underneath that
+            // legitimate, by-design length change.
+            std::map<int, juce::int64> spanAtIterationCount;
+            for (int cycle = 0; cycle < 3; ++cycle)
+            {
+                for (int iterationCount = 1; iterationCount <= 4; ++iterationCount)
+                {
+                    iterations->setValueNotifyingHost(iterations->convertTo0to1((float) iterationCount));
+                    processor.rebakeNow();
+
+                    const auto span = processor.getCurrentSampleSet()->zones[0].end - processor.getCurrentSampleSet()->zones[0].start;
+                    if (spanAtIterationCount.count(iterationCount) == 0)
+                        spanAtIterationCount[iterationCount] = span;
+                    else
+                        expectEquals((int) span, (int) spanAtIterationCount[iterationCount],
+                                     "the span for a given iteration count must be identical every time it recurs, "
+                                     "not shrink further on each pass through the cycle");
+                }
+            }
+
+            file.deleteFile();
+        }
+
+        beginTest("Save/reload with an active (non-bypassed) capture pass round-trips the raw "
+                  "zone's source-space start/end correctly (regression test for a related bug)");
+        {
+            // The companion bug to the one above: getStateInformation() used to persist the BAKED
+            // zone's start/end (rescaled to the working buffer's length) alongside the embedded
+            // SOURCE audio (always source-length) - on reload those two disagreed. Fixed by
+            // persisting rawSampleSet (always source-space) instead - see getStateInformation()'s
+            // own comment.
+            const auto file = writeTempSineWav(500.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.loadSample(file);
+
+            const auto originalRawZone = processor.getRawSampleSet()->zones[0];
+
+            auto* bypass = processor.apvts.getParameter(ConcreteAudioProcessor::captureBypassParamID);
+            auto* transpose = processor.apvts.getParameter(ConcreteAudioProcessor::captureTransposeParamID);
+            bypass->setValueNotifyingHost(0.0f);
+            transpose->setValueNotifyingHost(transpose->convertTo0to1(12.0f)); // halves the working buffer's length
+            processor.rebakeNow();
+
+            expect(processor.getCurrentSampleSet()->zones[0].end < originalRawZone.end,
+                   "sanity check: the baked zone really is shorter than the raw one at +12 semitones");
+
+            juce::MemoryBlock state;
+            processor.getStateInformation(state);
+
+            ConcreteAudioProcessor reloaded;
+            reloaded.setStateInformation(state.getData(), (int) state.getSize());
+
+            const auto reloadedRawZone = reloaded.getRawSampleSet()->zones[0];
+            expectEquals((int) reloadedRawZone.start, (int) originalRawZone.start,
+                         "reloaded raw start must match the original source-space value, not the baked/rescaled one");
+            expectEquals((int) reloadedRawZone.end, (int) originalRawZone.end,
+                         "reloaded raw end must match the original source-space value, not the baked/rescaled one");
+
+            file.deleteFile();
         }
     }
 };

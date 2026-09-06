@@ -19,10 +19,30 @@
 // groups/non-zero output destinations (Phase 6/multi-zone work) or reverse playback.
 struct ConcreteSampleZone
 {
-    // Shared (not copied) with any voice currently playing it, so a future capture-pass re-bake
-    // (Phase 4) can swap this pointer without invalidating an in-flight voice's read position -
-    // see ConcreteSampleSet's own reference-counting for the analogous whole-zone-list swap.
+    // The WORKING buffer - what ConcreteVoice actually plays. Phase 4's capture pass
+    // (ConcreteCapturePass) derives this from sourceBuffer below; before Phase 4 (or with the
+    // capture pass bypassed), it's an exact copy of sourceBuffer. Shared (not copied) with any
+    // voice currently playing it, so a capture-pass re-bake can swap this pointer without
+    // invalidating an in-flight voice's read position - see ConcreteSampleSet's own reference-
+    // counting for the analogous whole-zone-list swap.
     std::shared_ptr<const juce::AudioBuffer<float>> buffer;
+
+    // The SOURCE buffer - exactly as loaded from disk or decoded from embedded FLAC, never
+    // modified (see concrete-sampler-plugin-plan.md's Architecture #2: "the source buffer is
+    // never modified"). ConcreteSampleIO reads/writes ONLY this field, never `buffer` - session
+    // persistence/embedding is defined entirely in terms of the source, since the working buffer
+    // is regenerated from it on load rather than persisted itself. ConcreteAudioProcessor is what
+    // derives `buffer` from this + the current capture-pass settings after any load/relocate/
+    // state-restore.
+    std::shared_ptr<const juce::AudioBuffer<float>> sourceBuffer;
+
+    // How many total semitones ConcreteCapturePass actually baked into `buffer` the last time it
+    // ran (0 if bypassed or not yet baked) - NOT necessarily the CURRENT capture-transpose
+    // parameter value, since a parameter change and its background re-bake completing are not
+    // atomic. ConcreteVoice::startNote() subtracts this (when auto-compensate is on) to bring a
+    // resampled-up-for-capture buffer back to its original pitch/tempo at the zone's root note -
+    // see concrete-sampler-plugin-plan.md's Phase 4.
+    double captureTransposeSemitones = 0.0;
 
     juce::String sourcePath;      // always stored, even when embedded (Architecture #2)
     bool sourceMissing = false;   // true when sourcePath no longer resolves and there's no embedded copy

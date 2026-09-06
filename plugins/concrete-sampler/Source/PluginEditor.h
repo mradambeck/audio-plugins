@@ -22,8 +22,12 @@ public:
     {
         g.fillAll(juce::Colours::black);
 
+        // Drawn from the SOURCE buffer, not the (possibly capture-pass-transposed/driven/
+        // quantized) working buffer - Phase 8 adds an optional working-buffer overlay so the
+        // capture pass's effect is visible (see concrete-sampler-plugin-plan.md's Phase 8); this
+        // utility view just shows what was actually loaded.
         const auto sampleSet = processor.getCurrentSampleSet();
-        if (sampleSet->zones.empty() || sampleSet->zones[0].buffer == nullptr)
+        if (sampleSet->zones.empty() || sampleSet->zones[0].sourceBuffer == nullptr)
         {
             g.setColour(juce::Colours::grey);
             g.drawText(sampleSet->zones.empty() || !sampleSet->zones[0].sourceMissing
@@ -33,7 +37,7 @@ public:
             return;
         }
 
-        const auto& buffer = *sampleSet->zones[0].buffer;
+        const auto& buffer = *sampleSet->zones[0].sourceBuffer;
         const auto numSamples = buffer.getNumSamples();
         const auto bounds = getLocalBounds().toFloat();
         const auto midY = bounds.getCentreY();
@@ -126,6 +130,27 @@ private:
     juce::Label quantizerModeLabel { {}, "Quantizer Mode" };
     juce::ComboBox quantizerModeCombo;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> quantizerModeAttachment;
+
+    // Phase 4's capture pass (see ConcreteCapturePass.h) - same Attachment convention as the
+    // Phase 2/3 controls above. Auto-Compensate/Bypass are AudioParameterBool, so these use
+    // ToggleButton + ButtonAttachment rather than a Slider/ComboBox.
+    juce::Label captureTransposeLabel { {}, "Capture Transpose" };
+    juce::Slider captureTransposeSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> captureTransposeAttachment;
+
+    juce::Label captureDriveLabel { {}, "Capture Drive" };
+    juce::Slider captureDriveSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> captureDriveAttachment;
+
+    juce::ToggleButton captureAutoCompensateButton { "Auto-Compensate" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> captureAutoCompensateAttachment;
+
+    juce::ToggleButton captureBypassButton { "Capture Bypass" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> captureBypassAttachment;
+
+    juce::Label captureIterationsLabel { {}, "Capture Iterations" };
+    juce::Slider captureIterationsSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> captureIterationsAttachment;
 
     juce::MidiKeyboardComponent keyboardComponent;
 };

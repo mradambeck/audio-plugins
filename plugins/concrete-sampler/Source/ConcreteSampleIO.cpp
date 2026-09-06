@@ -41,7 +41,7 @@ namespace ConcreteSampleIO
             return zone;
         }
 
-        zone.buffer = buffer;
+        zone.sourceBuffer = buffer;
         zone.sourceSampleRate = sourceSampleRate;
         zone.start = 0;
         zone.end = buffer->getNumSamples();
@@ -69,7 +69,7 @@ namespace ConcreteSampleIO
 
     juce::MemoryBlock encodeZoneAsFlac(const ConcreteSampleZone& zone)
     {
-        if (zone.buffer == nullptr || zone.buffer->getNumSamples() <= 0)
+        if (zone.sourceBuffer == nullptr || zone.sourceBuffer->getNumSamples() <= 0)
             return {};
 
         juce::FlacAudioFormat flacFormat;
@@ -80,14 +80,14 @@ namespace ConcreteSampleIO
         auto* outputStream = new juce::MemoryOutputStream(result, false);
         std::unique_ptr<juce::AudioFormatWriter> writer(
             flacFormat.createWriterFor(outputStream, zone.sourceSampleRate,
-                                        (unsigned int) zone.buffer->getNumChannels(), 24, {}, 5));
+                                        (unsigned int) zone.sourceBuffer->getNumChannels(), 24, {}, 5));
         if (writer == nullptr)
         {
             delete outputStream;
             return {};
         }
 
-        writer->writeFromAudioSampleBuffer(*zone.buffer, 0, zone.buffer->getNumSamples());
+        writer->writeFromAudioSampleBuffer(*zone.sourceBuffer, 0, zone.sourceBuffer->getNumSamples());
         writer.reset(); // flushes/finalizes the FLAC stream into `result` before it's returned
         return result;
     }
@@ -197,7 +197,7 @@ namespace ConcreteSampleIO
             double decodedRate = zone.sourceSampleRate;
             if (decodeFlacBlock(flacBytes, decoded, decodedRate))
             {
-                zone.buffer = std::make_shared<juce::AudioBuffer<float>>(std::move(decoded));
+                zone.sourceBuffer = std::make_shared<juce::AudioBuffer<float>>(std::move(decoded));
                 zone.sourceSampleRate = decodedRate;
                 zone.sourceMissing = false;
                 return zone;
@@ -210,7 +210,7 @@ namespace ConcreteSampleIO
             double sourceSampleRate = zone.sourceSampleRate;
             if (readAudioFile(formatManager, juce::File(zone.sourcePath), buffer, sourceSampleRate))
             {
-                zone.buffer = buffer;
+                zone.sourceBuffer = buffer;
                 zone.sourceSampleRate = sourceSampleRate;
                 zone.sourceMissing = false;
                 return zone;

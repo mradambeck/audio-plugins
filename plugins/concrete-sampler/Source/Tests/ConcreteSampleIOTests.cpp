@@ -74,10 +74,10 @@ public:
             const auto zone = ConcreteSampleIO::loadZoneFromFile(formatManager(), file, 60);
 
             expect(!zone.sourceMissing);
-            expect(zone.buffer != nullptr);
-            expectEquals(zone.buffer->getNumChannels(), 1);
+            expect(zone.sourceBuffer != nullptr);
+            expectEquals(zone.sourceBuffer->getNumChannels(), 1);
             expectWithinAbsoluteError(zone.sourceSampleRate, 44100.0, 0.1);
-            expectEquals((int) zone.end, zone.buffer->getNumSamples());
+            expectEquals((int) zone.end, zone.sourceBuffer->getNumSamples());
             expectEquals(zone.rootNote, 60);
 
             file.deleteFile();
@@ -89,7 +89,7 @@ public:
             const auto zone = ConcreteSampleIO::loadZoneFromFile(formatManager(), missing, 60);
 
             expect(zone.sourceMissing);
-            expect(zone.buffer == nullptr);
+            expect(zone.sourceBuffer == nullptr);
             expectEquals(zone.sourcePath, missing.getFullPathName());
         }
 
@@ -100,7 +100,7 @@ public:
                 sine.setSample(0, i, 0.5f * (float) std::sin(2.0 * juce::MathConstants<double>::pi * 1000.0 * i / 44100.0));
 
             ConcreteSampleZone zone;
-            zone.buffer = std::make_shared<juce::AudioBuffer<float>>(sine);
+            zone.sourceBuffer = std::make_shared<juce::AudioBuffer<float>>(sine);
             zone.sourceSampleRate = 44100.0;
 
             const auto flacBytes = ConcreteSampleIO::encodeZoneAsFlac(zone);
@@ -111,8 +111,8 @@ public:
             const auto ok = ConcreteSampleIO::decodeFlacBlock(flacBytes, decoded, decodedRate);
             expect(ok);
             expectWithinAbsoluteError(decodedRate, 44100.0, 0.1);
-            expectEquals(decoded.getNumSamples(), zone.buffer->getNumSamples());
-            expect(maxAbsDifference(decoded, *zone.buffer) < 0.001f,
+            expectEquals(decoded.getNumSamples(), zone.sourceBuffer->getNumSamples());
+            expect(maxAbsDifference(decoded, *zone.sourceBuffer) < 0.001f,
                    "24-bit FLAC round-trip should be very close to the original float content");
         }
 
@@ -166,7 +166,7 @@ public:
 
             const auto roundTripped = ConcreteSampleIO::valueTreeToZone(reparsed, formatManager());
             expect(!roundTripped.sourceMissing);
-            expect(roundTripped.buffer != nullptr);
+            expect(roundTripped.sourceBuffer != nullptr);
             expectEquals(roundTripped.keyLo, 10);
             expectEquals(roundTripped.keyHi, 20);
             expectEquals(roundTripped.velLo, 1);
@@ -179,7 +179,7 @@ public:
             expect(roundTripped.loopEnabled);
             expectEquals((int) roundTripped.loopStart, 10);
             expectEquals((int) roundTripped.loopEnd, 1000);
-            expect(maxAbsDifference(*roundTripped.buffer, *zone.buffer) < 0.001f,
+            expect(maxAbsDifference(*roundTripped.sourceBuffer, *zone.sourceBuffer) < 0.001f,
                    "embedded audio should decode back to essentially the same content");
 
             file.deleteFile();
@@ -203,7 +203,7 @@ public:
 
             const auto roundTripped = ConcreteSampleIO::valueTreeToZone(tree, formatManager());
             expect(!roundTripped.sourceMissing, "the file still exists on disk, so it should load via sourcePath");
-            expect(roundTripped.buffer != nullptr);
+            expect(roundTripped.sourceBuffer != nullptr);
             expectEquals(roundTripped.sourcePath, zone.sourcePath);
 
             file.deleteFile();
@@ -222,7 +222,7 @@ public:
 
             const auto reloaded = ConcreteSampleIO::valueTreeToZone(tree, formatManager());
             expect(reloaded.sourceMissing, "a moved file with no embedded copy must be reported missing, not silently empty");
-            expect(reloaded.buffer == nullptr);
+            expect(reloaded.sourceBuffer == nullptr);
             expectEquals(reloaded.rootNote, 72, "every other field should still have loaded correctly");
         }
 
@@ -238,8 +238,8 @@ public:
             const auto relocated = ConcreteSampleIO::relocateZone(zone, formatManager(), newFile);
 
             expect(!relocated.sourceMissing);
-            expect(relocated.buffer != nullptr);
-            expectEquals(relocated.buffer->getNumChannels(), 2, "should reflect the NEW file's data, not the old one's");
+            expect(relocated.sourceBuffer != nullptr);
+            expectEquals(relocated.sourceBuffer->getNumChannels(), 2, "should reflect the NEW file's data, not the old one's");
             expectEquals(relocated.keyLo, 5, "non-audio metadata should be preserved across a relocate");
             expectEquals(relocated.keyHi, 6);
             expectWithinAbsoluteError(relocated.tuneSemitones, 2.0f, 1.0e-6f);
@@ -272,8 +272,8 @@ public:
             expectEquals((int) roundTripped->zones.size(), 2);
             expectEquals(roundTripped->zones[0].keyLo, 36);
             expectEquals(roundTripped->zones[1].keyLo, 38);
-            expect(roundTripped->zones[0].buffer != nullptr);
-            expect(roundTripped->zones[1].buffer != nullptr);
+            expect(roundTripped->zones[0].sourceBuffer != nullptr);
+            expect(roundTripped->zones[1].sourceBuffer != nullptr);
 
             fileA.deleteFile();
             fileB.deleteFile();

@@ -118,6 +118,11 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
         resetParam(ConcreteAudioProcessor::fineTuneParamID);
         resetParam(ConcreteAudioProcessor::bitDepthParamID);
         resetParam(ConcreteAudioProcessor::quantizerModeParamID);
+        resetParam(ConcreteAudioProcessor::captureTransposeParamID);
+        resetParam(ConcreteAudioProcessor::captureDriveParamID);
+        resetParam(ConcreteAudioProcessor::captureAutoCompensateParamID);
+        resetParam(ConcreteAudioProcessor::captureBypassParamID);
+        resetParam(ConcreteAudioProcessor::captureIterationsParamID);
     };
 
     addAndMakeVisible(pitchEngineLabel);
@@ -170,9 +175,41 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     quantizerModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processor.apvts, ConcreteAudioProcessor::quantizerModeParamID, quantizerModeCombo);
 
+    addAndMakeVisible(captureTransposeLabel);
+    captureTransposeLabel.attachToComponent(&captureTransposeSlider, true);
+    captureTransposeSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    captureTransposeSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
+    addAndMakeVisible(captureTransposeSlider);
+    captureTransposeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, ConcreteAudioProcessor::captureTransposeParamID, captureTransposeSlider);
+
+    addAndMakeVisible(captureDriveLabel);
+    captureDriveLabel.attachToComponent(&captureDriveSlider, true);
+    captureDriveSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    captureDriveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
+    addAndMakeVisible(captureDriveSlider);
+    captureDriveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, ConcreteAudioProcessor::captureDriveParamID, captureDriveSlider);
+
+    addAndMakeVisible(captureAutoCompensateButton);
+    captureAutoCompensateAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor.apvts, ConcreteAudioProcessor::captureAutoCompensateParamID, captureAutoCompensateButton);
+
+    addAndMakeVisible(captureBypassButton);
+    captureBypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor.apvts, ConcreteAudioProcessor::captureBypassParamID, captureBypassButton);
+
+    addAndMakeVisible(captureIterationsLabel);
+    captureIterationsLabel.attachToComponent(&captureIterationsSlider, true);
+    captureIterationsSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    captureIterationsSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(captureIterationsSlider);
+    captureIterationsAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, ConcreteAudioProcessor::captureIterationsParamID, captureIterationsSlider);
+
     addAndMakeVisible(keyboardComponent);
 
-    setSize(700, 490);
+    setSize(700, 560);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -219,6 +256,23 @@ void ConcreteAudioProcessorEditor::resized()
     bitDepthSlider.setBounds(quantRow.removeFromLeft(150));
     quantRow.removeFromLeft(110); // "Quantizer Mode" label
     quantizerModeCombo.setBounds(quantRow.removeFromLeft(150));
+
+    bounds.removeFromTop(8);
+
+    auto captureRow1 = bounds.removeFromTop(28);
+    captureRow1.removeFromLeft(120); // "Capture Transpose" label
+    captureTransposeSlider.setBounds(captureRow1.removeFromLeft(150));
+    captureRow1.removeFromLeft(100); // "Capture Drive" label
+    captureDriveSlider.setBounds(captureRow1.removeFromLeft(130));
+
+    bounds.removeFromTop(8);
+
+    auto captureRow2 = bounds.removeFromTop(28);
+    captureAutoCompensateButton.setBounds(captureRow2.removeFromLeft(160));
+    captureRow2.removeFromLeft(10);
+    captureBypassButton.setBounds(captureRow2.removeFromLeft(140));
+    captureRow2.removeFromLeft(130); // "Capture Iterations" label
+    captureIterationsSlider.setBounds(captureRow2.removeFromLeft(100));
 
     bounds.removeFromTop(10);
 

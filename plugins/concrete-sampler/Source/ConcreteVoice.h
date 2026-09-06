@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ConcretePitchEngine.h"
-#include "ConcreteQuantizer.h"
 #include "ConcreteSampleSet.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -9,13 +8,16 @@
 #include <array>
 
 // One note's playback: a pitch engine (Phase 1's reference interpolation, or one of Phase 2's
-// three machine modes - see ConcretePitchEngine.h), Phase 3's quantizer (see ConcreteQuantizer.h),
-// and a basic ADSR amp envelope. The pitch engine, base rate, coarse/fine tune, and quantizer
-// mode/bit depth are all snapshotted once at startNote() and held fixed for the voice's lifetime,
-// the same way Phase 1 already snapshots the zone/velocity - matches this catalog's precedent
-// (Strike's Mono/Topology switches) for "a mode selection is captured at note-on, not smoothly
-// live-updated mid-note" rather than introducing a second, inconsistent live-parameter convention
-// just for pitch/quantization.
+// three machine modes - see ConcretePitchEngine.h) plus a basic ADSR amp envelope. Phase 3's
+// quantizer (bit depth/companding - see ConcreteQuantizer.h) and Phase 4's capture pass (resample/
+// drive - see ConcreteCapturePass.h) are BAKED into the zone's working buffer offline rather than
+// applied live here (see concrete-sampler-plugin-plan.md's Architecture #2/#3 and Phase 4) - this
+// class just plays back whatever is in that buffer. The pitch engine, base rate, and coarse/fine
+// tune are all snapshotted once at startNote() and held fixed for the voice's lifetime, the same
+// way Phase 1 already snapshots the zone/velocity - matches this catalog's precedent (Strike's
+// Mono/Topology switches) for "a mode selection is captured at note-on, not smoothly live-updated
+// mid-note" rather than introducing a second, inconsistent live-parameter convention just for
+// pitch.
 //
 // Holds a ConcreteSampleSet::Ptr (not just a pointer to the one zone it's playing) for the whole
 // note, so a background sample reload mid-note can't invalidate the buffer this voice is reading
@@ -33,13 +35,14 @@ public:
     // played note's distance from the zone's root note into one total pitch ratio.
     // effectiveSourceRateHz is the zone's own sourceSampleRate for Mode::reference, or the
     // baseRate parameter for the three machine modes (see ConcretePitchEngine.h's header comment
-    // on why those are different things and which one applies when). quantizerMode/bitDepthBits
-    // are Phase 3's quantization stage (see ConcreteQuantizer.h) - captured at note-on like the
-    // pitch engine mode, not smoothly live-updated mid-note.
+    // on why those are different things and which one applies when). autoCompensate, when true,
+    // subtracts zone->captureTransposeSemitones (whatever Phase 4's capture pass actually baked
+    // into this zone's buffer, 0 if none) from the note's total pitch, bringing a resampled-up-
+    // for-capture buffer back to its original pitch/tempo at the zone's root note - see
+    // ConcreteCapturePass.h. false plays the baked-in pitch-up directly, uncompensated.
     void startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
                     ConcretePitchEngine::Mode mode, double effectiveSourceRateHz,
-                    int coarseTuneSemitones, float fineTuneCents,
-                    ConcreteQuantizer::Mode quantizerMode, int bitDepthBits) noexcept;
+                    int coarseTuneSemitones, float fineTuneCents, bool autoCompensate) noexcept;
 
     // Matches the juce::SynthesiserVoice convention this catalog's other instruments already
     // follow (Strike, Alloy): allowTailOff true lets the ADSR release play out; false silences
@@ -79,9 +82,6 @@ private:
     double pitchRatio = 1.0;
     double effectiveSourceRateHz = 44100.0;
     juce::int64 zoneEndSample = 0;
-
-    ConcreteQuantizer::Mode quantizerMode = ConcreteQuantizer::Mode::linear;
-    int bitDepthBits = 16;
 
     float velocityGain = 1.0f;
     juce::ADSR adsr;
