@@ -117,5 +117,15 @@ private:
     juce::Slider fineTuneSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> fineTuneAttachment;
 
+    // Phase 3's quantization controls (see ConcreteQuantizer.h) - same Attachment convention as
+    // the Phase 2 controls above.
+    juce::Label bitDepthLabel { {}, "Bit Depth" };
+    juce::Slider bitDepthSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> bitDepthAttachment;
+
+    juce::Label quantizerModeLabel { {}, "Quantizer Mode" };
+    juce::ComboBox quantizerModeCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> quantizerModeAttachment;
+
     juce::MidiKeyboardComponent keyboardComponent;
 };

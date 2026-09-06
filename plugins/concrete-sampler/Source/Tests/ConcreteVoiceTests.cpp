@@ -77,7 +77,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -92,7 +92,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f); // root + 12 semitones
+            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16); // root + 12 semitones
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -107,7 +107,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f); // root - 12 semitones
+            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16); // root - 12 semitones
 
             juce::AudioBuffer<float> out(1, 16384);
             out.clear();
@@ -125,7 +125,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate); // 44100
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -141,7 +141,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 0.05); // short: ~2205 samples
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             expect(voice.isActive(), "should be active immediately after startNote()");
 
@@ -157,7 +157,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(2, 512);
             out.clear();
@@ -186,7 +186,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(2, 256);
             out.clear();
@@ -216,7 +216,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(1, 256);
             out.clear();
@@ -233,7 +233,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> out(1, 128);
             out.clear();
@@ -254,7 +254,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
             voice.stopNote(false);
 
             expect(! voice.isActive(), "a hard stop should be immediate");
@@ -265,7 +265,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 1.0); // long enough to reach sustain
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, ConcreteQuantizer::Mode::linear, 16);
 
             juce::AudioBuffer<float> warmup(1, 4096); // reach sustain, well past the 0.002s attack
             warmup.clear();

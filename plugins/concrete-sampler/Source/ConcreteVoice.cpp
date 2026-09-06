@@ -12,7 +12,8 @@ void ConcreteVoice::prepare(double sampleRateIn) noexcept
 
 void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
                                 ConcretePitchEngine::Mode mode, double effectiveSourceRateHzIn,
-                                int coarseTuneSemitones, float fineTuneCents) noexcept
+                                int coarseTuneSemitones, float fineTuneCents,
+                                ConcreteQuantizer::Mode quantizerModeIn, int bitDepthBitsIn) noexcept
 {
     sampleSet = set;
     zone = &sampleSet->zones[(size_t) zoneIndex];
@@ -20,6 +21,8 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
     velocityGain = velocity01;
     pitchMode = mode;
     effectiveSourceRateHz = effectiveSourceRateHzIn;
+    quantizerMode = quantizerModeIn;
+    bitDepthBits = bitDepthBitsIn;
 
     // A zone whose source is missing (Architecture #2's relocate case) still exists in the set
     // with no buffer - allocate the voice slot (so note-on/note-off bookkeeping stays correct)
@@ -88,6 +91,7 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 mix += pitchEngines[(size_t) srcCh].processSample(pitchMode, buf.getReadPointer(srcCh), bufferLength,
                                                                      pitchRatio, effectiveSourceRateHz);
             mix /= (float) zoneChannels;
+            mix = ConcreteQuantizer::process(mix, quantizerMode, bitDepthBits);
             outputBuffer.addSample(0, startSample + i, mix * env);
         }
         else if (zoneChannels <= 1)
@@ -96,8 +100,9 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             // carry history - see ConcretePitchEngine.h), so it must be advanced exactly ONCE per
             // sample here, then the same value broadcast to every channel - calling it once per
             // OUTPUT channel (as the stereo-zone branch below does) would double-advance it.
-            const auto sampleValue = pitchEngines[0].processSample(pitchMode, buf.getReadPointer(0), bufferLength,
-                                                                     pitchRatio, effectiveSourceRateHz);
+            auto sampleValue = pitchEngines[0].processSample(pitchMode, buf.getReadPointer(0), bufferLength,
+                                                                pitchRatio, effectiveSourceRateHz);
+            sampleValue = ConcreteQuantizer::process(sampleValue, quantizerMode, bitDepthBits);
             for (int ch = 0; ch < outChannels; ++ch)
                 outputBuffer.addSample(ch, startSample + i, sampleValue * env);
         }
@@ -106,8 +111,9 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             for (int ch = 0; ch < outChannels; ++ch)
             {
                 const auto srcChannel = juce::jmin(ch, zoneChannels - 1);
-                const auto sampleValue = pitchEngines[(size_t) srcChannel].processSample(
+                auto sampleValue = pitchEngines[(size_t) srcChannel].processSample(
                     pitchMode, buf.getReadPointer(srcChannel), bufferLength, pitchRatio, effectiveSourceRateHz);
+                sampleValue = ConcreteQuantizer::process(sampleValue, quantizerMode, bitDepthBits);
                 outputBuffer.addSample(ch, startSample + i, sampleValue * env);
             }
         }

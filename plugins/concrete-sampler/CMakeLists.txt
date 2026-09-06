@@ -81,6 +81,7 @@ target_sources(ConcreteTests
         Source/Tests/ConcreteVoiceAllocatorTests.cpp
         Source/Tests/ConcreteVoiceTests.cpp
         Source/Tests/ConcretePitchEngineTests.cpp
+        Source/Tests/ConcreteQuantizerTests.cpp
         Source/Tests/ConcreteSampleIOTests.cpp
         Source/Tests/TestRunner.cpp
 )

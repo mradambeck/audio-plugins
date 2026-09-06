@@ -5,6 +5,7 @@
 #include "../../common/Presets/FactoryPreset.h"
 #include "ConcreteBusRouter.h"
 #include "ConcretePitchEngine.h"
+#include "ConcreteQuantizer.h"
 #include "ConcreteSampleIO.h"
 #include "ConcreteSampleSet.h"
 #include "ConcreteVoice.h"
@@ -14,11 +15,12 @@
 
 // Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
-// behavior. Phase 2 adds the three actual pitch-engine modes (ConcretePitchEngine.h) plus the
-// base-rate/coarse-tune/fine-tune parameters - the first real automatable APVTS parameters this
-// plugin has. Still no quantization, capture pass, or filters yet (Phase 3 onward) - the "working
+// behavior. Phase 2 added the three pitch-engine modes (ConcretePitchEngine.h) plus the base-rate/
+// coarse-tune/fine-tune parameters. Phase 3 adds bit-depth reduction and companding
+// (ConcreteQuantizer.h). Still no capture pass or filters yet (Phase 4 onward) - the "working
 // buffer" a voice plays IS the loaded buffer until Phase 4 introduces the capture pass and a
-// separate derived buffer.
+// separate derived buffer; Phase 3's quantizer runs live per-sample in ConcreteVoice rather than
+// as part of an offline bake, since that offline bake doesn't exist until Phase 4.
 class ConcreteAudioProcessor : public juce::AudioProcessor
 {
 public:
@@ -87,6 +89,12 @@ public:
     static constexpr auto coarseTuneParamID = "coarseTune";
     static constexpr auto fineTuneParamID = "fineTune";
 
+    // Phase 3's quantization stage (see ConcreteQuantizer.h). bitDepth is the storage word width
+    // in bits, 1-16. quantizerMode's raw value is the choice INDEX (0=Linear, 1=Companded) as a
+    // float, same convention as pitchEngineMode - see quantizerModeFromParam().
+    static constexpr auto bitDepthParamID = "bitDepth";
+    static constexpr auto quantizerModeParamID = "quantizerMode";
+
     // Bound to the editor's on-screen keyboard (Phase 1's temporary playing surface - see
     // concrete-sampler-plugin-plan.md's Phase 1 deliverables; Phase 8 replaces it with the real
     // pad-grid/keyboard trigger surface). processBlock() merges this into the real MIDI buffer
@@ -109,6 +117,8 @@ private:
     std::atomic<float>* baseRateParam = nullptr;
     std::atomic<float>* coarseTuneParam = nullptr;
     std::atomic<float>* fineTuneParam = nullptr;
+    std::atomic<float>* bitDepthParam = nullptr;
+    std::atomic<float>* quantizerModeParam = nullptr;
 
     // Fixed at 8 for Phase 1 as a reasonable placeholder - Phase 6 makes this a real, per-machine-
     // preset voice count with tested stealing behavior (see concrete-sampler-plugin-plan.md's

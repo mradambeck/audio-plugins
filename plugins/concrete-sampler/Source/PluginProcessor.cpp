@@ -41,6 +41,8 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
     baseRateParam = apvts.getRawParameterValue(baseRateParamID);
     coarseTuneParam = apvts.getRawParameterValue(coarseTuneParamID);
     fineTuneParam = apvts.getRawParameterValue(fineTuneParamID);
+    bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
+    quantizerModeParam = apvts.getRawParameterValue(quantizerModeParamID);
 }
 
 ConcreteAudioProcessor::~ConcreteAudioProcessor() = default;
@@ -59,6 +61,15 @@ namespace
             case 3:  return ConcretePitchEngine::Mode::deltaSigma;
             default: return ConcretePitchEngine::Mode::reference;
         }
+    }
+
+    // Same convention as pitchEngineModeFromParam() - quantizerModeParam's raw value is the
+    // AudioParameterChoice's selected index (0..1) as a float, matching the StringArray order in
+    // createParameterLayout() below.
+    ConcreteQuantizer::Mode quantizerModeFromParam(float rawIndex) noexcept
+    {
+        return (int) std::lround(rawIndex) == 1 ? ConcreteQuantizer::Mode::companded
+                                                 : ConcreteQuantizer::Mode::linear;
     }
 }
 
@@ -113,6 +124,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         juce::NormalisableRange<float>(-50.0f, 50.0f, 0.1f),
         0.0f,
         juce::AudioParameterFloatAttributes().withLabel("ct")));
+
+    // Phase 3's quantization stage (see ConcreteQuantizer.h). Default 16-bit/Linear is
+    // deliberately transparent - same "no artifacts before the user or a machine preset asks for
+    // them" convention as Base Rate's 44.1kHz default above: at 16 bits the quantization noise
+    // floor sits around -96dBFS, far below anything audible, so this costs nothing until a Phase 7
+    // preset (or the user directly) dials it down toward one of the machines' real depths (8, 12,
+    // 13 bits).
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{bitDepthParamID, 1},
+        "Bit Depth",
+        1, 16, 16,
+        juce::AudioParameterIntAttributes().withLabel("bit")));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{quantizerModeParamID, 1},
+        "Quantizer Mode",
+        juce::StringArray{"Linear", "Companded"}, 0));
 
     return { params.begin(), params.end() };
 }
@@ -223,9 +251,13 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
         const auto effectiveSourceRateHz = mode == ConcretePitchEngine::Mode::reference
             ? zone.sourceSampleRate : (double) baseRateParam->load();
 
+        const auto quantizerMode = quantizerModeFromParam(quantizerModeParam->load());
+        const auto bitDepthBits = (int) std::lround(bitDepthParam->load());
+
         const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, zoneIndex, zone.chokeGroup, isActive);
         voices[(size_t) voiceIndex].startNote(sampleSet, zoneIndex, note, velocity01, mode, effectiveSourceRateHz,
-                                                (int) std::lround(coarseTuneParam->load()), fineTuneParam->load());
+                                                (int) std::lround(coarseTuneParam->load()), fineTuneParam->load(),
+                                                quantizerMode, bitDepthBits);
     }
     else if (message.isNoteOff())
     {

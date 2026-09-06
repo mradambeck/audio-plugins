@@ -116,6 +116,8 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
         resetParam(ConcreteAudioProcessor::baseRateParamID);
         resetParam(ConcreteAudioProcessor::coarseTuneParamID);
         resetParam(ConcreteAudioProcessor::fineTuneParamID);
+        resetParam(ConcreteAudioProcessor::bitDepthParamID);
+        resetParam(ConcreteAudioProcessor::quantizerModeParamID);
     };
 
     addAndMakeVisible(pitchEngineLabel);
@@ -152,9 +154,25 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     fineTuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.apvts, ConcreteAudioProcessor::fineTuneParamID, fineTuneSlider);
 
+    addAndMakeVisible(bitDepthLabel);
+    bitDepthLabel.attachToComponent(&bitDepthSlider, true);
+    bitDepthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    bitDepthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
+    addAndMakeVisible(bitDepthSlider);
+    bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, ConcreteAudioProcessor::bitDepthParamID, bitDepthSlider);
+
+    addAndMakeVisible(quantizerModeLabel);
+    quantizerModeLabel.attachToComponent(&quantizerModeCombo, true);
+    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::quantizerModeParamID))
+        quantizerModeCombo.addItemList(param->getAllValueStrings(), 1);
+    addAndMakeVisible(quantizerModeCombo);
+    quantizerModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processor.apvts, ConcreteAudioProcessor::quantizerModeParamID, quantizerModeCombo);
+
     addAndMakeVisible(keyboardComponent);
 
-    setSize(700, 460);
+    setSize(700, 490);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -193,6 +211,14 @@ void ConcreteAudioProcessorEditor::resized()
     coarseTuneSlider.setBounds(tuneRow.removeFromLeft(130));
     tuneRow.removeFromLeft(80); // "Fine Tune" label
     fineTuneSlider.setBounds(tuneRow.removeFromLeft(130));
+
+    bounds.removeFromTop(8);
+
+    auto quantRow = bounds.removeFromTop(28);
+    quantRow.removeFromLeft(90); // "Bit Depth" label
+    bitDepthSlider.setBounds(quantRow.removeFromLeft(150));
+    quantRow.removeFromLeft(110); // "Quantizer Mode" label
+    quantizerModeCombo.setBounds(quantRow.removeFromLeft(150));
 
     bounds.removeFromTop(10);
 

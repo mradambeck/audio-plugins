@@ -36,7 +36,8 @@
 // native units, applied via setValueNotifyingHost() BEFORE the note-on so a voice starting picks
 // them up - matches every other plugin's RenderIR convention in this catalog. Phase 2 adds
 // pitchEngineMode (0=Reference, 1=Mode A, 2=Mode B, 3=Mode C - the same index order as the
-// AudioParameterChoice), baseRate (Hz), coarseTune (semitones), fineTune (cents).
+// AudioParameterChoice), baseRate (Hz), coarseTune (semitones), fineTune (cents). Phase 3 adds
+// bitDepth (1-16) and quantizerMode (0=Linear, 1=Companded).
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -74,6 +75,8 @@ namespace
         ConcreteAudioProcessor::baseRateParamID,
         ConcreteAudioProcessor::coarseTuneParamID,
         ConcreteAudioProcessor::fineTuneParamID,
+        ConcreteAudioProcessor::bitDepthParamID,
+        ConcreteAudioProcessor::quantizerModeParamID,
     };
 
     struct TimedEvent
