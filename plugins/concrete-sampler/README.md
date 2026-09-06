@@ -55,7 +55,8 @@ Phase 2's playback engines - see the Parameters table below.
 plugin in this catalog persists its full state (via the same `getStateInformation()` a DAW session
 save would use, including the loaded sample's embedded audio - see Architecture #2 in the plan
 doc) to `~/Library/Application Support/Concrete.settings` between launches - this is standard JUCE
-standalone-host behavior, not specific to Concrete. For a known-good baseline when testing:
+standalone-host behavior, not specific to Concrete. For a known-good baseline when testing, click
+the **Reset** button next to the Root Note control - it sets:
 
 | Control | Value |
 |---|---|
@@ -65,8 +66,8 @@ standalone-host behavior, not specific to Concrete. For a known-good baseline wh
 | Fine Tune | 0 |
 | Root Note | C3 (60) |
 
-To force a genuinely clean slate (also discards whichever sample was embedded - reload it
-afterward): `rm ~/Library/Application\ Support/Concrete.settings`.
+Reset doesn't touch the loaded sample. To force a genuinely clean slate (also discards whichever
+sample was embedded - reload it afterward): `rm ~/Library/Application\ Support/Concrete.settings`.
 
 ## Validating the AU (auval)
 

@@ -83,6 +83,12 @@ private:
     juce::TextButton loadButton { "Load..." };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
+    // Resets root note and the four Phase 2 pitch-engine parameters back to their known-good
+    // testing baseline (see README.md's "Standalone app remembers..." section) - the Standalone
+    // app persists whatever was last set to disk between launches, not the plugin's own compiled-
+    // in defaults, so this is the fast in-app equivalent of deleting that settings file.
+    juce::TextButton resetButton { "Reset" };
+
     ConcreteWaveformDisplay waveformDisplay;
 
     // Root note is zone-list state (Architecture #1), not an APVTS parameter, so this is a plain

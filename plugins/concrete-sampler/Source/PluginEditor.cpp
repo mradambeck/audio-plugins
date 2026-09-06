@@ -98,6 +98,26 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     };
     addAndMakeVisible(rootNoteSlider);
 
+    addAndMakeVisible(resetButton);
+    resetButton.onClick = [this]
+    {
+        // sendNotificationSync (not dontSendNotification) so onValueChange actually fires and
+        // calls setRootNoteForZone() - a silent setValue() here would just move the slider's
+        // displayed number without ever telling the processor about it. A no-op if root note is
+        // already 60, same as the APVTS resets below being no-ops at their own defaults.
+        rootNoteSlider.setValue(60.0, juce::sendNotificationSync);
+
+        auto resetParam = [this](const juce::String& paramID)
+        {
+            if (auto* param = processor.apvts.getParameter(paramID))
+                param->setValueNotifyingHost(param->getDefaultValue());
+        };
+        resetParam(ConcreteAudioProcessor::pitchEngineModeParamID);
+        resetParam(ConcreteAudioProcessor::baseRateParamID);
+        resetParam(ConcreteAudioProcessor::coarseTuneParamID);
+        resetParam(ConcreteAudioProcessor::fineTuneParamID);
+    };
+
     addAndMakeVisible(pitchEngineLabel);
     pitchEngineLabel.attachToComponent(&pitchEngineCombo, true);
     // Populated from the parameter's own choices rather than a hardcoded second copy of the list -
@@ -155,6 +175,8 @@ void ConcreteAudioProcessorEditor::resized()
     loadButton.setBounds(topRow.removeFromLeft(80));
     topRow.removeFromLeft(90); // space for the root note label, attached to the left of its slider
     rootNoteSlider.setBounds(topRow.removeFromLeft(200));
+    topRow.removeFromLeft(20);
+    resetButton.setBounds(topRow.removeFromLeft(80));
 
     bounds.removeFromTop(8);
 
