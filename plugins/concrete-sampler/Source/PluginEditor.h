@@ -102,6 +102,12 @@ private:
     juce::Label rootNoteLabel { {}, "Root Note" };
     juce::Slider rootNoteSlider;
 
+    // Also zone-list state (Architecture #1), not an APVTS parameter, for the same reason and with
+    // the same manual-wiring pattern as Root Note above - see ConcreteSampleZone::oneShot and
+    // ConcreteAudioProcessor::setOneShotForZone(). Off (gated/held-note playback) is the existing,
+    // tested default; on plays the zone through to its own end regardless of note-off.
+    juce::ToggleButton oneShotButton { "One-Shot" };
+
     // Phase 2's pitch-engine controls - real APVTS parameters, so these use the standard
     // Attachment classes rather than manual get/set wiring. STANDALONE CHECK 2 needs exactly this:
     // a mode selector, exposed, so the three machine modes can be A/B'd by ear.

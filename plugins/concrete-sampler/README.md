@@ -49,16 +49,21 @@ open build/Concrete_artefacts/Debug/Standalone/Concrete.app
 ```
 
 Load a sample via the Load button or by dragging a WAV/AIFF file onto the waveform area, then play
-it from your MIDI controller or the on-screen keyboard at the bottom of the window. The Pitch
-Engine dropdown and the Base Rate/Coarse Tune/Fine Tune sliders above the waveform switch between
-Phase 2's playback engines; the Bit Depth slider and Quantizer Mode dropdown below them switch
-between Phase 3's bit-depth reduction and companding; the Capture Transpose/Drive sliders and
-Auto-Compensate/Capture Bypass toggles below those control Phase 4's capture pass; the Filter
-Model/Cutoff/Resonance/Env Amount/Key Track controls and the Double Smear toggle+controls below
-those are Phase 5's - see the Parameters table below. Capture-pass, quantizer, and double-smear
-changes trigger a background re-bake of the loaded sample (not instant - there's no bake-progress
-indicator yet, that's Phase 8); the live filter controls (like Phase 2's pitch controls) take
-effect on the very next sample instead, with no re-bake at all.
+it from your MIDI controller or the on-screen keyboard at the bottom of the window. The One-Shot
+toggle next to Root Note switches between the two ways a sampler can handle playback: off (the
+default) plays only while the key/trigger is held, stopping (with the amp envelope's release tail)
+on note-off; on plays the whole zone through to its own end regardless of how long the key was
+held - see `ConcreteSampleZone::oneShot`. The Pitch Engine dropdown and the Base Rate/Coarse Tune/
+Fine Tune sliders above the waveform switch between Phase 2's playback engines; the Bit Depth
+slider and Quantizer Mode dropdown below them switch between Phase 3's bit-depth reduction and
+companding; the Capture Transpose/Drive sliders and Auto-Compensate/Capture Bypass toggles below
+those control Phase 4's capture pass; the Filter Model/Cutoff/Resonance/Env Amount/Key Track
+controls and the Double Smear toggle+controls below those are Phase 5's - see the Parameters table
+below. Capture-pass, quantizer, and double-smear changes trigger a background re-bake of the
+loaded sample (not instant - there's no bake-progress indicator yet, that's Phase 8); the live
+filter controls (like Phase 2's pitch controls) take effect on the very next sample instead, with
+no re-bake at all. One-Shot and Root Note are zone state, like the loaded sample itself - not
+APVTS parameters, so they aren't automatable and take effect immediately, with no re-bake either.
 
 **The Standalone app remembers whatever you left it at, not the compiled-in defaults.** Every
 plugin in this catalog persists its full state (via the same `getStateInformation()` a DAW session
@@ -89,6 +94,7 @@ the **Reset** button next to the Root Note control - it sets:
 | Double Smear Filter Model | SSM |
 | Double Smear Cutoff | 8,000 Hz |
 | Double Smear Resonance | 0 |
+| One-Shot | Off |
 | Root Note | C3 (60) |
 
 Reset doesn't touch the loaded sample. To force a genuinely clean slate (also discards whichever

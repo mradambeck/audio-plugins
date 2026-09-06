@@ -76,8 +76,15 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
     filterEnvelope.noteOn();
 }
 
-void ConcreteVoice::stopNote(bool allowTailOff) noexcept
+void ConcreteVoice::stopNote(bool allowTailOff, bool isForced) noexcept
 {
+    // An ordinary (non-forced) note-off on a one-shot zone is a no-op: the zone plays through to
+    // its own end (see renderNextBlock()'s zoneEndSample check) regardless of when, or whether,
+    // note-off ever arrives. zone can be null (a missing-source zone that was never actually
+    // activated - see startNote()), in which case there's nothing playing to leave alone either way.
+    if (!isForced && zone != nullptr && zone->oneShot)
+        return;
+
     if (allowTailOff)
     {
         adsr.noteOff();

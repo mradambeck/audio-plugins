@@ -12,11 +12,14 @@
 //
 // Every field here is either loaded straight from disk (buffer, sourcePath) or is part of the
 // zone-list state schema Architecture #1 specifies (root/keyLo/keyHi/velLo/velHi/start/end/
-// loopStart/loopEnd/loopEnabled/reverse/tune/level/pan/chokeGroup/output) - persisted in
-// PluginProcessor's zones ValueTree, never as APVTS parameters (see that section for why).
-// reverse/loopEnabled/chokeGroup/output are schema-complete but not yet acted on by ConcreteVoice
-// in Phase 1: there's no UI yet to set loop points (that's Phase 8) or a reason to use choke
-// groups/non-zero output destinations (Phase 6/multi-zone work) or reverse playback.
+// loopStart/loopEnd/loopEnabled/reverse/tune/level/pan/chokeGroup/output), plus oneShot (added
+// after Phase 5, same non-automatable "zone-list state, not an APVTS parameter" category as the
+// rest of this list - a real per-machine-preset trait some drum-oriented samplers hardwired, not
+// something anyone would automate mid-performance) - persisted in PluginProcessor's zones
+// ValueTree, never as APVTS parameters (see that section for why). reverse/loopEnabled/chokeGroup/
+// output are schema-complete but not yet acted on by ConcreteVoice in Phase 1: there's no UI yet
+// to set loop points (that's Phase 8) or a reason to use choke groups/non-zero output destinations
+// (Phase 6/multi-zone work) or reverse playback.
 struct ConcreteSampleZone
 {
     // The WORKING buffer - what ConcreteVoice actually plays. Phase 4's capture pass
@@ -64,6 +67,14 @@ struct ConcreteSampleZone
     juce::int64 loopEnd = 0;
     bool loopEnabled = false;
     bool reverse = false;
+
+    // False (the existing, tested default): the zone plays only while the key/trigger is held,
+    // stopping (with the amp envelope's release tail) on note-off - a "gated" sampler. True: a
+    // note-on plays the whole zone through to its own end regardless of how long the key is held
+    // or when note-off arrives - a "one-shot" sampler (the SP-1200/MPC drum-pad convention). See
+    // ConcreteVoice::stopNote()'s isForced parameter for how choke groups still cut a one-shot
+    // voice immediately even though an ordinary note-off can't.
+    bool oneShot = false;
 
     float tuneSemitones = 0.0f;
     float level = 1.0f;

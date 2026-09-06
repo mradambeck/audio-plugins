@@ -98,6 +98,12 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     };
     addAndMakeVisible(rootNoteSlider);
 
+    addAndMakeVisible(oneShotButton);
+    oneShotButton.onClick = [this]
+    {
+        processor.setOneShotForZone(0, oneShotButton.getToggleState());
+    };
+
     addAndMakeVisible(resetButton);
     resetButton.onClick = [this]
     {
@@ -106,6 +112,11 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
         // displayed number without ever telling the processor about it. A no-op if root note is
         // already 60, same as the APVTS resets below being no-ops at their own defaults.
         rootNoteSlider.setValue(60.0, juce::sendNotificationSync);
+
+        // setToggleState() doesn't call onClick, so setOneShotForZone() is called directly - same
+        // "no-op if already at default" reasoning as root note above.
+        oneShotButton.setToggleState(false, juce::dontSendNotification);
+        processor.setOneShotForZone(0, false);
 
         auto resetParam = [this](const juce::String& paramID)
         {
@@ -308,6 +319,8 @@ void ConcreteAudioProcessorEditor::resized()
     topRow.removeFromLeft(90); // space for the root note label, attached to the left of its slider
     rootNoteSlider.setBounds(topRow.removeFromLeft(200));
     topRow.removeFromLeft(20);
+    oneShotButton.setBounds(topRow.removeFromLeft(90));
+    topRow.removeFromLeft(20);
     resetButton.setBounds(topRow.removeFromLeft(80));
 
     bounds.removeFromTop(8);
@@ -429,6 +442,9 @@ void ConcreteAudioProcessorEditor::loadFile(const juce::File& file)
     if (processor.loadSample(file))
     {
         rootNoteSlider.setValue(60.0, juce::dontSendNotification);
+        // loadSample() always builds a fresh zone with oneShot at its default (false) - reflect
+        // that in the UI too, same as the root note reset above.
+        oneShotButton.setToggleState(false, juce::dontSendNotification);
         waveformDisplay.repaint();
     }
 }

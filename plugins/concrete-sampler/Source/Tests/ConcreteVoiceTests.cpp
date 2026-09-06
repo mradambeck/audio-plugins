@@ -255,7 +255,7 @@ public:
             ConcreteVoice voice;
             voice.prepare(sampleRate);
             voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
-            voice.stopNote(false);
+            voice.stopNote(false, true);
 
             expect(! voice.isActive(), "a hard stop should be immediate");
         }
@@ -272,7 +272,7 @@ public:
             voice.renderNextBlock(warmup, 0, warmup.getNumSamples());
             expect(voice.isActive(), "should still be active after reaching sustain");
 
-            voice.stopNote(true);
+            voice.stopNote(true, true);
             expect(voice.isActive(), "should still be active immediately at the start of the release tail");
 
             // Default release is 0.05s (~2205 samples) - render less than that and confirm it's
@@ -286,6 +286,55 @@ public:
             pastRelease.clear();
             voice.renderNextBlock(pastRelease, 0, pastRelease.getNumSamples());
             expect(! voice.isActive(), "should have finished releasing by now");
+        }
+
+        beginTest("A one-shot zone ignores an ordinary note-off and keeps playing to its own end");
+        {
+            auto set = makeSetWithSineZone(1000.0, 1, 60, 0.5);
+            set->zones[0].oneShot = true;
+            ConcreteVoice voice;
+            voice.prepare(sampleRate);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+
+            juce::AudioBuffer<float> warmup(1, 4096);
+            warmup.clear();
+            voice.renderNextBlock(warmup, 0, warmup.getNumSamples());
+            expect(voice.isActive(), "should still be active after reaching sustain");
+
+            // isForced=false, exactly what an ordinary MIDI note-off passes.
+            voice.stopNote(true, false);
+            expect(voice.isActive(), "an ordinary note-off on a one-shot zone must be a complete no-op");
+
+            // Render well past where a NON-one-shot voice's release tail would have finished -
+            // a one-shot voice must still be going, since it never even started releasing.
+            juce::AudioBuffer<float> pastWhereReleaseWouldEnd(1, 8000);
+            pastWhereReleaseWouldEnd.clear();
+            voice.renderNextBlock(pastWhereReleaseWouldEnd, 0, pastWhereReleaseWouldEnd.getNumSamples());
+            expect(voice.isActive(), "a one-shot voice must keep playing long after an ordinary note-off, "
+                                       "unaffected by the amp envelope's own release time");
+
+            // Now run it all the way to the zone's own end (0.5s = 22050 samples; ~12096 samples
+            // consumed by the renders above) and confirm it finishes there, on its own.
+            juce::AudioBuffer<float> toTheEnd(1, 20000);
+            toTheEnd.clear();
+            voice.renderNextBlock(toTheEnd, 0, toTheEnd.getNumSamples());
+            expect(! voice.isActive(), "a one-shot voice must still deactivate once it reaches the zone's own end");
+        }
+
+        beginTest("A one-shot zone still responds to a forced stop (voice stealing / a choke group)");
+        {
+            auto set = makeSetWithSineZone(1000.0, 1, 60, 0.5);
+            set->zones[0].oneShot = true;
+            ConcreteVoice voice;
+            voice.prepare(sampleRate);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+
+            juce::AudioBuffer<float> warmup(1, 4096);
+            warmup.clear();
+            voice.renderNextBlock(warmup, 0, warmup.getNumSamples());
+
+            voice.stopNote(false, true); // isForced=true, exactly what a choke group / voice steal passes
+            expect(! voice.isActive(), "a forced stop must cut a one-shot voice immediately, same as any other voice");
         }
     }
 };

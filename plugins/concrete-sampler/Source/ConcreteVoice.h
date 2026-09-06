@@ -53,11 +53,16 @@ public:
                     ConcreteFilterModel::Mode filterMode, float filterCutoffHz, float filterResonance01,
                     float filterEnvAmountOctaves, float filterKeyTrack01) noexcept;
 
-    // Matches the juce::SynthesiserVoice convention this catalog's other instruments already
-    // follow (Strike, Alloy): allowTailOff true lets the ADSR release play out; false silences
-    // immediately (a hard stop - Phase 1's "basic" envelope doesn't soften this with its own
-    // fade, unlike a real note release).
-    void stopNote(bool allowTailOff) noexcept;
+    // allowTailOff matches the juce::SynthesiserVoice convention this catalog's other instruments
+    // already follow (Strike, Alloy): true lets the ADSR release play out; false silences
+    // immediately (a hard stop - Phase 1's "basic" envelope doesn't soften this with its own fade,
+    // unlike a real note release). isForced distinguishes a genuine, unconditional stop (voice
+    // stealing, a choke group cutting this voice - always executes) from an ordinary note-off (the
+    // key/trigger being released - a no-op if the zone's oneShot is set, since a one-shot zone
+    // plays through to its own end regardless of how long the key was held; see
+    // ConcreteSampleZone::oneShot). Every OTHER caller of stopNote() in this codebase besides a
+    // literal note-off should pass isForced=true.
+    void stopNote(bool allowTailOff, bool isForced) noexcept;
 
     bool isActive() const noexcept { return active; }
     int getCurrentMidiNote() const noexcept { return currentMidiNote; }

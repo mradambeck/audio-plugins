@@ -524,6 +524,46 @@ public:
 
             file.deleteFile();
         }
+
+        beginTest("A one-shot zone keeps sounding through the real MIDI dispatch path, well past a quick "
+                  "key press and past where an ordinary release tail would have finished");
+        {
+            const auto file = writeTempSineWav(1000.0, 1.0); // 1 second - plenty long enough to still be sounding
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setOneShotForZone(0, true);
+
+            // A very quick key press: note-on at sample 0, note-off at sample 50, both in the same
+            // block - about as short a "hold" as a real performance could produce.
+            juce::MidiBuffer quickPress;
+            quickPress.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 0);
+            quickPress.addEvent(juce::MidiMessage::noteOff(1, 60), 50);
+
+            juce::AudioBuffer<float> firstBlock(2, 512);
+            firstBlock.clear();
+            processor.processBlock(firstBlock, quickPress);
+
+            // The default amp envelope release is 0.05s (~2205 samples) - render several blocks'
+            // worth well past that (and past the first block above) with no further MIDI at all,
+            // and confirm real audio is still coming out.
+            float energyPastWhereReleaseWouldHaveEnded = 0.0f;
+            juce::AudioBuffer<float> laterBlock(2, 512);
+            juce::MidiBuffer noMidi;
+            for (int block = 0; block < 8; ++block) // 8*512 = 4096 samples past the first block
+            {
+                laterBlock.clear();
+                processor.processBlock(laterBlock, noMidi);
+                for (int ch = 0; ch < laterBlock.getNumChannels(); ++ch)
+                    for (int i = 0; i < laterBlock.getNumSamples(); ++i)
+                        energyPastWhereReleaseWouldHaveEnded += std::abs(laterBlock.getSample(ch, i));
+            }
+            expect(energyPastWhereReleaseWouldHaveEnded > 0.0f,
+                   "a one-shot zone must still be audibly playing long after such a short key press, "
+                   "well past where the amp envelope's own release would have silenced a gated zone");
+
+            file.deleteFile();
+        }
     }
 };
 

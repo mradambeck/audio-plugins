@@ -73,6 +73,13 @@ public:
     // zone-list state, not an APVTS parameter.
     void setRootNoteForZone(int zoneIndex, int newRootNote);
 
+    // Changes the (only, in v1) zone's one-shot flag and republishes - same zone-list-state
+    // category as setRootNoteForZone() above, and for the same reason: whether a zone is gated
+    // (plays only while held) or one-shot (plays through regardless of note-off) is a property of
+    // that particular sample, not something anyone would automate mid-performance. See
+    // ConcreteSampleZone::oneShot.
+    void setOneShotForZone(int zoneIndex, bool oneShot);
+
     // Re-reads a zone's source from a new location (Architecture #2's relocate case) and
     // republishes, preserving that zone's other fields.
     bool relocateZone(int zoneIndex, const juce::File& newFile);

@@ -28,9 +28,9 @@ namespace ConcreteSampleIO
                                          int rootNote = 60);
 
     // Re-reads sourcePath from a new location (the user relocating a missing file - Architecture
-    // #2), preserving every other field (key/velocity range, tune/level/pan, chokeGroup, output).
-    // Start/end/loop points reset to the new file's full length, since the old points were
-    // positions within different audio data.
+    // #2), preserving every other field (key/velocity range, tune/level/pan, chokeGroup, output,
+    // oneShot). Start/end/loop points reset to the new file's full length, since the old points
+    // were positions within different audio data.
     ConcreteSampleZone relocateZone(const ConcreteSampleZone& existing, juce::AudioFormatManager& formatManager,
                                      const juce::File& newFile);
 
@@ -83,6 +83,7 @@ namespace ConcreteZoneIDs
     inline const juce::Identifier loopEnd { "loopEnd" };
     inline const juce::Identifier loopEnabled { "loopEnabled" };
     inline const juce::Identifier reverse { "reverse" };
+    inline const juce::Identifier oneShot { "oneShot" };
     inline const juce::Identifier tune { "tune" };
     inline const juce::Identifier level { "level" };
     inline const juce::Identifier pan { "pan" };

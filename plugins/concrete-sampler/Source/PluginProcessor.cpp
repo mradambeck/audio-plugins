@@ -465,7 +465,7 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
             const auto chokeMask = voiceAllocator.getChokeMask(zone.chokeGroup, isActive);
             for (int i = 0; i < maxVoices; ++i)
                 if (chokeMask[(size_t) i])
-                    voices[(size_t) i].stopNote(false);
+                    voices[(size_t) i].stopNote(false, true); // forced - a choke cuts a one-shot voice too
         }
 
         const auto mode = pitchEngineModeFromParam(pitchEngineModeParam->load());
@@ -489,7 +489,7 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
         const auto note = message.getNoteNumber();
         const auto voiceIndex = voiceAllocator.findVoiceForNoteOff(note);
         if (voiceIndex >= 0)
-            voices[(size_t) voiceIndex].stopNote(true);
+            voices[(size_t) voiceIndex].stopNote(true, false); // ordinary note-off - respects the zone's oneShot
     }
 }
 
@@ -514,6 +514,18 @@ void ConcreteAudioProcessor::setRootNoteForZone(int zoneIndex, int newRootNote)
     ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
     newRawSet->zones = existingRaw->zones;
     newRawSet->zones[(size_t) zoneIndex].rootNote = newRootNote;
+    publishRawSampleSet(newRawSet);
+}
+
+void ConcreteAudioProcessor::setOneShotForZone(int zoneIndex, bool oneShot)
+{
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
+        return;
+
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].oneShot = oneShot;
     publishRawSampleSet(newRawSet);
 }
 

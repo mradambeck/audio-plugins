@@ -64,6 +64,7 @@ namespace ConcreteSampleIO
         updated.pan = existing.pan;
         updated.chokeGroup = existing.chokeGroup;
         updated.output = existing.output;
+        updated.oneShot = existing.oneShot;
         return updated;
     }
 
@@ -143,6 +144,7 @@ namespace ConcreteSampleIO
         tree.setProperty(loopEnd, (juce::int64) zone.loopEnd, nullptr);
         tree.setProperty(loopEnabled, zone.loopEnabled, nullptr);
         tree.setProperty(reverse, zone.reverse, nullptr);
+        tree.setProperty(oneShot, zone.oneShot, nullptr);
         tree.setProperty(tune, (double) zone.tuneSemitones, nullptr);
         tree.setProperty(level, (double) zone.level, nullptr);
         tree.setProperty(pan, (double) zone.pan, nullptr);
@@ -177,6 +179,7 @@ namespace ConcreteSampleIO
         zone.loopEnd = (juce::int64) zoneTree.getProperty(loopEnd, (juce::int64) 0);
         zone.loopEnabled = (bool) zoneTree.getProperty(loopEnabled, false);
         zone.reverse = (bool) zoneTree.getProperty(reverse, false);
+        zone.oneShot = (bool) zoneTree.getProperty(oneShot, false);
         zone.tuneSemitones = (float) (double) zoneTree.getProperty(tune, 0.0);
         zone.level = (float) (double) zoneTree.getProperty(level, 1.0);
         zone.pan = (float) (double) zoneTree.getProperty(pan, 0.0);
