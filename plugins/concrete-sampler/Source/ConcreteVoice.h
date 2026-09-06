@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ConcreteFilterModels.h"
 #include "ConcretePitchEngine.h"
 #include "ConcreteSampleSet.h"
 
@@ -8,16 +9,17 @@
 #include <array>
 
 // One note's playback: a pitch engine (Phase 1's reference interpolation, or one of Phase 2's
-// three machine modes - see ConcretePitchEngine.h) plus a basic ADSR amp envelope. Phase 3's
-// quantizer (bit depth/companding - see ConcreteQuantizer.h) and Phase 4's capture pass (resample/
-// drive - see ConcreteCapturePass.h) are BAKED into the zone's working buffer offline rather than
-// applied live here (see concrete-sampler-plugin-plan.md's Architecture #2/#3 and Phase 4) - this
-// class just plays back whatever is in that buffer. The pitch engine, base rate, and coarse/fine
-// tune are all snapshotted once at startNote() and held fixed for the voice's lifetime, the same
-// way Phase 1 already snapshots the zone/velocity - matches this catalog's precedent (Strike's
-// Mono/Topology switches) for "a mode selection is captured at note-on, not smoothly live-updated
-// mid-note" rather than introducing a second, inconsistent live-parameter convention just for
-// pitch.
+// three machine modes - see ConcretePitchEngine.h), Phase 5's playback-side filter (see
+// ConcreteFilterModels.h), and basic ADSR amp/filter envelopes. Phase 3's quantizer (bit depth/
+// companding - see ConcreteQuantizer.h) and Phase 4's capture pass (resample/drive - see
+// ConcreteCapturePass.h) are BAKED into the zone's working buffer offline rather than applied live
+// here (see concrete-sampler-plugin-plan.md's Architecture #2/#3 and Phase 4) - this class just
+// plays back whatever is in that buffer, then filters it. The pitch engine, base rate, coarse/fine
+// tune, and filter mode/cutoff/resonance/env-amount/key-track are all snapshotted once at
+// startNote() and held fixed for the voice's lifetime, the same way Phase 1 already snapshots the
+// zone/velocity - matches this catalog's precedent (Strike's Mono/Topology switches) for "a mode
+// selection is captured at note-on, not smoothly live-updated mid-note" rather than introducing a
+// second, inconsistent live-parameter convention just for pitch/filtering.
 //
 // Holds a ConcreteSampleSet::Ptr (not just a pointer to the one zone it's playing) for the whole
 // note, so a background sample reload mid-note can't invalidate the buffer this voice is reading
@@ -40,9 +42,16 @@ public:
     // into this zone's buffer, 0 if none) from the note's total pitch, bringing a resampled-up-
     // for-capture buffer back to its original pitch/tempo at the zone's root note - see
     // ConcreteCapturePass.h. false plays the baked-in pitch-up directly, uncompensated.
+    // filterMode/filterCutoffHz/filterResonance01 select and configure Phase 5's playback filter
+    // (see ConcreteFilterModels.h). filterEnvAmountOctaves is the filter envelope's modulation
+    // depth in octaves (bipolar - negative sweeps the cutoff down instead of up); filterKeyTrack01
+    // is 0 (no tracking) to 1 (cutoff scales with the played note's distance from C3 exactly like
+    // pitch would).
     void startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
                     ConcretePitchEngine::Mode mode, double effectiveSourceRateHz,
-                    int coarseTuneSemitones, float fineTuneCents, bool autoCompensate) noexcept;
+                    int coarseTuneSemitones, float fineTuneCents, bool autoCompensate,
+                    ConcreteFilterModel::Mode filterMode, float filterCutoffHz, float filterResonance01,
+                    float filterEnvAmountOctaves, float filterKeyTrack01) noexcept;
 
     // Matches the juce::SynthesiserVoice convention this catalog's other instruments already
     // follow (Strike, Alloy): allowTailOff true lets the ADSR release play out; false silences
@@ -85,4 +94,16 @@ private:
 
     float velocityGain = 1.0f;
     juce::ADSR adsr;
+
+    // One filter per possible zone channel (max 2), matching pitchEngines above - a stereo zone's
+    // L/R content must not share filter state. filterKeyTrackOctaveOffset folds key-tracking into
+    // a fixed per-note octave offset computed once at startNote() (see that function's own
+    // comment), combined with the live envelope's contribution every sample in renderNextBlock().
+    std::array<ConcreteFilterModel, 2> filters;
+    ConcreteFilterModel::Mode filterMode = ConcreteFilterModel::Mode::bypass;
+    float filterBaseCutoffHz = 20000.0f;
+    float filterResonance01 = 0.0f;
+    float filterEnvAmountOctaves = 0.0f;
+    float filterKeyTrackOctaveOffset = 0.0f;
+    juce::ADSR filterEnvelope;
 };

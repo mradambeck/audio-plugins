@@ -152,5 +152,45 @@ private:
     juce::Slider captureIterationsSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> captureIterationsAttachment;
 
+    // Phase 5's playback-side filter (see ConcreteFilterModels.h) - same Attachment convention as
+    // every control above. STANDALONE CHECK 5 needs exactly this: a model selector plus cutoff/
+    // resonance exposed, so the filter models can be A/B'd by ear.
+    juce::Label filterModelLabel { {}, "Filter Model" };
+    juce::ComboBox filterModelCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterModelAttachment;
+
+    juce::Label filterCutoffLabel { {}, "Filter Cutoff" };
+    juce::Slider filterCutoffSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterCutoffAttachment;
+
+    juce::Label filterResonanceLabel { {}, "Filter Resonance" };
+    juce::Slider filterResonanceSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterResonanceAttachment;
+
+    juce::Label filterEnvAmountLabel { {}, "Filter Env Amount" };
+    juce::Slider filterEnvAmountSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterEnvAmountAttachment;
+
+    juce::Label filterKeyTrackLabel { {}, "Filter Key Track" };
+    juce::Slider filterKeyTrackSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterKeyTrackAttachment;
+
+    // Phase 5's "double smear" (see ConcreteCapturePass.h) - its own dedicated model/cutoff/
+    // resonance, deliberately separate from the live filter controls above.
+    juce::ToggleButton captureDoubleSmearButton { "Double Smear" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> captureDoubleSmearAttachment;
+
+    juce::Label doubleSmearFilterModelLabel { {}, "Smear Filter" };
+    juce::ComboBox doubleSmearFilterModelCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> doubleSmearFilterModelAttachment;
+
+    juce::Label doubleSmearCutoffLabel { {}, "Smear Cutoff" };
+    juce::Slider doubleSmearCutoffSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> doubleSmearCutoffAttachment;
+
+    juce::Label doubleSmearResonanceLabel { {}, "Smear Resonance" };
+    juce::Slider doubleSmearResonanceSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> doubleSmearResonanceAttachment;
+
     juce::MidiKeyboardComponent keyboardComponent;
 };

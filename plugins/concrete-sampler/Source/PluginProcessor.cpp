@@ -82,12 +82,23 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
     captureAutoCompensateParam = apvts.getRawParameterValue(captureAutoCompensateParamID);
     captureBypassParam = apvts.getRawParameterValue(captureBypassParamID);
     captureIterationsParam = apvts.getRawParameterValue(captureIterationsParamID);
+    filterModelParam = apvts.getRawParameterValue(filterModelParamID);
+    filterCutoffParam = apvts.getRawParameterValue(filterCutoffParamID);
+    filterResonanceParam = apvts.getRawParameterValue(filterResonanceParamID);
+    filterEnvAmountParam = apvts.getRawParameterValue(filterEnvAmountParamID);
+    filterKeyTrackParam = apvts.getRawParameterValue(filterKeyTrackParamID);
+    captureDoubleSmearParam = apvts.getRawParameterValue(captureDoubleSmearParamID);
+    doubleSmearFilterModelParam = apvts.getRawParameterValue(doubleSmearFilterModelParamID);
+    doubleSmearCutoffParam = apvts.getRawParameterValue(doubleSmearCutoffParamID);
+    doubleSmearResonanceParam = apvts.getRawParameterValue(doubleSmearResonanceParamID);
 
     // Only the parameters that actually change what ConcreteCapturePass::apply() produces need to
-    // trigger a re-bake - captureAutoCompensate is deliberately excluded (see its own declaration
-    // comment in PluginProcessor.h).
+    // trigger a re-bake - captureAutoCompensate and every live filterXxx parameter are deliberately
+    // excluded (see their own declaration comments in PluginProcessor.h).
     for (auto* paramID : { bitDepthParamID, quantizerModeParamID, captureTransposeParamID,
-                            captureDriveParamID, captureBypassParamID, captureIterationsParamID })
+                            captureDriveParamID, captureBypassParamID, captureIterationsParamID,
+                            captureDoubleSmearParamID, doubleSmearFilterModelParamID,
+                            doubleSmearCutoffParamID, doubleSmearResonanceParamID })
         apvts.addParameterListener(paramID, this);
 
     startThread();
@@ -126,6 +137,23 @@ namespace
         return (int) std::lround(rawIndex) == 1 ? ConcreteQuantizer::Mode::companded
                                                  : ConcreteQuantizer::Mode::linear;
     }
+
+    // Same convention again - the raw value is the AudioParameterChoice's selected index (0..5),
+    // matching the StringArray order in createParameterLayout() below (Bypass/SSM/CEM Loss/CEM
+    // Compensated/Digital+VCA/One-Pole). Shared by the live filter parameter and the double-smear
+    // filter parameter, which are two independent choices using this same mapping.
+    ConcreteFilterModel::Mode filterModeFromParam(float rawIndex) noexcept
+    {
+        switch ((int) std::lround(rawIndex))
+        {
+            case 1:  return ConcreteFilterModel::Mode::ssm;
+            case 2:  return ConcreteFilterModel::Mode::cemResonanceLoss;
+            case 3:  return ConcreteFilterModel::Mode::cemResonanceCompensated;
+            case 4:  return ConcreteFilterModel::Mode::digitalVca;
+            case 5:  return ConcreteFilterModel::Mode::onePole;
+            default: return ConcreteFilterModel::Mode::bypass;
+        }
+    }
 }
 
 ConcreteCapturePass::Settings ConcreteAudioProcessor::currentCapturePassSettings() const
@@ -137,6 +165,10 @@ ConcreteCapturePass::Settings ConcreteAudioProcessor::currentCapturePassSettings
     settings.iterations = (int) std::lround(captureIterationsParam->load());
     settings.quantizerMode = quantizerModeFromParam(quantizerModeParam->load());
     settings.bitDepthBits = (int) std::lround(bitDepthParam->load());
+    settings.doubleSmear = captureDoubleSmearParam->load() >= 0.5f;
+    settings.doubleSmearFilterModel = filterModeFromParam(doubleSmearFilterModelParam->load());
+    settings.doubleSmearCutoffHz = (double) doubleSmearCutoffParam->load();
+    settings.doubleSmearResonance01 = (double) doubleSmearResonanceParam->load();
     return settings;
 }
 
@@ -275,6 +307,65 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         "Capture Iterations",
         1, 4, 1));
 
+    // Phase 5's playback-side filter (see ConcreteFilterModels.h). Defaults to Bypass/fully-open/
+    // no resonance/no modulation - transparent until a machine preset (Phase 7) or the user
+    // deliberately engages it, matching every other control's own default convention.
+    const juce::StringArray filterModelChoices{"Bypass", "SSM", "CEM Loss", "CEM Compensated", "Digital+VCA", "One-Pole"};
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{filterModelParamID, 1}, "Filter Model", filterModelChoices, 0));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterCutoffParamID, 1},
+        "Filter Cutoff",
+        juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f),
+        20000.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("Hz")
+            .withStringFromValueFunction([](float v, int) { return juce::String(juce::roundToInt(v)) + " Hz"; })));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterResonanceParamID, 1},
+        "Filter Resonance",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterEnvAmountParamID, 1},
+        "Filter Env Amount",
+        juce::NormalisableRange<float>(-8.0f, 8.0f, 0.01f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("oct")));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{filterKeyTrackParamID, 1},
+        "Filter Key Track",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f));
+
+    // Phase 5's "double smear" (Architecture #3) - off by default, its own dedicated model/cutoff/
+    // resonance, deliberately independent of the live filter parameters above.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{captureDoubleSmearParamID, 1}, "Double Smear", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{doubleSmearFilterModelParamID, 1}, "Double Smear Filter Model", filterModelChoices, 1));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{doubleSmearCutoffParamID, 1},
+        "Double Smear Cutoff",
+        juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f),
+        8000.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel("Hz")
+            .withStringFromValueFunction([](float v, int) { return juce::String(juce::roundToInt(v)) + " Hz"; })));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{doubleSmearResonanceParamID, 1},
+        "Double Smear Resonance",
+        juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f),
+        0.0f));
+
     return { params.begin(), params.end() };
 }
 
@@ -384,10 +475,14 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
         const auto effectiveSourceRateHz = mode == ConcretePitchEngine::Mode::reference
             ? zone.sourceSampleRate : (double) baseRateParam->load();
 
+        const auto filterMode = filterModeFromParam(filterModelParam->load());
+
         const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, zoneIndex, zone.chokeGroup, isActive);
         voices[(size_t) voiceIndex].startNote(sampleSet, zoneIndex, note, velocity01, mode, effectiveSourceRateHz,
                                                 (int) std::lround(coarseTuneParam->load()), fineTuneParam->load(),
-                                                captureAutoCompensateParam->load() >= 0.5f);
+                                                captureAutoCompensateParam->load() >= 0.5f,
+                                                filterMode, filterCutoffParam->load(), filterResonanceParam->load(),
+                                                filterEnvAmountParam->load(), filterKeyTrackParam->load());
     }
     else if (message.isNoteOff())
     {

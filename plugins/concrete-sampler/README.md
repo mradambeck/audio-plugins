@@ -4,12 +4,13 @@ A vintage sampler emulation instrument (AU / VST3 / Standalone) modeling the pla
 architectures of twelve classic 1980s hardware samplers - the pitch-shifting mechanism,
 quantization scheme, and analog filter behavior of each machine, not just a bitcrusher preset.
 
-**Status: early build-in-progress, not a usable instrument yet.** Phases 0-4 of the 9-phase build
+**Status: early build-in-progress, not a usable instrument yet.** Phases 0-5 of the 9-phase build
 plan are done (scaffold, clean sample playback, the three pitch-engine modes - variable-clock
 zero-order hold, fixed-rate drop-sample decimation, and delta-sigma - bit-depth reduction plus
-E-mu-style companding, and the capture pass: an offline resample/drive/quantize technique modeling
-"pitch the source up before capturing it, then pitch it back down on playback"). No filter models,
-real polyphony/voice stealing, machine presets, or hardware-panel UI exist yet - see
+E-mu-style companding, the capture pass: an offline resample/drive/quantize technique modeling
+"pitch the source up before capturing it, then pitch it back down on playback," and five playback-
+side filter models plus the capture pass's "double smear" option). No real polyphony/voice
+stealing, machine presets, or hardware-panel UI exist yet - see
 [`concrete-sampler-plugin-plan.md`](concrete-sampler-plugin-plan.md) for the full plan and current
 progress. The editor is a plain utility panel (load a file, see the waveform, play via MIDI or an
 on-screen keyboard), not the finished UI.
@@ -52,10 +53,12 @@ it from your MIDI controller or the on-screen keyboard at the bottom of the wind
 Engine dropdown and the Base Rate/Coarse Tune/Fine Tune sliders above the waveform switch between
 Phase 2's playback engines; the Bit Depth slider and Quantizer Mode dropdown below them switch
 between Phase 3's bit-depth reduction and companding; the Capture Transpose/Drive sliders and
-Auto-Compensate/Capture Bypass toggles below those control Phase 4's capture pass - see the
-Parameters table below. Capture-pass and quantizer changes trigger a background re-bake of the
-loaded sample (not instant - there's no bake-progress indicator yet, that's Phase 8) rather than
-taking effect on the very next sample the way Phase 2's live pitch controls do.
+Auto-Compensate/Capture Bypass toggles below those control Phase 4's capture pass; the Filter
+Model/Cutoff/Resonance/Env Amount/Key Track controls and the Double Smear toggle+controls below
+those are Phase 5's - see the Parameters table below. Capture-pass, quantizer, and double-smear
+changes trigger a background re-bake of the loaded sample (not instant - there's no bake-progress
+indicator yet, that's Phase 8); the live filter controls (like Phase 2's pitch controls) take
+effect on the very next sample instead, with no re-bake at all.
 
 **The Standalone app remembers whatever you left it at, not the compiled-in defaults.** Every
 plugin in this catalog persists its full state (via the same `getStateInformation()` a DAW session
@@ -77,6 +80,15 @@ the **Reset** button next to the Root Note control - it sets:
 | Capture Auto-Compensate | On |
 | Capture Bypass | On |
 | Capture Iterations | 1 |
+| Filter Model | Bypass |
+| Filter Cutoff | 20,000 Hz |
+| Filter Resonance | 0 |
+| Filter Env Amount | 0 oct |
+| Filter Key Track | 0 |
+| Double Smear | Off |
+| Double Smear Filter Model | SSM |
+| Double Smear Cutoff | 8,000 Hz |
+| Double Smear Resonance | 0 |
 | Root Note | C3 (60) |
 
 Reset doesn't touch the loaded sample. To force a genuinely clean slate (also discards whichever
@@ -136,13 +148,13 @@ test primitives, and one `verify_phaseN.py` script per completed build phase) th
 cd analysis
 python3 -m venv venv && source venv/bin/activate
 pip install -r ../../common/tools/requirements.txt
-python3 verify_phase4.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py / verify_phase3.py
+python3 verify_phase5.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py / verify_phase3.py / verify_phase4.py
 ```
 
 ## Parameters
 
-The Phase 2 pitch-engine controls, Phase 3's quantizer, and Phase 4's capture pass exist so far -
-no filter or machine-preset parameters yet.
+The Phase 2 pitch-engine controls, Phase 3's quantizer, Phase 4's capture pass, and Phase 5's
+filter/double-smear controls exist so far - no machine-preset parameters yet.
 
 | Parameter | Range | Default | Description |
 |---|---|---|---|
@@ -157,6 +169,15 @@ no filter or machine-preset parameters yet.
 | Capture Auto-Compensate | On/Off | On | Subtracts the baked-in Capture Transpose back out at playback, so a note lands at its expected pitch while still carrying the capture pass's artifacts. Off plays the pitched-up/sped-up capture directly. A live toggle - does not trigger a re-bake. |
 | Capture Bypass | On/Off | On | Disables the whole capture pass (resample + drive + quantize) at once, making the working buffer an exact copy of the source - "every preset ships with the capture pass off," per the plan; it's a technique the user applies, not a machine's stock behavior. |
 | Capture Iterations | 1-4 | 1 | Repeats the whole resample -> drive -> quantize chain this many times, for compounding degradation. |
+| Filter Model | Bypass / SSM / CEM Loss / CEM Compensated / Digital+VCA / One-Pole | Bypass | The playback-side filter (see `ConcreteFilterModels.h`) - live, per-voice, applied fresh every sample (never baked). SSM/CEM Loss/CEM Compensated share a 4-pole resonant ladder core: SSM adds its own internal saturation and can self-oscillate; CEM Loss loses passband level as resonance rises (the Fairlight/Linn 9000 CEM3320); CEM Compensated holds passband level steady instead (the Mirage's CEM3328). Digital+VCA is a clean, non-ladder state-variable lowpass plus a fixed VCA-character saturation stage (the K250 - deliberately not an analog filter model). One-Pole (the SK-1) ignores Filter Resonance entirely - a single pole can't peak or self-oscillate. Bypass ignores every filter parameter. |
+| Filter Cutoff | 20-20,000 Hz | 20,000 Hz | Defaults fully open (transparent) - same "no coloration until asked for" convention as every other control. |
+| Filter Resonance | 0-1 | 0 | 1 is at (or just past) self-oscillation for the ladder models; has no effect on One-Pole. |
+| Filter Env Amount | -8 to +8 octaves | 0 | Depth of a fixed-shape filter envelope's modulation of cutoff (bipolar - negative sweeps down). The envelope's own attack/decay/sustain/release shape isn't user-adjustable yet (Phase 6 owns real per-voice envelope design), only its depth. |
+| Filter Key Track | 0-1 | 0 | How much the cutoff scales with the played note's distance from C3 - 0 is no tracking, 1 is full 1:1 tracking, like pitch. |
+| Double Smear | On/Off | Off | Explicitly non-authentic (see Architecture #3 in the plan): bakes an extra filter pass into the very end of the capture chain, modeling "audio that already came out of a playback path being re-recorded." Off by default; has no effect while Capture Bypass is on (bypass disables the whole capture pass as one unit). |
+| Double Smear Filter Model | Same six choices as Filter Model | SSM | Deliberately independent of the live Filter Model above - changing one never triggers a re-bake via the other. |
+| Double Smear Cutoff | 20-20,000 Hz | 8,000 Hz | Its own dedicated cutoff, separate from the live Filter Cutoff. |
+| Double Smear Resonance | 0-1 | 0 | Its own dedicated resonance, separate from the live Filter Resonance. |
 
 ## Project structure
 
@@ -175,6 +196,7 @@ concrete-sampler/
 │   ├── ConcretePitchEngine.h/.cpp    # Reference/Mode A/Mode B/Mode C playback engines
 │   ├── ConcreteQuantizer.h           # Linear bit-depth reduction + mu-law compand/expand curve
 │   ├── ConcreteCapturePass.h/.cpp    # Offline resample -> drive -> quantize working-buffer bake
+│   ├── ConcreteFilterModels.h        # SSM/CEM Loss/CEM Compensated/Digital+VCA/One-Pole/Bypass
 │   ├── ConcreteVoiceAllocator.h      # Voice-to-note allocation/oldest-voice-stealing for the pool
 │   ├── ConcreteBusRouter.h           # Per-zone output-destination indirection (main bus only so far)
 │   ├── Tests/                        # ConcreteTests (DSP/data seams) + ConcreteProcessorTests

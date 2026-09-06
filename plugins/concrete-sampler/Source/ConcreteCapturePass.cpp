@@ -89,6 +89,19 @@ void ConcreteCapturePass::applyDrive(juce::AudioBuffer<float>& buffer, double so
     }
 }
 
+void ConcreteCapturePass::applyDoubleSmear(juce::AudioBuffer<float>& buffer, double sourceSampleRate,
+                                             ConcreteFilterModel::Mode model, double cutoffHz, double resonance01)
+{
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        ConcreteFilterModel filter;
+        filter.prepare(sourceSampleRate);
+        auto* data = buffer.getWritePointer(ch);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            data[i] = filter.processSample(model, data[i], (float) cutoffHz, (float) resonance01);
+    }
+}
+
 ConcreteCapturePass::Result ConcreteCapturePass::apply(const juce::AudioBuffer<float>& sourceBuffer,
                                                           double sourceSampleRate, const Settings& settings)
 {
@@ -116,6 +129,12 @@ ConcreteCapturePass::Result ConcreteCapturePass::apply(const juce::AudioBuffer<f
                 data[i] = ConcreteQuantizer::process(data[i], settings.quantizerMode, settings.bitDepthBits);
         }
     }
+
+    // The one deliberate exception to "the capture pass doesn't touch filters" (Architecture #3) -
+    // sits at the very END of the whole chain, once, after all iterations - see the class comment.
+    if (settings.doubleSmear)
+        applyDoubleSmear(*workingBuffer, sourceSampleRate, settings.doubleSmearFilterModel,
+                          settings.doubleSmearCutoffHz, settings.doubleSmearResonance01);
 
     result.buffer = workingBuffer; // shared_ptr<AudioBuffer<float>> -> shared_ptr<const ...>, implicit
     result.captureTransposeSemitones = settings.transposeSemitones * (double) iterations;

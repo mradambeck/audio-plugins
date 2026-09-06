@@ -5,6 +5,7 @@
 #include "../../common/Presets/FactoryPreset.h"
 #include "ConcreteBusRouter.h"
 #include "ConcreteCapturePass.h"
+#include "ConcreteFilterModels.h"
 #include "ConcretePitchEngine.h"
 #include "ConcreteQuantizer.h"
 #include "ConcreteSampleIO.h"
@@ -18,11 +19,14 @@
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
 // behavior. Phase 2 added the three pitch-engine modes (ConcretePitchEngine.h) plus the base-rate/
 // coarse-tune/fine-tune parameters. Phase 3 added bit-depth reduction and companding
-// (ConcreteQuantizer.h). Phase 4 adds the capture pass (ConcreteCapturePass.h): resample -> drive
+// (ConcreteQuantizer.h). Phase 4 added the capture pass (ConcreteCapturePass.h): resample -> drive
 // -> quantize, baked offline into each zone's working buffer rather than applied live - Phase 3's
 // quantizer moved from ConcreteVoice into this bake (see ConcreteCapturePass.h's own comment on
 // why quantization is part of this pipeline even when the resample/drive technique is bypassed).
-// Still no filters yet (Phase 5 onward).
+// Phase 5 adds the playback-side filter models (ConcreteFilterModels.h, live per-voice - see
+// ConcreteVoice.h) plus the capture pass's "double smear" option (baked, see
+// ConcreteCapturePass.h's own comment on why it's the one deliberate exception to "the capture
+// pass never touches filters").
 class ConcreteAudioProcessor : public juce::AudioProcessor,
                                 private juce::Thread,
                                 private juce::AudioProcessorValueTreeState::Listener
@@ -116,6 +120,26 @@ public:
     static constexpr auto captureBypassParamID = "captureBypass";
     static constexpr auto captureIterationsParamID = "captureIterations";
 
+    // Phase 5's playback-side filter (see ConcreteFilterModels.h) - live, per-voice, never baked
+    // (Architecture #3: filters are playback-side only). Defaults to Bypass/fully-open/no-
+    // resonance/no-modulation, matching every other control's "no coloration until asked for"
+    // convention. filterEnvAmount is bipolar octaves (negative sweeps down); filterKeyTrack is
+    // 0 (no tracking) to 1 (full 1:1 tracking with the played note, like pitch).
+    static constexpr auto filterModelParamID = "filterModel";
+    static constexpr auto filterCutoffParamID = "filterCutoff";
+    static constexpr auto filterResonanceParamID = "filterResonance";
+    static constexpr auto filterEnvAmountParamID = "filterEnvAmount";
+    static constexpr auto filterKeyTrackParamID = "filterKeyTrack";
+
+    // Phase 5's "double smear" (Architecture #3) - an explicitly non-authentic option, off by
+    // default, that bakes an extra filter pass into the END of the capture chain using its OWN
+    // dedicated model/cutoff/resonance (deliberately separate from the live filter parameters
+    // above, so turning THOSE never triggers a re-bake - only these do).
+    static constexpr auto captureDoubleSmearParamID = "captureDoubleSmear";
+    static constexpr auto doubleSmearFilterModelParamID = "doubleSmearFilterModel";
+    static constexpr auto doubleSmearCutoffParamID = "doubleSmearCutoff";
+    static constexpr auto doubleSmearResonanceParamID = "doubleSmearResonance";
+
     // Synchronously re-derives every zone's working buffer from its source buffer using the
     // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
     // private juce::Thread override below) runs this same logic asynchronously whenever a capture-
@@ -150,14 +174,15 @@ private:
     // stopped in the destructor.
     void run() override;
 
-    // juce::AudioProcessorValueTreeState::Listener override, registered for exactly the six
-    // capture-pass-affecting parameter IDs (bitDepth, quantizerMode, captureTranspose,
-    // captureDrive, captureBypass, captureIterations - NOT captureAutoCompensate, which is read
-    // live at note-on in handleMidiMessage() and never needs a re-bake, see ConcreteVoice.h). May
-    // fire from ANY thread depending on the host (worst case the audio thread itself, if a host
-    // applies automation from inside processBlock()), so this does the absolute minimum: wake the
-    // bake thread. The actual (expensive, allocating) re-bake work always happens on that thread,
-    // never here.
+    // juce::AudioProcessorValueTreeState::Listener override, registered for exactly the parameter
+    // IDs that change what ConcreteCapturePass::apply() produces: bitDepth, quantizerMode,
+    // captureTranspose, captureDrive, captureBypass, captureIterations, captureDoubleSmear,
+    // doubleSmearFilterModel, doubleSmearCutoff, doubleSmearResonance - NOT captureAutoCompensate
+    // or any of the live filterXxx parameters, none of which need a re-bake (see their own
+    // declaration comments above and ConcreteVoice.h). May fire from ANY thread depending on the
+    // host (worst case the audio thread itself, if a host applies automation from inside
+    // processBlock()), so this does the absolute minimum: wake the bake thread. The actual
+    // (expensive, allocating) re-bake work always happens on that thread, never here.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
     // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
@@ -177,6 +202,15 @@ private:
     std::atomic<float>* captureAutoCompensateParam = nullptr;
     std::atomic<float>* captureBypassParam = nullptr;
     std::atomic<float>* captureIterationsParam = nullptr;
+    std::atomic<float>* filterModelParam = nullptr;
+    std::atomic<float>* filterCutoffParam = nullptr;
+    std::atomic<float>* filterResonanceParam = nullptr;
+    std::atomic<float>* filterEnvAmountParam = nullptr;
+    std::atomic<float>* filterKeyTrackParam = nullptr;
+    std::atomic<float>* captureDoubleSmearParam = nullptr;
+    std::atomic<float>* doubleSmearFilterModelParam = nullptr;
+    std::atomic<float>* doubleSmearCutoffParam = nullptr;
+    std::atomic<float>* doubleSmearResonanceParam = nullptr;
 
     // Set by parameterChanged(), cleared and acted on by run() - see that function's own comment.
     std::atomic<bool> bakeRequested { false };

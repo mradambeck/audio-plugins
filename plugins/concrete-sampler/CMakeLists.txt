@@ -85,6 +85,7 @@ target_sources(ConcreteTests
         Source/Tests/ConcretePitchEngineTests.cpp
         Source/Tests/ConcreteQuantizerTests.cpp
         Source/Tests/ConcreteCapturePassTests.cpp
+        Source/Tests/ConcreteFilterModelsTests.cpp
         Source/Tests/ConcreteSampleIOTests.cpp
         Source/Tests/TestRunner.cpp
 )

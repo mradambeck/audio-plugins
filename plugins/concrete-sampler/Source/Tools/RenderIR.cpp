@@ -41,7 +41,11 @@
 // (semitones), captureDrive (dB), captureAutoCompensate (0/1), captureBypass (0/1), and
 // captureIterations (1-4). Capture-pass parameters are applied (via setValueNotifyingHost(),
 // same as every other flag here) BEFORE --sample is loaded, so the sample's initial bake already
-// reflects them - see ConcreteAudioProcessor::loadSample().
+// reflects them - see ConcreteAudioProcessor::loadSample(). Phase 5 adds the live filter
+// (filterModel 0-5 = Bypass/SSM/CEM Loss/CEM Compensated/Digital+VCA/One-Pole, filterCutoff Hz,
+// filterResonance 0-1, filterEnvAmount octaves, filterKeyTrack 0-1) and double smear
+// (captureDoubleSmear 0/1, doubleSmearFilterModel 0-5, doubleSmearCutoff Hz,
+// doubleSmearResonance 0-1).
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -86,6 +90,15 @@ namespace
         ConcreteAudioProcessor::captureAutoCompensateParamID,
         ConcreteAudioProcessor::captureBypassParamID,
         ConcreteAudioProcessor::captureIterationsParamID,
+        ConcreteAudioProcessor::filterModelParamID,
+        ConcreteAudioProcessor::filterCutoffParamID,
+        ConcreteAudioProcessor::filterResonanceParamID,
+        ConcreteAudioProcessor::filterEnvAmountParamID,
+        ConcreteAudioProcessor::filterKeyTrackParamID,
+        ConcreteAudioProcessor::captureDoubleSmearParamID,
+        ConcreteAudioProcessor::doubleSmearFilterModelParamID,
+        ConcreteAudioProcessor::doubleSmearCutoffParamID,
+        ConcreteAudioProcessor::doubleSmearResonanceParamID,
     };
 
     struct TimedEvent
