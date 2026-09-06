@@ -10,10 +10,13 @@ that file doesn't have:
     approximate/statistical (envelope correlation, log-spectral distance), not a literal
     sample-by-sample difference, which Phase 4's capture-pass non-destructiveness test and
     Phase 5's double-smear regression test both need (e.g. "must null to silence").
+  - THD and energy-above-a-frequency -- needed starting with Phase 1's own reference-path
+    verification ("THD < 0.1%", "no energy above 2kHz beyond the noise floor"), a phase earlier
+    than originally guessed when this module was first written.
 
-THD, noise-floor, spectral-centroid, and image/alias-energy-above-a-frequency measurements are
-deliberately NOT here yet -- they get added in Phase 2/3/4/7 when those phases first need them,
-per this repo's ml-toolkit "build only what the current effect needs" convention (see AGENTS.md).
+Spectral-centroid and image/alias-energy-vs-transpose measurements are still deliberately NOT
+here -- they get added in Phase 2/7 when those phases first need them, per this repo's ml-toolkit
+"build only what the current effect needs" convention (see AGENTS.md).
 """
 import numpy as np
 from scipy.io import wavfile
@@ -58,6 +61,38 @@ def find_partials(signal, sample_rate, prominence_db=20.0, min_freq_hz=20.0):
     peaks = [(float(freqs[i]), float(magnitude_db[i])) for i in peak_indices]
     peaks.sort(key=lambda p: -p[1])
     return peaks
+
+
+def thd_percent(signal, sample_rate, fundamental_hz, num_harmonics=10):
+    """Total Harmonic Distortion, as a percentage: RMS of the 2nd..Nth harmonics' magnitude over
+    the fundamental's magnitude. Reads magnitude directly at the fundamental's and each harmonic's
+    exact expected bin (nearest-bin lookup, not a peak search) so a low-THD measurement isn't
+    thrown off by find_partials() picking up an unrelated nearby peak instead."""
+    freqs, magnitude_db = magnitude_spectrum_db(signal, sample_rate)
+    bin_width = freqs[1] - freqs[0]
+
+    def magnitude_at(freq_hz):
+        index = int(round(freq_hz / bin_width))
+        if index <= 0 or index >= len(magnitude_db):
+            return 0.0
+        return 10.0 ** (magnitude_db[index] / 20.0)
+
+    fundamental_magnitude = magnitude_at(fundamental_hz)
+    if fundamental_magnitude <= 0.0:
+        return float("inf")
+
+    harmonic_energy = sum(magnitude_at(fundamental_hz * n) ** 2 for n in range(2, num_harmonics + 1))
+    return 100.0 * np.sqrt(harmonic_energy) / fundamental_magnitude
+
+
+def energy_above_freq_db(signal, sample_rate, freq_hz):
+    """RMS level, in dBFS, of spectral energy at frequencies >= freq_hz - e.g. "is there anything
+    above 2kHz that shouldn't be there" for a 1kHz reference tone."""
+    freqs, magnitude_db = magnitude_spectrum_db(signal, sample_rate)
+    magnitude = 10.0 ** (magnitude_db / 20.0)
+    mask = freqs >= freq_hz
+    rms = float(np.sqrt(np.mean(magnitude[mask] ** 2))) if np.any(mask) else 0.0
+    return 20.0 * np.log10(max(rms, 1e-12))
 
 
 def residual_db(signal_a, signal_b):
