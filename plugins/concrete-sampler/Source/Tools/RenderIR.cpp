@@ -43,9 +43,9 @@
 // same as every other flag here) BEFORE --sample is loaded, so the sample's initial bake already
 // reflects them - see ConcreteAudioProcessor::loadSample(). Phase 5 adds the live filter
 // (filterModel 0-5 = Bypass/SSM/CEM Loss/CEM Compensated/Digital+VCA/One-Pole, filterCutoff Hz,
-// filterResonance 0-1, filterEnvAmount octaves, filterKeyTrack 0-1) and double smear
-// (captureDoubleSmear 0/1, doubleSmearFilterModel 0-5, doubleSmearCutoff Hz,
-// doubleSmearResonance 0-1).
+// filterResonance 0-1, filterEnvAmount octaves, filterKeyTrack 0-1). Phase 6 adds voiceCount
+// (1-18, the runtime polyphony cap - see ConcreteVoiceAllocator.h) and ampEnvelopeMode (0=ADSR,
+// 1=Contoured - see ConcreteContourEnvelope.h).
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -95,10 +95,8 @@ namespace
         ConcreteAudioProcessor::filterResonanceParamID,
         ConcreteAudioProcessor::filterEnvAmountParamID,
         ConcreteAudioProcessor::filterKeyTrackParamID,
-        ConcreteAudioProcessor::captureDoubleSmearParamID,
-        ConcreteAudioProcessor::doubleSmearFilterModelParamID,
-        ConcreteAudioProcessor::doubleSmearCutoffParamID,
-        ConcreteAudioProcessor::doubleSmearResonanceParamID,
+        ConcreteAudioProcessor::voiceCountParamID,
+        ConcreteAudioProcessor::ampEnvelopeModeParamID,
     };
 
     struct TimedEvent

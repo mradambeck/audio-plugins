@@ -238,26 +238,19 @@ would then need a third mode. One list expresses all three. Everything below fol
     still loads.
 - Reported latency stays 0. The capture pass is offline; nothing in the playback path adds delay.
 
-### 3. The capture pass does not touch the filters — except when explicitly asked to
+### 3. The capture pass does not touch the filters
 
 The capture pass is `resample → input drive/saturation → quantization`, and it deliberately does
 **not** run through any filter model. On the real machines the filter chip sat on the playback
 side, one per voice card, so audio only hit it coming *out*, not going *in*. This ordering is the
 whole reason Phase 4 sits before Phase 5.
 
-A **"double smear"** option is worth having: filter the audio on the way in as well as on the way
-out, which is what you'd actually get by re-recording one machine's output back into it. It ships
-as an explicitly non-authentic option, **off by default**, added in Phase 5 once the filter models
-exist:
-
-- The stage sits at the *end* of the capture chain (`resample → drive → quantize → filter`),
-  mirroring "audio that already came out of a playback path is being re-recorded."
-- It uses **its own dedicated cutoff/resonance controls**, not the live playback filter knobs.
-  This matters practically: if the baked-in filter tracked the playback filter knobs, every turn
-  of the cutoff knob would trigger a full re-bake. It's a bake-it-in decision with its own
-  settings, made once.
-- Verification is a regression null test: with the toggle off, output must null against the
-  pre-feature build. If it doesn't, the option leaked into the default path.
+Phase 5 originally shipped a **"double smear"** option here as a deliberate exception — an
+explicitly non-authentic toggle that baked an extra filter pass into the *end* of the capture
+chain, modeling "audio that already came out of a playback path is being re-recorded." It was
+removed after Phase 6: with Capture Iterations already covering compounding degradation, a second
+independent "make it worse again" control didn't earn its keep. The rule is back to having no
+exception — the capture pass never touches filters, full stop.
 
 ### 4. UI comes last, once — not twice
 
@@ -420,8 +413,7 @@ Deliverables:
 - `ConcreteCapturePass`: offline, operating on the source buffer, producing the working buffer.
   Order is **`resample → input drive/saturation → quantization`**, mirroring the physical order:
   pitched-up audio hits the machine's converter and the converter's limits get baked into what's
-  stored. It does **not** pass through any filter model (see Architecture §3; the optional
-  double-smear stage arrives in Phase 5).
+  stored. It does **not** pass through any filter model (see Architecture §3).
 - Playback pitch compensation, on by default, applying the inverse transpose so a note plays at the
   expected pitch. Off gives the pitched-up sound directly.
 - Non-destructive, per Architecture §2: the source buffer is never written; the working buffer is
@@ -456,7 +448,7 @@ loses top end rather than just getting louder.
 
 ---
 
-## Phase 5: Filter models (playback side), plus the double-smear option
+## Phase 5: Filter models (playback side)
 
 Four genuinely distinct behaviors, plus bypass and a one-pole. Filters are **per-voice**, never on
 the master bus — these machines had a physical filter chip per voice card.
@@ -482,9 +474,8 @@ by a VCA-character saturation stage. Do not give the K250 an analog filter model
 Plus **bypass** (the SP-1200's actual path deliberately omitted the reconstruction filter) and a
 **one-pole** for the SK-1. Each model gets cutoff, resonance, envelope amount, and key tracking.
 
-**Double-smear option** (Architecture §3): a `captureFilter` toggle, default **off**, inserting a
-filter instance at the end of the capture chain with its own dedicated cutoff/resonance controls.
-Explicitly non-authentic; label it as such in the UI and the manual.
+This phase originally also shipped a "double smear" option baking an extra filter pass into the
+capture chain (see Architecture §3) — removed after Phase 6 as redundant with Capture Iterations.
 
 Analysis:
 - Frequency-response sweep of each model at low resonance: SSM and CEM models should measure close
@@ -499,15 +490,11 @@ Analysis:
 - Per-voice confirmation: 4-note chord, high resonance, envelope-modulated cutoff. Each note's
   sweep must be independent. If it sounds like one filter sweeping the chord, the filter is in the
   wrong place.
-- **Double-smear regression:** with the toggle off, render the Phase 4 battery again and null it
-  against the pre-Phase-5 renders. Must null to silence. With it on, measure the added HF loss and
-  distortion vs. off, and confirm turning the *playback* filter knobs does not trigger a re-bake.
 
 **STANDALONE CHECK 5.** Sustained pad sample, sweep cutoff by hand on each model at high resonance.
 The two CEM models should differ audibly in level behavior as resonance rises; the SSM model should
 fatten and distort when driven rather than clipping harshly. Play a chord and confirm each note's
-filter moves independently. Then engage double-smear and confirm it's an obvious, deliberate extra
-degradation — and that it stays put when you move the playback filter.
+filter moves independently.
 
 ---
 
@@ -716,8 +703,8 @@ deferred.
 
 Phase 4 sits before Phase 5 because the capture pass depends on the pitch engine and the
 quantization stage but deliberately **not** on the filters — the filter chips were on the playback
-side. The double-smear option is the one thing that crosses that line, which is exactly why it
-arrives in Phase 5, off by default, with its own controls and a regression null test.
+side (see Architecture §3 for the "double smear" option that briefly crossed this line and was
+later removed).
 
 Multi-zone sets — kits, multisampled instruments — are out of scope for v1, but Architecture §1 is
 what makes them a UI change rather than a rewrite: the zone list, the list-based state schema, the

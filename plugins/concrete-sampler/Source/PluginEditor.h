@@ -138,7 +138,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> quantizerModeAttachment;
 
     // Phase 4's capture pass (see ConcreteCapturePass.h) - same Attachment convention as the
-    // Phase 2/3 controls above. Auto-Compensate/Bypass are AudioParameterBool, so these use
+    // Phase 2/3 controls above. Pitch Compensate/Bypass are AudioParameterBool, so these use
     // ToggleButton + ButtonAttachment rather than a Slider/ComboBox.
     juce::Label captureTransposeLabel { {}, "Capture Transpose" };
     juce::Slider captureTransposeSlider;
@@ -148,7 +148,7 @@ private:
     juce::Slider captureDriveSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> captureDriveAttachment;
 
-    juce::ToggleButton captureAutoCompensateButton { "Auto-Compensate" };
+    juce::ToggleButton captureAutoCompensateButton { "Pitch Compensate" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> captureAutoCompensateAttachment;
 
     juce::ToggleButton captureBypassButton { "Capture Bypass" };
@@ -181,22 +181,15 @@ private:
     juce::Slider filterKeyTrackSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterKeyTrackAttachment;
 
-    // Phase 5's "double smear" (see ConcreteCapturePass.h) - its own dedicated model/cutoff/
-    // resonance, deliberately separate from the live filter controls above.
-    juce::ToggleButton captureDoubleSmearButton { "Double Smear" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> captureDoubleSmearAttachment;
+    // Phase 6's voice architecture (see ConcreteVoiceAllocator.h/ConcreteContourEnvelope.h) - same
+    // Attachment convention as every control above.
+    juce::Label voiceCountLabel { {}, "Voice Count" };
+    juce::Slider voiceCountSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> voiceCountAttachment;
 
-    juce::Label doubleSmearFilterModelLabel { {}, "Smear Filter" };
-    juce::ComboBox doubleSmearFilterModelCombo;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> doubleSmearFilterModelAttachment;
-
-    juce::Label doubleSmearCutoffLabel { {}, "Smear Cutoff" };
-    juce::Slider doubleSmearCutoffSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> doubleSmearCutoffAttachment;
-
-    juce::Label doubleSmearResonanceLabel { {}, "Smear Resonance" };
-    juce::Slider doubleSmearResonanceSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> doubleSmearResonanceAttachment;
+    juce::Label ampEnvelopeModeLabel { {}, "Amp Envelope" };
+    juce::ComboBox ampEnvelopeModeCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ampEnvelopeModeAttachment;
 
     juce::MidiKeyboardComponent keyboardComponent;
 };

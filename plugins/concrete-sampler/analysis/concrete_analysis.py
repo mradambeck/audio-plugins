@@ -8,8 +8,8 @@ that file doesn't have:
     verification (a 1kHz sine must show exactly one partial, no harmonics).
   - A sample-accurate null-test/residual helper -- compare_wavs.py's comparisons are all
     approximate/statistical (envelope correlation, log-spectral distance), not a literal
-    sample-by-sample difference, which Phase 4's capture-pass non-destructiveness test and
-    Phase 5's double-smear regression test both need (e.g. "must null to silence").
+    sample-by-sample difference, which Phase 4's capture-pass non-destructiveness test needs
+    (e.g. "must null to silence").
   - THD and energy-above-a-frequency -- needed starting with Phase 1's own reference-path
     verification ("THD < 0.1%", "no energy above 2kHz beyond the noise floor"), a phase earlier
     than originally guessed when this module was first written.

@@ -77,7 +77,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -92,7 +92,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f); // root + 12 semitones
+            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root + 12 semitones
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -107,7 +107,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f); // root - 12 semitones
+            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root - 12 semitones
 
             juce::AudioBuffer<float> out(1, 16384);
             out.clear();
@@ -125,7 +125,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate); // 44100
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -141,7 +141,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 0.05); // short: ~2205 samples
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             expect(voice.isActive(), "should be active immediately after startNote()");
 
@@ -157,7 +157,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(2, 512);
             out.clear();
@@ -186,7 +186,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(2, 256);
             out.clear();
@@ -216,7 +216,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 256);
             out.clear();
@@ -233,7 +233,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 128);
             out.clear();
@@ -254,7 +254,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
             voice.stopNote(false, true);
 
             expect(! voice.isActive(), "a hard stop should be immediate");
@@ -265,7 +265,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 1.0); // long enough to reach sustain
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096); // reach sustain, well past the 0.002s attack
             warmup.clear();
@@ -294,7 +294,7 @@ public:
             set->zones[0].oneShot = true;
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096);
             warmup.clear();
@@ -327,7 +327,7 @@ public:
             set->zones[0].oneShot = true;
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096);
             warmup.clear();
@@ -335,6 +335,71 @@ public:
 
             voice.stopNote(false, true); // isForced=true, exactly what a choke group / voice steal passes
             expect(! voice.isActive(), "a forced stop must cut a one-shot voice immediately, same as any other voice");
+        }
+
+        beginTest("Contoured amp envelope mode keeps decaying while held, unlike ADSR's flat sustain");
+        {
+            auto contouredSet = makeSetWithSineZone(1000.0, 1, 60, 2.0); // long enough to hold well past 1s
+            ConcreteVoice contouredVoice;
+            contouredVoice.prepare(sampleRate);
+            contouredVoice.startNote(contouredSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+                                       ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
+                                       ConcreteAmpEnvelopeMode::contoured);
+
+            auto adsrSet = makeSetWithSineZone(1000.0, 1, 60, 2.0);
+            ConcreteVoice adsrVoice;
+            adsrVoice.prepare(sampleRate);
+            adsrVoice.startNote(adsrSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+                                 ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
+                                 ConcreteAmpEnvelopeMode::adsr);
+
+            // Both voices reach sustain quickly (2ms attack); render a short block just past that
+            // to measure early level, then render on (from each voice's own continuing state, into
+            // a FRESH buffer each time - renderNextBlock() adds to existing content, so reusing an
+            // uncleared buffer across calls would sum the sine onto itself) to measure the level
+            // much later into the same held note.
+            juce::AudioBuffer<float> early(1, 2048);
+            early.clear();
+            contouredVoice.renderNextBlock(early, 0, early.getNumSamples());
+            const auto contouredEarlyPeak = early.getMagnitude(0, early.getNumSamples() - 512, 512);
+            early.clear();
+            adsrVoice.renderNextBlock(early, 0, early.getNumSamples());
+            const auto adsrEarlyPeak = early.getMagnitude(0, early.getNumSamples() - 512, 512);
+
+            constexpr int fastForwardSamples = 40960; // ~0.93s further into the held note
+            juce::AudioBuffer<float> later(1, fastForwardSamples); // freshly cleared before each voice's render below
+            later.clear();
+            contouredVoice.renderNextBlock(later, 0, fastForwardSamples);
+            const auto contouredLaterPeak = later.getMagnitude(0, fastForwardSamples - 512, 512);
+            later.clear();
+            adsrVoice.renderNextBlock(later, 0, fastForwardSamples);
+            const auto adsrLaterPeak = later.getMagnitude(0, fastForwardSamples - 512, 512);
+
+            expect(contouredLaterPeak < contouredEarlyPeak * 0.9f,
+                   "the contoured envelope should measurably quieten over time while the note is still held");
+            expectWithinAbsoluteError(adsrLaterPeak, adsrEarlyPeak, adsrEarlyPeak * 0.05f,
+                                       "ADSR's flat sustain should stay essentially constant over the same held span");
+        }
+
+        beginTest("Contoured amp envelope mode still deactivates on its own once fully decayed");
+        {
+            auto set = makeSetWithSineZone(1000.0, 1, 60, 20.0); // long zone - envelope, not zone end, must finish the note
+            ConcreteVoice voice;
+            voice.prepare(sampleRate);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+                             ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
+                             ConcreteAmpEnvelopeMode::contoured);
+
+            juce::AudioBuffer<float> block(1, 44100);
+            bool becameInactive = false;
+            for (int i = 0; i < 10 && ! becameInactive; ++i)
+            {
+                block.clear();
+                voice.renderNextBlock(block, 0, block.getNumSamples());
+                if (! voice.isActive())
+                    becameInactive = true;
+            }
+            expect(becameInactive, "a held contoured note should eventually decay to silence and deactivate on its own");
         }
     }
 };

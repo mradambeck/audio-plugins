@@ -139,10 +139,8 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
         resetParam(ConcreteAudioProcessor::filterResonanceParamID);
         resetParam(ConcreteAudioProcessor::filterEnvAmountParamID);
         resetParam(ConcreteAudioProcessor::filterKeyTrackParamID);
-        resetParam(ConcreteAudioProcessor::captureDoubleSmearParamID);
-        resetParam(ConcreteAudioProcessor::doubleSmearFilterModelParamID);
-        resetParam(ConcreteAudioProcessor::doubleSmearCutoffParamID);
-        resetParam(ConcreteAudioProcessor::doubleSmearResonanceParamID);
+        resetParam(ConcreteAudioProcessor::voiceCountParamID);
+        resetParam(ConcreteAudioProcessor::ampEnvelopeModeParamID);
     };
 
     addAndMakeVisible(pitchEngineLabel);
@@ -267,37 +265,25 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     filterKeyTrackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processor.apvts, ConcreteAudioProcessor::filterKeyTrackParamID, filterKeyTrackSlider);
 
-    addAndMakeVisible(captureDoubleSmearButton);
-    captureDoubleSmearAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureDoubleSmearParamID, captureDoubleSmearButton);
+    addAndMakeVisible(voiceCountLabel);
+    voiceCountLabel.attachToComponent(&voiceCountSlider, true);
+    voiceCountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    voiceCountSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
+    addAndMakeVisible(voiceCountSlider);
+    voiceCountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processor.apvts, ConcreteAudioProcessor::voiceCountParamID, voiceCountSlider);
 
-    addAndMakeVisible(doubleSmearFilterModelLabel);
-    doubleSmearFilterModelLabel.attachToComponent(&doubleSmearFilterModelCombo, true);
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::doubleSmearFilterModelParamID))
-        doubleSmearFilterModelCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(doubleSmearFilterModelCombo);
-    doubleSmearFilterModelAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::doubleSmearFilterModelParamID, doubleSmearFilterModelCombo);
-
-    addAndMakeVisible(doubleSmearCutoffLabel);
-    doubleSmearCutoffLabel.attachToComponent(&doubleSmearCutoffSlider, true);
-    doubleSmearCutoffSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    doubleSmearCutoffSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 60, 20);
-    addAndMakeVisible(doubleSmearCutoffSlider);
-    doubleSmearCutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::doubleSmearCutoffParamID, doubleSmearCutoffSlider);
-
-    addAndMakeVisible(doubleSmearResonanceLabel);
-    doubleSmearResonanceLabel.attachToComponent(&doubleSmearResonanceSlider, true);
-    doubleSmearResonanceSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    doubleSmearResonanceSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(doubleSmearResonanceSlider);
-    doubleSmearResonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::doubleSmearResonanceParamID, doubleSmearResonanceSlider);
+    addAndMakeVisible(ampEnvelopeModeLabel);
+    ampEnvelopeModeLabel.attachToComponent(&ampEnvelopeModeCombo, true);
+    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::ampEnvelopeModeParamID))
+        ampEnvelopeModeCombo.addItemList(param->getAllValueStrings(), 1);
+    addAndMakeVisible(ampEnvelopeModeCombo);
+    ampEnvelopeModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processor.apvts, ConcreteAudioProcessor::ampEnvelopeModeParamID, ampEnvelopeModeCombo);
 
     addAndMakeVisible(keyboardComponent);
 
-    setSize(700, 720);
+    setSize(700, 690);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -388,18 +374,11 @@ void ConcreteAudioProcessorEditor::resized()
 
     bounds.removeFromTop(8);
 
-    auto smearRow1 = bounds.removeFromTop(28);
-    captureDoubleSmearButton.setBounds(smearRow1.removeFromLeft(120));
-    smearRow1.removeFromLeft(90); // "Smear Filter" label
-    doubleSmearFilterModelCombo.setBounds(smearRow1.removeFromLeft(200));
-
-    bounds.removeFromTop(8);
-
-    auto smearRow2 = bounds.removeFromTop(28);
-    smearRow2.removeFromLeft(90); // "Smear Cutoff" label
-    doubleSmearCutoffSlider.setBounds(smearRow2.removeFromLeft(160));
-    smearRow2.removeFromLeft(120); // "Smear Resonance" label
-    doubleSmearResonanceSlider.setBounds(smearRow2.removeFromLeft(130));
+    auto voiceRow = bounds.removeFromTop(28);
+    voiceRow.removeFromLeft(90); // "Voice Count" label
+    voiceCountSlider.setBounds(voiceRow.removeFromLeft(100));
+    voiceRow.removeFromLeft(100); // "Amp Envelope" label
+    ampEnvelopeModeCombo.setBounds(voiceRow.removeFromLeft(150));
 
     bounds.removeFromTop(10);
 

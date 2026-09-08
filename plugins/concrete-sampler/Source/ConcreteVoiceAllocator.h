@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -41,28 +42,58 @@ public:
     // caller-supplied isActive flags - this class has no way to know that itself, since it
     // doesn't touch the real Voice objects). If every voice is active, steals the OLDEST
     // triggered voice (basic oldest-voice-stealing, not release-aware - a reasonable future
-    // refinement, formally owned by Phase 6, not implemented here). Marks the returned slot as
-    // belonging to midiNoteNumber/zoneIndex/chokeGroup - the caller is responsible for actually
-    // calling noteOn() on the real Voice at that index.
+    // refinement, not implemented here). Marks the returned slot as belonging to midiNoteNumber/
+    // zoneIndex/chokeGroup - the caller is responsible for actually calling noteOn() on the real
+    // Voice at that index.
+    //
+    // activeVoiceLimit is Phase 6's per-preset polyphony cap (Architecture #1 - "running out of
+    // voices was an audible, characteristic part of playing these machines, so it's emulation, not
+    // a limitation to design around"): clamped to [1, MaxVoices]. Enforced by comparing the TOTAL
+    // number of currently-active voices against the limit, not by restricting which INDICES are
+    // considered - free-slot and steal searches always scan the whole pool. An earlier version of
+    // this restricted both searches to indices [0, limit), which had a real, reported bug: if the
+    // limit was ever higher when a voice landed in a high-index slot (e.g. the default of 8,
+    // before the user turned Voice Count down), lowering the limit afterward made that slot
+    // permanently invisible to future stealing - it could never be reclaimed again no matter how
+    // many more notes were played, silently letting the audible voice count exceed the configured
+    // limit for as long as that orphaned voice kept sounding (reported as "1-4 chokes properly,
+    // but after 5 it's as if I can play as many notes as I want" - by the time Voice Count reached
+    // 5, one or more voices had already been stranded above that window from an earlier, higher
+    // setting). Comparing the total active count instead means every voice in the pool stays
+    // reachable by stealing regardless of index, so lowering the limit can never strand one.
     int allocateVoiceForNoteOn(int midiNoteNumber, int zoneIndex, int chokeGroup,
-                                const std::array<bool, MaxVoices>& isActive) noexcept
+                                const std::array<bool, MaxVoices>& isActive,
+                                int activeVoiceLimit) noexcept
     {
+        const auto limit = std::clamp(activeVoiceLimit, 1, MaxVoices);
+        const auto activeCount = std::count(isActive.begin(), isActive.end(), true);
+
         int chosen = -1;
-        for (int i = 0; i < MaxVoices; ++i)
+        if (activeCount < limit)
         {
-            if (!isActive[(size_t) i])
+            for (int i = 0; i < MaxVoices; ++i)
             {
-                chosen = i;
-                break;
+                if (!isActive[(size_t) i])
+                {
+                    chosen = i;
+                    break;
+                }
             }
         }
 
         if (chosen < 0)
         {
-            chosen = 0;
-            for (int i = 1; i < MaxVoices; ++i)
-                if (voiceAge[(size_t) i] < voiceAge[(size_t) chosen])
+            // At or over budget (or, degenerately, no free slot existed at all) - steal the
+            // globally oldest ACTIVE voice, wherever it is. Falls back to slot 0 if nothing is
+            // active yet (activeCount == 0 but limit's clamp guarantees limit >= 1, so this only
+            // happens if the caller's isActive array is all-false while also reporting
+            // activeCount >= limit, which can't occur - kept only as a defensive, unreachable-in-
+            // practice fallback rather than leaving chosen at -1).
+            for (int i = 0; i < MaxVoices; ++i)
+                if (isActive[(size_t) i] && (chosen < 0 || voiceAge[(size_t) i] < voiceAge[(size_t) chosen]))
                     chosen = i;
+            if (chosen < 0)
+                chosen = 0;
         }
 
         voiceMidiNote[(size_t) chosen] = midiNoteNumber;
@@ -101,8 +132,10 @@ public:
     }
 
     // Indices of every currently-active voice sharing the given choke group. Group 0 always
-    // returns an all-false mask (0 means "no choke", per Architecture #1) - v1 never assigns a
-    // non-zero chokeGroup to any zone, so this is exercised only by unit tests until Phase 6.
+    // returns an all-false mask (0 means "no choke", per Architecture #1) - v1's UI never assigns a
+    // non-zero chokeGroup to any zone (that's a Phase 8 zone-editing control), so this is exercised
+    // by unit tests and by ConcreteProcessorTests's end-to-end Phase 6 choke test, which builds a
+    // two-zone set by hand rather than through the normal one-zone-only load flow.
     std::array<bool, MaxVoices> getChokeMask(int chokeGroup, const std::array<bool, MaxVoices>& isActive) const noexcept
     {
         std::array<bool, MaxVoices> mask{};

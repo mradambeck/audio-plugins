@@ -6,6 +6,7 @@ void ConcreteVoice::prepare(double sampleRateIn) noexcept
 {
     sampleRate = sampleRateIn;
     adsr.setSampleRate(sampleRate);
+    contourEnvelope.setSampleRate(sampleRate);
     filterEnvelope.setSampleRate(sampleRate);
     for (auto& engine : pitchEngines)
         engine.prepare(sampleRate);
@@ -18,8 +19,9 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
                                 int coarseTuneSemitones, float fineTuneCents, bool autoCompensate,
                                 ConcreteFilterModel::Mode filterModeIn, float filterCutoffHz,
                                 float filterResonance01In, float filterEnvAmountOctavesIn,
-                                float filterKeyTrack01) noexcept
+                                float filterKeyTrack01, ConcreteAmpEnvelopeMode ampEnvelopeModeIn) noexcept
 {
+    ampEnvelopeMode = ampEnvelopeModeIn;
     sampleSet = set;
     zone = &sampleSet->zones[(size_t) zoneIndex];
     currentMidiNote = midiNote;
@@ -61,11 +63,25 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
     for (auto& engine : pitchEngines)
         engine.start((double) zone->start);
 
-    // Fixed, basic default envelope for Phase 1/2 - no APVTS knobs expose these yet (Phase 6 owns
-    // per-voice envelope design, including velocity sensitivity beyond this flat linear gain).
-    // Attack is short but non-zero purely to avoid a hard-edge click on a full-scale sample.
+    // Fixed, basic default ADSR shape - flat sustain, matching every earlier phase. Attack is
+    // short but non-zero purely to avoid a hard-edge click on a full-scale sample. Velocity
+    // sensitivity is the separate, flat linear velocityGain applied in renderNextBlock() below,
+    // not an ADSR parameter - real per-voice velocity-to-envelope shaping (e.g. velocity affecting
+    // attack/decay time, not just level) is a reasonable future refinement beyond Phase 6's scope.
     adsr.setParameters({ 0.002f, 0.0f, 1.0f, 0.05f });
-    adsr.noteOn();
+    // Only one of these drives env below (see the isActive()/getNextSample() dispatch in
+    // renderNextBlock()), but explicitly resetting the OTHER one too means a voice slot reused
+    // across a mode change never carries stale isActive() state from its previous note.
+    if (ampEnvelopeMode == ConcreteAmpEnvelopeMode::contoured)
+    {
+        adsr.reset();
+        contourEnvelope.noteOn();
+    }
+    else
+    {
+        contourEnvelope.reset();
+        adsr.noteOn();
+    }
 
     // Fixed, basic filter envelope shape for Phase 5 - just like the amp envelope above, no APVTS
     // knobs expose ITS shape yet (only its overall depth, via filterEnvAmountOctaves - see Phase 6
@@ -88,11 +104,13 @@ void ConcreteVoice::stopNote(bool allowTailOff, bool isForced) noexcept
     if (allowTailOff)
     {
         adsr.noteOff();
+        contourEnvelope.noteOff();
         filterEnvelope.noteOff();
     }
     else
     {
         adsr.reset();
+        contourEnvelope.reset();
         filterEnvelope.reset();
         active = false;
     }
@@ -108,15 +126,19 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     const auto outChannels = outputBuffer.getNumChannels();
     const auto bufferLength = buf.getNumSamples();
 
+    const auto usingContourEnvelope = ampEnvelopeMode == ConcreteAmpEnvelopeMode::contoured;
+
     for (int i = 0; i < numSamples; ++i)
     {
-        if (!adsr.isActive() || pitchEngines[0].getSourcePhase() >= (double) zoneEndSample)
+        const auto ampEnvelopeActive = usingContourEnvelope ? contourEnvelope.isActive() : adsr.isActive();
+        if (!ampEnvelopeActive || pitchEngines[0].getSourcePhase() >= (double) zoneEndSample)
         {
             active = false;
             break;
         }
 
-        const auto env = adsr.getNextSample() * velocityGain * zone->level;
+        const auto ampEnvelopeValue = usingContourEnvelope ? contourEnvelope.getNextSample() : adsr.getNextSample();
+        const auto env = ampEnvelopeValue * velocityGain * zone->level;
 
         // One filter-envelope/cutoff computation per sample, shared by every output channel's own
         // filter instance below - key tracking and envelope amount both modulate the SAME base

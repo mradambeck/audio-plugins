@@ -12,8 +12,6 @@ ConcreteRenderIR tool.
   5. Per-voice independence: a 4-note chord through a high-resonance filter must match the sum of
      the four notes rendered and filtered INDEPENDENTLY - proof no filter state leaks between
      voices.
-  6. Double-smear regression: off (the default) must null exactly against a render that never
-     touches the double-smear parameters at all; on must measurably change the output.
 
 Thread safety and "turning the live filter knobs doesn't trigger a re-bake" are structural/code-
 level guarantees (the filter parameters are simply never registered as APVTS listeners - see
@@ -65,24 +63,17 @@ def write_mono_sine_wav(path, freq_hz, amplitude=0.5, seconds=1.0, sample_rate=4
 def render(out_path, note=60, seconds=1.0, sample_rate=44100, velocity=127, sample_path=None, sequence=None,
            filter_model=FILTER_BYPASS, filter_cutoff=20000.0, filter_resonance=0.0,
            filter_env_amount=0.0, filter_key_track=0.0,
-           capture_bypass=True, capture_transpose=0.0,
-           capture_double_smear=False, double_smear_model=FILTER_SSM, double_smear_cutoff=8000.0,
-           double_smear_resonance=0.0):
+           capture_bypass=True, capture_transpose=0.0):
     if sample_path is None:
         sample_path = os.path.join(TEST_ASSETS, "sine_1khz.wav")
     args = [RENDER_IR_BIN, "--out", out_path, "--sample", sample_path,
             "--velocity", str(velocity), "--seconds", str(seconds), "--sampleRate", str(sample_rate),
             "--pitchEngineMode", "0",  # Reference throughout - isolates the filter from Phase 2's pitch engines
-            # Capture pass bypassed by default (isolating Phase 5's filter from Phase 4's capture
-            # pass) - Check 6 deliberately overrides this to exercise double smear, which (like
-            # everything else in the capture pass) has no effect while bypassed.
+            # Capture pass bypassed by default, isolating Phase 5's filter from Phase 4's capture pass.
             "--captureBypass", "1" if capture_bypass else "0", "--captureTranspose", str(capture_transpose),
             "--filterModel", str(filter_model), "--filterCutoff", str(filter_cutoff),
             "--filterResonance", str(filter_resonance), "--filterEnvAmount", str(filter_env_amount),
-            "--filterKeyTrack", str(filter_key_track),
-            "--captureDoubleSmear", "1" if capture_double_smear else "0",
-            "--doubleSmearFilterModel", str(double_smear_model), "--doubleSmearCutoff", str(double_smear_cutoff),
-            "--doubleSmearResonance", str(double_smear_resonance)]
+            "--filterKeyTrack", str(filter_key_track)]
     if sequence is not None:
         args += ["--sequence", sequence]
     else:
@@ -195,35 +186,6 @@ def main():
         check("a 4-note chord through the filter matches the sum of 4 independently-filtered notes "
               "(no shared/leaking filter state between voices)",
               residual < -40.0, f"residual {residual:.1f}dBFS")
-
-        print("\n--- Check 6: Double-smear regression ---")
-        # captureBypass off (and transpose=0, so resample/drive/quantize themselves stay
-        # transparent) isolates double smear as the only thing under test here - bypass=on (this
-        # script's default for every other check) would mask double smear entirely, since it
-        # disables the whole capture pass as one unit (see the class comment in
-        # ConcreteCapturePass.h) - confirmed the hard way: an earlier version of this check left
-        # bypass on and "smear on vs off" nulled to silence, which was this test never actually
-        # engaging the feature under test, not a real finding.
-        out_offA = os.path.join(tmp, "smear_off_a.wav")
-        out_offB = os.path.join(tmp, "smear_off_b.wav")
-        render(out_offA, capture_bypass=False, capture_double_smear=False)
-        render(out_offB, capture_bypass=False, capture_double_smear=False, double_smear_model=FILTER_CEM_LOSS,
-               double_smear_cutoff=3000.0, double_smear_resonance=0.7)  # dirty dials, still off
-        _, dOffA = ca.load_wav(out_offA)
-        _, dOffB = ca.load_wav(out_offB)
-        residualOff = ca.residual_db(ca.to_mono(dOffA), ca.to_mono(dOffB))
-        print(f"    residual (smear off, clean dials vs. smear off, dirty dials): {residualOff:.1f}dBFS")
-        check("double smear off nulls to silence regardless of its own dial positions",
-              residualOff < -100.0, f"residual {residualOff:.1f}dBFS")
-
-        out_on = os.path.join(tmp, "smear_on.wav")
-        render(out_on, capture_bypass=False, capture_double_smear=True, double_smear_model=FILTER_SSM,
-               double_smear_cutoff=3000.0, double_smear_resonance=0.5)
-        _, dOn = ca.load_wav(out_on)
-        residualOn = ca.residual_db(ca.to_mono(dOn), ca.to_mono(dOffA))
-        print(f"    residual (smear on vs. off): {residualOn:.1f}dBFS")
-        check("engaging double smear measurably changes the output", residualOn > -40.0,
-              f"residual {residualOn:.1f}dBFS")
 
     print("\n" + ("ALL PHASE 5 CHECKS PASSED" if all(results) else "PHASE 5 CHECKS FAILED"))
     return 0 if all(results) else 1

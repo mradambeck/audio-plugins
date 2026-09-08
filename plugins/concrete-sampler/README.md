@@ -4,13 +4,16 @@ A vintage sampler emulation instrument (AU / VST3 / Standalone) modeling the pla
 architectures of twelve classic 1980s hardware samplers - the pitch-shifting mechanism,
 quantization scheme, and analog filter behavior of each machine, not just a bitcrusher preset.
 
-**Status: early build-in-progress, not a usable instrument yet.** Phases 0-5 of the 9-phase build
+**Status: early build-in-progress, not a usable instrument yet.** Phases 0-6 of the 9-phase build
 plan are done (scaffold, clean sample playback, the three pitch-engine modes - variable-clock
 zero-order hold, fixed-rate drop-sample decimation, and delta-sigma - bit-depth reduction plus
 E-mu-style companding, the capture pass: an offline resample/drive/quantize technique modeling
-"pitch the source up before capturing it, then pitch it back down on playback," and five playback-
-side filter models plus the capture pass's "double smear" option). No real polyphony/voice
-stealing, machine presets, or hardware-panel UI exist yet - see
+"pitch the source up before capturing it, then pitch it back down on playback," five playback-side
+filter models, and Phase 6's voice architecture - a per-preset voice-count limit with deterministic
+oldest-voice stealing, choke groups, velocity-
+sensitive amp gain, and a K250-style "contoured" amp envelope alternative to the default flat-
+sustain ADSR), plus a standalone One-Shot playback option not in the original plan. Machine presets
+and the hardware-panel UI don't exist yet - see
 [`concrete-sampler-plugin-plan.md`](concrete-sampler-plugin-plan.md) for the full plan and current
 progress. The editor is a plain utility panel (load a file, see the waveform, play via MIDI or an
 on-screen keyboard), not the finished UI.
@@ -56,14 +59,15 @@ on note-off; on plays the whole zone through to its own end regardless of how lo
 held - see `ConcreteSampleZone::oneShot`. The Pitch Engine dropdown and the Base Rate/Coarse Tune/
 Fine Tune sliders above the waveform switch between Phase 2's playback engines; the Bit Depth
 slider and Quantizer Mode dropdown below them switch between Phase 3's bit-depth reduction and
-companding; the Capture Transpose/Drive sliders and Auto-Compensate/Capture Bypass toggles below
+companding; the Capture Transpose/Drive sliders and Pitch Compensate/Capture Bypass toggles below
 those control Phase 4's capture pass; the Filter Model/Cutoff/Resonance/Env Amount/Key Track
-controls and the Double Smear toggle+controls below those are Phase 5's - see the Parameters table
-below. Capture-pass, quantizer, and double-smear changes trigger a background re-bake of the
-loaded sample (not instant - there's no bake-progress indicator yet, that's Phase 8); the live
-filter controls (like Phase 2's pitch controls) take effect on the very next sample instead, with
-no re-bake at all. One-Shot and Root Note are zone state, like the loaded sample itself - not
-APVTS parameters, so they aren't automatable and take effect immediately, with no re-bake either.
+controls below those are Phase 5's; the Voice Count slider and Amp Envelope dropdown at the bottom
+are Phase 6's - see the Parameters table below. Capture-pass and quantizer changes trigger a
+background re-bake of the loaded sample (not instant - there's no bake-progress indicator yet,
+that's Phase 8); the live filter controls, Voice Count, and Amp Envelope (like Phase 2's pitch
+controls) take effect on the very next sample instead, with no re-bake at all. One-Shot and Root
+Note are zone state, like the loaded sample itself - not APVTS parameters, so they aren't
+automatable and take effect immediately, with no re-bake either.
 
 **The Standalone app remembers whatever you left it at, not the compiled-in defaults.** Every
 plugin in this catalog persists its full state (via the same `getStateInformation()` a DAW session
@@ -82,7 +86,7 @@ the **Reset** button next to the Root Note control - it sets:
 | Quantizer Mode | Linear |
 | Capture Transpose | 5 st |
 | Capture Drive | 0 dB |
-| Capture Auto-Compensate | On |
+| Capture Pitch Compensate | On |
 | Capture Bypass | On |
 | Capture Iterations | 1 |
 | Filter Model | Bypass |
@@ -90,10 +94,8 @@ the **Reset** button next to the Root Note control - it sets:
 | Filter Resonance | 0 |
 | Filter Env Amount | 0 oct |
 | Filter Key Track | 0 |
-| Double Smear | Off |
-| Double Smear Filter Model | SSM |
-| Double Smear Cutoff | 8,000 Hz |
-| Double Smear Resonance | 0 |
+| Voice Count | 8 |
+| Amp Envelope | ADSR |
 | One-Shot | Off |
 | Root Note | C3 (60) |
 
@@ -154,13 +156,13 @@ test primitives, and one `verify_phaseN.py` script per completed build phase) th
 cd analysis
 python3 -m venv venv && source venv/bin/activate
 pip install -r ../../common/tools/requirements.txt
-python3 verify_phase5.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py / verify_phase3.py / verify_phase4.py
+python3 verify_phase6.py   # or verify_phase0.py / verify_phase1.py / verify_phase2.py / verify_phase3.py / verify_phase4.py / verify_phase5.py
 ```
 
 ## Parameters
 
-The Phase 2 pitch-engine controls, Phase 3's quantizer, Phase 4's capture pass, and Phase 5's
-filter/double-smear controls exist so far - no machine-preset parameters yet.
+The Phase 2 pitch-engine controls, Phase 3's quantizer, Phase 4's capture pass, Phase 5's filter
+controls, and Phase 6's voice-architecture controls exist so far - no machine-preset parameters yet.
 
 | Parameter | Range | Default | Description |
 |---|---|---|---|
@@ -172,18 +174,16 @@ filter/double-smear controls exist so far - no machine-preset parameters yet.
 | Quantizer Mode | Linear / Companded | Linear | Linear is direct mid-tread rounding at Bit Depth - a constant quantization step regardless of signal level. Companded compresses (mu-law-shaped) before quantizing and expands after, the E-mu Emulator II/Emax storage scheme - quantization error shrinks at low signal levels at the cost of some full-scale headroom. No dither anywhere in either mode, matching the real machines. |
 | Capture Transpose | 0-24 semitones | 5 | The 33->45rpm-style pitch-up amount applied (per iteration) before "capturing" - see `ConcreteCapturePass.h`. Has no effect while Capture Bypass is on. 5 semitones is the ratio most people actually want once they turn bypass off. |
 | Capture Drive | 0-24 dB | 0 dB | Saturation drive into the capture stage, plus an accompanying high-frequency rolloff that increases with drive (modeling "sampling hot rolled off the top end on playback," e.g. the MPC60). 0dB is a no-op - no added saturation or filtering. |
-| Capture Auto-Compensate | On/Off | On | Subtracts the baked-in Capture Transpose back out at playback, so a note lands at its expected pitch while still carrying the capture pass's artifacts. Off plays the pitched-up/sped-up capture directly. A live toggle - does not trigger a re-bake. |
+| Capture Pitch Compensate | On/Off | On | Subtracts the baked-in Capture Transpose back out at playback, so a note lands at its expected pitch while still carrying the capture pass's artifacts. Off plays the pitched-up/sped-up capture directly. A live toggle - does not trigger a re-bake. |
 | Capture Bypass | On/Off | On | Disables the whole capture pass (resample + drive + quantize) at once, making the working buffer an exact copy of the source - "every preset ships with the capture pass off," per the plan; it's a technique the user applies, not a machine's stock behavior. |
 | Capture Iterations | 1-4 | 1 | Repeats the whole resample -> drive -> quantize chain this many times, for compounding degradation. |
 | Filter Model | Bypass / SSM / CEM Loss / CEM Compensated / Digital+VCA / One-Pole | Bypass | The playback-side filter (see `ConcreteFilterModels.h`) - live, per-voice, applied fresh every sample (never baked). SSM/CEM Loss/CEM Compensated share a 4-pole resonant ladder core: SSM adds its own internal saturation and can self-oscillate; CEM Loss loses passband level as resonance rises (the Fairlight/Linn 9000 CEM3320); CEM Compensated holds passband level steady instead (the Mirage's CEM3328). Digital+VCA is a clean, non-ladder state-variable lowpass plus a fixed VCA-character saturation stage (the K250 - deliberately not an analog filter model). One-Pole (the SK-1) ignores Filter Resonance entirely - a single pole can't peak or self-oscillate. Bypass ignores every filter parameter. |
 | Filter Cutoff | 20-20,000 Hz | 20,000 Hz | Defaults fully open (transparent) - same "no coloration until asked for" convention as every other control. |
 | Filter Resonance | 0-1 | 0 | 1 is at (or just past) self-oscillation for the ladder models; has no effect on One-Pole. |
-| Filter Env Amount | -8 to +8 octaves | 0 | Depth of a fixed-shape filter envelope's modulation of cutoff (bipolar - negative sweeps down). The envelope's own attack/decay/sustain/release shape isn't user-adjustable yet (Phase 6 owns real per-voice envelope design), only its depth. |
+| Filter Env Amount | -8 to +8 octaves | 0 | Depth of a fixed-shape filter envelope's modulation of cutoff (bipolar - negative sweeps down). The envelope's own attack/decay/sustain/release shape isn't user-adjustable, only its depth - same fixed-shape convention as the amp envelope (Amp Envelope below only picks between two whole shapes, not their individual stage timings). |
 | Filter Key Track | 0-1 | 0 | How much the cutoff scales with the played note's distance from C3 - 0 is no tracking, 1 is full 1:1 tracking, like pitch. |
-| Double Smear | On/Off | Off | Explicitly non-authentic (see Architecture #3 in the plan): bakes an extra filter pass into the very end of the capture chain, modeling "audio that already came out of a playback path being re-recorded." Off by default; has no effect while Capture Bypass is on (bypass disables the whole capture pass as one unit). |
-| Double Smear Filter Model | Same six choices as Filter Model | SSM | Deliberately independent of the live Filter Model above - changing one never triggers a re-bake via the other. |
-| Double Smear Cutoff | 20-20,000 Hz | 8,000 Hz | Its own dedicated cutoff, separate from the live Filter Cutoff. |
-| Double Smear Resonance | 0-1 | 0 | Its own dedicated resonance, separate from the live Filter Resonance. |
+| Voice Count | 1-18 | 8 | The runtime polyphony cap (see `ConcreteVoiceAllocator.h`) - a note-on beyond this many already-sounding voices steals the oldest-triggered one instead of adding a 9th, matching the plan's "running out of voices was an audible, characteristic part of playing these machines." A live control, not baked - takes effect on the very next note-on. |
+| Amp Envelope | ADSR / Contoured | ADSR | The per-voice amplitude envelope shape (see `ConcreteContourEnvelope.h`). ADSR is a flat-sustain shape (2ms attack, no decay, full sustain, 50ms release) - every earlier phase's behavior. Contoured is the Kurzweil K250's dual-VCA-style shape instead: it keeps decaying in two stages the whole time a note is held, rather than holding a flat level, modeling "amplitude contouring, not filtering." |
 
 ## Project structure
 
@@ -198,12 +198,13 @@ concrete-sampler/
 │   ├── ConcreteSampleZone.h          # One playable region: buffer, key/velocity range, tune/level/pan
 │   ├── ConcreteSampleSet.h           # The zone list + note/velocity lookup (multi-zone-ready)
 │   ├── ConcreteSampleIO.h/.cpp       # File loading, FLAC session-embedding, relocate handling
-│   ├── ConcreteVoice.h/.cpp          # One note's playback: pitch engine + ADSR envelope
+│   ├── ConcreteVoice.h/.cpp          # One note's playback: pitch engine + filter + amp envelope
 │   ├── ConcretePitchEngine.h/.cpp    # Reference/Mode A/Mode B/Mode C playback engines
 │   ├── ConcreteQuantizer.h           # Linear bit-depth reduction + mu-law compand/expand curve
 │   ├── ConcreteCapturePass.h/.cpp    # Offline resample -> drive -> quantize working-buffer bake
 │   ├── ConcreteFilterModels.h        # SSM/CEM Loss/CEM Compensated/Digital+VCA/One-Pole/Bypass
-│   ├── ConcreteVoiceAllocator.h      # Voice-to-note allocation/oldest-voice-stealing for the pool
+│   ├── ConcreteContourEnvelope.h     # K250-style continuously-decaying amp envelope alternative
+│   ├── ConcreteVoiceAllocator.h      # Voice-to-note allocation/oldest-voice-stealing, voice-count limit
 │   ├── ConcreteBusRouter.h           # Per-zone output-destination indirection (main bus only so far)
 │   ├── Tests/                        # ConcreteTests (DSP/data seams) + ConcreteProcessorTests
 │   └── Tools/RenderIR.cpp            # ConcreteRenderIR: offline MIDI-driven render console app

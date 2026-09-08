@@ -76,6 +76,20 @@ namespace
                 worst = std::max(worst, std::abs(a.getSample(ch, i) - b.getSample(ch, i)));
         return worst;
     }
+
+    // Phase 6's choke-group test needs two zones sharing a chokeGroup, which v1's UI has no way to
+    // construct (see PluginProcessor.h's setRawSampleSetForTest() comment) - builds a mono sine
+    // sourceBuffer directly rather than going through a temp WAV file/loadSample(), since these
+    // zones are assembled by hand anyway.
+    std::shared_ptr<const juce::AudioBuffer<float>> makeSineBuffer(double freqHz, double durationSeconds, double sampleRate)
+    {
+        const auto numSamples = (int) (durationSeconds * sampleRate);
+        auto buffer = std::make_shared<juce::AudioBuffer<float>>(1, numSamples);
+        auto* data = buffer->getWritePointer(0);
+        for (int i = 0; i < numSamples; ++i)
+            data[i] = 0.5f * (float) std::sin(2.0 * juce::MathConstants<double>::pi * freqHz * (double) i / sampleRate);
+        return buffer;
+    }
 }
 class ConcreteProcessorTests : public juce::UnitTest
 {
@@ -563,6 +577,173 @@ public:
                    "well past where the amp envelope's own release would have silenced a gated zone");
 
             file.deleteFile();
+        }
+
+        beginTest("Voice Count limits real polyphony: 6 overlapping notes with a 4-voice limit "
+                  "leaves exactly 4 sounding, stealing the oldest first (Phase 6)");
+        {
+            const auto file = writeTempSineWav(1000.0, 2.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+
+            auto* voiceCount = processor.apvts.getParameter(ConcreteAudioProcessor::voiceCountParamID);
+            voiceCount->setValueNotifyingHost(voiceCount->convertTo0to1(4.0f));
+
+            // Distinct sample positions (not all exactly 0) so note-on order within the block is
+            // unambiguous, regardless of how MidiBuffer breaks same-timestamp ties.
+            juce::MidiBuffer sixNotesOn;
+            for (int i = 0; i < 6; ++i)
+                sixNotesOn.addEvent(juce::MidiMessage::noteOn(1, 60 + i, (juce::uint8) 100), i);
+
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            processor.processBlock(buffer, sixNotesOn);
+
+            expectEquals(processor.getNumActiveVoicesForTest(), 4,
+                         "exactly the configured voice-count limit should end up sounding, not all 6 triggered");
+
+            // Matches ConcreteVoiceAllocatorTests.cpp's own deterministic-stealing test: the first
+            // two notes triggered (60, 61) are stolen from, in order, by the two that overflow the
+            // limit (64, 65) - notes 62/63 are never touched.
+            expect(!processor.isNoteSoundingForTest(60), "note 60 (triggered first) should have been stolen from");
+            expect(!processor.isNoteSoundingForTest(61), "note 61 (triggered second) should have been stolen from");
+            expect(processor.isNoteSoundingForTest(62), "note 62 was never stolen and should still be sounding");
+            expect(processor.isNoteSoundingForTest(63), "note 63 was never stolen and should still be sounding");
+            expect(processor.isNoteSoundingForTest(64), "note 64 (the first thief) should still be sounding");
+            expect(processor.isNoteSoundingForTest(65), "note 65 (the second thief) should still be sounding");
+
+            file.deleteFile();
+        }
+
+        beginTest("Regression: lowering Voice Count after voices already occupy high-index slots "
+                  "must still let those slots be reclaimed (real reported bug: '1-4 chokes "
+                  "properly, but after 5 it's as if I can play as many notes as I want')");
+        {
+            // Root cause: an earlier version of ConcreteVoiceAllocator::allocateVoiceForNoteOn()
+            // restricted BOTH the free-slot search and the steal search to indices
+            // [0, activeVoiceLimit) - once a voice landed in a high-index slot under a higher
+            // limit (the default of 8, before Voice Count was turned down), lowering the limit
+            // made that slot permanently unreachable by future stealing, so it kept sounding
+            // forever no matter how many more notes were played. Fixed by comparing the total
+            // active voice count against the limit and searching the WHOLE pool either way - see
+            // ConcreteVoiceAllocator.h's own comment on allocateVoiceForNoteOn().
+            const auto file = writeTempSineWav(1000.0, 4.0); // long enough that nothing naturally ends
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+
+            // Voice Count starts at its default (8) - fill every voice.
+            juce::MidiBuffer eightNotesOn;
+            for (int i = 0; i < 8; ++i)
+                eightNotesOn.addEvent(juce::MidiMessage::noteOn(1, 60 + i, (juce::uint8) 100), i);
+
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            processor.processBlock(buffer, eightNotesOn);
+            expectEquals(processor.getNumActiveVoicesForTest(), 8, "all 8 default voices should be sounding");
+
+            // The user turns Voice Count down to 5 mid-performance and keeps playing - one note
+            // at a time, across separate blocks, the way a real keyboard would - triggering more
+            // notes than the pool size so a correct implementation is guaranteed to have cycled
+            // through every one of the original 8 voices at least once (see
+            // ConcreteVoiceAllocatorTests.cpp's "repeated stealing cycles through voices" test for
+            // why a strictly-increasing age counter guarantees that).
+            auto* voiceCount = processor.apvts.getParameter(ConcreteAudioProcessor::voiceCountParamID);
+            voiceCount->setValueNotifyingHost(voiceCount->convertTo0to1(5.0f));
+
+            for (int i = 0; i < 12; ++i)
+            {
+                juce::MidiBuffer nextNoteOn;
+                nextNoteOn.addEvent(juce::MidiMessage::noteOn(1, 100 + i, (juce::uint8) 100), 0);
+                buffer.clear();
+                processor.processBlock(buffer, nextNoteOn);
+            }
+
+            expect(!processor.isNoteSoundingForTest(65), "note 65 must eventually be reclaimed once Voice Count drops, wherever it landed");
+            expect(!processor.isNoteSoundingForTest(66), "note 66 must eventually be reclaimed once Voice Count drops, wherever it landed");
+            expect(!processor.isNoteSoundingForTest(67), "note 67 must eventually be reclaimed once Voice Count drops, wherever it landed");
+
+            // Lowering the limit isn't retroactive (nothing here released a voice on its own) -
+            // the fix's guarantee is reachability, not an instant forced cut, so the total must
+            // simply never have grown past what was already sounding when the limit dropped.
+            expect(processor.getNumActiveVoicesForTest() <= 8,
+                   "total sounding voices must never exceed what was already active when the limit dropped");
+
+            file.deleteFile();
+        }
+
+        beginTest("Velocity response: output level increases monotonically and roughly linearly with velocity (Phase 6)");
+        {
+            const auto file = writeTempSineWav(1000.0, 0.5);
+
+            float previousPeak = -1.0f;
+            for (const int velocity : { 1, 32, 64, 96, 127 })
+            {
+                ConcreteAudioProcessor processor;
+                processor.prepareToPlay(44100.0, 512);
+                expect(processor.loadSample(file));
+
+                juce::AudioBuffer<float> buffer(2, 4096);
+                buffer.clear();
+                auto midi = noteOnBuffer(60, (juce::uint8) velocity);
+                processor.processBlock(buffer, midi);
+
+                // Past the 0.002s attack, well before any release (the note is never let go).
+                const auto peak = buffer.getMagnitude(0, 2048, 2048);
+                expect(peak > previousPeak, "output level must strictly increase as velocity increases");
+
+                // Phase 1's flat linear velocityGain (see ConcreteVoice.cpp) means level should
+                // track velocity/127 directly against the source file's own 0.5f amplitude.
+                const auto expectedPeak = 0.5f * (float) velocity / 127.0f;
+                expectWithinAbsoluteError(peak, expectedPeak, 0.02f,
+                                           "velocity should map linearly onto output level");
+
+                previousPeak = peak;
+            }
+
+            file.deleteFile();
+        }
+
+        beginTest("Choke groups: two zones sharing a chokeGroup, the second note-on cuts the first (Phase 6)");
+        {
+            // v1's UI can only ever load one zone spanning the whole keyboard, so a chokeGroup !=
+            // 0 has to be constructed by hand - see setRawSampleSetForTest()'s own comment.
+            ConcreteSampleZone zoneA;
+            zoneA.sourceBuffer = makeSineBuffer(1000.0, 1.0, 44100.0);
+            zoneA.sourceSampleRate = 44100.0;
+            zoneA.rootNote = 60;
+            zoneA.keyLo = 0;
+            zoneA.keyHi = 63;
+            zoneA.start = 0;
+            zoneA.end = zoneA.sourceBuffer->getNumSamples();
+            zoneA.chokeGroup = 5;
+
+            ConcreteSampleZone zoneB = zoneA; // same content/choke group, different key range/root
+            zoneB.rootNote = 90;
+            zoneB.keyLo = 64;
+            zoneB.keyHi = 127;
+
+            ConcreteSampleSet::Ptr set(new ConcreteSampleSet());
+            set->zones.push_back(zoneA);
+            set->zones.push_back(zoneB);
+
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            processor.setRawSampleSetForTest(set);
+
+            juce::AudioBuffer<float> buffer(2, 512);
+            buffer.clear();
+            auto noteOnA = noteOnBuffer(60); // zone A
+            processor.processBlock(buffer, noteOnA);
+            expect(processor.isNoteSoundingForTest(60), "zone A's note should be sounding right after its own note-on");
+
+            buffer.clear();
+            auto noteOnB = noteOnBuffer(90); // zone B, same choke group as zone A
+            processor.processBlock(buffer, noteOnB);
+            expect(!processor.isNoteSoundingForTest(60),
+                   "note 60's voice should have been choked by the second note-on sharing its choke group");
+            expect(processor.isNoteSoundingForTest(90), "the second note-on itself should be sounding");
         }
     }
 };

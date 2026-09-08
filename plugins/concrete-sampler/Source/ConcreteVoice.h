@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ConcreteContourEnvelope.h"
 #include "ConcreteFilterModels.h"
 #include "ConcretePitchEngine.h"
 #include "ConcreteSampleSet.h"
@@ -8,9 +9,17 @@
 
 #include <array>
 
+// Phase 6's amp-envelope shape selector: adsr is the flat-sustain juce::ADSR every earlier phase
+// used; contoured swaps in the K250-style continuously-decaying ConcreteContourEnvelope.h shape.
+// A free enum rather than a mode nested inside either envelope class, since it picks between two
+// entirely separate implementations rather than configuring one of them.
+enum class ConcreteAmpEnvelopeMode { adsr, contoured };
+
 // One note's playback: a pitch engine (Phase 1's reference interpolation, or one of Phase 2's
 // three machine modes - see ConcretePitchEngine.h), Phase 5's playback-side filter (see
-// ConcreteFilterModels.h), and basic ADSR amp/filter envelopes. Phase 3's quantizer (bit depth/
+// ConcreteFilterModels.h), a filter envelope (fixed-shape ADSR), and an amp envelope that's either
+// a fixed-shape ADSR or Phase 6's contoured shape (see ConcreteAmpEnvelopeMode above). Phase 3's
+// quantizer (bit depth/
 // companding - see ConcreteQuantizer.h) and Phase 4's capture pass (resample/drive - see
 // ConcreteCapturePass.h) are BAKED into the zone's working buffer offline rather than applied live
 // here (see concrete-sampler-plugin-plan.md's Architecture #2/#3 and Phase 4) - this class just
@@ -46,12 +55,14 @@ public:
     // (see ConcreteFilterModels.h). filterEnvAmountOctaves is the filter envelope's modulation
     // depth in octaves (bipolar - negative sweeps the cutoff down instead of up); filterKeyTrack01
     // is 0 (no tracking) to 1 (cutoff scales with the played note's distance from C3 exactly like
-    // pitch would).
+    // pitch would). ampEnvelopeMode picks between the flat-sustain ADSR every earlier phase used
+    // and Phase 6's K250-style continuously-decaying contour (see ConcreteAmpEnvelopeMode above).
     void startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
                     ConcretePitchEngine::Mode mode, double effectiveSourceRateHz,
                     int coarseTuneSemitones, float fineTuneCents, bool autoCompensate,
                     ConcreteFilterModel::Mode filterMode, float filterCutoffHz, float filterResonance01,
-                    float filterEnvAmountOctaves, float filterKeyTrack01) noexcept;
+                    float filterEnvAmountOctaves, float filterKeyTrack01,
+                    ConcreteAmpEnvelopeMode ampEnvelopeMode) noexcept;
 
     // allowTailOff matches the juce::SynthesiserVoice convention this catalog's other instruments
     // already follow (Strike, Alloy): true lets the ADSR release play out; false silences
@@ -99,6 +110,8 @@ private:
 
     float velocityGain = 1.0f;
     juce::ADSR adsr;
+    ConcreteContourEnvelope contourEnvelope;
+    ConcreteAmpEnvelopeMode ampEnvelopeMode = ConcreteAmpEnvelopeMode::adsr;
 
     // One filter per possible zone channel (max 2), matching pitchEngines above - a stereo zone's
     // L/R content must not share filter state. filterKeyTrackOctaveOffset folds key-tracking into

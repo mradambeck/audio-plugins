@@ -24,9 +24,8 @@
 // quantizer moved from ConcreteVoice into this bake (see ConcreteCapturePass.h's own comment on
 // why quantization is part of this pipeline even when the resample/drive technique is bypassed).
 // Phase 5 adds the playback-side filter models (ConcreteFilterModels.h, live per-voice - see
-// ConcreteVoice.h) plus the capture pass's "double smear" option (baked, see
-// ConcreteCapturePass.h's own comment on why it's the one deliberate exception to "the capture
-// pass never touches filters").
+// ConcreteVoice.h). Phase 6 adds the voice architecture (ConcreteVoiceAllocator.h's voice-count
+// limit, ConcreteContourEnvelope.h's K250-style amp envelope alternative).
 class ConcreteAudioProcessor : public juce::AudioProcessor,
                                 private juce::Thread,
                                 private juce::AudioProcessorValueTreeState::Listener
@@ -99,6 +98,25 @@ public:
     // own comment. Exposed for tests that need to inspect source-space zone metadata directly.
     ConcreteSampleSet::Ptr getRawSampleSet() const;
 
+    // Test/tooling accessors for Phase 6's voice-count limit and choke-group behavior: how many of
+    // the fixed voice pool are currently rendering, and whether a specific MIDI note is one of
+    // them. Not used by production code (the editor has no polyphony meter) - added because these
+    // are otherwise only observable by rendering audio and inferring voice count from summed
+    // content, which can't reliably distinguish "N voices" from "N+1" without controlling every
+    // zone's pitch, the way ConcreteProcessorTests's other internal-state accessors (e.g.
+    // getCurrentSampleSet()) already trade a small amount of encapsulation for a directly testable
+    // assertion instead of an audio-measurement proxy for it.
+    int getNumActiveVoicesForTest() const noexcept;
+    bool isNoteSoundingForTest(int midiNote) const noexcept;
+
+    // Test-only: publishes an arbitrary raw sample set directly, bypassing the one-zone-only
+    // loadSample() flow - Phase 6's choke-group behavior needs two zones sharing a non-zero
+    // chokeGroup, which v1's UI has no way to construct yet (that's a Phase 8 zone-editing
+    // control). See concrete-sampler-plugin-plan.md's Phase 6 Analysis: "tested even though v1
+    // never sets a non-zero group." Goes through the normal publishRawSampleSet() path, so the
+    // capture pass still bakes it exactly as it would any other raw set.
+    void setRawSampleSetForTest(ConcreteSampleSet::Ptr set) { publishRawSampleSet(std::move(set)); }
+
     juce::AudioProcessorValueTreeState apvts;
 
     // Phase 2's first real automatable parameters. pitchEngineMode's raw value is the choice
@@ -138,14 +156,16 @@ public:
     static constexpr auto filterEnvAmountParamID = "filterEnvAmount";
     static constexpr auto filterKeyTrackParamID = "filterKeyTrack";
 
-    // Phase 5's "double smear" (Architecture #3) - an explicitly non-authentic option, off by
-    // default, that bakes an extra filter pass into the END of the capture chain using its OWN
-    // dedicated model/cutoff/resonance (deliberately separate from the live filter parameters
-    // above, so turning THOSE never triggers a re-bake - only these do).
-    static constexpr auto captureDoubleSmearParamID = "captureDoubleSmear";
-    static constexpr auto doubleSmearFilterModelParamID = "doubleSmearFilterModel";
-    static constexpr auto doubleSmearCutoffParamID = "doubleSmearCutoff";
-    static constexpr auto doubleSmearResonanceParamID = "doubleSmearResonance";
+    // Phase 6's voice architecture (see ConcreteVoiceAllocator.h and ConcreteContourEnvelope.h).
+    // voiceCount is the runtime polyphony cap (1..maxVoices, default 8 - v1's existing behavior
+    // unchanged until a machine preset or the user dials it down): Architecture #1's point that
+    // running out of voices is emulation, not a bug, so it's a real, automatable-in-principle
+    // parameter rather than compiled-in per-preset data. ampEnvelopeMode's raw value is the choice
+    // INDEX (0=ADSR, 1=Contoured) as a float, same convention as pitchEngineMode/quantizerMode/
+    // filterModel - see ampEnvelopeModeFromParam(). Neither triggers a re-bake (both are live,
+    // per-voice playback behavior, same category as the filter parameters above).
+    static constexpr auto voiceCountParamID = "voiceCount";
+    static constexpr auto ampEnvelopeModeParamID = "ampEnvelopeMode";
 
     // Synchronously re-derives every zone's working buffer from its source buffer using the
     // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
@@ -183,8 +203,7 @@ private:
 
     // juce::AudioProcessorValueTreeState::Listener override, registered for exactly the parameter
     // IDs that change what ConcreteCapturePass::apply() produces: bitDepth, quantizerMode,
-    // captureTranspose, captureDrive, captureBypass, captureIterations, captureDoubleSmear,
-    // doubleSmearFilterModel, doubleSmearCutoff, doubleSmearResonance - NOT captureAutoCompensate
+    // captureTranspose, captureDrive, captureBypass, captureIterations - NOT captureAutoCompensate
     // or any of the live filterXxx parameters, none of which need a re-bake (see their own
     // declaration comments above and ConcreteVoice.h). May fire from ANY thread depending on the
     // host (worst case the audio thread itself, if a host applies automation from inside
@@ -214,18 +233,18 @@ private:
     std::atomic<float>* filterResonanceParam = nullptr;
     std::atomic<float>* filterEnvAmountParam = nullptr;
     std::atomic<float>* filterKeyTrackParam = nullptr;
-    std::atomic<float>* captureDoubleSmearParam = nullptr;
-    std::atomic<float>* doubleSmearFilterModelParam = nullptr;
-    std::atomic<float>* doubleSmearCutoffParam = nullptr;
-    std::atomic<float>* doubleSmearResonanceParam = nullptr;
+    std::atomic<float>* voiceCountParam = nullptr;
+    std::atomic<float>* ampEnvelopeModeParam = nullptr;
 
     // Set by parameterChanged(), cleared and acted on by run() - see that function's own comment.
     std::atomic<bool> bakeRequested { false };
 
-    // Fixed at 8 for Phase 1 as a reasonable placeholder - Phase 6 makes this a real, per-machine-
-    // preset voice count with tested stealing behavior (see concrete-sampler-plugin-plan.md's
-    // Architecture #1 and Phase 6).
-    static constexpr int maxVoices = 8;
+    // Fixed compile-time CAPACITY of the voice pool, not the current polyphony - see
+    // voiceCountParamID above for the runtime-adjustable limit. 18 covers the highest count in the
+    // Phase 7 machine table (Linn 9000, 13 poly / 18 multitimbral - see
+    // concrete-sampler-plugin-plan.md's Phase 7 machine table); every other machine's voice count
+    // fits well inside it.
+    static constexpr int maxVoices = 18;
     std::array<ConcreteVoice, maxVoices> voices;
     ConcreteVoiceAllocator<maxVoices> voiceAllocator;
     ConcreteBusRouter busRouter;
