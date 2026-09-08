@@ -45,8 +45,11 @@ public:
     // semitones, fineTune in cents - both combine with the zone's own tuneSemitones and the
     // played note's distance from the zone's root note into one total pitch ratio.
     // effectiveSourceRateHz is the zone's own sourceSampleRate for Mode::reference, or the
-    // baseRate parameter for the three machine modes (see ConcretePitchEngine.h's header comment
-    // on why those are different things and which one applies when). autoCompensate, when true,
+    // baseRate parameter for the three machine modes - used ONLY to shape artifact character for
+    // those three (how coarse the zero-order hold/decimation is), never root-pitch playback speed,
+    // which always tracks the zone's real sourceSampleRate regardless of mode (see
+    // ConcretePitchEngine.h's header comment on processSample()'s fileSourceRateHz parameter, and
+    // readModeA()'s own comment on the real bug this fixed). autoCompensate, when true,
     // subtracts zone->captureTransposeSemitones (whatever Phase 4's capture pass actually baked
     // into this zone's buffer, 0 if none) from the note's total pitch, bringing a resampled-up-
     // for-capture buffer back to its original pitch/tempo at the zone's root note - see

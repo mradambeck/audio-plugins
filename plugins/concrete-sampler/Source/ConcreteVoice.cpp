@@ -155,7 +155,7 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             float mix = 0.0f;
             for (int srcCh = 0; srcCh < zoneChannels; ++srcCh)
                 mix += pitchEngines[(size_t) srcCh].processSample(pitchMode, buf.getReadPointer(srcCh), bufferLength,
-                                                                     pitchRatio, effectiveSourceRateHz);
+                                                                     pitchRatio, effectiveSourceRateHz, zone->sourceSampleRate);
             mix /= (float) zoneChannels;
             mix = filters[0].processSample(filterMode, mix, modulatedCutoffHz, filterResonance01);
             outputBuffer.addSample(0, startSample + i, mix * env);
@@ -169,7 +169,7 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             // output channel still gets its OWN filter instance, even though they're fed the same
             // input - matches the per-channel filtering the stereo branch below does.
             const auto sampleValue = pitchEngines[0].processSample(pitchMode, buf.getReadPointer(0), bufferLength,
-                                                                     pitchRatio, effectiveSourceRateHz);
+                                                                     pitchRatio, effectiveSourceRateHz, zone->sourceSampleRate);
             for (int ch = 0; ch < outChannels; ++ch)
             {
                 const auto filtered = filters[(size_t) ch].processSample(filterMode, sampleValue, modulatedCutoffHz, filterResonance01);
@@ -182,7 +182,7 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             {
                 const auto srcChannel = juce::jmin(ch, zoneChannels - 1);
                 auto sampleValue = pitchEngines[(size_t) srcChannel].processSample(
-                    pitchMode, buf.getReadPointer(srcChannel), bufferLength, pitchRatio, effectiveSourceRateHz);
+                    pitchMode, buf.getReadPointer(srcChannel), bufferLength, pitchRatio, effectiveSourceRateHz, zone->sourceSampleRate);
                 sampleValue = filters[(size_t) ch].processSample(filterMode, sampleValue, modulatedCutoffHz, filterResonance01);
                 outputBuffer.addSample(ch, startSample + i, sampleValue * env);
             }

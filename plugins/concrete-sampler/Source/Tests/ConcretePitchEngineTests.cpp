@@ -40,7 +40,7 @@ public:
             for (int i = 0; i < 2000; ++i)
             {
                 const auto out = engine.processSample(ConcretePitchEngine::Mode::reference,
-                                                        sine.data(), (int) sine.size(), 1.0, 44100.0);
+                                                        sine.data(), (int) sine.size(), 1.0, 44100.0, 44100.0);
                 expectWithinAbsoluteError(out, sine[(size_t) i], 1.0e-6f);
             }
         }
@@ -63,14 +63,20 @@ public:
             for (int i = 0; i < 500; ++i)
             {
                 const auto out = engine.processSample(ConcretePitchEngine::Mode::variableClockZeroOrderHold,
-                                                        ramp.data(), (int) ramp.size(), pitchRatio, 44100.0);
+                                                        ramp.data(), (int) ramp.size(), pitchRatio, 44100.0, 44100.0);
                 const auto rounded = std::round(out);
                 expectWithinAbsoluteError(out, rounded, 1.0e-6f, "Mode A must read an exact sample, not an interpolated blend");
             }
         }
 
-        beginTest("Mode A's phase advances by exactly pitchRatio*baseRate/hostRate per sample");
+        beginTest("Mode A's hold-tick rate scales with baseRate*pitchRatio (fileRate matched to baseRate here, "
+                  "isolating this from the fileRate/baseRate compensation - see the dedicated regression test below)");
         {
+            // Mode A no longer advances sourcePhase by a fixed fraction every single sample (that
+            // was the bug - see readModeA()'s own comment) - it now advances in discrete jumps,
+            // only when a hold-tick fires. Over enough samples the total ticks fired converges on
+            // baseRate*pitchRatio/hostRate per sample, but any single short window can be off by
+            // up to one tick's worth of rounding - a large sample count keeps that negligible.
             std::vector<float> data(10000, 0.0f);
             ConcretePitchEngine engine;
             engine.prepare(48000.0);
@@ -78,12 +84,50 @@ public:
 
             const auto pitchRatio = 1.5;
             const auto baseRateHz = 30000.0;
-            const auto expectedIncrement = pitchRatio * baseRateHz / 48000.0;
+            constexpr int numSamples = 100000;
+            const auto expectedTickCount = (baseRateHz * pitchRatio / 48000.0) * numSamples;
 
-            for (int i = 0; i < 100; ++i)
-                engine.processSample(ConcretePitchEngine::Mode::variableClockZeroOrderHold, data.data(), (int) data.size(), pitchRatio, baseRateHz);
+            for (int i = 0; i < numSamples; ++i)
+                engine.processSample(ConcretePitchEngine::Mode::variableClockZeroOrderHold, data.data(), (int) data.size(),
+                                       pitchRatio, baseRateHz, baseRateHz);
 
-            expectWithinAbsoluteError(engine.getSourcePhase(), expectedIncrement * 100.0, 1.0e-6);
+            // fileRateHz == baseRateHz here, so each tick advances sourcePhase by exactly 1 -
+            // sourcePhase itself IS the tick count.
+            expectWithinAbsoluteError(engine.getSourcePhase(), expectedTickCount, 2.0,
+                                       "total ticks over many samples should match baseRate*pitchRatio/hostRate, within rounding");
+        }
+
+        beginTest("Regression: Mode A's root-pitch playback speed tracks the file's real rate, not baseRateHz "
+                  "(real reported bug: switching machines changed a loaded sample's pitch/tempo, not just its "
+                  "character - a 1kHz tone measured as ~212Hz through the Casio SK-1 preset, baseRate 9.38kHz)");
+        {
+            std::vector<float> data(200000, 0.0f);
+            constexpr double hostRate = 44100.0;
+            constexpr double fileRateHz = 44100.0; // the loaded file's own real rate
+            constexpr int numSamples = 100000;
+
+            auto totalSourceAdvance = [&](double baseRateHz)
+            {
+                ConcretePitchEngine engine;
+                engine.prepare(hostRate);
+                engine.start(0.0);
+                for (int i = 0; i < numSamples; ++i)
+                    engine.processSample(ConcretePitchEngine::Mode::variableClockZeroOrderHold, data.data(), (int) data.size(),
+                                           1.0, baseRateHz, fileRateHz); // pitchRatio 1.0 - an untransposed, root note
+                return engine.getSourcePhase();
+            };
+
+            // At an untransposed root note, the total distance traveled through the source over N
+            // samples must match the file's own real rate (fileRateHz/hostRate per sample)
+            // REGARDLESS of baseRateHz - three wildly different machine base rates must all reach
+            // essentially the same source position, since none of them transposed the note.
+            const auto expected = (fileRateHz / hostRate) * numSamples;
+            expectWithinAbsoluteError(totalSourceAdvance(9380.0), expected, 10.0,
+                                       "the Casio SK-1's 9.38kHz base rate must not change root-pitch playback speed");
+            expectWithinAbsoluteError(totalSourceAdvance(44100.0), expected, 10.0,
+                                       "a matched base rate is the existing, already-correct baseline");
+            expectWithinAbsoluteError(totalSourceAdvance(50000.0), expected, 10.0,
+                                       "the Synclavier's 50kHz base rate must not change root-pitch playback speed");
         }
 
         beginTest("Mode B ticks at a fixed rate: the held value only changes every N host samples");
@@ -100,10 +144,10 @@ public:
 
             const auto baseRateHz = 44100.0 / 4.0;
             int changeCount = 0;
-            float previous = engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, ramp.data(), (int) ramp.size(), 1.0, baseRateHz);
+            float previous = engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, ramp.data(), (int) ramp.size(), 1.0, baseRateHz, baseRateHz);
             for (int i = 1; i < 40; ++i)
             {
-                const auto current = engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, ramp.data(), (int) ramp.size(), 1.0, baseRateHz);
+                const auto current = engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, ramp.data(), (int) ramp.size(), 1.0, baseRateHz, baseRateHz);
                 if (current != previous)
                     ++changeCount;
                 previous = current;
@@ -132,7 +176,7 @@ public:
                 engine.prepare(44100.0);
                 engine.start(0.0);
                 for (int i = 0; i < 400; ++i)
-                    engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, data.data(), (int) data.size(), pitchRatio, baseRateHz);
+                    engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, data.data(), (int) data.size(), pitchRatio, baseRateHz, baseRateHz);
                 return engine.getSourcePhase() / pitchRatio;
             };
 
@@ -147,6 +191,34 @@ public:
             expectWithinAbsoluteError(ticksAtUnity, ticksDownAnOctave, 1.0, "tick rate must be pitch-independent");
         }
 
+        beginTest("Regression: Mode B's root-pitch playback speed tracks the file's real rate, not baseRateHz "
+                  "(same real reported bug as Mode A's own regression test above)");
+        {
+            std::vector<float> data(200000, 0.0f);
+            constexpr double hostRate = 44100.0;
+            constexpr double fileRateHz = 44100.0;
+            constexpr int numSamples = 100000;
+
+            auto totalSourceAdvance = [&](double baseRateHz)
+            {
+                ConcretePitchEngine engine;
+                engine.prepare(hostRate);
+                engine.start(0.0);
+                for (int i = 0; i < numSamples; ++i)
+                    engine.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, data.data(), (int) data.size(),
+                                           1.0, baseRateHz, fileRateHz);
+                return engine.getSourcePhase();
+            };
+
+            const auto expected = (fileRateHz / hostRate) * numSamples;
+            expectWithinAbsoluteError(totalSourceAdvance(9380.0), expected, 10.0,
+                                       "the Casio SK-1's 9.38kHz base rate must not change root-pitch playback speed");
+            expectWithinAbsoluteError(totalSourceAdvance(26040.0), expected, 10.0,
+                                       "the SP-1200's 26.04kHz base rate must not change root-pitch playback speed");
+            expectWithinAbsoluteError(totalSourceAdvance(50000.0), expected, 10.0,
+                                       "a base rate above the file's real rate must not change root-pitch playback speed either");
+        }
+
         beginTest("Mode C's output is bounded and tracks a constant DC input");
         {
             std::vector<float> dc(2000, 0.6f);
@@ -157,12 +229,41 @@ public:
             float lastValue = 0.0f;
             for (int i = 0; i < 2000; ++i)
             {
-                lastValue = engine.processSample(ConcretePitchEngine::Mode::deltaSigma, dc.data(), (int) dc.size(), 1.0, 30000.0);
+                lastValue = engine.processSample(ConcretePitchEngine::Mode::deltaSigma, dc.data(), (int) dc.size(), 1.0, 30000.0, 30000.0);
                 expect(std::isfinite(lastValue), "delta-sigma output must never be NaN/inf");
                 expect(std::abs(lastValue) <= 1.0f + 1.0e-3f, "delta-sigma output must stay within a reasonable bound");
             }
             expectWithinAbsoluteError(lastValue, 0.6f, 0.05f,
                                        "after settling, the decimated output should track the constant input");
+        }
+
+        beginTest("Regression: Mode C's root-pitch playback speed tracks the file's real rate, not baseRateHz "
+                  "(same real reported bug as Modes A/B's own regression tests above)");
+        {
+            std::vector<float> data(2000000, 0.0f);
+            constexpr double hostRate = 44100.0;
+            constexpr double fileRateHz = 44100.0;
+            constexpr int numSamples = 100000;
+
+            auto totalSourceAdvance = [&](double baseRateHz)
+            {
+                ConcretePitchEngine engine;
+                engine.prepare(hostRate);
+                engine.start(0.0);
+                for (int i = 0; i < numSamples; ++i)
+                    engine.processSample(ConcretePitchEngine::Mode::deltaSigma, data.data(), (int) data.size(),
+                                           1.0, baseRateHz, fileRateHz);
+                return engine.getSourcePhase();
+            };
+
+            const auto expected = (fileRateHz / hostRate) * numSamples;
+            // A wider tolerance than Modes A/B: at 64x oversampling, up to 64 oversample ticks can
+            // be "in flight" (accumulated but not yet fired) at any host sample, versus at most 1
+            // for A/B's own single-rate tick clocks - see readModeC()'s own oversampleTickAccumulator.
+            expectWithinAbsoluteError(totalSourceAdvance(9380.0), expected, 128.0,
+                                       "the Casio SK-1's 9.38kHz base rate must not change root-pitch playback speed");
+            expectWithinAbsoluteError(totalSourceAdvance(30000.0), expected, 128.0,
+                                       "the ASR-10's own ~30kHz base rate must not change root-pitch playback speed");
         }
 
         beginTest("All modes' getSourcePhase() reaches the same position given identical inputs (channel-lockstep assumption)");
@@ -181,8 +282,8 @@ public:
 
             for (int i = 0; i < 500; ++i)
             {
-                engineA.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, dataA.data(), (int) dataA.size(), 1.3, 20000.0);
-                engineB.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, dataB.data(), (int) dataB.size(), 1.3, 20000.0);
+                engineA.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, dataA.data(), (int) dataA.size(), 1.3, 20000.0, 20000.0);
+                engineB.processSample(ConcretePitchEngine::Mode::dropSampleDecimation, dataB.data(), (int) dataB.size(), 1.3, 20000.0, 20000.0);
             }
 
             expectWithinAbsoluteError(engineA.getSourcePhase(), engineB.getSourcePhase(), 1.0e-9);

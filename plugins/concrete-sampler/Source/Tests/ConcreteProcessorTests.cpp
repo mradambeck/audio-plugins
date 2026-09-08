@@ -77,6 +77,18 @@ namespace
         return worst;
     }
 
+    // Phase 7's tests look machines up by a short, unique substring of their name rather than a
+    // hardcoded table index, so they don't silently start testing the wrong machine if
+    // ConcreteMachines.h's table order ever changes. Returns -1 if nothing matches.
+    int machineTableIndexByName(const juce::String& nameFragment)
+    {
+        const auto& machines = getConcreteMachines();
+        for (size_t i = 0; i < machines.size(); ++i)
+            if (juce::String(machines[i].name).containsIgnoreCase(nameFragment))
+                return (int) i;
+        return -1;
+    }
+
     // Phase 6's choke-group test needs two zones sharing a chokeGroup, which v1's UI has no way to
     // construct (see PluginProcessor.h's setRawSampleSetForTest() comment) - builds a mono sine
     // sourceBuffer directly rather than going through a temp WAV file/loadSample(), since these
@@ -163,10 +175,10 @@ public:
                    "reloaded state should keep the same ValueTree type");
         }
 
-        beginTest("No factory presets exist yet (Phase 7 defines the twelve machines)");
+        beginTest("The twelve machines are exposed as factory presets (Phase 7)");
         {
             ConcreteAudioProcessor processor;
-            expectEquals(processor.getNumPrograms(), 0);
+            expectEquals(processor.getNumPrograms(), 12);
         }
 
         beginTest("loadSample() loads a real file and playing at root reproduces its pitch");
@@ -744,6 +756,142 @@ public:
             expect(!processor.isNoteSoundingForTest(60),
                    "note 60's voice should have been choked by the second note-on sharing its choke group");
             expect(processor.isNoteSoundingForTest(90), "the second note-on itself should be sounding");
+        }
+
+        beginTest("Selecting a machine applies its full parameter set (Phase 7)");
+        {
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+
+            const auto sk1Index = machineTableIndexByName("SK-1");
+            expect(sk1Index >= 0, "the Casio SK-1 should be one of the twelve machines");
+
+            auto* machine = processor.apvts.getParameter(ConcreteAudioProcessor::machineParamID);
+            machine->setValueNotifyingHost(machine->convertTo0to1((float) (sk1Index + 1)));
+
+            const auto& sk1 = getConcreteMachines()[(size_t) sk1Index];
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::bitDepthParamID)->load()),
+                         sk1.bitDepthBits);
+            expectWithinAbsoluteError(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::baseRateParamID)->load(),
+                                       sk1.baseRateHz, 0.01f);
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::quantizerModeParamID)->load()),
+                         (int) sk1.quantizerMode);
+            expectWithinAbsoluteError(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::captureTransposeParamID)->load(),
+                                       sk1.captureTransposeSemitones, 0.01f);
+            expect(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::captureBypassParamID)->load() >= 0.5f,
+                   "every machine ships with the capture pass off");
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::filterModelParamID)->load()),
+                         (int) sk1.filterModel);
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::voiceCountParamID)->load()),
+                         sk1.voiceCount);
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::ampEnvelopeModeParamID)->load()),
+                         (int) sk1.ampEnvelopeMode);
+        }
+
+        beginTest("Switching machines does not touch the loaded sample (Phase 7 Architecture requirement)");
+        {
+            const auto file = writeTempSineWav(1000.0, 0.5);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setRootNoteForZone(0, 72);
+            processor.setOneShotForZone(0, true);
+
+            const auto beforeSourceBuffer = processor.getRawSampleSet()->zones[0].sourceBuffer;
+            const auto beforeRootNote = processor.getRawSampleSet()->zones[0].rootNote;
+            const auto beforeOneShot = processor.getRawSampleSet()->zones[0].oneShot;
+
+            const auto k250Index = machineTableIndexByName("K250");
+            auto* machine = processor.apvts.getParameter(ConcreteAudioProcessor::machineParamID);
+            machine->setValueNotifyingHost(machine->convertTo0to1((float) (k250Index + 1)));
+
+            expect(processor.getRawSampleSet()->zones[0].sourceBuffer == beforeSourceBuffer,
+                   "selecting a machine must not touch the loaded sample's audio");
+            expectEquals(processor.getRawSampleSet()->zones[0].rootNote, beforeRootNote,
+                         "selecting a machine must not touch zone-list state like root note");
+            expect(processor.getRawSampleSet()->zones[0].oneShot == beforeOneShot,
+                   "selecting a machine must not touch zone-list state like one-shot");
+
+            file.deleteFile();
+        }
+
+        beginTest("Host program list and the in-plugin Machine parameter select the same twelve, in sync (Phase 7)");
+        {
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+
+            expectEquals(processor.getNumPrograms(), 12);
+
+            const auto mirageIndex = machineTableIndexByName("Mirage");
+            expect(mirageIndex >= 0, "the Ensoniq Mirage should be one of the twelve machines");
+            expectEquals(processor.getProgramName(mirageIndex), juce::String(getConcreteMachines()[(size_t) mirageIndex].name));
+
+            processor.setCurrentProgram(mirageIndex);
+
+            expectEquals(processor.getCurrentProgram(), mirageIndex,
+                         "setCurrentProgram() should update getCurrentProgram() to match");
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::machineParamID)->load()),
+                         mirageIndex + 1,
+                         "picking a host program should move the in-plugin Machine parameter to match");
+
+            const auto& mirage = getConcreteMachines()[(size_t) mirageIndex];
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::filterModelParamID)->load()),
+                         (int) mirage.filterModel,
+                         "setCurrentProgram() should apply the same values selecting the Machine parameter directly would");
+        }
+
+        beginTest("Machine index 0, \"(Custom)\", is a genuine no-op (Phase 7)");
+        {
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+
+            auto* filterModel = processor.apvts.getParameter(ConcreteAudioProcessor::filterModelParamID);
+            filterModel->setValueNotifyingHost(filterModel->convertTo0to1(3.0f)); // CEM Compensated - a deliberately non-default value
+
+            auto* machine = processor.apvts.getParameter(ConcreteAudioProcessor::machineParamID);
+            machine->setValueNotifyingHost(machine->convertTo0to1(0.0f)); // "(Custom)"
+
+            expectEquals((int) std::lround(processor.apvts.getRawParameterValue(ConcreteAudioProcessor::filterModelParamID)->load()), 3,
+                         "selecting \"(Custom)\" must not reset or otherwise touch any other parameter");
+        }
+
+        beginTest("Regression: a customization made after selecting a machine survives a session "
+                  "round-trip, rather than being clobbered back to the machine's own defaults (Phase 7)");
+        {
+            // Real risk this guards against: AudioProcessorValueTreeState::replaceState() can fire
+            // parameterChanged() for every parameter whose value differs from what's currently
+            // held, INCLUDING machineParamID if the restored session had a machine selected -
+            // machineParamID's listener applies a whole machine's worth of values on change (see
+            // ConcreteAudioProcessor::applyMachine()), so left registered during a restore, it
+            // would silently overwrite every other just-restored parameter (including anything the
+            // user had deliberately customized past the machine's own starting point) with that
+            // machine's canned values instead of the session's actual saved ones. Fixed by
+            // unregistering that one listener for the duration of replaceState() - see
+            // setStateInformation()'s own comment.
+            ConcreteAudioProcessor original;
+            original.prepareToPlay(44100.0, 512);
+
+            const auto mpc60Index = machineTableIndexByName("MPC60");
+            auto* machine = original.apvts.getParameter(ConcreteAudioProcessor::machineParamID);
+            machine->setValueNotifyingHost(machine->convertTo0to1((float) (mpc60Index + 1)));
+
+            const auto& mpc60 = getConcreteMachines()[(size_t) mpc60Index];
+            auto* bitDepth = original.apvts.getParameter(ConcreteAudioProcessor::bitDepthParamID);
+            const auto customizedBitDepth = mpc60.bitDepthBits == 16 ? 10 : 16; // deliberately different from the machine's own value
+            bitDepth->setValueNotifyingHost(bitDepth->convertTo0to1((float) customizedBitDepth));
+
+            juce::MemoryBlock state;
+            original.getStateInformation(state);
+
+            ConcreteAudioProcessor reloaded;
+            reloaded.setStateInformation(state.getData(), (int) state.getSize());
+
+            expectEquals((int) std::lround(reloaded.apvts.getRawParameterValue(ConcreteAudioProcessor::bitDepthParamID)->load()),
+                         customizedBitDepth,
+                         "the customization made after selecting the machine must survive the round-trip");
+            expectEquals((int) std::lround(reloaded.apvts.getRawParameterValue(ConcreteAudioProcessor::machineParamID)->load()),
+                         mpc60Index + 1,
+                         "the restored Machine selection itself should still round-trip correctly");
         }
     }
 };

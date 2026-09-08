@@ -123,6 +123,10 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
             if (auto* param = processor.apvts.getParameter(paramID))
                 param->setValueNotifyingHost(param->getDefaultValue());
         };
+        // Resets to "(Custom)" - a no-op application-wise (see machineParamID's own comment), but
+        // still worth doing so the combo itself visibly reflects "nothing selected" after Reset,
+        // matching every other control here reverting to ITS OWN default.
+        resetParam(ConcreteAudioProcessor::machineParamID);
         resetParam(ConcreteAudioProcessor::pitchEngineModeParamID);
         resetParam(ConcreteAudioProcessor::baseRateParamID);
         resetParam(ConcreteAudioProcessor::coarseTuneParamID);
@@ -142,6 +146,14 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
         resetParam(ConcreteAudioProcessor::voiceCountParamID);
         resetParam(ConcreteAudioProcessor::ampEnvelopeModeParamID);
     };
+
+    addAndMakeVisible(machineLabel);
+    machineLabel.attachToComponent(&machineCombo, true);
+    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::machineParamID))
+        machineCombo.addItemList(param->getAllValueStrings(), 1);
+    addAndMakeVisible(machineCombo);
+    machineAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        processor.apvts, ConcreteAudioProcessor::machineParamID, machineCombo);
 
     addAndMakeVisible(pitchEngineLabel);
     pitchEngineLabel.attachToComponent(&pitchEngineCombo, true);
@@ -283,7 +295,7 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
 
     addAndMakeVisible(keyboardComponent);
 
-    setSize(700, 690);
+    setSize(700, 726);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -308,6 +320,12 @@ void ConcreteAudioProcessorEditor::resized()
     oneShotButton.setBounds(topRow.removeFromLeft(90));
     topRow.removeFromLeft(20);
     resetButton.setBounds(topRow.removeFromLeft(80));
+
+    bounds.removeFromTop(8);
+
+    auto machineRow = bounds.removeFromTop(28);
+    machineRow.removeFromLeft(90); // space for the "Machine" label
+    machineCombo.setBounds(machineRow.removeFromLeft(220));
 
     bounds.removeFromTop(8);
 

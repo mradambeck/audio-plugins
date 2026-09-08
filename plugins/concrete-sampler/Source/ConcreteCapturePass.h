@@ -20,11 +20,18 @@
 // carrying those artifacts. Deliberately does NOT otherwise run through any filter model
 // (Architecture #3 - filters are playback-side only on the real hardware; an earlier "double
 // smear" option that broke this rule as a deliberate exception was removed as not worth the extra
-// control once Capture Iterations already covers compounding degradation). Quantization always
-// runs (using the current Bit Depth/Quantizer Mode - Phase 3) even when the resample+drive
-// technique itself is bypassed, since on real hardware SOME converter is always in the signal path
-// - `settings.bypass` specifically disables resample+drive+quantize as one unit ("monitor the raw
-// source with nothing engaged"), not quantization alone.
+// control once Capture Iterations already covers compounding degradation).
+//
+// `settings.bypass` disables resample+drive+quantize ALL THREE as one unit ("monitor the raw
+// source with nothing engaged" - see apply()'s own early-return) - including quantization, not
+// just the resample/drive technique. This means Bit Depth/Quantizer Mode (Phase 3) have NO
+// audible effect on a machine's DEFAULT sound, since every Phase 7 machine preset ships with
+// bypass on (see concrete-sampler-plugin-plan.md's table notes: "every preset ships with the
+// capture pass off - it's a technique the user applies, not part of a machine's stock behavior");
+// they only matter once the user deliberately turns Capture Bypass off, at which point the
+// machine's own Bit Depth/Quantizer Mode preset values (already set, just previously inert) take
+// effect immediately. Confirmed via analysis/verify_phase7.py's investigation into why bit-depth
+// differences between machines don't show up in their default-settings spectra.
 class ConcreteCapturePass
 {
 public:

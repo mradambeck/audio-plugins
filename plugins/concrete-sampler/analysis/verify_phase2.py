@@ -6,8 +6,9 @@ ConcreteRenderIR tool.
      the effective playback rate. Reports frequency/level of the strongest image.
   2. Mode A vs Phase 1 reference, same note: null test - must NOT null.
   3. Mode A at increasing downward transposition: image energy increases monotonically (charted).
-  4. Mode B at 26.04kHz, 1kHz sine: high-frequency image content, and a spectrum measurably
-     different from Mode A at the same pitch (a null test between the two).
+  4. Mode B at 26.04kHz, 1kHz sine: high-frequency image content even at root pitch, and (once
+     transposed - the two are mathematically identical at root by construction, see Check 4's own
+     comment) a spectrum measurably different from Mode A (a null test between the two).
   5. Mode C, full-scale sine: noise floor in-band (20Hz-15kHz) vs above 20kHz.
   6. Mode A/B image measurements repeated at 44.1kHz and 96kHz host rates - measured artifact
      frequencies must agree.
@@ -65,17 +66,18 @@ def render(out_path, note=60, seconds=1.0, sample_rate=44100, velocity=127,
 
 
 def effective_fundamental_hz(note, base_rate_hz, source_freq_hz=1000.0, source_file_rate_hz=44100.0, root_note=60):
-    """The ACTUAL output fundamental for machine modes A/B/C, accounting for two independent
-    pitch effects that both apply: the played note's transposition from the zone's root, AND
-    ConcretePitchEngine's use of baseRateHz in place of the file's own real rate (see
-    ConcretePitchEngine.h's header comment) - which re-interprets whatever's in the buffer as if
-    it had been captured at baseRateHz instead of source_file_rate_hz, shifting pitch by that
-    ratio independently of note transposition. A file recorded at exactly baseRateHz has no such
-    shift; test-assets/sine_1khz.wav is a 44.1kHz file, so anything but base_rate_hz=44100 mixes
-    the two effects together - this reproduces exactly what ConcreteVoice/ConcretePitchEngine
-    actually compute, not a re-derivation from scratch."""
+    """The ACTUAL output fundamental for machine modes A/B/C: just the played note's transposition
+    from the zone's root, exactly like Reference mode - root-pitch playback speed tracks the
+    file's own real rate, never baseRateHz (see ConcretePitchEngine.h's own comment on readModeA()
+    for the real, previously-shipped bug this fixed: baseRateHz used to substitute for the file's
+    real rate in the pitch calculation, so loading the same file into two machines with different
+    base rates played it back at two different pitches/tempos even at an untransposed note -
+    reported directly against a real breakbeat, and confirmed with a 1kHz tone measuring ~212Hz
+    through the Casio SK-1 preset instead of 1kHz. base_rate_hz/source_file_rate_hz are still
+    accepted for call-site compatibility below but no longer affect the result - baseRateHz now
+    controls only artifact CHARACTER (how coarse the zero-order hold is), never pitch/tempo."""
     pitch_ratio = 2.0 ** ((note - root_note) / 12.0)
-    return source_freq_hz * (base_rate_hz / source_file_rate_hz) * pitch_ratio
+    return source_freq_hz * pitch_ratio
 
 
 def band_energy_db(signal, sample_rate, lo_hz, hi_hz):
@@ -173,18 +175,36 @@ def main():
         plt.close()
         print(f"    chart saved to {PLOTS_DIR}/mode_a_image_energy_vs_transposition.png")
 
-        print("\n--- Check 4: Mode B vs Mode A at the same pitch - genuinely different engines ---")
-        out_b = os.path.join(tmp, "modeB_root.wav")
-        out_a_root = os.path.join(tmp, "modeA_root.wav")
-        render(out_b, note=60, seconds=1.0, mode=MODE_B, base_rate=base_rate)
-        render(out_a_root, note=60, seconds=1.0, mode=MODE_A, base_rate=base_rate)
-        _, dB = ca.load_wav(out_b)
-        _, dA = ca.load_wav(out_a_root)
+        print("\n--- Check 4: Mode B vs Mode A - genuinely different engines under transposition ---")
+        # Tested TRANSPOSED (-12 semitones), not at root: Mode A's hold-tick rate scales with
+        # baseRate*pitchRatio (the clock moves with transposition) while Mode B's stays fixed at
+        # baseRate regardless of pitch (the clock never moves - see each mode's own comment in
+        # ConcretePitchEngine.cpp) - those are, respectively, EXACTLY equal and exactly baseRate
+        # when pitchRatio=1, so AT ROOT the two are mathematically identical by construction, not
+        # a bug: with no transposition happening, there is nothing for "a clock that scales with
+        # transposition" to do differently from "a clock that doesn't." The genuine distinction
+        # between them - the entire point of shipping two separate modes - only exists once you
+        # actually transpose, which is where this check now looks for it instead.
+        out_b_transposed = os.path.join(tmp, "modeB_transposed.wav")
+        out_a_transposed = os.path.join(tmp, "modeA_transposed.wav")
+        render(out_b_transposed, note=48, seconds=1.0, mode=MODE_B, base_rate=base_rate)
+        render(out_a_transposed, note=48, seconds=1.0, mode=MODE_A, base_rate=base_rate)
+        _, dB = ca.load_wav(out_b_transposed)
+        _, dA = ca.load_wav(out_a_transposed)
         residualAB = ca.residual_db(ca.to_mono(dB), ca.to_mono(dA))
-        check("Mode B differs measurably from Mode A at the same pitch (residual above -40dBFS)",
+        check("Mode B differs measurably from Mode A once transposed (residual above -40dBFS)",
               residualAB > -40.0, f"residual {residualAB:.1f}dBFS")
-        monoB = ca.to_mono(dB)[4000:]
-        above_hf = band_energy_db(monoB, rate, 8000.0, 22000.0)
+
+        # A SEPARATE, root-pitch render for Mode B's own "always-present, pitch-independent
+        # imaging" claim - unlike the A-vs-B comparison above, this one is still true and testable
+        # at root, since it's about Mode B's OWN character (baseRate 26.04kHz sitting well below
+        # the file's real 44.1kHz rate produces real stair-stepping regardless of transposition),
+        # not about distinguishing it from Mode A specifically.
+        out_b_root = os.path.join(tmp, "modeB_root.wav")
+        render(out_b_root, note=60, seconds=1.0, mode=MODE_B, base_rate=base_rate)
+        _, dBRoot = ca.load_wav(out_b_root)
+        monoBRoot = ca.to_mono(dBRoot)[4000:]
+        above_hf = band_energy_db(monoBRoot, rate, 8000.0, 22000.0)
         check("Mode B shows real high-frequency image content even at root pitch",
               above_hf > -80.0, f"8-22kHz band energy {above_hf:.1f}dBFS")
 

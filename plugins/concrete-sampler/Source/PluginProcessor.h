@@ -6,6 +6,7 @@
 #include "ConcreteBusRouter.h"
 #include "ConcreteCapturePass.h"
 #include "ConcreteFilterModels.h"
+#include "ConcreteMachines.h"
 #include "ConcretePitchEngine.h"
 #include "ConcreteQuantizer.h"
 #include "ConcreteSampleIO.h"
@@ -25,7 +26,9 @@
 // why quantization is part of this pipeline even when the resample/drive technique is bypassed).
 // Phase 5 adds the playback-side filter models (ConcreteFilterModels.h, live per-voice - see
 // ConcreteVoice.h). Phase 6 adds the voice architecture (ConcreteVoiceAllocator.h's voice-count
-// limit, ConcreteContourEnvelope.h's K250-style amp envelope alternative).
+// limit, ConcreteContourEnvelope.h's K250-style amp envelope alternative). Phase 7 adds the twelve
+// machines (ConcreteMachines.h) as a Machine parameter plus host-native factory presets - see
+// machineParamID's own comment for how those two selectors share one apply path.
 class ConcreteAudioProcessor : public juce::AudioProcessor,
                                 private juce::Thread,
                                 private juce::AudioProcessorValueTreeState::Listener
@@ -167,6 +170,32 @@ public:
     static constexpr auto voiceCountParamID = "voiceCount";
     static constexpr auto ampEnvelopeModeParamID = "ampEnvelopeMode";
 
+    // Phase 7's Machine selector (see ConcreteMachines.h) - "a single Machine selector as the
+    // primary control," per the plan, with everything else (the parameters above) still exposed
+    // underneath as secondary controls, so a machine is a starting point rather than a locked
+    // mode. Raw value is the choice index: 0 is "(Custom)", a deliberate non-machine sentinel, NOT
+    // one of the twelve - without it, an AudioParameterChoice's default would have to BE one of
+    // the twelve machines (a choice parameter always has some concrete default), which would mean
+    // either silently coloring a freshly-loaded instance with that machine's settings before the
+    // user ever touched anything (breaking every earlier phase's "no coloration until asked for"
+    // convention - see e.g. baseRateParamID's own comment on why THIS plugin's default resists
+    // defaulting to any one machine's real rate), or leaving that one machine permanently
+    // unreachable from its own combo box (JUCE's ComboBox doesn't fire onChange when you pick the
+    // item that's already showing - see FactoryPreset.h's setupPresetCombo() for the same gotcha).
+    // Indices 1-12 select machines 0-11 of getConcreteMachines(), in table order.
+    //
+    // This is a SEPARATE mechanism from getNumPrograms()/setCurrentProgram()/getProgramName()
+    // below (JUCE's older, non-automatable "host program list" concept - see FactoryPreset.h) even
+    // though both surfaces list the same twelve machines, because the plan explicitly wants BOTH:
+    // an automatable in-plugin parameter a host's automation lane can ride, AND host-native program
+    // menu compatibility "so host program menus work like every other plugin in the catalog." They
+    // share exactly one application path to stay in sync by construction rather than by duplicating
+    // apply logic: setCurrentProgram() only moves this parameter (to index+1), and
+    // parameterChanged()'s handling of THIS parameter (applyMachine()) is the sole place that
+    // actually pushes a machine's values into the other parameters, via
+    // factoryPresets.setCurrentProgram() - see that method's own comment.
+    static constexpr auto machineParamID = "machine";
+
     // Synchronously re-derives every zone's working buffer from its source buffer using the
     // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
     // private juce::Thread override below) runs this same logic asynchronously whenever a capture-
@@ -201,15 +230,33 @@ private:
     // stopped in the destructor.
     void run() override;
 
-    // juce::AudioProcessorValueTreeState::Listener override, registered for exactly the parameter
-    // IDs that change what ConcreteCapturePass::apply() produces: bitDepth, quantizerMode,
-    // captureTranspose, captureDrive, captureBypass, captureIterations - NOT captureAutoCompensate
-    // or any of the live filterXxx parameters, none of which need a re-bake (see their own
-    // declaration comments above and ConcreteVoice.h). May fire from ANY thread depending on the
-    // host (worst case the audio thread itself, if a host applies automation from inside
-    // processBlock()), so this does the absolute minimum: wake the bake thread. The actual
-    // (expensive, allocating) re-bake work always happens on that thread, never here.
+    // juce::AudioProcessorValueTreeState::Listener override, registered for two DIFFERENT groups
+    // of parameter IDs that need two DIFFERENT responses:
+    //   - The parameters that change what ConcreteCapturePass::apply() produces: bitDepth,
+    //     quantizerMode, captureTranspose, captureDrive, captureBypass, captureIterations - NOT
+    //     captureAutoCompensate or any of the live filterXxx parameters, none of which need a
+    //     re-bake (see their own declaration comments above and ConcreteVoice.h). These do the
+    //     absolute minimum: wake the bake thread. The actual (expensive, allocating) re-bake work
+    //     always happens on that thread, never here - see machineParamID's own comment for why
+    //     THIS group's handling is safe to keep doing the bare minimum even now that a single
+    //     Machine change can touch several of them at once.
+    //   - machineParamID (Phase 7) - see applyMachine(). Unlike the group above, this one's
+    //     response (looping over ~9 setValueNotifyingHost() calls) is real work done directly here
+    //     rather than deferred to the bake thread - each of those calls is a cheap, bounded atomic
+    //     value write plus listener notification (not allocating or blocking I/O, unlike the
+    //     capture pass itself), so it stays acceptable even in the worst case of a host automating
+    //     Machine from inside processBlock(). Every one of THOSE calls may itself synchronously
+    //     re-enter this same override for whichever of the IDs above it touches, which is fine -
+    //     their handling is already just an atomic flag set, safe to re-enter from anywhere.
+    // May fire from ANY thread depending on the host (worst case the audio thread itself).
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+
+    // The sole place a machine's values actually get pushed into the other parameters - see
+    // machineParamID's own comment. machineChoiceIndex is the Machine parameter's raw value: <= 0
+    // ("(Custom)") is a deliberate no-op, otherwise index-1 selects getConcreteMachines()[index-1]
+    // via factoryPresets.setCurrentProgram(), the same call a host picking its own native program
+    // makes (see setCurrentProgram() below) - one apply path shared by both entry points.
+    void applyMachine(int machineChoiceIndex);
 
     // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
     // getProgramName() above just forward to this.

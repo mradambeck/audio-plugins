@@ -95,6 +95,15 @@ private:
 
     ConcreteWaveformDisplay waveformDisplay;
 
+    // Phase 7's Machine selector (see ConcreteMachines.h) - "a single Machine selector as the
+    // primary control," per the plan, hence its own row right under the load/reset controls,
+    // above every other (secondary) control below. A real APVTS parameter, so this uses the
+    // standard Attachment convention like Pitch Engine/Filter Model/etc, not the manual wiring
+    // Root Note/One-Shot below need (those are zone-list state, not parameters).
+    juce::Label machineLabel { {}, "Machine" };
+    juce::ComboBox machineCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> machineAttachment;
+
     // Root note is zone-list state (Architecture #1), not an APVTS parameter, so this is a plain
     // Slider with no Attachment - setRootNoteForZone() is called directly on change. Displayed as
     // a note name (e.g. "C3") rather than a raw MIDI number, per octaveNumForMiddleC=3 (note 60 =

@@ -50,7 +50,17 @@ def render(out_path, note=60, seconds=1.0, sample_rate=44100, velocity=127,
          # pitchEngineMode 0 = Reference throughout this phase's checks - Phase 3's quantizer is
          # deliberately isolated from Phase 2's pitch engines so each phase's checks measure only
          # the thing that phase added (matches verify_phase2.py's own isolation of pitch effects).
-         "--pitchEngineMode", "0", "--bitDepth", str(bit_depth), "--quantizerMode", str(quantizer_mode)],
+         "--pitchEngineMode", "0", "--bitDepth", str(bit_depth), "--quantizerMode", str(quantizer_mode),
+         # captureBypass must be OFF: Phase 4 later moved Phase 3's quantizer from always-on live
+         # processing into the offline capture pass (see ConcreteCapturePass.h's own comment on why
+         # quantization lives there), which defaults to bypassed - without this flag, every render
+         # below was silently an exact, unquantized copy of the source regardless of bitDepth/
+         # quantizerMode, a real regression in this SCRIPT (not the DSP - ConcreteQuantizerTests.cpp
+         # and verify_phase4.py both already exercise the quantizer correctly) that went unnoticed
+         # since Phase 4 shipped, until a full verify_phase0-7 regression sweep caught it.
+         # captureTranspose 0 keeps the capture pass's own resample step a no-op, isolating the
+         # quantizer exactly as this phase's checks intend.
+         "--captureBypass", "0", "--captureTranspose", "0"],
         check=True, capture_output=True, text=True,
     )
 

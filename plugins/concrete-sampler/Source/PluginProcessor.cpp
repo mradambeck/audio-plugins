@@ -4,13 +4,47 @@
 
 namespace
 {
-    // No factory presets yet - Phase 7 defines the twelve machine presets from the plan's machine
-    // table (concrete-sampler-plugin-plan.md), decoded from real .aupreset files the same way
-    // every other plugin's getFactoryPresets() is, per common/Presets/FactoryPreset.h's
-    // convention. Empty for now: FactoryPresetList/getNumPrograms() handle zero presets correctly.
+    // The twelve machines from concrete-sampler-plugin-plan.md's machine table (see
+    // ConcreteMachines.h), surfaced as the host's native factory-preset list - see
+    // ConcreteAudioProcessor::machineParamID's own comment for why this exists ALONGSIDE a live
+    // Machine parameter rather than instead of it.
+    //
+    // Deliberate divergence from FactoryPreset.h's own stated convention: every other plugin's
+    // factory presets are decoded from real .aupreset files a developer saved via a host's native
+    // preset UI. These twelve are hand-authored directly from the plan's researched machine table
+    // instead, because that table IS the specification - there's no real hardware to save a
+    // reference .aupreset from. Any additional "sound" presets layered on top of these twelve
+    // (not part of Phase 7) should follow the usual .aupreset route.
+    //
+    // captureBypass is always set to 1 (on) here, never captureTranspose's own value alone - "every
+    // preset ships with the capture pass off," per the plan's table notes; what a machine sets is
+    // only the default the Capture Transpose control lands on once the user manually engages it.
+    // The enum -> raw-index casts below are safe because every affected enum's underlying values
+    // were defined to match its AudioParameterChoice's StringArray order exactly (see
+    // createParameterLayout() and e.g. filterModeFromParam() below) - a static_assert isn't
+    // practical across four unrelated enums, so this comment is the guardrail instead.
     const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
-        static const std::vector<wildjag::FactoryPreset> presets = {};
+        static const std::vector<wildjag::FactoryPreset> presets = []
+        {
+            std::vector<wildjag::FactoryPreset> result;
+            for (const auto& machine : getConcreteMachines())
+            {
+                result.push_back({ juce::String(machine.name),
+                    {
+                        { ConcreteAudioProcessor::pitchEngineModeParamID, (float) static_cast<int>(machine.pitchEngineMode) },
+                        { ConcreteAudioProcessor::baseRateParamID, machine.baseRateHz },
+                        { ConcreteAudioProcessor::bitDepthParamID, (float) machine.bitDepthBits },
+                        { ConcreteAudioProcessor::quantizerModeParamID, (float) static_cast<int>(machine.quantizerMode) },
+                        { ConcreteAudioProcessor::captureTransposeParamID, machine.captureTransposeSemitones },
+                        { ConcreteAudioProcessor::captureBypassParamID, 1.0f },
+                        { ConcreteAudioProcessor::filterModelParamID, (float) static_cast<int>(machine.filterModel) },
+                        { ConcreteAudioProcessor::voiceCountParamID, (float) machine.voiceCount },
+                        { ConcreteAudioProcessor::ampEnvelopeModeParamID, (float) static_cast<int>(machine.ampEnvelopeMode) },
+                    } });
+            }
+            return result;
+        }();
         return presets;
     }
 
@@ -96,6 +130,11 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
     for (auto* paramID : { bitDepthParamID, quantizerModeParamID, captureTransposeParamID,
                             captureDriveParamID, captureBypassParamID, captureIterationsParamID })
         apvts.addParameterListener(paramID, this);
+
+    // Registered separately (not folded into the loop above) since it triggers a completely
+    // different response in parameterChanged() - see machineParamID's and that method's own
+    // comments.
+    apvts.addParameterListener(machineParamID, this);
 
     startThread();
 }
@@ -194,21 +233,40 @@ void ConcreteAudioProcessor::run()
     }
 }
 
-void ConcreteAudioProcessor::parameterChanged(const juce::String&, float)
+void ConcreteAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Deliberately the ENTIRE body - may run on the audio thread (see this method's declaration
-    // comment in PluginProcessor.h), so it must stay lock-free/allocation-free/wait-free. notify()
-    // is a plain juce::WaitableEvent signal under the hood, safe to call from any thread.
+    if (parameterID == machineParamID)
+    {
+        applyMachine((int) std::lround(newValue));
+        return;
+    }
+
+    // Deliberately the ENTIRE body for every other registered ID - may run on the audio thread
+    // (see this method's declaration comment in PluginProcessor.h), so it must stay lock-free/
+    // allocation-free/wait-free. notify() is a plain juce::WaitableEvent signal under the hood,
+    // safe to call from any thread.
     bakeRequested = true;
     notify();
+}
+
+void ConcreteAudioProcessor::applyMachine(int machineChoiceIndex)
+{
+    if (machineChoiceIndex <= 0)
+        return; // "(Custom)" - a deliberate no-op sentinel, see machineParamID's own comment
+
+    const auto machineTableIndex = machineChoiceIndex - 1;
+    if (!juce::isPositiveAndBelow(machineTableIndex, (int) getConcreteMachines().size()))
+        return; // defensive only - every real host value is in range by construction
+
+    factoryPresets.setCurrentProgram(machineTableIndex, apvts);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::createParameterLayout()
 {
     // Phase 2's first real automatable parameters - root note/key range/tune/level/pan stay
     // zone-list state (Architecture #1), but pitch engine mode/base rate/coarse/fine tune are
-    // genuine live controls a machine preset (Phase 7) will set defaults for and the user can
-    // push past them. Ranges/step sizes for the tune pair match gradient-pitch's own
+    // genuine live controls a machine preset (see ConcreteMachines.h) sets defaults for, and the
+    // user can push past them. Ranges/step sizes for the tune pair match gradient-pitch's own
     // pitchSemitones/pitchFineCents controls (-24..24st, -50..50ct) for consistency across the
     // catalog's pitch-shifting controls.
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -220,16 +278,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         0));
 
     // Default 44.1kHz, NOT one of the machines' own rates (e.g. the SP-1200's 26.04kHz, the first
-    // choice tried here) - baseRate substitutes for the loaded file's own rate for Modes A/B/C
-    // (see ConcretePitchEngine.h), and almost every file a user loads will itself be a 44.1kHz
-    // recording, so defaulting to anything else means root note DOESN'T reproduce the original
-    // pitch/tempo out of the box, in every mode, before the user has touched anything - breaking
-    // the one convention every sampler upholds. At baseRate == the file's real rate and unison
-    // pitch, Mode A reduces to a bit-exact match of Reference (zero-order-hold and cubic
-    // interpolation both collapse to reading the exact sample at zero fractional offset), so this
-    // default costs nothing: the character still shows up exactly where it should - as soon as the
-    // note is transposed away from root, or Base Rate is deliberately lowered to emulate a
-    // narrower-bandwidth machine on purpose. Range covers the full machine table's span
+    // choice tried here). Root-pitch playback speed always tracks the zone's real sourceSampleRate
+    // regardless of Base Rate (see ConcretePitchEngine.h's own comment on readModeA() for the real,
+    // previously-shipped bug where it didn't) - what Base Rate controls, for Modes A/B/C, is purely
+    // artifact CHARACTER: how coarse the zero-order hold/decimation is, which scales with how far
+    // Base Rate sits from the loaded file's own real rate. Almost every file a user loads will
+    // itself be a 44.1kHz recording, so defaulting to anything else would introduce audible
+    // artifact at root before the user has touched anything - the "no coloration until asked for"
+    // convention every other control here follows. At Base Rate == the file's real rate, Mode A
+    // reduces to a bit-exact match of Reference (zero-order-hold and cubic interpolation both
+    // collapse to reading the exact sample at zero fractional offset) regardless of the note
+    // played, so this default costs nothing: the character still shows up exactly where it should -
+    // as soon as Base Rate is deliberately lowered (or a machine preset sets its own, different
+    // default) to emulate a narrower-bandwidth machine on purpose. Range covers the full machine table's span
     // (concrete-sampler-plugin-plan.md's preset table, Phase 7): the SK-1's fixed 9.38kHz up
     // through the Synclavier's programmable ceiling of 100kHz.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
@@ -258,9 +319,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
     // Phase 3's quantization stage (see ConcreteQuantizer.h). Default 16-bit/Linear is
     // deliberately transparent - same "no artifacts before the user or a machine preset asks for
     // them" convention as Base Rate's 44.1kHz default above: at 16 bits the quantization noise
-    // floor sits around -96dBFS, far below anything audible, so this costs nothing until a Phase 7
-    // preset (or the user directly) dials it down toward one of the machines' real depths (8, 12,
-    // 13 bits).
+    // floor sits around -96dBFS, far below anything audible, so this costs nothing until a machine
+    // preset (see ConcreteMachines.h) or the user directly dials it down toward one of the
+    // machines' real depths (8, 12, 13 bits) - which, per Capture Bypass's own comment, still
+    // needs Capture Bypass turned off before it's actually audible.
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{bitDepthParamID, 1},
         "Bit Depth",
@@ -356,6 +418,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         juce::ParameterID{ampEnvelopeModeParamID, 1},
         "Amp Envelope Mode",
         juce::StringArray{"ADSR", "Contoured"}, 0));
+
+    // Phase 7's Machine selector (see ConcreteMachines.h and machineParamID's own comment). Index
+    // 0 is "(Custom)", a deliberate non-machine default - selecting it never applies anything, so
+    // a fresh instance keeps every parameter's own independent default above rather than being
+    // silently colored by whichever machine happened to be listed first.
+    juce::StringArray machineChoices{"(Custom)"};
+    for (const auto& machine : getConcreteMachines())
+        machineChoices.add(machine.name);
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{machineParamID, 1},
+        "Machine",
+        machineChoices, 0));
 
     return { params.begin(), params.end() };
 }
@@ -600,7 +675,20 @@ double ConcreteAudioProcessor::getTailLengthSeconds() const { return 0.05; }
 
 int ConcreteAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int ConcreteAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void ConcreteAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+
+void ConcreteAudioProcessor::setCurrentProgram(int index)
+{
+    // See machineParamID's own comment: moving that parameter is the ONLY thing this does -
+    // parameterChanged()'s handling of it (applyMachine()) is what actually calls
+    // factoryPresets.setCurrentProgram() and pushes the machine's values into every other
+    // parameter, synchronously, before this call returns (setValueNotifyingHost() always
+    // dispatches to listeners immediately, on whatever thread called it). Routing the host's own
+    // program-list selection through the SAME parameter the in-plugin Machine control uses keeps
+    // both entry points in sync by construction, rather than duplicating the apply logic here too.
+    if (auto* machine = apvts.getParameter(machineParamID))
+        machine->setValueNotifyingHost(machine->convertTo0to1((float) (index + 1)));
+}
+
 const juce::String ConcreteAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 void ConcreteAudioProcessor::changeProgramName(int, const juce::String&) {}
 
@@ -632,7 +720,17 @@ void ConcreteAudioProcessor::setStateInformation(const void* data, int sizeInByt
     const auto restoredState = juce::ValueTree::fromXml(*xml);
     const auto zonesTree = restoredState.getChildWithName(ConcreteZoneIDs::zones);
 
+    // machineParamID's listener applies a whole machine's worth of OTHER parameter values on
+    // change (see applyMachine()), and replaceState() can fire parameterChanged() for every
+    // parameter whose value differs from what's currently held - including this one, if the
+    // restored session had a different Machine selected. Left registered, that would silently
+    // clobber every other just-restored parameter with the machine's own canned values instead of
+    // the session's actual saved ones. Unregistered only for the duration of the replace; every
+    // OTHER registered listener (the bake-triggering group) tolerates firing during a restore just
+    // fine, since none of them set any other parameter themselves.
+    apvts.removeParameterListener(machineParamID, this);
     apvts.replaceState(restoredState);
+    apvts.addParameterListener(machineParamID, this);
 
     embedSamplesOverride = (bool) zonesTree.getProperty(ConcreteZoneIDs::embedOverride, false);
     // The working buffer is never persisted (Architecture #2) - valueTreeToSampleSet() restores

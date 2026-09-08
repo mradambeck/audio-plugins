@@ -13,10 +13,14 @@ that file doesn't have:
   - THD and energy-above-a-frequency -- needed starting with Phase 1's own reference-path
     verification ("THD < 0.1%", "no energy above 2kHz beyond the noise floor"), a phase earlier
     than originally guessed when this module was first written.
+  - Spectral centroid -- added for Phase 7's twelve-machine comparison table (a single "brightness"
+    number per render, needed to check e.g. "the SK-1 has by far the lowest spectral centroid").
 
-Spectral-centroid and image/alias-energy-vs-transpose measurements are still deliberately NOT
-here -- they get added in Phase 2/7 when those phases first need them, per this repo's ml-toolkit
-"build only what the current effect needs" convention (see AGENTS.md).
+Image/alias-energy-vs-transpose measurements are still deliberately NOT here -- Phase 4's own
+verification found that metric didn't track aliasing at all for this plugin's resample
+construction (see verify_phase4.py's own comment) and replaced it with a precise closed-form
+near-Nyquist-tone prediction instead, which is specific enough to that phase's own test harness
+that it was never worth promoting into a shared primitive.
 """
 import numpy as np
 from scipy.io import wavfile
@@ -93,6 +97,17 @@ def energy_above_freq_db(signal, sample_rate, freq_hz):
     mask = freqs >= freq_hz
     rms = float(np.sqrt(np.mean(magnitude[mask] ** 2))) if np.any(mask) else 0.0
     return 20.0 * np.log10(max(rms, 1e-12))
+
+
+def spectral_centroid(signal, sample_rate):
+    """The magnitude-weighted average frequency, in Hz - a single-number "brightness" proxy (a
+    higher centroid means more energy concentrated at higher frequencies). Weighted by LINEAR
+    magnitude, not dB, so a handful of loud low partials properly dominate a much larger number of
+    quiet high ones, matching how "brightness" is actually perceived."""
+    freqs, magnitude_db = magnitude_spectrum_db(signal, sample_rate)
+    magnitude = 10.0 ** (magnitude_db / 20.0)
+    total = float(np.sum(magnitude))
+    return float(np.sum(freqs * magnitude) / total) if total > 0.0 else 0.0
 
 
 def residual_db(signal_a, signal_b):

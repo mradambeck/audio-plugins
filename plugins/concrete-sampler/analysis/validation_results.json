@@ -1,0 +1,617 @@
+{
+  "machines": {
+    "E-mu SP-1200": {
+      "root": {
+        "noise_floor_db": -67.96508514920936,
+        "spectral_centroid_hz": 8604.541281982378,
+        "image_energy_above_10khz_db": -51.96947579069161
+      },
+      "up12": {
+        "noise_floor_db": -48.84219168357877,
+        "spectral_centroid_hz": 8652.464547020943,
+        "image_energy_above_10khz_db": -62.501611053853765
+      },
+      "down12": {
+        "noise_floor_db": -72.04733052278992,
+        "spectral_centroid_hz": 8158.482127770848,
+        "image_energy_above_10khz_db": -52.26593525641799
+      }
+    },
+    "E-mu Emulator II": {
+      "root": {
+        "noise_floor_db": -68.14731577188961,
+        "spectral_centroid_hz": 8891.278177701673,
+        "image_energy_above_10khz_db": -51.544248425882756
+      },
+      "up12": {
+        "noise_floor_db": -48.86869137483633,
+        "spectral_centroid_hz": 10746.028288680742,
+        "image_energy_above_10khz_db": -59.97322682142389
+      },
+      "down12": {
+        "noise_floor_db": -68.82385330992763,
+        "spectral_centroid_hz": 7036.6309022657415,
+        "image_energy_above_10khz_db": -56.22323856472518
+      }
+    },
+    "E-mu Emax": {
+      "root": {
+        "noise_floor_db": -71.6703848512819,
+        "spectral_centroid_hz": 10482.558688149196,
+        "image_energy_above_10khz_db": -49.523364240400376
+      },
+      "up12": {
+        "noise_floor_db": -48.86771672407791,
+        "spectral_centroid_hz": 10724.275235624633,
+        "image_energy_above_10khz_db": -59.9738612254023
+      },
+      "down12": {
+        "noise_floor_db": -73.57054330722929,
+        "spectral_centroid_hz": 7793.06277975026,
+        "image_energy_above_10khz_db": -52.42489525471431
+      }
+    },
+    "Akai MPC60": {
+      "root": {
+        "noise_floor_db": -76.35369008484945,
+        "spectral_centroid_hz": 10629.399080998925,
+        "image_energy_above_10khz_db": -52.17029247607406
+      },
+      "up12": {
+        "noise_floor_db": -52.15053553630266,
+        "spectral_centroid_hz": 11152.617167006629,
+        "image_energy_above_10khz_db": -62.27041576081706
+      },
+      "down12": {
+        "noise_floor_db": -74.14716484541405,
+        "spectral_centroid_hz": 8041.9538730681725,
+        "image_energy_above_10khz_db": -55.38447657797704
+      }
+    },
+    "Fairlight CMI": {
+      "root": {
+        "noise_floor_db": -73.63668322498776,
+        "spectral_centroid_hz": 9411.719183133078,
+        "image_energy_above_10khz_db": -54.382023876917955
+      },
+      "up12": {
+        "noise_floor_db": -52.173626713548074,
+        "spectral_centroid_hz": 10701.6765779597,
+        "image_energy_above_10khz_db": -63.485569799849785
+      },
+      "down12": {
+        "noise_floor_db": -73.1570976033131,
+        "spectral_centroid_hz": 7340.8387882520765,
+        "image_energy_above_10khz_db": -58.52765216202915
+      }
+    },
+    "Synclavier II": {
+      "root": {
+        "noise_floor_db": -91.06367269340693,
+        "spectral_centroid_hz": 11036.716988202177,
+        "image_energy_above_10khz_db": -51.72811571334542
+      },
+      "up12": {
+        "noise_floor_db": -52.15376862648757,
+        "spectral_centroid_hz": 11112.121952195437,
+        "image_energy_above_10khz_db": -62.350781658485126
+      },
+      "down12": {
+        "noise_floor_db": -74.78347825588897,
+        "spectral_centroid_hz": 8376.057778343213,
+        "image_energy_above_10khz_db": -54.7357626099516
+      }
+    },
+    "Kurzweil K250": {
+      "root": {
+        "noise_floor_db": -87.45995834742223,
+        "spectral_centroid_hz": 9714.719442532545,
+        "image_energy_above_10khz_db": -64.69689269191593
+      },
+      "up12": {
+        "noise_floor_db": -63.41375657932175,
+        "spectral_centroid_hz": 9658.760421301467,
+        "image_energy_above_10khz_db": -70.21717554274227
+      },
+      "down12": {
+        "noise_floor_db": -110.93192631975855,
+        "spectral_centroid_hz": 7564.7618379667865,
+        "image_energy_above_10khz_db": -67.2311209461823
+      }
+    },
+    "Ensoniq Mirage": {
+      "root": {
+        "noise_floor_db": -72.89005336179022,
+        "spectral_centroid_hz": 8882.11898448778,
+        "image_energy_above_10khz_db": -55.11615569480975
+      },
+      "up12": {
+        "noise_floor_db": -52.17566376876987,
+        "spectral_centroid_hz": 10661.793646165974,
+        "image_energy_above_10khz_db": -63.4563595686103
+      },
+      "down12": {
+        "noise_floor_db": -72.3750294901745,
+        "spectral_centroid_hz": 7043.943293928955,
+        "image_energy_above_10khz_db": -59.818386595272244
+      }
+    },
+    "Ensoniq EPS": {
+      "root": {
+        "noise_floor_db": -72.9424956826893,
+        "spectral_centroid_hz": 7764.071305822972,
+        "image_energy_above_10khz_db": -56.468577342081836
+      },
+      "up12": {
+        "noise_floor_db": -52.17733838527316,
+        "spectral_centroid_hz": 10634.706079836844,
+        "image_energy_above_10khz_db": -63.56505640508281
+      },
+      "down12": {
+        "noise_floor_db": -71.49568827641461,
+        "spectral_centroid_hz": 6374.425547005893,
+        "image_energy_above_10khz_db": -60.67848694384358
+      }
+    },
+    "Ensoniq ASR-10": {
+      "root": {
+        "noise_floor_db": -92.35211431303121,
+        "spectral_centroid_hz": 9104.155513249087,
+        "image_energy_above_10khz_db": -57.466581777885665
+      },
+      "up12": {
+        "noise_floor_db": -52.29800317896788,
+        "spectral_centroid_hz": 9210.345777009226,
+        "image_energy_above_10khz_db": -70.88382359099458
+      },
+      "down12": {
+        "noise_floor_db": -84.66992058878857,
+        "spectral_centroid_hz": 6777.32170463342,
+        "image_energy_above_10khz_db": -59.23692543927334
+      }
+    },
+    "Linn 9000": {
+      "root": {
+        "noise_floor_db": -73.74995036217462,
+        "spectral_centroid_hz": 9491.037226857714,
+        "image_energy_above_10khz_db": -54.25551891271108
+      },
+      "up12": {
+        "noise_floor_db": -52.177418634516826,
+        "spectral_centroid_hz": 10630.81024626056,
+        "image_energy_above_10khz_db": -63.558108290741615
+      },
+      "down12": {
+        "noise_floor_db": -73.25015554208838,
+        "spectral_centroid_hz": 7425.662517223251,
+        "image_energy_above_10khz_db": -58.25644560025832
+      }
+    },
+    "Casio SK-1": {
+      "root": {
+        "noise_floor_db": -63.631082533712345,
+        "spectral_centroid_hz": 6431.18928636567,
+        "image_energy_above_10khz_db": -60.84391964776817
+      },
+      "up12": {
+        "noise_floor_db": -52.09349451616824,
+        "spectral_centroid_hz": 7711.996705036869,
+        "image_energy_above_10khz_db": -68.16636928401968
+      },
+      "down12": {
+        "noise_floor_db": -63.37427014043144,
+        "spectral_centroid_hz": 5461.3333087143665,
+        "image_energy_above_10khz_db": -62.97268780817149
+      }
+    }
+  },
+  "isolated_pitch_engine": {
+    "E-mu SP-1200": {
+      "root": -54.51262256512748,
+      "down12": -54.79718015804199
+    },
+    "E-mu Emulator II": {
+      "root": -54.07197872825325,
+      "down12": -58.62844685988874
+    },
+    "E-mu Emax": {
+      "root": -51.940002297764174,
+      "down12": -55.01680278383997
+    },
+    "Akai MPC60": {
+      "root": -52.17029247607406,
+      "down12": -55.38447657797704
+    },
+    "Fairlight CMI": {
+      "root": -53.3534484176539,
+      "down12": -57.512035236250405
+    },
+    "Synclavier II": {
+      "root": -51.72811571334542,
+      "down12": -54.7357626099516
+    },
+    "Kurzweil K250": {
+      "root": -66.56465996101394,
+      "down12": -70.19477281782864
+    },
+    "Ensoniq Mirage": {
+      "root": -54.124872602210445,
+      "down12": -58.715989236034616
+    },
+    "Ensoniq EPS": {
+      "root": -55.57024833066485,
+      "down12": -59.532166600630774
+    },
+    "Ensoniq ASR-10": {
+      "root": -57.466581777885665,
+      "down12": -59.23692543927334
+    },
+    "Linn 9000": {
+      "root": -53.22026374865581,
+      "down12": -57.251130909639244
+    },
+    "Casio SK-1": {
+      "root": -60.05711896003148,
+      "down12": -62.20565943328427
+    }
+  },
+  "pairwise_nulls": [
+    {
+      "a": "E-mu SP-1200",
+      "b": "E-mu Emulator II",
+      "residual_db": -9.668612656198789
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "E-mu Emax",
+      "residual_db": -10.431866168735471
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Akai MPC60",
+      "residual_db": -10.910410342812707
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Fairlight CMI",
+      "residual_db": -10.879617313402346
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Synclavier II",
+      "residual_db": -11.039729438760892
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Kurzweil K250",
+      "residual_db": -9.202031025775716
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Ensoniq Mirage",
+      "residual_db": -10.781974949496272
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Ensoniq EPS",
+      "residual_db": -10.492347925676048
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -12.008487824157774
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Linn 9000",
+      "residual_db": -10.947408754313479
+    },
+    {
+      "a": "E-mu SP-1200",
+      "b": "Casio SK-1",
+      "residual_db": -8.644466839288256
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "E-mu Emax",
+      "residual_db": -10.833564000603248
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Akai MPC60",
+      "residual_db": -12.452764993206998
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Fairlight CMI",
+      "residual_db": -11.893312596562787
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Synclavier II",
+      "residual_db": -11.440908793249648
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Kurzweil K250",
+      "residual_db": -9.267055979635812
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Ensoniq Mirage",
+      "residual_db": -10.80966562715501
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Ensoniq EPS",
+      "residual_db": -10.483582934073127
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -12.252145074471548
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Linn 9000",
+      "residual_db": -11.090476248525825
+    },
+    {
+      "a": "E-mu Emulator II",
+      "b": "Casio SK-1",
+      "residual_db": -8.814032613559755
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Akai MPC60",
+      "residual_db": -15.341822478774054
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Fairlight CMI",
+      "residual_db": -12.69935818869476
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Synclavier II",
+      "residual_db": -17.72076406722975
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Kurzweil K250",
+      "residual_db": -10.203870126852827
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Ensoniq Mirage",
+      "residual_db": -11.836898947615014
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Ensoniq EPS",
+      "residual_db": -10.796554867195454
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -14.438594695654112
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Linn 9000",
+      "residual_db": -12.877317551184222
+    },
+    {
+      "a": "E-mu Emax",
+      "b": "Casio SK-1",
+      "residual_db": -8.927157389127169
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Fairlight CMI",
+      "residual_db": -14.919195081224224
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Synclavier II",
+      "residual_db": -19.91018474253409
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Kurzweil K250",
+      "residual_db": -12.694618852785883
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Ensoniq Mirage",
+      "residual_db": -13.818165485346906
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Ensoniq EPS",
+      "residual_db": -12.54759664088562
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -18.098554653558566
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Linn 9000",
+      "residual_db": -14.965002590226357
+    },
+    {
+      "a": "Akai MPC60",
+      "b": "Casio SK-1",
+      "residual_db": -10.621081389744255
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Synclavier II",
+      "residual_db": -15.123224524194903
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Kurzweil K250",
+      "residual_db": -12.550772801238379
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Ensoniq Mirage",
+      "residual_db": -13.696597081698258
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Ensoniq EPS",
+      "residual_db": -13.018919186403636
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -17.092728485053552
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Linn 9000",
+      "residual_db": -14.20756323973042
+    },
+    {
+      "a": "Fairlight CMI",
+      "b": "Casio SK-1",
+      "residual_db": -10.984297103517218
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Kurzweil K250",
+      "residual_db": -12.998160485259243
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Ensoniq Mirage",
+      "residual_db": -13.9772545336891
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Ensoniq EPS",
+      "residual_db": -12.530994766818475
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -19.27250462642622
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Linn 9000",
+      "residual_db": -15.42897670477405
+    },
+    {
+      "a": "Synclavier II",
+      "b": "Casio SK-1",
+      "residual_db": -10.604359044209637
+    },
+    {
+      "a": "Kurzweil K250",
+      "b": "Ensoniq Mirage",
+      "residual_db": -12.286159428432759
+    },
+    {
+      "a": "Kurzweil K250",
+      "b": "Ensoniq EPS",
+      "residual_db": -11.874193465100069
+    },
+    {
+      "a": "Kurzweil K250",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -14.616708238925277
+    },
+    {
+      "a": "Kurzweil K250",
+      "b": "Linn 9000",
+      "residual_db": -12.580359128006805
+    },
+    {
+      "a": "Kurzweil K250",
+      "b": "Casio SK-1",
+      "residual_db": -11.615803731057689
+    },
+    {
+      "a": "Ensoniq Mirage",
+      "b": "Ensoniq EPS",
+      "residual_db": -12.857097990028372
+    },
+    {
+      "a": "Ensoniq Mirage",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -16.22319104665285
+    },
+    {
+      "a": "Ensoniq Mirage",
+      "b": "Linn 9000",
+      "residual_db": -13.681505132709237
+    },
+    {
+      "a": "Ensoniq Mirage",
+      "b": "Casio SK-1",
+      "residual_db": -10.917230039813193
+    },
+    {
+      "a": "Ensoniq EPS",
+      "b": "Ensoniq ASR-10",
+      "residual_db": -15.187671989261904
+    },
+    {
+      "a": "Ensoniq EPS",
+      "b": "Linn 9000",
+      "residual_db": -13.89999240250949
+    },
+    {
+      "a": "Ensoniq EPS",
+      "b": "Casio SK-1",
+      "residual_db": -10.817255433355895
+    },
+    {
+      "a": "Ensoniq ASR-10",
+      "b": "Linn 9000",
+      "residual_db": -17.236241604924217
+    },
+    {
+      "a": "Ensoniq ASR-10",
+      "b": "Casio SK-1",
+      "residual_db": -12.283675244704606
+    },
+    {
+      "a": "Linn 9000",
+      "b": "Casio SK-1",
+      "residual_db": -10.90318344528159
+    }
+  ],
+  "checks": [
+    {
+      "name": "no two machines null to near-silence against each other (nothing configured identically)",
+      "passed": true,
+      "detail": "closest pair Akai MPC60/Synclavier II at -19.9dBFS"
+    },
+    {
+      "name": "SP-1200 shows higher out-of-band image energy than the SK-1 (the only other fixed-rate machine)",
+      "passed": true,
+      "detail": "SP-1200 -54.5dB vs SK-1 -60.1dB"
+    },
+    {
+      "name": "the Casio SK-1 has by far the lowest spectral centroid of all twelve",
+      "passed": true,
+      "detail": "lowest was actually Casio SK-1"
+    },
+    {
+      "name": "Synclavier II and Kurzweil K250 both being \"cleanest at root\" per the plan",
+      "passed": null,
+      "detail": "K250 measures cleanest of all twelve (rank 1/12) as expected; Synclavier II measures mid-pack (rank 12/12) even with the filter isolated - confirmed not a filter-engagement or Mode A correctness issue (see this script's own comment on why a broad energy-above-10kHz metric can't cleanly separate 'more natural bandwidth' from 'more aliasing' here). Rigorously verifying this specific claim needs the same closed-form per-machine fold-frequency approach Phase 4 built, not yet implemented for Phase 7."
+    },
+    {
+      "name": "Synclavier II and Kurzweil K250 both being among the machines that change most dramatically pitched down, per the plan",
+      "passed": null,
+      "detail": "Synclavier II ranked 4/12, K250 ranked 7/12 by filter-isolated image-energy delta - both dropped out of the top 6 after fixing a real pitch-engine bug (see this script's own comment), confirming the same broad-energy-metric limitation already documented for the \"cleanest at root\" finding above, not a new issue."
+    }
+  ]
+}

@@ -7,7 +7,7 @@
 // The three pitch-engine modes that replace Phase 1's high-quality interpolation step, plus that
 // interpolation itself kept as a fourth "reference" mode (see concrete-sampler-plugin-plan.md's
 // Phase 2) - the reference path stays available for auditioning/measurement, but no real machine
-// preset ever selects it once Phase 7 lands. One class, not one subclass per mode, so
+// preset ever selects it (see ConcreteMachines.h). One class, not one subclass per mode, so
 // ConcreteVoice's inner render loop calls the same processSample() regardless of mode - only
 // startNote() picking which Mode to pass branches on machine type, not the per-sample hot path.
 //
@@ -52,29 +52,37 @@ public:
     //     it's the baseRate parameter instead (a machine's assumed capture rate stands in for the
     //     file's actual one - see concrete-sampler-plugin-plan.md's Phase 2). Only ever used as a
     //     ratio against hostSampleRate, so the same value means the same thing at 44.1k/48k/96k.
-    float processSample(Mode mode, const float* data, int dataLength, double pitchRatio, double effectiveSourceRateHz) noexcept
+    //   - fileSourceRateHz: the loaded file's own REAL rate, always - see readModeA()'s own comment
+    //     for why Modes A/B/C need this SEPARATELY from effectiveSourceRateHz (a real, previously-
+    //     shipped bug: without it, root-pitch playback speed tracked effectiveSourceRateHz instead
+    //     of the actual note played, so switching machines changed a sample's fundamental pitch/
+    //     tempo, not just its character - reported directly against a real breakbeat). Ignored by
+    //     Mode::reference, which already gets everything it needs from effectiveSourceRateHz.
+    float processSample(Mode mode, const float* data, int dataLength, double pitchRatio,
+                         double effectiveSourceRateHz, double fileSourceRateHz) noexcept
     {
         switch (mode)
         {
             case Mode::reference:                  return readReference(data, dataLength, pitchRatio, effectiveSourceRateHz);
-            case Mode::variableClockZeroOrderHold:  return readModeA(data, dataLength, pitchRatio, effectiveSourceRateHz);
-            case Mode::dropSampleDecimation:        return readModeB(data, dataLength, pitchRatio, effectiveSourceRateHz);
-            case Mode::deltaSigma:                  return readModeC(data, dataLength, pitchRatio, effectiveSourceRateHz);
+            case Mode::variableClockZeroOrderHold:  return readModeA(data, dataLength, pitchRatio, effectiveSourceRateHz, fileSourceRateHz);
+            case Mode::dropSampleDecimation:        return readModeB(data, dataLength, pitchRatio, effectiveSourceRateHz, fileSourceRateHz);
+            case Mode::deltaSigma:                  return readModeC(data, dataLength, pitchRatio, effectiveSourceRateHz, fileSourceRateHz);
         }
         return 0.0f;
     }
 
 private:
     float readReference(const float* data, int dataLength, double pitchRatio, double sourceRateHz) noexcept;
-    float readModeA(const float* data, int dataLength, double pitchRatio, double baseRateHz) noexcept;
-    float readModeB(const float* data, int dataLength, double pitchRatio, double baseRateHz) noexcept;
-    float readModeC(const float* data, int dataLength, double pitchRatio, double baseRateHz) noexcept;
+    float readModeA(const float* data, int dataLength, double pitchRatio, double baseRateHz, double fileRateHz) noexcept;
+    float readModeB(const float* data, int dataLength, double pitchRatio, double baseRateHz, double fileRateHz) noexcept;
+    float readModeC(const float* data, int dataLength, double pitchRatio, double baseRateHz, double fileRateHz) noexcept;
 
     double hostSampleRate = 44100.0;
     double sourcePhase = 0.0;
 
-    // Mode B state (also doubles as "have we produced a first sample yet" for Mode A/reference,
-    // which don't otherwise need it).
+    // Mode A/B's own hold-tick clock (each has its own tick RATE formula - see their own comments
+    // in ConcretePitchEngine.cpp - but share this same state, since a single ConcretePitchEngine
+    // instance only ever runs one mode for a note's whole lifetime). Unused by Reference/Mode C.
     double baseRateTickPhase = 0.0;
     float heldSample = 0.0f;
     bool pendingFirstTick = true;

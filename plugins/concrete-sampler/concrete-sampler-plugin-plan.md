@@ -372,6 +372,25 @@ pitching down; Mode B bright and aliased even at root, a different flavor of gri
 relatively clean with a distinctive high-frequency hiss. All three obviously different from each
 other and from Phase 1.
 
+**Real bug found after Phase 7 (not caught at the time - see Phase 7's own note):** Modes A/B/C
+all used baseRateHz in place of the file's own real rate for BOTH artifact character AND the
+actual source-traversal speed, so root-pitch playback speed tracked baseRateHz instead of the note
+played - loading the same file into two machines with different base rates played it back at two
+different pitches/tempos even at an untransposed note. Passed unnoticed through this phase's own
+STANDALONE CHECK 2 (and its automated Analysis) because both used baseRate close to the file's own
+44.1kHz rate throughout; it only became obvious once Phase 7's machine presets set baseRate to each
+machine's own wildly different native rate (9.38kHz to 100kHz) and a real breakbeat was auditioned
+across them. Fixed by decoupling the two: each mode's hold/tick RATE still scales with baseRateHz
+(and, for Mode A, transposition) exactly as before, controlling artifact character; the SOURCE
+ADVANCE per tick is now scaled by fileRateHz/baseRateHz so the net traversal speed always matches
+pitchRatio*fileRateHz, regardless of baseRateHz - see `ConcretePitchEngine.h`'s and
+`ConcretePitchEngine.cpp`'s own comments on `readModeA()`/`readModeB()`/`readModeC()`. One
+consequence worth knowing about, not a further bug: at root pitch specifically, Mode A and Mode B
+are now mathematically identical by construction (a clock that "scales with transposition" and one
+that "stays fixed regardless of transposition" are trivially the same thing when there is no
+transposition) - `verify_phase2.py`'s own Check 4 was moved off root to a transposed note, which is
+where the two modes' real, intended difference actually lives.
+
 ---
 
 ## Phase 3: Quantization and companding
@@ -397,6 +416,17 @@ Analysis:
 **STANDALONE CHECK 3.** Same sample at 16, 12, and 8-bit linear, then 8-bit companded. Audible
 steps in grit between depths, and a quieter, smoother tail on decaying material from the companded
 version than from linear at the same depth.
+
+**Stale test script found during an unrelated full-regression sweep (Phase 7 era), not a DSP bug:**
+`verify_phase3.py`'s own `render()` never passed `--captureBypass 0`. Phase 4 later moved this
+phase's quantizer from always-on live processing into the offline capture pass (see
+`ConcreteCapturePass.h`'s own comment on why), which defaults to bypassed - every render this
+script made was silently an exact, unquantized copy of the source regardless of `bitDepth`/
+`quantizerMode` from the moment Phase 4 shipped, and nobody re-ran this specific script since to
+notice. `ConcreteQuantizerTests.cpp` and `verify_phase4.py` both already exercised the quantizer
+correctly the whole time, so this was a coverage gap in one script, not an actual regression in the
+plugin. Fixed by adding `--captureBypass 0 --captureTranspose 0` to isolate exactly what this
+phase's checks intend, same as every later phase's own verify script already does.
 
 ---
 
@@ -535,12 +565,12 @@ Deliverables:
   with everything else exposed underneath as secondary controls so a machine can be a starting
   point and pushed past the original spec.
 - The twelve machines are *also* surfaced as factory presets through
-  [`wildjag::FactoryPresetList`](../common/Presets/FactoryPreset.h) + `setupPresetCombo`, so host
-  program menus work like every other plugin in the catalog. **Deliberate divergence to note:**
-  that header's convention is that factory presets are decoded from `.aupreset` files saved in a
-  host rather than hand-tuned. These twelve are hand-authored from the researched table below,
-  because the table *is* the specification. Any additional "sound" presets layered on top should
-  follow the usual `.aupreset` route. Say this in a comment at `getFactoryPresets()`.
+  [`wildjag::FactoryPresetList`](../common/Presets/FactoryPreset.h), so host program menus work
+  like every other plugin in the catalog. **Deliberate divergence to note:** that header's
+  convention is that factory presets are decoded from `.aupreset` files saved in a host rather than
+  hand-tuned. These twelve are hand-authored from the researched table below, because the table
+  *is* the specification. Any additional "sound" presets layered on top should follow the usual
+  `.aupreset` route. Said in a comment at `getFactoryPresets()`.
 - User preset save/load via the host's normal state mechanism (this catalog doesn't ship its own
   preset file format).
 
@@ -560,6 +590,71 @@ Analysis:
 **STANDALONE CHECK 7.** One drum break, stepped through all twelve at root pitch, then again
 pitched down an octave. Every machine distinguishable from its neighbors, and the pitched-down pass
 showing dramatic character differences between the variable-clock machines and the fixed-rate ones.
+
+**Implementation notes and empirical findings (Phase 7 is done):**
+- The Machine `AudioParameterChoice`'s index 0 is a deliberate "(Custom)" sentinel, not one of the
+  twelve — an `AudioParameterChoice` always has SOME concrete default, and without a non-machine
+  placeholder, that default would have to BE a real machine, either silently coloring a
+  freshly-loaded instance before the user touches anything (breaking every earlier phase's "no
+  coloration until asked for" convention) or leaving that one machine permanently unreachable from
+  its own combo box (JUCE doesn't fire `onChange` when you reselect the item already showing — the
+  same gotcha `setupPresetCombo()` itself works around a different way).
+- No second, `setupPresetCombo()`-driven dropdown was added in the editor alongside the Machine
+  parameter's own combo box: both would list the identical twelve names, and JUCE's older, non-
+  automatable "host program" mechanism (`getNumPrograms()`/`setCurrentProgram()`/`getProgramName()`)
+  is what actually makes a host's OWN native program menu work — that doesn't require any in-plugin
+  UI element at all. `setCurrentProgram()` only moves the Machine parameter (to index+1);
+  `parameterChanged()`'s handling of THAT parameter is the sole place a machine's values are
+  actually applied (via `factoryPresets.setCurrentProgram()`), so the host's program list and the
+  in-plugin Machine control share one apply path and stay in sync by construction.
+- `AudioProcessorValueTreeState::replaceState()` (session restore) can fire `parameterChanged()`
+  for the Machine parameter too, if the restored value differs from the current one — left
+  registered, that would silently re-apply a whole machine's worth of values over whatever the
+  session actually saved (including any customization made past the machine's own starting point).
+  Fixed by unregistering that one listener for the duration of `replaceState()` only.
+- Found via the Analysis work, not by inspection: Bit Depth/Quantizer Mode never actually affect a
+  machine's DEFAULT sound, because they're baked in as part of the SAME capture pass every machine
+  ships bypassed (see Architecture §3 and `ConcreteCapturePass.h`'s own comment) — a stale comment
+  claiming quantization "always runs even when bypassed" contradicted the actual (correct, already-
+  tested) code and has been corrected. This is intentional, not a bug to fix: a machine's real
+  bit-depth character becomes audible once Capture Bypass is turned off, at which point the right
+  values are already dialed in.
+- Found via the pairwise null test: the Ensoniq Mirage and Linn 9000 presets originally nulled to
+  near-silence against each other. Root cause wasn't a DSP bug — CEM Loss and CEM Compensated are
+  mathematically identical at Filter Resonance's default of 0 (the compensation term is
+  `1 + resonance × 3.6`, a no-op at resonance 0), and both presets happened to share the same
+  placeholder base rate (28kHz, picked independently for each with no explicit table default to
+  work from). Fixed by giving the Linn 9000 a different, still in-range base rate (33kHz).
+- The "cleanest at root" targeted check needed the filter forced to Bypass to isolate the pitch
+  engine/base rate's own aliasing character from filter engagement (a real filter model rolls off
+  some energy near Nyquist even nominally wide open at 20kHz cutoff, unlike true Bypass — comparing
+  machines with different filters, or none, mostly measured "is a filter engaged," not aliasing).
+  Even isolated, Synclavier II still measures mid-pack rather than cleanest — confirmed NOT a
+  filter-engagement artifact or a Mode A correctness bug (a direct null test of Mode A at
+  baseRate = host rate against Reference mode confirmed bit-exact behavior, matching
+  `ConcretePitchEngine.h`'s own documented guarantee). "Energy above 10kHz" on a broadband source
+  conflates "how much natural high-frequency content survives" with "how much aliasing is
+  present" — properly separating those needs the same closed-form per-machine near-Nyquist-tone
+  fold-frequency approach Phase 4 had to build for its own alias-energy metric, not yet extended to
+  Phase 7. Reported as an informational finding in `validation_report.md` rather than forced to a
+  false pass or fail — see that report and `verify_phase7.py`'s own comment for the full
+  explanation. Every other targeted check (including K250 being the single cleanest of the twelve)
+  passes.
+- **The real bug this whole investigation was chasing, eventually found via manual testing, not
+  the automated Analysis above:** stepping through the twelve machines by ear with a real breakbeat
+  (STANDALONE CHECK 7) revealed every preset played back at a visibly different pitch/tempo even
+  triggered from the same root note - Base Rate had been substituting for the loaded file's real
+  rate in the pitch calculation for ALL of Modes A/B/C since Phase 2, not just shaping artifact
+  character as intended. See Phase 2's own note on this fix for the root cause and the correction.
+  Once fixed, the "cleanest at root"/"changes most dramatically pitched down" investigation above
+  was re-run: Synclavier II's and K250's rankings on that same broad energy-above-10kHz metric got
+  MEASURABLY WORSE (Synclavier II from rank 1/12 to 4/12 on the "dramatic change" ranking, K250
+  from 4/12 to 7/12, dropping both out of the top 6), because some of their earlier apparent
+  distinctiveness had itself been an artifact of the very pitch bug just fixed, not a genuine
+  aliasing signature. That ranking is now ALSO reported as an informational finding rather than
+  asserted, for the same reason as "cleanest at root" - this doesn't reopen either question, it
+  reinforces the original diagnosis that this specific metric needs Phase 4's closed-form
+  fold-frequency treatment before either claim can be verified rigorously.
 
 ---
 

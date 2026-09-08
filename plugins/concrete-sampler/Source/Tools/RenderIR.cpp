@@ -45,7 +45,10 @@
 // (filterModel 0-5 = Bypass/SSM/CEM Loss/CEM Compensated/Digital+VCA/One-Pole, filterCutoff Hz,
 // filterResonance 0-1, filterEnvAmount octaves, filterKeyTrack 0-1). Phase 6 adds voiceCount
 // (1-18, the runtime polyphony cap - see ConcreteVoiceAllocator.h) and ampEnvelopeMode (0=ADSR,
-// 1=Contoured - see ConcreteContourEnvelope.h).
+// 1=Contoured - see ConcreteContourEnvelope.h). Phase 7 adds machine (0="(Custom)"/no-op, 1-12
+// select getConcreteMachines()[0-11] in table order - see ConcreteMachines.h and
+// ConcreteAudioProcessor::machineParamID), applied before every other flag above so an explicit
+// flag for one of the params a machine also sets still wins.
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -79,6 +82,13 @@ namespace
     }
 
     constexpr const char* allParamIDs[] = {
+        // Applied FIRST, deliberately - see ConcreteAudioProcessor::machineParamID's own comment:
+        // selecting a machine cascades into setting several of the OTHER param IDs below via
+        // setValueNotifyingHost(), synchronously, before this loop even reaches them. Any of those
+        // ALSO passed explicitly on the command line still applies afterward and wins, exactly
+        // like "load this machine as a starting point, then override these specific things" - the
+        // reverse array order would let the machine silently undo an explicit override instead.
+        ConcreteAudioProcessor::machineParamID,
         ConcreteAudioProcessor::pitchEngineModeParamID,
         ConcreteAudioProcessor::baseRateParamID,
         ConcreteAudioProcessor::coarseTuneParamID,
