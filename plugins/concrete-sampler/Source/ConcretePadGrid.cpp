@@ -16,9 +16,6 @@ namespace
     const juce::Colour noteLabelColour { 0xff6a6a6a };
     const juce::Colour noteLabelLitColour { 0xff1c1c1c };
 
-    // SilkscreenLabel.module.css
-    const juce::Colour labelColour { 0xff6a6a6a };
-    const juce::Colour ruleColour { 0xff3a3a3a };
     const float labelHeight = ConcreteLookAndFeel::kSilkscreenLabelHeight; // see that constant's own comment
 }
 
@@ -63,21 +60,12 @@ int ConcretePadGrid::padIndexAtPosition (juce::Point<float> position) const noex
 
 void ConcretePadGrid::paint (juce::Graphics& g)
 {
-    // SilkscreenLabel: small-caps label + hairline rule (ui-plan.md's "Silkscreen legends" -
-    // no boxes, no badges, unlike the rack-effect catalog's section badges).
-    auto labelArea = getLocalBounds().toFloat().withHeight (labelHeight);
-    g.setColour (labelColour);
-    const auto labelFont = lookAndFeel.getSmallPrintFont (10.0f).withExtraKerningFactor (0.2f);
-    g.setFont (labelFont);
-    const auto labelText = "Pads";
-    // Measured with the SAME (kerned) font actually used to draw it below - measuring the
-    // unkerned font instead under-measures the real width, and drawText() silently ellipsizes
-    // text that doesn't fit the box it's given rather than overflowing it.
-    const auto labelTextWidth = juce::GlyphArrangement::getStringWidth (labelFont, labelText);
-    g.drawText (labelText, labelArea.removeFromLeft (labelTextWidth), juce::Justification::centredLeft);
-    g.setColour (ruleColour);
-    g.fillRect (juce::Rectangle<float> (labelArea.getX() + 8.0f, labelArea.getCentreY() - 0.5f,
-                                         juce::jmax (0.0f, labelArea.getWidth() - 8.0f), 1.0f));
+    // SilkscreenLabel.tsx renders this uppercase (text-transform:uppercase) - drawing the literal
+    // "Pads" here (this component predates ConcreteLookAndFeel::paintSilkscreenLabel, which was
+    // extracted later from this exact code and already handles the uppercase/kerning/rule
+    // correctly) was a real, uncaught bug, not a style choice. Delegating to that shared helper
+    // instead of the hand-rolled version this used to have.
+    lookAndFeel.paintSilkscreenLabel (g, getLocalBounds().toFloat().withHeight (labelHeight), "Pads", false);
 
     for (int i = 0; i < padCount; ++i)
     {
@@ -89,11 +77,19 @@ void ConcretePadGrid::paint (juce::Graphics& g)
 
         // Two-tone top/bottom border edge (CSS border-top/border-bottom, 1px each) rather than a
         // uniform stroke - a flat drawRoundedRectangle outline reads noticeably different from the
-        // mockup's subtle bevel.
-        g.setColour (lit ? padLitBorder : padBorderTop);
-        g.drawLine (bounds.getX() + 4.0f, bounds.getY() + 0.5f, bounds.getRight() - 4.0f, bounds.getY() + 0.5f, 1.0f);
-        g.setColour (lit ? padLitBorder : padBorderBottom);
-        g.drawLine (bounds.getX() + 4.0f, bounds.getBottom() - 0.5f, bounds.getRight() - 4.0f, bounds.getBottom() - 0.5f, 1.0f);
+        // mockup's subtle bevel. Clipped to the rounded silhouette (was a manual 4px inset guess
+        // before - the exact clip matches every other component's border now, see
+        // ConcretePanelButton's own comment on why a straight full-width line needs this at all).
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            juce::Path roundedPath;
+            roundedPath.addRoundedRectangle (bounds, 4.0f);
+            g.reduceClipRegion (roundedPath);
+            g.setColour (lit ? padLitBorder : padBorderTop);
+            g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
+            g.setColour (lit ? padLitBorder : padBorderBottom);
+            g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
+        }
 
         if (lit)
         {

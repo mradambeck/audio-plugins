@@ -57,6 +57,18 @@ void ConcreteFader::paint (juce::Graphics& g)
     g.setColour (trackFill);
     g.fillRoundedRectangle (track, 4.0f);
 
+    // box-shadow: inset 0 1px 4px rgba(0,0,0,0.9) - JUCE has no native inset shadow, so this is a
+    // top-hugging dark fade approximating the blur falloff (same technique as the LCD screen's own
+    // glass recess - see ConcreteScreen.cpp's comment on why a single edge-hugging linear fade
+    // reads closer to a real small-blur inset shadow than a radial gradient does). Was missing
+    // entirely before (flat fill only) - found by Adam: "drop shadows seem to be missing".
+    {
+        juce::ColourGradient insetFade (juce::Colours::black.withAlpha (0.7f), track.getX(), track.getY(),
+                                         juce::Colours::transparentBlack, track.getX(), track.getY() + 5.0f, false);
+        g.setGradientFill (insetFade);
+        g.fillRoundedRectangle (track, 4.0f);
+    }
+
     const auto fillHeight = track.getHeight() * norm;
     const auto fillBounds = juce::Rectangle<float> (track.getX(), track.getBottom() - fillHeight, track.getWidth(), fillHeight);
     if (fillHeight > 0.0f)
@@ -69,12 +81,29 @@ void ConcreteFader::paint (juce::Graphics& g)
 
     const auto capCentreY = track.getBottom() - fillHeight;
     const auto capBounds = juce::Rectangle<float> (capWidth, capHeight).withCentre ({ componentWidth * 0.5f, capCentreY });
+
+    // box-shadow: 0 2px 3px rgba(0,0,0,0.7) - a real juce::DropShadow (was entirely missing).
+    {
+        juce::DropShadow shadow (juce::Colours::black.withAlpha (0.7f), 3, { 0, 2 });
+        juce::Path capShadowPath;
+        capShadowPath.addRoundedRectangle (capBounds, 2.0f);
+        shadow.drawForPath (g, capShadowPath);
+    }
+
     g.setColour (capFill);
     g.fillRoundedRectangle (capBounds, 2.0f);
-    g.setColour (capBorderTop);
-    g.drawLine (capBounds.getX(), capBounds.getY() + 0.5f, capBounds.getRight(), capBounds.getY() + 0.5f, 1.0f);
-    g.setColour (capBorderBottom);
-    g.drawLine (capBounds.getX(), capBounds.getBottom() - 1.0f, capBounds.getRight(), capBounds.getBottom() - 1.0f, 2.0f);
+    {
+        // Clipped to the rounded silhouette - see ConcretePanelButton's own comment on why a
+        // straight full-width drawLine() otherwise squares off the corners.
+        juce::Graphics::ScopedSaveState save (g);
+        juce::Path roundedPath;
+        roundedPath.addRoundedRectangle (capBounds, 2.0f);
+        g.reduceClipRegion (roundedPath);
+        g.setColour (capBorderTop);
+        g.drawLine (capBounds.getX(), capBounds.getY() + 0.5f, capBounds.getRight(), capBounds.getY() + 0.5f, 1.0f);
+        g.setColour (capBorderBottom);
+        g.drawLine (capBounds.getX(), capBounds.getBottom() - 1.0f, capBounds.getRight(), capBounds.getBottom() - 1.0f, 2.0f);
+    }
     g.setColour (capLine);
     g.drawLine (capBounds.getX() + 4.0f, capBounds.getCentreY(), capBounds.getRight() - 4.0f, capBounds.getCentreY(), 1.0f);
 

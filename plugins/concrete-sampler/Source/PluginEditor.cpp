@@ -200,9 +200,13 @@ void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
         g, stripBox.withY(stripBox.getY() - ConcreteLookAndFeel::kSilkscreenLabelHeight).withHeight(ConcreteLookAndFeel::kSilkscreenLabelHeight),
         "Performance", true);
 
-    auto volumeBox = juce::Rectangle<float>(sampleVolumeFader.getX() - 20.0f, sampleVolumeFader.getY() - 14.0f,
+    // Height/Y match stripBox exactly (both are the SAME padsPerformanceRow, stretched by
+    // align-items:stretch to PadGrid's own height in the mockup) rather than being derived from
+    // sampleVolumeFader's own (shorter) bounds - that previously left Volume's box visibly
+    // shorter than Performance's, since a fader doesn't fill its box the way it's centered within.
+    auto volumeBox = juce::Rectangle<float>(sampleVolumeFader.getX() - 20.0f, stripBox.getY(),
                                              masterVolumeFader.getRight() - sampleVolumeFader.getX() + 40.0f,
-                                             sampleVolumeFader.getHeight() + 28.0f);
+                                             stripBox.getHeight());
     g.setColour(stripFill);
     g.fillRoundedRectangle(volumeBox, 4.0f);
     lookAndFeel.paintSilkscreenLabel(
@@ -240,7 +244,11 @@ void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
     footerArea = footerArea.removeFromBottom(footerHeight);
     g.setColour(footerLeftColour);
     g.setFont(lookAndFeel.getSmallPrintFont(10.0f).withExtraKerningFactor(0.08f));
-    g.drawText(juce::String("CONCRETE \xc2\xb7 v") + concreteVersion, footerArea, juce::Justification::centredLeft);
+    // juce::String's raw (const char*) constructor does NOT reliably assume UTF-8 the way
+    // juce::CharPointer_UTF8 explicitly does - a bare "\xc2\xb7" literal here rendered as the
+    // mojibake "Â·" instead of "·" (found by Adam, not caught by this session's own screenshots).
+    g.drawText(juce::String(juce::CharPointer_UTF8("CONCRETE \xc2\xb7 v")) + concreteVersion,
+               footerArea, juce::Justification::centredLeft);
     g.setColour(footerRightColour);
     g.drawText("WILD JAG", footerArea, juce::Justification::centredRight);
 }

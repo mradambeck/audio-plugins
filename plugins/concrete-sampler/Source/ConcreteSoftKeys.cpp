@@ -37,12 +37,19 @@ void ConcreteSoftKeys::paint (juce::Graphics& g)
         g.setColour (keyFill);
         g.fillRoundedRectangle (bounds, 3.0f);
 
-        // Two-tone top/bottom border edge (CSS border-top/border-bottom), same technique as every
-        // other flat sampler-style cap in this codebase (ConcretePadGrid/ConcreteKnob).
-        g.setColour (keyBorderTop);
-        g.drawLine (bounds.getX() + 3.0f, bounds.getY() + 0.5f, bounds.getRight() - 3.0f, bounds.getY() + 0.5f, 1.0f);
-        g.setColour (keyBorderBottom);
-        g.drawLine (bounds.getX() + 3.0f, bounds.getBottom() - 1.0f, bounds.getRight() - 3.0f, bounds.getBottom() - 1.0f, 2.0f);
+        // Two-tone top/bottom border edge (CSS border-top/border-bottom) clipped to the rounded
+        // silhouette - a straight full-width drawLine() pokes past the rounded corners otherwise,
+        // visually squaring them off (see ConcretePanelButton's own comment on this exact bug).
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            juce::Path roundedPath;
+            roundedPath.addRoundedRectangle (bounds, 3.0f);
+            g.reduceClipRegion (roundedPath);
+            g.setColour (keyBorderTop);
+            g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
+            g.setColour (keyBorderBottom);
+            g.drawLine (bounds.getX(), bounds.getBottom() - 1.0f, bounds.getRight(), bounds.getBottom() - 1.0f, 2.0f);
+        }
 
         const bool lit = i == activePage;
         const auto ledBounds = bounds.withSizeKeepingCentre (6.0f, 6.0f);

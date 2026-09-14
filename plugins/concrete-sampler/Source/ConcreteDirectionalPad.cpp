@@ -37,16 +37,31 @@ void ConcreteDirectionalPad::paint (juce::Graphics& g)
         { 2, 1, "\xe2\x96\xbc" }, // down
     };
 
-    g.setFont (lookAndFeel.getSmallPrintFont (11.0f));
+    // CSS says font-size:11px, but Oswald (the font this size is meant for) has no glyphs for
+    // U+25B2/25BC/25C0/25B6 - both the browser and JUCE fall back to a system font for these
+    // specific characters, and the two picked noticeably different-sized fallbacks at the "same"
+    // nominal size (found by Adam: "Navigate arrows are the wrong size" - confirmed by a direct
+    // crop comparison against the live mockup, not just this comment's say-so). Sized up
+    // empirically to visually match the mockup's own arrow glyphs rather than the nominal CSS
+    // value, since there's no shared font metric to derive an exact number from here.
+    g.setFont (lookAndFeel.getSmallPrintFont (16.0f));
     for (const auto& key : keys)
     {
         const auto bounds = cellBounds (key.row, key.col);
         g.setColour (keyFill);
         g.fillRoundedRectangle (bounds, 3.0f);
-        g.setColour (keyBorderTop);
-        g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
-        g.setColour (keyBorderBottom);
-        g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
+        {
+            // Clipped to the rounded silhouette - see ConcretePanelButton's own comment on why a
+            // straight full-width drawLine() otherwise squares off the corners.
+            juce::Graphics::ScopedSaveState save (g);
+            juce::Path roundedPath;
+            roundedPath.addRoundedRectangle (bounds, 3.0f);
+            g.reduceClipRegion (roundedPath);
+            g.setColour (keyBorderTop);
+            g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
+            g.setColour (keyBorderBottom);
+            g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
+        }
         g.setColour (glyphColour);
         g.drawText (juce::String (juce::CharPointer_UTF8 (key.glyphUtf8)), bounds, juce::Justification::centred);
     }

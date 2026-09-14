@@ -205,15 +205,15 @@ void ConcreteScreen::paint (juce::Graphics& g)
     g.fillRect (bounds);
 
     // Approximates box-shadow: inset 0 0 10px 2px rgba(0,0,0,0.5) - JUCE has no native inner
-    // shadow. A small blur+spread inset shadow like this one only darkens a thin rim actually
-    // touching the edges (roughly blur+spread =~ 12px, a bit more with typical blur falloff) and
-    // leaves the rest of the box - the large majority of it - completely untouched; a single
-    // radial gradient reaching toward the centre (the first attempt here) darkened far more of
-    // the box than the real effect does and read as "way off" against the mockup. Four edge-
-    // hugging linear fades (one per side) approximate the real rectangular falloff much more
-    // closely than a radial gradient can; overlapping at the corners naturally reads darker there
-    // too, same as the real shadow.
-    constexpr float recessDepth = 16.0f;
+    // shadow. recessDepth matches the CSS blur+spread (10+2=12) directly rather than a rounder
+    // guess. The four edge fades' rectangles are kept EXCLUSIVE of each other (left/right stop
+    // short of the top/bottom bands) rather than overlapping in the corners - overlapping normal
+    // alpha-blends each fade on top of the last, so a corner covered by both a 0.5-alpha top fade
+    // AND a 0.5-alpha side fade composited to ~0.75 effective alpha, not the intended 0.5 (found
+    // by Adam: "inner shadow... is too dark"). A real Gaussian blur does darken corners somewhat
+    // more than edges, but not by compounding two independent 50%-alpha layers on top of each
+    // other; this keeps every covered pixel at exactly the intended alpha at its own edge distance.
+    constexpr float recessDepth = 12.0f;
     const auto recessColour = juce::Colours::black.withAlpha (0.5f);
 
     juce::ColourGradient topFade (recessColour, 0, bounds.getY(), juce::Colours::transparentBlack, 0, bounds.getY() + recessDepth, false);
@@ -224,13 +224,16 @@ void ConcreteScreen::paint (juce::Graphics& g)
     g.setGradientFill (bottomFade);
     g.fillRect (juce::Rectangle<float> (bounds.getX(), bounds.getBottom() - recessDepth, bounds.getWidth(), recessDepth));
 
+    const auto sideY = bounds.getY() + recessDepth;
+    const auto sideHeight = juce::jmax (0.0f, bounds.getHeight() - 2.0f * recessDepth);
+
     juce::ColourGradient leftFade (recessColour, bounds.getX(), 0, juce::Colours::transparentBlack, bounds.getX() + recessDepth, 0, false);
     g.setGradientFill (leftFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getX(), bounds.getY(), recessDepth, bounds.getHeight()));
+    g.fillRect (juce::Rectangle<float> (bounds.getX(), sideY, recessDepth, sideHeight));
 
     juce::ColourGradient rightFade (recessColour, bounds.getRight(), 0, juce::Colours::transparentBlack, bounds.getRight() - recessDepth, 0, false);
     g.setGradientFill (rightFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getRight() - recessDepth, bounds.getY(), recessDepth, bounds.getHeight()));
+    g.fillRect (juce::Rectangle<float> (bounds.getRight() - recessDepth, sideY, recessDepth, sideHeight));
 
     const auto content = bounds.reduced (screenPaddingX, screenPaddingY);
     if (! isBooted)
@@ -534,10 +537,18 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
 {
     auto inner = paintPageChrome (g, content);
 
+    // WaveSurfer.module.css's .dropzone is a fixed 140px box (with its own box-sizing:border-box
+    // 8px padding, hence the .reduced(2) below leaving room for the 2px dashed stroke inside that)
+    // - NOT the full page content area, which this used to stretch both the drag-over highlight
+    // and the empty-state dashed border across (found by Adam: "way way off"). It sits at the top
+    // of `inner` since WaveSurferDropzone is the Sample page's only content (see WaveSurfer.tsx).
+    constexpr float dropzoneHeight = 140.0f;
+    const auto dropzoneArea = inner.withHeight (dropzoneHeight);
+
     if (isDraggingFileOver)
     {
         g.setColour (lcdInk.withAlpha (0.1f));
-        g.fillRect (inner);
+        g.fillRect (dropzoneArea);
     }
 
     const auto sampleSet = processor.getCurrentSampleSet();
@@ -551,10 +562,8 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
     else if (! hasSample)
     {
         g.setColour (lcdInk);
-        // Empty state's own 2px DASHED border (WaveSurfer.module.css's .dropzone), inset slightly
-        // from MainContent's own solid border so both remain visible, matching the mockup's nested
-        // dashed-inside-solid look.
-        const auto dashArea = inner.reduced (2.0f);
+        // Empty state's own 2px DASHED border (WaveSurfer.module.css's .dropzone).
+        const auto dashArea = dropzoneArea.reduced (2.0f);
         float dashLengths[] { 4.0f, 3.0f };
         juce::Path dashPath;
         dashPath.addRectangle (dashArea);
@@ -563,7 +572,7 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
 
         g.setColour (lcdInk.withAlpha (0.7f));
         g.setFont (lookAndFeel.getLcdFont (16.0f));
-        g.drawText ("Drop an audio file here", inner, juce::Justification::centred);
+        g.drawText ("Drop an audio file here", dashArea, juce::Justification::centred);
     }
     else
     {

@@ -46,8 +46,15 @@ void ConcreteKnob::paint (juce::Graphics& g)
     const auto capBounds = bounds.withSizeKeepingCentre (capDiameter, capDiameter).withY (bounds.getY());
     const auto centre = capBounds.getCentre();
 
-    g.setColour (juce::Colours::black.withAlpha (0.4f));
-    g.fillEllipse (capBounds.translated (0.0f, 1.0f));
+    // box-shadow: 0 1px 3px rgba(0,0,0,0.6) - a real juce::DropShadow (offset+blur), not the crude
+    // flat offset-copy this used to draw (which had no blur at all and read as a hard double-edge
+    // rather than a soft shadow - found by Adam: "drop shadows seem to be missing").
+    {
+        juce::DropShadow shadow (juce::Colours::black.withAlpha (0.6f), 3, { 0, 1 });
+        juce::Path capPath;
+        capPath.addEllipse (capBounds);
+        shadow.drawForPath (g, capPath);
+    }
     g.setColour (capFill);
     g.fillEllipse (capBounds);
 

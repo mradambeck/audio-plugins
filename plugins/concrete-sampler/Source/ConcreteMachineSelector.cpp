@@ -74,10 +74,18 @@ void ConcreteMachineSelector::paint (juce::Graphics& g)
 
         g.setColour (arrowFill.withAlpha (disabled ? 0.5f : 1.0f));
         g.fillRoundedRectangle (bounds, 3.0f);
-        g.setColour (arrowBorderTop.withAlpha (disabled ? 0.5f : 1.0f));
-        g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
-        g.setColour (arrowBorderBottom.withAlpha (disabled ? 0.5f : 1.0f));
-        g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
+        {
+            // Clipped to the rounded silhouette - see ConcretePanelButton's own comment on why a
+            // straight full-width drawLine() otherwise squares off the corners.
+            juce::Graphics::ScopedSaveState save (g);
+            juce::Path roundedPath;
+            roundedPath.addRoundedRectangle (bounds, 3.0f);
+            g.reduceClipRegion (roundedPath);
+            g.setColour (arrowBorderTop.withAlpha (disabled ? 0.5f : 1.0f));
+            g.drawLine (bounds.getX(), bounds.getY() + 0.5f, bounds.getRight(), bounds.getY() + 0.5f, 1.0f);
+            g.setColour (arrowBorderBottom.withAlpha (disabled ? 0.5f : 1.0f));
+            g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
+        }
 
         g.setColour (arrowText.withAlpha (disabled ? 0.3f : 1.0f));
         g.setFont (lookAndFeel.getSmallPrintFont (11.0f));
@@ -89,6 +97,15 @@ void ConcreteMachineSelector::paint (juce::Graphics& g)
     const auto readout = readoutBounds();
     g.setColour (readoutFill);
     g.fillRoundedRectangle (readout, 3.0f);
+    {
+        // box-shadow: inset 0 1px 4px rgba(0,0,0,0.8) - see ConcreteFader's track for why a
+        // top-hugging fade (not a native JUCE feature) approximates this better than nothing at
+        // all, which is what this had before (found by Adam: "drop shadows seem to be missing").
+        juce::ColourGradient insetFade (juce::Colours::black.withAlpha (0.6f), readout.getX(), readout.getY(),
+                                         juce::Colours::transparentBlack, readout.getX(), readout.getY() + 5.0f, false);
+        g.setGradientFill (insetFade);
+        g.fillRoundedRectangle (readout, 3.0f);
+    }
 
     const auto displayName = param != nullptr ? param->getCurrentValueAsText() : juce::String();
     juce::String subline (" ");
@@ -103,7 +120,9 @@ void ConcreteMachineSelector::paint (juce::Graphics& g)
             if (modeIndex >= 0 && modeIndex < strings.size())
                 pitchEngineName = strings[modeIndex];
         }
-        subline = pitchEngineName + " \xc2\xb7 " + juce::String (machine.bitDepthBits) + "-bit";
+        // See PluginEditor.cpp's footer for why this needs the explicit CharPointer_UTF8 wrapper.
+        subline = pitchEngineName + juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 "))
+                  + juce::String (machine.bitDepthBits) + "-bit";
     }
 
     auto textArea = readout.reduced (10.0f, 4.0f);

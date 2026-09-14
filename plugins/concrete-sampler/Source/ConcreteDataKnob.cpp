@@ -34,8 +34,14 @@ void ConcreteDataKnob::paint (juce::Graphics& g)
     const auto capBounds = juce::Rectangle<float> (0.0f, 0.0f, capDiameter, capDiameter);
     const auto centre = capBounds.getCentre();
 
-    g.setColour (juce::Colours::black.withAlpha (0.4f));
-    g.fillEllipse (capBounds.translated (0.0f, 2.0f));
+    // box-shadow: 0 4px 8px rgba(0,0,0,0.6) - a real juce::DropShadow, not a crude flat offset
+    // copy (see ConcreteKnob's own comment on why that read as a hard double-edge, not a shadow).
+    {
+        juce::DropShadow shadow (juce::Colours::black.withAlpha (0.6f), 8, { 0, 4 });
+        juce::Path capPath;
+        capPath.addEllipse (capBounds);
+        shadow.drawForPath (g, capPath);
+    }
     g.setColour (capFill);
     g.fillEllipse (capBounds);
 
