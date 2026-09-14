@@ -43,3 +43,32 @@ juce::Font ConcreteLookAndFeel::getLcdFont(float height) const
         return juce::Font(juce::FontOptions(lcdTypeface).withHeight(height * heightCorrectionRatio));
     return getDisplayFont(height); // fallback if the typeface somehow failed to load
 }
+
+void ConcreteLookAndFeel::paintSilkscreenLabel(juce::Graphics& g, juce::Rectangle<float> area,
+                                                const juce::String& text, bool centered) const
+{
+    // SilkscreenLabel.module.css: font-size 10, letter-spacing 2px, uppercase, color #6a6a6a; the
+    // rule is #3a3a3a, 1px, with an 8px gap from the text. 2px/10px = 0.2 kerning factor - the
+    // same ratio already established for this typeface/size pairing (see ConcretePadGrid's own
+    // "Pads" label and ConcreteKnob's legend, both derived the same way).
+    const juce::Colour labelColour { 0xff6a6a6a };
+    const juce::Colour ruleColour { 0xff3a3a3a };
+    const auto font = getSmallPrintFont(10.0f).withExtraKerningFactor(0.2f);
+    const auto upper = text.toUpperCase();
+
+    g.setColour(labelColour);
+    g.setFont(font);
+
+    if (centered)
+    {
+        g.drawText(upper, area, juce::Justification::centred);
+        return;
+    }
+
+    auto remaining = area;
+    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, upper);
+    g.drawText(upper, remaining.removeFromLeft(textWidth), juce::Justification::centredLeft);
+    g.setColour(ruleColour);
+    g.fillRect(juce::Rectangle<float>(remaining.getX() + 8.0f, remaining.getCentreY() - 0.5f,
+                                       juce::jmax(0.0f, remaining.getWidth() - 8.0f), 1.0f));
+}

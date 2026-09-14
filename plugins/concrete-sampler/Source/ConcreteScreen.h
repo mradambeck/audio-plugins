@@ -41,6 +41,36 @@ public:
     // loading-animation behavior lives here rather than being duplicated at each call site.
     void loadFile(const juce::File& file);
 
+    // The Session block's "Clear Sample" button (mockup: useSample.tsx's requestClear(), minus
+    // the confirmation overlay it arms first - ClearConfirmOverlay.tsx is a real LCD-page addition
+    // deferred to a later slice, not built here). Publishes a fresh empty ConcreteSampleSet - the
+    // exact same state the processor starts in before any load, so this is known-safe.
+    void clearSample();
+
+    // Physical DataKnob's entry point (see ConcreteDataKnob) - identical to the mouse-wheel stand-
+    // in adjustSelectedField() already used for headless/no-hardware testing.
+    void adjustSelected(int delta) { adjustSelectedField(delta); }
+
+    // Physical DirectionalPad's entry points - navigate the current page's field grid exactly like
+    // useEditableFields.tsx's moveVertical/moveHorizontal (Up/Down keep column, wrap by row;
+    // Left/Right keep row, wrap by column).
+    void moveSelectionVertical(int delta);
+    void moveSelectionHorizontal(int delta);
+
+    // Physical SoftKeys' entry points (see ConcreteSoftKeys) - exposed as a plain index rather
+    // than ScreenPage so that component doesn't need this enum. onPageChanged fires whenever the
+    // page changes from EITHER side (a SoftKey press or a footer-tab click on the screen itself),
+    // so SoftKeys' own LED can't drift out of sync with whichever caused the change.
+    int getPageIndex() const noexcept { return (int) currentPage; }
+    void setPageIndex(int index) { setCurrentPage((ScreenPage) index); }
+    std::function<void()> onPageChanged;
+
+    // The Volume section's "Sample" fader (see ConcreteFader) two-way-binds to this SAME field the
+    // Sample/Machine pages' own "Volume" row reads/adjusts - matching Panel.tsx's own comment that
+    // moving one moves the other.
+    float getLocalVolumePercent() const noexcept { return localVolumePercent; }
+    void setLocalVolumePercent(float percent) { localVolumePercent = juce::jlimit(0.0f, 120.0f, percent); repaint(); }
+
 private:
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
@@ -65,6 +95,10 @@ private:
     // useEditableFields.tsx's own useEffect on view change.
     void setCurrentPage(ScreenPage page);
     static juce::String firstFieldIdForPage(ScreenPage page);
+
+    // Backs moveSelectionVertical/Horizontal - matches useEditableFields.tsx's own `grid` per view
+    // exactly (same row/column shape the DirectionalPad navigates on the mockup side).
+    static std::vector<std::vector<juce::String>> fieldGridForPage(ScreenPage page);
 
     // Header + MainContent's bordered box + Footer - identical shell shared by every booted page,
     // Sample included. Returns MainContent's inner content rect for the caller to fill in; footer

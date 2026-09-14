@@ -19,7 +19,7 @@ namespace
     // SilkscreenLabel.module.css
     const juce::Colour labelColour { 0xff6a6a6a };
     const juce::Colour ruleColour { 0xff3a3a3a };
-    constexpr float labelHeight = 10.0f + 10.0f; // font-size 10 + margin-bottom 10
+    const float labelHeight = ConcreteLookAndFeel::kSilkscreenLabelHeight; // see that constant's own comment
 }
 
 ConcretePadGrid::ConcretePadGrid (ConcreteAudioProcessor& processorIn, ConcreteLookAndFeel& lookAndFeelIn)

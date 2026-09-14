@@ -20,8 +20,12 @@ namespace
     // rectangle. 60px comfortably fits "RESONANCE" at 9px with the CSS-matching 1px letter-spacing
     // (measured via fontTools against the real embedded Oswald SemiBold, not eyeballed).
     constexpr float knobWidth = 60.0f;
-    constexpr float readoutHeight = 13.0f;
-    constexpr float legendHeight = 11.0f;
+    // Both real ~26px tall, not ~11-13px - see ConcreteLookAndFeel::kSmallTextLineHeight's comment
+    // (measured via getBoundingClientRect() on the live mockup, not derived from the 9/10px
+    // font-size directly - a plain <div> at these sizes inherits a fixed, much taller line-height
+    // from the mockup's root font/line-height rule).
+    const float readoutHeight = ConcreteLookAndFeel::kSmallTextLineHeight;
+    const float legendHeight = ConcreteLookAndFeel::kSmallTextLineHeight;
     constexpr float gap = 6.0f;
 }
 

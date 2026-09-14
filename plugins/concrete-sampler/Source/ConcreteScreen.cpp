@@ -864,6 +864,85 @@ void ConcreteScreen::setCurrentPage (ScreenPage page)
     currentPage = page;
     selectedFieldId = firstFieldIdForPage (page);
     repaint();
+    if (onPageChanged)
+        onPageChanged();
+}
+
+std::vector<std::vector<juce::String>> ConcreteScreen::fieldGridForPage (ScreenPage page)
+{
+    switch (page)
+    {
+        case ScreenPage::Sample:
+            return { { "root", "oneShot", "loop" }, { "coarse", "fine", "volume" } };
+        case ScreenPage::Machine:
+            return { { "pitchEngine", "companding" }, { "baseRate", "voices" },
+                     { "bitDepth", "volume" }, { "ampEnvelope" } };
+        case ScreenPage::Filter:
+            return { { "filterModel", "envAmount" }, { "cutoff", "keyTrack" }, { "resonance" } };
+        case ScreenPage::Capture:
+            return { { "transpose", "bypass" }, { "drive", "pitchCompensate" },
+                     { "iterations", "saveSample" } };
+    }
+    return {};
+}
+
+void ConcreteScreen::moveSelectionVertical (int delta)
+{
+    const auto grid = fieldGridForPage (currentPage);
+    if (grid.empty())
+        return;
+
+    int row = 0, col = 0;
+    for (int r = 0; r < (int) grid.size(); ++r)
+    {
+        const auto& rowIds = grid[(size_t) r];
+        const auto it = std::find (rowIds.begin(), rowIds.end(), selectedFieldId);
+        if (it != rowIds.end())
+        {
+            row = r;
+            col = (int) std::distance (rowIds.begin(), it);
+            break;
+        }
+    }
+
+    const auto rowCount = (int) grid.size();
+    const auto nextRow = ((row + delta) % rowCount + rowCount) % rowCount;
+    const auto nextCol = juce::jmin (col, (int) grid[(size_t) nextRow].size() - 1);
+    selectedFieldId = grid[(size_t) nextRow][(size_t) nextCol];
+    repaint();
+}
+
+void ConcreteScreen::moveSelectionHorizontal (int delta)
+{
+    const auto grid = fieldGridForPage (currentPage);
+    if (grid.empty())
+        return;
+
+    int row = 0, col = 0;
+    for (int r = 0; r < (int) grid.size(); ++r)
+    {
+        const auto& rowIds = grid[(size_t) r];
+        const auto it = std::find (rowIds.begin(), rowIds.end(), selectedFieldId);
+        if (it != rowIds.end())
+        {
+            row = r;
+            col = (int) std::distance (rowIds.begin(), it);
+            break;
+        }
+    }
+
+    const auto& rowIds = grid[(size_t) row];
+    const auto colCount = (int) rowIds.size();
+    const auto nextCol = ((col + delta) % colCount + colCount) % colCount;
+    selectedFieldId = rowIds[(size_t) nextCol];
+    repaint();
+}
+
+void ConcreteScreen::clearSample()
+{
+    processor.clearSample();
+    selectedFieldId = "root"; // matches loadFile()'s own reset
+    repaint();
 }
 
 juce::String ConcreteScreen::firstFieldIdForPage (ScreenPage page)

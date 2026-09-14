@@ -40,6 +40,12 @@ target_sources(Concrete
         Source/ConcreteScreen.cpp
         Source/ConcretePadGrid.cpp
         Source/ConcreteKnob.cpp
+        Source/ConcreteSoftKeys.cpp
+        Source/ConcreteMachineSelector.cpp
+        Source/ConcreteDirectionalPad.cpp
+        Source/ConcreteDataKnob.cpp
+        Source/ConcreteFader.cpp
+        Source/ConcretePanelButton.cpp
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
         Source/ConcreteCapturePass.cpp

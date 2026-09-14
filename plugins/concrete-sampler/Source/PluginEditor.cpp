@@ -1,208 +1,143 @@
 #include "PluginEditor.h"
 
+namespace
+{
+    // ---- Panel.module.css ----
+    constexpr float panelPaddingX = 28.0f;
+    constexpr float panelPaddingY = 20.0f;
+    constexpr float sectionGap = 16.0f; // .Panel's own column gap (header/body/footer)
+    constexpr float bodyGap = 24.0f;    // .body's row gap (leftColumn/rightColumn)
+
+    // Measured via getBoundingClientRect() on the live mockup at a desktop-width viewport (not
+    // eyeballed, and not the ~1000px-wide headless-Chrome window this was FIRST measured at by
+    // mistake - that width is below the mockup's own `@media (max-width:1024px)` breakpoint and
+    // silently drops the root font-size, throwing off every unstyled line-height on the page -
+    // see ConcreteLookAndFeel::kSmallTextLineHeight's comment for the full story).
+    constexpr float headerHeight = 28.0f;
+    constexpr float footerHeight = 26.0f;
+
+    constexpr float screenWellPadding = 16.0f;
+    constexpr float leftColumnGap = 12.0f;
+    constexpr float softKeysMarginTop = 8.0f;
+
+    constexpr float rightColumnWidth = 300.0f;
+    constexpr float rightColumnGap = 14.0f;
+
+    const juce::Colour panelBackground { 0xff161616 };
+    const juce::Colour screenWellFill { 0xff050505 };
+    const juce::Colour wordmarkColour { 0xff7fa5f5 };
+    const juce::Colour taglineColour { 0xff6f8280 };
+    const juce::Colour footerLeftColour { 0xff586566 };
+    const juce::Colour footerRightColour { 0xff3a4547 };
+    const juce::Colour stripFill { 0xff1c1c1c };
+
+    constexpr auto concreteVersion = "0.1.0"; // matches CMakeLists.txt's project() VERSION
+}
+
 ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcessor& p)
     : AudioProcessorEditor(&p), processor(p),
       concreteScreen(p, lookAndFeel),
+      softKeys(concreteScreen),
+      padGrid(p, lookAndFeel),
       cutoffKnob(p, lookAndFeel, ConcreteAudioProcessor::filterCutoffParamID, "Cutoff",
                  [](float v) { return v >= 1000.0f ? juce::String(v / 1000.0f, 1) + "k" : juce::String(juce::roundToInt(v)) + "Hz"; }),
       resonanceKnob(p, lookAndFeel, ConcreteAudioProcessor::filterResonanceParamID, "Resonance",
                     [](float v) { return juce::String(v, 2); }),
-      padGrid(p, lookAndFeel)
+      sampleVolumeFader(lookAndFeel, "Sample", 0.0f, 120.0f,
+                         [this] { return concreteScreen.getLocalVolumePercent(); },
+                         [this](float v) { concreteScreen.setLocalVolumePercent(v); },
+                         [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
+      masterVolumeFader(lookAndFeel, "Master", 0.0f, 120.0f,
+                         [this] { return masterVolumePercent; },
+                         [this](float v) { masterVolumePercent = juce::jlimit(0.0f, 120.0f, v); },
+                         [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
+      machineSelector(p, lookAndFeel),
+      directionalPad(lookAndFeel),
+      dataKnob(lookAndFeel),
+      oneShotButton(lookAndFeel, "One-Shot",
+                    [this]
+                    {
+                        const auto sampleSet = processor.getCurrentSampleSet();
+                        if (sampleSet != nullptr && !sampleSet->zones.empty())
+                            processor.setOneShotForZone(0, !sampleSet->zones[0].oneShot);
+                        concreteScreen.repaint();
+                    },
+                    [this]
+                    {
+                        const auto sampleSet = processor.getCurrentSampleSet();
+                        return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].oneShot;
+                    }),
+      loopButton(lookAndFeel, "Loop",
+                 [this]
+                 {
+                     const auto sampleSet = processor.getCurrentSampleSet();
+                     if (sampleSet != nullptr && !sampleSet->zones.empty())
+                         processor.setLoopEnabledForZone(0, !sampleSet->zones[0].loopEnabled);
+                     concreteScreen.repaint();
+                 },
+                 [this]
+                 {
+                     const auto sampleSet = processor.getCurrentSampleSet();
+                     return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].loopEnabled;
+                 }),
+      resampleButton(lookAndFeel, "Resample", [this] { processor.triggerBake(); }),
+      saveSampleButton(lookAndFeel, "Save Sample",
+                       [this] { processor.setEmbedSamplesOverride(!processor.getEmbedSamplesOverride()); }),
+      loadClearButton(lookAndFeel, "Load Sample",
+                      [this]
+                      {
+                          if (hasSampleLoaded())
+                          {
+                              concreteScreen.clearSample();
+                              return;
+                          }
+                          fileChooser = std::make_unique<juce::FileChooser>(
+                              "Load a sample...", juce::File(), "*.wav;*.aif;*.aiff");
+                          fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                                    [this](const juce::FileChooser& chooser)
+                                                    {
+                                                        const auto file = chooser.getResult();
+                                                        if (file != juce::File())
+                                                            loadFile(file);
+                                                    });
+                      })
 {
     setLookAndFeel(&lookAndFeel);
 
-    addAndMakeVisible(loadButton);
-    loadButton.onClick = [this]
-    {
-        fileChooser = std::make_unique<juce::FileChooser>(
-            "Load a sample...", juce::File(), "*.wav;*.aif;*.aiff");
+    concreteScreen.onPageChanged = [this] { softKeys.repaint(); };
 
-        fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                                  [this](const juce::FileChooser& chooser)
-                                  {
-                                      const auto file = chooser.getResult();
-                                      if (file != juce::File())
-                                          loadFile(file);
-                                  });
-    };
+    resampleButton.setTooltip("Re-runs the capture pass with the current settings");
+    saveSampleButton.setTooltip(
+        "Toggles whether the sample is saved inside this preset (portable, larger) or only "
+        "referenced by file path (smaller, breaks if that file moves)");
+    loadClearButton.labelSource = [this] { return hasSampleLoaded() ? "Clear Sample" : "Load Sample"; };
 
-    addAndMakeVisible(concreteScreen);
+    directionalPad.onUp = [this] { concreteScreen.moveSelectionVertical(-1); };
+    directionalPad.onDown = [this] { concreteScreen.moveSelectionVertical(1); };
+    directionalPad.onLeft = [this] { concreteScreen.moveSelectionHorizontal(-1); };
+    directionalPad.onRight = [this] { concreteScreen.moveSelectionHorizontal(1); };
+    dataKnob.onAdjust = [this](int delta) { concreteScreen.adjustSelected(delta); };
 
-    addAndMakeVisible(resetButton);
-    resetButton.onClick = [this]
-    {
-        // No UI controls left to reset here for these two - ConcreteScreen just reads zone state
-        // straight from the processor every repaint, so setting it directly is enough (a no-op if
-        // root note/one-shot are already at these values, same as the APVTS resets below being
-        // no-ops at their own defaults).
-        processor.setRootNoteForZone(0, 60);
-        processor.setOneShotForZone(0, false);
+    // Explicit std::initializer_list<Component*> (not auto*) - a braced-init-list only allows a
+    // SINGLE common element type under `auto` deduction, so mixed subclass pointers need the
+    // target type spelled out for the usual derived*->base* conversions to kick in.
+    for (juce::Component* c : std::initializer_list<juce::Component*> {
+             &concreteScreen, &softKeys, &padGrid, &cutoffKnob, &resonanceKnob,
+             &sampleVolumeFader, &masterVolumeFader, &machineSelector, &directionalPad, &dataKnob,
+             &oneShotButton, &loopButton, &resampleButton, &saveSampleButton, &loadClearButton })
+        addAndMakeVisible(c);
 
-        auto resetParam = [this](const juce::String& paramID)
-        {
-            if (auto* param = processor.apvts.getParameter(paramID))
-                param->setValueNotifyingHost(param->getDefaultValue());
-        };
-        // Resets to "(Custom)" - a no-op application-wise (see machineParamID's own comment), but
-        // still worth doing so the combo itself visibly reflects "nothing selected" after Reset,
-        // matching every other control here reverting to ITS OWN default.
-        resetParam(ConcreteAudioProcessor::machineParamID);
-        resetParam(ConcreteAudioProcessor::pitchEngineModeParamID);
-        resetParam(ConcreteAudioProcessor::baseRateParamID);
-        resetParam(ConcreteAudioProcessor::coarseTuneParamID);
-        resetParam(ConcreteAudioProcessor::fineTuneParamID);
-        resetParam(ConcreteAudioProcessor::bitDepthParamID);
-        resetParam(ConcreteAudioProcessor::quantizerModeParamID);
-        resetParam(ConcreteAudioProcessor::captureTransposeParamID);
-        resetParam(ConcreteAudioProcessor::captureDriveParamID);
-        resetParam(ConcreteAudioProcessor::captureAutoCompensateParamID);
-        resetParam(ConcreteAudioProcessor::captureBypassParamID);
-        resetParam(ConcreteAudioProcessor::captureIterationsParamID);
-        resetParam(ConcreteAudioProcessor::filterModelParamID);
-        resetParam(ConcreteAudioProcessor::filterCutoffParamID);
-        resetParam(ConcreteAudioProcessor::filterResonanceParamID);
-        resetParam(ConcreteAudioProcessor::filterEnvAmountParamID);
-        resetParam(ConcreteAudioProcessor::filterKeyTrackParamID);
-        resetParam(ConcreteAudioProcessor::voiceCountParamID);
-        resetParam(ConcreteAudioProcessor::ampEnvelopeModeParamID);
-    };
+    // Session button LEDs (One-Shot/Loop) and the Load/Clear label can change from the LCD screen's
+    // own field taps, not just from these buttons themselves - a small idle repaint keeps them from
+    // going stale without wiring a dedicated change-broadcast path for what's a purely cosmetic
+    // sync (matches how meters/LEDs are commonly kept live in this catalog).
+    startTimerHz(15);
 
-    addAndMakeVisible(machineLabel);
-    machineLabel.attachToComponent(&machineCombo, true);
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::machineParamID))
-        machineCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(machineCombo);
-    machineAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::machineParamID, machineCombo);
-
-    addAndMakeVisible(pitchEngineLabel);
-    pitchEngineLabel.attachToComponent(&pitchEngineCombo, true);
-    // Populated from the parameter's own choices rather than a hardcoded second copy of the list -
-    // see ConcreteAudioProcessor::createParameterLayout()'s AudioParameterChoice.
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::pitchEngineModeParamID))
-        pitchEngineCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(pitchEngineCombo);
-    pitchEngineAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::pitchEngineModeParamID, pitchEngineCombo);
-
-    addAndMakeVisible(baseRateLabel);
-    baseRateLabel.attachToComponent(&baseRateSlider, true);
-    baseRateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    baseRateSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 60, 20);
-    addAndMakeVisible(baseRateSlider);
-    baseRateAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::baseRateParamID, baseRateSlider);
-
-    addAndMakeVisible(coarseTuneLabel);
-    coarseTuneLabel.attachToComponent(&coarseTuneSlider, true);
-    coarseTuneSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    coarseTuneSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(coarseTuneSlider);
-    coarseTuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::coarseTuneParamID, coarseTuneSlider);
-
-    addAndMakeVisible(fineTuneLabel);
-    fineTuneLabel.attachToComponent(&fineTuneSlider, true);
-    fineTuneSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    fineTuneSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(fineTuneSlider);
-    fineTuneAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::fineTuneParamID, fineTuneSlider);
-
-    addAndMakeVisible(bitDepthLabel);
-    bitDepthLabel.attachToComponent(&bitDepthSlider, true);
-    bitDepthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    bitDepthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(bitDepthSlider);
-    bitDepthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::bitDepthParamID, bitDepthSlider);
-
-    addAndMakeVisible(quantizerModeLabel);
-    quantizerModeLabel.attachToComponent(&quantizerModeCombo, true);
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::quantizerModeParamID))
-        quantizerModeCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(quantizerModeCombo);
-    quantizerModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::quantizerModeParamID, quantizerModeCombo);
-
-    addAndMakeVisible(captureTransposeLabel);
-    captureTransposeLabel.attachToComponent(&captureTransposeSlider, true);
-    captureTransposeSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    captureTransposeSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(captureTransposeSlider);
-    captureTransposeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureTransposeParamID, captureTransposeSlider);
-
-    addAndMakeVisible(captureDriveLabel);
-    captureDriveLabel.attachToComponent(&captureDriveSlider, true);
-    captureDriveSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    captureDriveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(captureDriveSlider);
-    captureDriveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureDriveParamID, captureDriveSlider);
-
-    addAndMakeVisible(captureAutoCompensateButton);
-    captureAutoCompensateAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureAutoCompensateParamID, captureAutoCompensateButton);
-
-    addAndMakeVisible(captureBypassButton);
-    captureBypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureBypassParamID, captureBypassButton);
-
-    addAndMakeVisible(captureIterationsLabel);
-    captureIterationsLabel.attachToComponent(&captureIterationsSlider, true);
-    captureIterationsSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    captureIterationsSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
-    addAndMakeVisible(captureIterationsSlider);
-    captureIterationsAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::captureIterationsParamID, captureIterationsSlider);
-
-    addAndMakeVisible(filterModelLabel);
-    filterModelLabel.attachToComponent(&filterModelCombo, true);
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::filterModelParamID))
-        filterModelCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(filterModelCombo);
-    filterModelAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::filterModelParamID, filterModelCombo);
-
-    addAndMakeVisible(cutoffKnob);
-    addAndMakeVisible(resonanceKnob);
-
-    addAndMakeVisible(filterEnvAmountLabel);
-    filterEnvAmountLabel.attachToComponent(&filterEnvAmountSlider, true);
-    filterEnvAmountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    filterEnvAmountSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(filterEnvAmountSlider);
-    filterEnvAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::filterEnvAmountParamID, filterEnvAmountSlider);
-
-    addAndMakeVisible(filterKeyTrackLabel);
-    filterKeyTrackLabel.attachToComponent(&filterKeyTrackSlider, true);
-    filterKeyTrackSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    filterKeyTrackSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(filterKeyTrackSlider);
-    filterKeyTrackAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::filterKeyTrackParamID, filterKeyTrackSlider);
-
-    addAndMakeVisible(voiceCountLabel);
-    voiceCountLabel.attachToComponent(&voiceCountSlider, true);
-    voiceCountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    voiceCountSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 20);
-    addAndMakeVisible(voiceCountSlider);
-    voiceCountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::voiceCountParamID, voiceCountSlider);
-
-    addAndMakeVisible(ampEnvelopeModeLabel);
-    ampEnvelopeModeLabel.attachToComponent(&ampEnvelopeModeCombo, true);
-    if (auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::ampEnvelopeModeParamID))
-        ampEnvelopeModeCombo.addItemList(param->getAllValueStrings(), 1);
-    addAndMakeVisible(ampEnvelopeModeCombo);
-    ampEnvelopeModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processor.apvts, ConcreteAudioProcessor::ampEnvelopeModeParamID, ampEnvelopeModeCombo);
-
-    addAndMakeVisible(padGrid);
-
-    setSize(980, 726);
+    // 936x762 - recomputed from the corrected section heights below (was 740 tall before the
+    // kSmallTextLineHeight/kSilkscreenLabelHeight fixes; see resized()'s own math for how this
+    // number is reached, and ConcreteLookAndFeel::kSmallTextLineHeight's comment for why the old
+    // heights were wrong in the first place).
+    setSize(936, 762);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -210,117 +145,191 @@ ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
+bool ConcreteAudioProcessorEditor::hasSampleLoaded() const
+{
+    const auto sampleSet = processor.getCurrentSampleSet();
+    return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].sourceBuffer != nullptr;
+}
+
+void ConcreteAudioProcessorEditor::timerCallback()
+{
+    oneShotButton.repaint();
+    loopButton.repaint();
+    resampleButton.repaint();
+    loadClearButton.repaint();
+}
+
 void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff1c1f20));
+    g.fillAll(panelBackground);
+
+    auto bounds = getLocalBounds().toFloat().reduced(panelPaddingX, panelPaddingY);
+
+    auto headerArea = bounds.removeFromTop(headerHeight);
+    g.setColour(wordmarkColour);
+    g.setFont(lookAndFeel.getDisplayFont(24.0f));
+    const auto wordmarkWidth = juce::GlyphArrangement::getStringWidth(lookAndFeel.getDisplayFont(24.0f), "CONCRETE");
+    g.drawText("CONCRETE", headerArea.removeFromLeft(wordmarkWidth), juce::Justification::centredLeft);
+    headerArea.removeFromLeft(12.0f);
+    g.setColour(taglineColour);
+    g.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(1.6f / 11.0f));
+    g.drawText("VARIABLE RATE SAMPLER", headerArea, juce::Justification::centredLeft);
+
+    bounds.removeFromTop(sectionGap);
+
+    // Screen well: a 16px-padded #050505 recess around the LCD - the only bevel this chrome has
+    // (ui-plan.md's "Three divergences": no chassis, no fluted-rim knobs elsewhere).
+    const auto screenWellBounds = juce::Rectangle<float>(concreteScreen.getX() - screenWellPadding,
+                                                           concreteScreen.getY() - screenWellPadding,
+                                                           concreteScreen.getWidth() + 2.0f * screenWellPadding,
+                                                           concreteScreen.getHeight() + 2.0f * screenWellPadding);
+    g.setColour(screenWellFill);
+    g.fillRoundedRectangle(screenWellBounds, 6.0f);
+    juce::DropShadow innerShadow(juce::Colours::black.withAlpha(0.7f), 8, { 0, 3 });
+    juce::Path wellPath;
+    wellPath.addRoundedRectangle(screenWellBounds, 6.0f);
+    innerShadow.drawForPath(g, wellPath);
+
+    // The Performance strip and Volume section each get a flat #1c1c1c backing box (.stripControlsVertical/
+    // .volumeControls) - PadGrid paints its own pads directly with no such backing, matching the mockup.
+    auto stripBox = juce::Rectangle<float>(cutoffKnob.getX() - 20.0f, cutoffKnob.getY() - 14.0f,
+                                            cutoffKnob.getWidth() + 40.0f, resonanceKnob.getBottom() - cutoffKnob.getY() + 28.0f);
+    g.setColour(stripFill);
+    g.fillRoundedRectangle(stripBox, 4.0f);
+    lookAndFeel.paintSilkscreenLabel(
+        g, stripBox.withY(stripBox.getY() - ConcreteLookAndFeel::kSilkscreenLabelHeight).withHeight(ConcreteLookAndFeel::kSilkscreenLabelHeight),
+        "Performance", true);
+
+    auto volumeBox = juce::Rectangle<float>(sampleVolumeFader.getX() - 20.0f, sampleVolumeFader.getY() - 14.0f,
+                                             masterVolumeFader.getRight() - sampleVolumeFader.getX() + 40.0f,
+                                             sampleVolumeFader.getHeight() + 28.0f);
+    g.setColour(stripFill);
+    g.fillRoundedRectangle(volumeBox, 4.0f);
+    lookAndFeel.paintSilkscreenLabel(
+        g, volumeBox.withY(volumeBox.getY() - ConcreteLookAndFeel::kSilkscreenLabelHeight).withHeight(ConcreteLookAndFeel::kSilkscreenLabelHeight),
+        "Volume", true);
+
+    // Right column's own section labels/backing boxes (Edit/Session). Derived from
+    // machineSelector's own bottom edge (NOT from directionalPad/dataKnob's positions) - those two
+    // are vertically centered WITHIN this box at possibly-different offsets from each other (see
+    // resized()), so building the box from their positions instead risks the box's top edge
+    // encroaching on the label above it (exactly the bug this comment used to not warn about: the
+    // box was painted 9px into the label's own rectangle, silently covering the text underneath -
+    // found by swapping this fill to solid red and seeing the box sit higher than the "Edit" text
+    // ever appeared).
+    const auto editSectionTop = (float) machineSelector.getBottom() + rightColumnGap;
+    lookAndFeel.paintSilkscreenLabel(
+        g, { (float) machineSelector.getX(), editSectionTop, rightColumnWidth, ConcreteLookAndFeel::kSilkscreenLabelHeight },
+        "Edit", false);
+    const auto editContentBottom = (float) juce::jmax(directionalPad.getBottom(), dataKnob.getBottom());
+    const auto editBoxTopEdge = editSectionTop + ConcreteLookAndFeel::kSilkscreenLabelHeight;
+    auto editBox = juce::Rectangle<float>((float) machineSelector.getX(), editBoxTopEdge,
+                                           rightColumnWidth, editContentBottom - editBoxTopEdge + 12.0f);
+    g.setColour(stripFill);
+    g.fillRoundedRectangle(editBox, 4.0f);
+    // Redraw the pad/knob's own transparent-background children on top would be wrong order-wise -
+    // paint() runs before children, so this box is drawn first and the child components composite
+    // over it normally (see resized(), which positions them inside this same rect).
+
+    lookAndFeel.paintSilkscreenLabel(
+        g, { (float) machineSelector.getX(), (float) oneShotButton.getY() - ConcreteLookAndFeel::kSilkscreenLabelHeight,
+             rightColumnWidth, ConcreteLookAndFeel::kSilkscreenLabelHeight },
+        "Session", false);
+
+    auto footerArea = getLocalBounds().toFloat().reduced(panelPaddingX, panelPaddingY);
+    footerArea = footerArea.removeFromBottom(footerHeight);
+    g.setColour(footerLeftColour);
+    g.setFont(lookAndFeel.getSmallPrintFont(10.0f).withExtraKerningFactor(0.08f));
+    g.drawText(juce::String("CONCRETE \xc2\xb7 v") + concreteVersion, footerArea, juce::Justification::centredLeft);
+    g.setColour(footerRightColour);
+    g.drawText("WILD JAG", footerArea, juce::Justification::centredRight);
 }
 
 void ConcreteAudioProcessorEditor::resized()
 {
-    auto fullBounds = getLocalBounds();
+    auto bounds = getLocalBounds().toFloat().reduced(panelPaddingX, panelPaddingY);
 
-    // Reserved up front, as genuinely EXTRA width (see setSize() below), not scavenged from
-    // whatever looked empty in the existing rows - those turned out to already use nearly this
-    // window's full original 700px in several rows (Base Rate/Coarse/Fine Tune alone need ~670),
-    // so there was nowhere to actually fit a 260px pad grid without it overlapping something.
-    // Growing the window WIDER for this rather than TALLER (which the pad grid's own ~280px
-    // height would otherwise have demanded) keeps it closer to fitting on a laptop screen - still
-    // just Phase 1's utility layout, not the real compact panel this becomes later.
-    auto padArea = fullBounds.removeFromRight(280);
-    padGrid.setTopLeftPosition(padArea.getX() + 10, 48);
+    bounds.removeFromTop(headerHeight);
+    bounds.removeFromTop(sectionGap);
+    bounds.removeFromBottom(footerHeight);
+    bounds.removeFromBottom(sectionGap);
 
-    auto bounds = fullBounds.reduced(10);
+    auto rightColumnArea = bounds.removeFromRight(rightColumnWidth);
+    bounds.removeFromRight(bodyGap);
+    auto leftColumnArea = bounds; // whatever's left is the left column's own content width
 
-    auto topRow = bounds.removeFromTop(30);
-    loadButton.setBounds(topRow.removeFromLeft(80));
-    topRow.removeFromLeft(20);
-    resetButton.setBounds(topRow.removeFromLeft(80));
+    // --- Left column ---
+    // padsPerformanceRow is the widest thing in this column (PadGrid + Performance strip +
+    // Volume section, each with its own gap) - screenWell/SoftKeys re-center under IT, matching
+    // leftColumn's own align-items:center (see Panel.module.css's comment on why).
+    // stripWidth is 100 (20+20 padding + 60 knob width), NOT the mockup's own real 84 (20+20+44) -
+    // ConcreteKnob is deliberately 60px wide, not the mockup's 44px, to avoid clipping "RESONANCE"
+    // (JUCE ellipsizes overflow text; a browser div without overflow:hidden doesn't - see
+    // ConcreteKnob.cpp's own comment). That intentional +16px necessarily carries through to this
+    // box and therefore to the whole row/leftColumn (556px here vs the mockup's real 540px,
+    // confirmed via getBoundingClientRect()) - a traced-through, accepted consequence of that
+    // earlier fix, not a new discrepancy.
+    constexpr float stripWidth = 100.0f;
+    constexpr float volumeWidth = 148.0f;  // 20+20 padding + 2*44 fader width + 20 gap - matches the mockup exactly
+    const float padsPerformanceRowWidth = 260.0f + bodyGap + stripWidth + bodyGap + volumeWidth;
 
-    bounds.removeFromTop(8);
+    auto leftColumn = leftColumnArea.withWidth(padsPerformanceRowWidth);
 
-    // ConcreteScreen is fixed at the mockup's own 500x250 - centered in whatever width is left
-    // rather than stretched, so it stays pixel-accurate for screenshot diffing regardless of this
-    // throwaway editor's own window size.
-    concreteScreen.setTopLeftPosition((bounds.getWidth() - concreteScreen.getWidth()) / 2, bounds.getY());
-    bounds.removeFromTop(concreteScreen.getHeight() + 8);
+    auto screenWellSlot = leftColumn.withWidth(concreteScreen.getWidth() + 2.0f * screenWellPadding);
+    screenWellSlot.setX(leftColumn.getX() + (padsPerformanceRowWidth - screenWellSlot.getWidth()) * 0.5f);
+    concreteScreen.setTopLeftPosition((int) (screenWellSlot.getX() + screenWellPadding),
+                                       (int) (leftColumn.getY() + screenWellPadding));
 
+    auto softKeysSlot = leftColumn.withWidth((float) softKeys.getWidth());
+    softKeysSlot.setX(leftColumn.getX() + (padsPerformanceRowWidth - softKeysSlot.getWidth()) * 0.5f);
+    softKeys.setTopLeftPosition((int) softKeysSlot.getX(),
+                                (int) (concreteScreen.getBottom() + screenWellPadding + leftColumnGap + softKeysMarginTop));
 
-    auto machineRow = bounds.removeFromTop(28);
-    machineRow.removeFromLeft(90); // space for the "Machine" label
-    machineCombo.setBounds(machineRow.removeFromLeft(220));
+    const auto padsRowY = softKeys.getBottom() + leftColumnGap;
+    padGrid.setTopLeftPosition((int) leftColumn.getX(), (int) padsRowY);
 
-    bounds.removeFromTop(8);
+    const auto stripX = padGrid.getRight() + bodyGap;
+    cutoffKnob.setTopLeftPosition((int) (stripX + 20.0f),
+                                   (int) (padsRowY + ConcreteLookAndFeel::kSilkscreenLabelHeight + 14.0f));
+    const float knobGapForStretch = (260.0f - 2.0f * cutoffKnob.getHeight()) - 2.0f * 14.0f; // stretched to PadGrid's own height
+    resonanceKnob.setTopLeftPosition(cutoffKnob.getX(),
+                                      (int) (cutoffKnob.getBottom() + juce::jmax(0.0f, knobGapForStretch)));
 
-    auto pitchRow = bounds.removeFromTop(28);
-    pitchRow.removeFromLeft(90); // space for the "Pitch Engine" label
-    pitchEngineCombo.setBounds(pitchRow.removeFromLeft(220));
+    const auto volumeX = stripX + stripWidth + bodyGap;
+    const auto volumeBoxTop = padsRowY + ConcreteLookAndFeel::kSilkscreenLabelHeight;
+    const auto volumeBoxHeight = 260.0f;
+    const auto faderHeight = (float) sampleVolumeFader.getHeight();
+    const auto faderY = volumeBoxTop + (volumeBoxHeight - faderHeight) * 0.5f;
+    sampleVolumeFader.setTopLeftPosition((int) (volumeX + 20.0f), (int) faderY);
+    masterVolumeFader.setTopLeftPosition(sampleVolumeFader.getRight() + 20, (int) faderY);
 
-    bounds.removeFromTop(8);
+    // --- Right column ---
+    machineSelector.setBounds((int) rightColumnArea.getX(), (int) rightColumnArea.getY(),
+                               (int) rightColumnWidth, machineSelector.getHeight());
 
-    auto tuneRow = bounds.removeFromTop(28);
-    tuneRow.removeFromLeft(90); // space for the "Base Rate" label
-    baseRateSlider.setBounds(tuneRow.removeFromLeft(150));
-    tuneRow.removeFromLeft(90); // "Coarse Tune" label
-    coarseTuneSlider.setBounds(tuneRow.removeFromLeft(130));
-    tuneRow.removeFromLeft(80); // "Fine Tune" label
-    fineTuneSlider.setBounds(tuneRow.removeFromLeft(130));
+    const auto editBoxTop = machineSelector.getBottom() + rightColumnGap
+                             + ConcreteLookAndFeel::kSilkscreenLabelHeight + 12.0f /* box padding */;
+    const auto editControlsGap = 44.0f;
+    const auto editContentWidth = directionalPad.getWidth() + editControlsGap + dataKnob.getWidth();
+    const auto editContentX = rightColumnArea.getX() + (rightColumnWidth - editContentWidth) * 0.5f;
+    const auto editContentHeight = (float) juce::jmax(directionalPad.getHeight(), dataKnob.getHeight());
+    directionalPad.setTopLeftPosition((int) editContentX, (int) (editBoxTop + (editContentHeight - directionalPad.getHeight()) * 0.5f));
+    dataKnob.setTopLeftPosition((int) (directionalPad.getRight() + editControlsGap),
+                                (int) (editBoxTop + (editContentHeight - dataKnob.getHeight()) * 0.5f));
 
-    bounds.removeFromTop(8);
+    const auto sessionTop = juce::jmax (directionalPad.getBottom(), dataKnob.getBottom()) + 12.0f + rightColumnGap
+                             + ConcreteLookAndFeel::kSilkscreenLabelHeight;
+    const auto buttonGap = 6.0f;
+    const auto buttonWidth = (rightColumnWidth - 2.0f * buttonGap) / 3.0f;
 
-    auto quantRow = bounds.removeFromTop(28);
-    quantRow.removeFromLeft(90); // "Bit Depth" label
-    bitDepthSlider.setBounds(quantRow.removeFromLeft(150));
-    quantRow.removeFromLeft(110); // "Quantizer Mode" label
-    quantizerModeCombo.setBounds(quantRow.removeFromLeft(150));
+    oneShotButton.setBounds((int) rightColumnArea.getX(), (int) sessionTop, (int) buttonWidth, oneShotButton.getHeight());
+    loopButton.setBounds(oneShotButton.getRight() + (int) buttonGap, (int) sessionTop, (int) buttonWidth, loopButton.getHeight());
+    resampleButton.setBounds(loopButton.getRight() + (int) buttonGap, (int) sessionTop, (int) buttonWidth, resampleButton.getHeight());
 
-    bounds.removeFromTop(8);
-
-    auto captureRow1 = bounds.removeFromTop(28);
-    captureRow1.removeFromLeft(120); // "Capture Transpose" label
-    captureTransposeSlider.setBounds(captureRow1.removeFromLeft(150));
-    captureRow1.removeFromLeft(100); // "Capture Drive" label
-    captureDriveSlider.setBounds(captureRow1.removeFromLeft(130));
-
-    bounds.removeFromTop(8);
-
-    auto captureRow2 = bounds.removeFromTop(28);
-    captureAutoCompensateButton.setBounds(captureRow2.removeFromLeft(160));
-    captureRow2.removeFromLeft(10);
-    captureBypassButton.setBounds(captureRow2.removeFromLeft(140));
-    captureRow2.removeFromLeft(130); // "Capture Iterations" label
-    captureIterationsSlider.setBounds(captureRow2.removeFromLeft(100));
-
-    bounds.removeFromTop(8);
-
-    auto filterRow1 = bounds.removeFromTop(28);
-    filterRow1.removeFromLeft(90); // "Filter Model" label
-    filterModelCombo.setBounds(filterRow1.removeFromLeft(220));
-
-    bounds.removeFromTop(8);
-
-    // Taller than the other rows here (68px, not 28) - ConcreteKnob draws its own label/readout
-    // below its cap rather than needing a separate juce::Label the way every Attachment-based
-    // control on this page still does, but that means it needs real vertical room, not a single
-    // slider-height row.
-    auto filterRow2 = bounds.removeFromTop (cutoffKnob.getHeight());
-    cutoffKnob.setTopLeftPosition (filterRow2.getX(), filterRow2.getY());
-    resonanceKnob.setTopLeftPosition (filterRow2.getX() + cutoffKnob.getWidth() + 20, filterRow2.getY());
-
-    bounds.removeFromTop(8);
-
-    auto filterRow3 = bounds.removeFromTop(28);
-    filterRow3.removeFromLeft(120); // "Filter Env Amount" label
-    filterEnvAmountSlider.setBounds(filterRow3.removeFromLeft(130));
-    filterRow3.removeFromLeft(100); // "Filter Key Track" label
-    filterKeyTrackSlider.setBounds(filterRow3.removeFromLeft(130));
-
-    bounds.removeFromTop(8);
-
-    auto voiceRow = bounds.removeFromTop(28);
-    voiceRow.removeFromLeft(90); // "Voice Count" label
-    voiceCountSlider.setBounds(voiceRow.removeFromLeft(100));
-    voiceRow.removeFromLeft(100); // "Amp Envelope" label
-    ampEnvelopeModeCombo.setBounds(voiceRow.removeFromLeft(150));
+    const auto secondRowTop = sessionTop + oneShotButton.getHeight() + 8.0f;
+    const auto halfButtonWidth = (rightColumnWidth - buttonGap) / 2.0f;
+    saveSampleButton.setBounds((int) rightColumnArea.getX(), (int) secondRowTop, (int) halfButtonWidth, saveSampleButton.getHeight());
+    loadClearButton.setBounds(saveSampleButton.getRight() + (int) buttonGap, (int) secondRowTop, (int) halfButtonWidth, loadClearButton.getHeight());
 }
 
 bool ConcreteAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files)
@@ -349,9 +358,9 @@ void ConcreteAudioProcessorEditor::filesDropped(const juce::StringArray& files, 
 
 void ConcreteAudioProcessorEditor::loadFile(const juce::File& file)
 {
-    // Delegates to ConcreteScreen, which owns the async load + its own loading-animation display
-    // now (see that class's loadFile()) - both this Load button and the top-level drop target
-    // below funnel through here rather than duplicating that logic at each call site.
+    // Delegates to ConcreteScreen, which owns the async load + its own loading-animation display -
+    // both this path and the Session block's Load button funnel through here rather than
+    // duplicating that logic at each call site.
     concreteScreen.loadFile(file);
 }
 

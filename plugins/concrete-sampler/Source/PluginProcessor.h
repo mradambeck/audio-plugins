@@ -80,6 +80,11 @@ public:
     // the destructor waits for an in-flight call here to finish first.
     void loadSampleAsync(const juce::File& file, std::function<void(bool)> onComplete);
 
+    // The Session block's "Clear Sample" button (see ConcreteScreen::clearSample()). Publishes a
+    // fresh empty ConcreteSampleSet - the exact same state this processor starts in before any
+    // load, so there's no separate "empty" code path to get wrong.
+    void clearSample() { publishRawSampleSet(ConcreteSampleSet::Ptr(new ConcreteSampleSet())); }
+
     // Changes the (only, in v1) zone's root note and republishes - see Architecture #1: this is
     // zone-list state, not an APVTS parameter.
     void setRootNoteForZone(int zoneIndex, int newRootNote);
