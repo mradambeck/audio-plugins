@@ -14,6 +14,8 @@
 #include "ConcreteSoftKeys.h"
 #include "PluginProcessor.h"
 
+#include "../../common/UI/ResizableZoom.h"
+
 // Phase 8's real panel chrome - ~/code/lcd-mockup's Panel.tsx/.module.css translated to JUCE:
 // header wordmark, screen well + soft keys + a Pads/Performance/Volume row on the left, Machine
 // selector + Edit section + Session buttons on the right, footer. See concrete-sampler-plugin-
@@ -29,13 +31,19 @@
 // moveSelectionVertical()/moveSelectionHorizontal() for what field id does what. Only Cutoff/
 // Resonance keep a dedicated physical knob (the performance strip) and Machine keeps its own
 // dedicated selector - matching Panel.tsx's own comments on both.
-class ConcreteAudioProcessorEditor : public juce::AudioProcessorEditor,
-                                      public juce::FileDragAndDropTarget,
-                                      private juce::Timer
+//
+// All real painting/layout lives here, at a fixed native size (see the setSize() call in the
+// constructor) that never changes again - see ConcreteAudioProcessorEditor below for why, and
+// common/UI/ResizableZoom.h for the resizable/zoom mechanism this split exists to support
+// (matches every other hardware-panel plugin in the catalog - see e.g. strike-synth's own
+// StrikeEditorContent/StrikeAudioProcessorEditor split).
+class ConcreteEditorContent : public juce::Component,
+                               public juce::FileDragAndDropTarget,
+                               private juce::Timer
 {
 public:
-    explicit ConcreteAudioProcessorEditor(ConcreteAudioProcessor&);
-    ~ConcreteAudioProcessorEditor() override;
+    explicit ConcreteEditorContent(ConcreteAudioProcessor&);
+    ~ConcreteEditorContent() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -83,4 +91,23 @@ private:
 
     juce::TooltipWindow tooltipWindow { this };
     std::unique_ptr<juce::FileChooser> fileChooser;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ConcreteEditorContent)
+};
+
+// Thin shell around ConcreteEditorContent: owns the plugin window's actual (resizable/zoomable)
+// size. wildjag::ResizableZoomHandler (see common/UI/ResizableZoom.h) makes this editor natively
+// resizable within a fixed aspect ratio and keeps content scaled via AffineTransform to fill it -
+// corner-grip/window-edge drag, with no custom zoom UI drawn by the plugin itself. Always reopens
+// at 100% (native size) - the resized size is deliberately not persisted.
+class ConcreteAudioProcessorEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit ConcreteAudioProcessorEditor(ConcreteAudioProcessor&);
+
+private:
+    ConcreteEditorContent content;
+    wildjag::ResizableZoomHandler zoomHandler;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ConcreteAudioProcessorEditor)
 };

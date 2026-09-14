@@ -34,8 +34,8 @@ namespace
     constexpr auto concreteVersion = "0.1.0"; // matches CMakeLists.txt's project() VERSION
 }
 
-ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcessor& p)
-    : AudioProcessorEditor(&p), processor(p),
+ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
+    : processor(p),
       concreteScreen(p, lookAndFeel),
       softKeys(concreteScreen),
       padGrid(p, lookAndFeel),
@@ -140,18 +140,18 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     setSize(936, 762);
 }
 
-ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
+ConcreteEditorContent::~ConcreteEditorContent()
 {
     setLookAndFeel(nullptr);
 }
 
-bool ConcreteAudioProcessorEditor::hasSampleLoaded() const
+bool ConcreteEditorContent::hasSampleLoaded() const
 {
     const auto sampleSet = processor.getCurrentSampleSet();
     return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].sourceBuffer != nullptr;
 }
 
-void ConcreteAudioProcessorEditor::timerCallback()
+void ConcreteEditorContent::timerCallback()
 {
     oneShotButton.repaint();
     loopButton.repaint();
@@ -159,7 +159,7 @@ void ConcreteAudioProcessorEditor::timerCallback()
     loadClearButton.repaint();
 }
 
-void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
+void ConcreteEditorContent::paint(juce::Graphics& g)
 {
     g.fillAll(panelBackground);
 
@@ -253,7 +253,7 @@ void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("WILD JAG", footerArea, juce::Justification::centredRight);
 }
 
-void ConcreteAudioProcessorEditor::resized()
+void ConcreteEditorContent::resized()
 {
     auto bounds = getLocalBounds().toFloat().reduced(panelPaddingX, panelPaddingY);
 
@@ -340,7 +340,7 @@ void ConcreteAudioProcessorEditor::resized()
     loadClearButton.setBounds(saveSampleButton.getRight() + (int) buttonGap, (int) secondRowTop, (int) halfButtonWidth, loadClearButton.getHeight());
 }
 
-bool ConcreteAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files)
+bool ConcreteEditorContent::isInterestedInFileDrag(const juce::StringArray& files)
 {
     for (const auto& path : files)
     {
@@ -351,7 +351,7 @@ bool ConcreteAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArra
     return false;
 }
 
-void ConcreteAudioProcessorEditor::filesDropped(const juce::StringArray& files, int, int)
+void ConcreteEditorContent::filesDropped(const juce::StringArray& files, int, int)
 {
     for (const auto& path : files)
     {
@@ -364,12 +364,19 @@ void ConcreteAudioProcessorEditor::filesDropped(const juce::StringArray& files, 
     }
 }
 
-void ConcreteAudioProcessorEditor::loadFile(const juce::File& file)
+void ConcreteEditorContent::loadFile(const juce::File& file)
 {
     // Delegates to ConcreteScreen, which owns the async load + its own loading-animation display -
     // both this path and the Session block's Load button funnel through here rather than
     // duplicating that logic at each call site.
     concreteScreen.loadFile(file);
+}
+
+ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcessor& p)
+    : AudioProcessorEditor(&p), content(p),
+      zoomHandler(*this, content, { content.getWidth(), content.getHeight() })
+{
+    addAndMakeVisible(content);
 }
 
 juce::AudioProcessorEditor* ConcreteAudioProcessor::createEditor()
