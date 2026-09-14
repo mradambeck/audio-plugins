@@ -141,6 +141,16 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
 
 ConcreteAudioProcessor::~ConcreteAudioProcessor()
 {
+    // Same reasoning as stopThread() below, for loadSampleAsync()'s one-shot background threads
+    // instead of the persistent bake thread: a lambda already running on one of those captures
+    // `this` and keeps touching this object's members after this destructor starts, so they must
+    // finish first. Bounded wait, same 2-second convention as stopThread() - if a load somehow never
+    // finishes this gives up rather than hanging the host indefinitely; that's already a stuck-file-
+    // read this object can't do anything about either way.
+    const auto deadline = juce::Time::getMillisecondCounter() + 2000;
+    while (pendingAsyncLoads.load() > 0 && juce::Time::getMillisecondCounter() < deadline)
+        juce::Thread::sleep(5);
+
     // Must happen before any of this object's OTHER members (or apvts) start being destroyed -
     // see run()'s own comment. juce::Thread's own destructor would eventually stop the thread too,
     // but only AFTER this derived class's members are already gone, which is too late if run() is
@@ -224,13 +234,35 @@ void ConcreteAudioProcessor::run()
     while (!threadShouldExit())
     {
         wait(-1);
-        // Re-checks bakeRequested rather than baking once per wait() - a parameterChanged() that
-        // lands WHILE rebakeNow() is already running (e.g. a host smoothing a knob move into many
-        // rapid automation events) must not be missed just because this thread wasn't back at
-        // wait() yet to receive it.
-        while (bakeRequested.exchange(false) && !threadShouldExit())
-            rebakeNow();
+        // Re-checks both flags rather than servicing each once per wait() - a request that lands
+        // WHILE this loop is already busy (e.g. a host smoothing a knob move into many rapid
+        // automation events, or a publish landing mid-encode) must not be missed just because this
+        // thread wasn't back at wait() yet to receive it.
+        while (!threadShouldExit() && (bakeRequested.load() || sizeCacheRequested.load()))
+        {
+            if (bakeRequested.exchange(false))
+            {
+                bakeInProgress = true;
+                processorStateBroadcaster.sendChangeMessage();
+                rebakeNow(); // publishes via publishSampleSet(), which sets sizeCacheRequested itself
+                bakeInProgress = false;
+                processorStateBroadcaster.sendChangeMessage();
+            }
+
+            if (sizeCacheRequested.exchange(false))
+                recomputeCachedEmbedPayloadSize();
+        }
     }
+}
+
+void ConcreteAudioProcessor::recomputeCachedEmbedPayloadSize()
+{
+    const auto set = getCurrentSampleSet();
+    const juce::int64 size = (set != nullptr && !set->zones.empty())
+                                  ? (juce::int64) ConcreteSampleIO::encodeZoneAsFlac(set->zones[0]).getSize()
+                                  : (juce::int64) 0;
+    cachedEmbedPayloadSizeBytes = size;
+    processorStateBroadcaster.sendChangeMessage();
 }
 
 void ConcreteAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -574,6 +606,30 @@ bool ConcreteAudioProcessor::loadSample(const juce::File& file)
     return true;
 }
 
+void ConcreteAudioProcessor::loadSampleAsync(const juce::File& file, std::function<void(bool)> onComplete)
+{
+    ++pendingAsyncLoads;
+    juce::Thread::launch([this, file, onComplete]
+    {
+        const bool ok = loadSample(file);
+        // Decremented HERE, on this background thread, right after the last point this lambda
+        // touches `this` - not inside the callAsync below, which by design captures no reference
+        // back to this processor (see this method's own comment in PluginProcessor.h: the
+        // destructor waits for pendingAsyncLoads to reach 0 before this object starts being torn
+        // down, so this line must run before that wait can be satisfied).
+        --pendingAsyncLoads;
+        juce::MessageManager::callAsync([onComplete, ok]
+        {
+            // Deliberately no `this` capture - onComplete is the caller's problem to keep safe
+            // across its own lifetime (e.g. a juce::Component::SafePointer capture at the call
+            // site), the same way any callAsync into a Component should be guarded. This processor
+            // may already be gone by the time this runs; it must not need to still exist.
+            if (onComplete)
+                onComplete(ok);
+        });
+    });
+}
+
 void ConcreteAudioProcessor::setRootNoteForZone(int zoneIndex, int newRootNote)
 {
     const auto existingRaw = getRawSampleSet();
@@ -598,6 +654,18 @@ void ConcreteAudioProcessor::setOneShotForZone(int zoneIndex, bool oneShot)
     publishRawSampleSet(newRawSet);
 }
 
+void ConcreteAudioProcessor::setLoopEnabledForZone(int zoneIndex, bool loopEnabled)
+{
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
+        return;
+
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].loopEnabled = loopEnabled;
+    publishRawSampleSet(newRawSet);
+}
+
 bool ConcreteAudioProcessor::relocateZone(int zoneIndex, const juce::File& newFile)
 {
     const auto existingRaw = getRawSampleSet();
@@ -617,8 +685,16 @@ bool ConcreteAudioProcessor::relocateZone(int zoneIndex, const juce::File& newFi
 
 void ConcreteAudioProcessor::publishSampleSet(ConcreteSampleSet::Ptr newSet)
 {
-    const juce::SpinLock::ScopedLockType lock(sampleSetLock);
-    currentSampleSet = newSet;
+    {
+        const juce::SpinLock::ScopedLockType lock(sampleSetLock);
+        currentSampleSet = newSet;
+    }
+    // Wakes the bake thread to recompute cachedEmbedPayloadSizeBytes - see this method's own
+    // declaration comment in PluginProcessor.h. Safe to call notify() here even when this IS
+    // already the bake thread (rebakeNow()'s case): it only sets a WaitableEvent, run()'s own loop
+    // re-checks both flags before going back to wait() rather than relying on being woken again.
+    sizeCacheRequested = true;
+    notify();
 }
 
 void ConcreteAudioProcessor::publishRawSampleSet(ConcreteSampleSet::Ptr newRawSet)
@@ -627,9 +703,11 @@ void ConcreteAudioProcessor::publishRawSampleSet(ConcreteSampleSet::Ptr newRawSe
     // real buffer) and must never run while holding a lock the audio thread might also want (see
     // sampleSetLock's own comment on why it's never held during rendering).
     const auto baked = bakeSampleSet(*newRawSet, currentCapturePassSettings());
-    const juce::SpinLock::ScopedLockType lock(sampleSetLock);
-    rawSampleSet = newRawSet;
-    currentSampleSet = baked;
+    {
+        const juce::SpinLock::ScopedLockType lock(sampleSetLock);
+        rawSampleSet = newRawSet;
+    }
+    publishSampleSet(baked);
 }
 
 ConcreteSampleSet::Ptr ConcreteAudioProcessor::getCurrentSampleSet() const

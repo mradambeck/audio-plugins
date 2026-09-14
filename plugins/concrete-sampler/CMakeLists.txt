@@ -29,6 +29,7 @@ juce_add_binary_data(ConcreteBinaryData
         ../common/Assets/WildJagLogo.svg
         ../common/Assets/Oxanium-Bold.ttf
         ../common/Assets/Oswald-SemiBold.ttf
+        Source/Assets/VCROSDMono-Regular.ttf
 )
 
 target_sources(Concrete
@@ -36,6 +37,9 @@ target_sources(Concrete
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
         Source/ConcreteLookAndFeel.cpp
+        Source/ConcreteScreen.cpp
+        Source/ConcretePadGrid.cpp
+        Source/ConcreteKnob.cpp
         Source/ConcreteVoice.cpp
         Source/ConcretePitchEngine.cpp
         Source/ConcreteCapturePass.cpp
@@ -47,6 +51,12 @@ target_compile_definitions(Concrete
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        # macOS's CoreGraphics "font smoothing" (CGContextSetShouldSmoothFonts, on by default)
+        # embolds text beyond plain antialiasing - a legacy pre-Retina legibility technique that
+        # reads as text being a touch bolder than the same font rendered in a browser (which uses
+        # its own rasterizer, not this). Scoped to Concrete only, not plugins/common, since this
+        # plugin's pixel-art LCD font is the one place that difference is visually load-bearing.
+        JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING=1
 )
 
 target_link_libraries(Concrete

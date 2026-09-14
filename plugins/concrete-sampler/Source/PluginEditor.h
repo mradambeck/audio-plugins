@@ -2,69 +2,18 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "ConcreteKnob.h"
 #include "ConcreteLookAndFeel.h"
+#include "ConcretePadGrid.h"
+#include "ConcreteScreen.h"
 #include "PluginProcessor.h"
 
 // Phase 1's utility standalone UI: load a file (button or drag-and-drop), see the waveform, play
-// via MIDI or this temporary on-screen keyboard. Explicitly unstyled - Phase 8 replaces this
-// entirely with the real hardware-panel UI (a pad grid, the waveform view with loop markers, the
-// embed-override control, etc - see concrete-sampler-plugin-plan.md's Phase 8) once the DSP phases
-// have settled what controls exist. There is deliberately no missing-file relocate UI, no embed-
-// override toggle, and no per-zone editing here - Architecture #2's backing logic for all of that
-// already exists on ConcreteAudioProcessor and is covered by ConcreteProcessorTests; only Phase 8
-// gives it a control surface.
-class ConcreteWaveformDisplay : public juce::Component
-{
-public:
-    explicit ConcreteWaveformDisplay(ConcreteAudioProcessor& processorIn) : processor(processorIn) {}
-
-    void paint(juce::Graphics& g) override
-    {
-        g.fillAll(juce::Colours::black);
-
-        // Drawn from the SOURCE buffer, not the (possibly capture-pass-transposed/driven/
-        // quantized) working buffer - Phase 8 adds an optional working-buffer overlay so the
-        // capture pass's effect is visible (see concrete-sampler-plugin-plan.md's Phase 8); this
-        // utility view just shows what was actually loaded.
-        const auto sampleSet = processor.getCurrentSampleSet();
-        if (sampleSet->zones.empty() || sampleSet->zones[0].sourceBuffer == nullptr)
-        {
-            g.setColour(juce::Colours::grey);
-            g.drawText(sampleSet->zones.empty() || !sampleSet->zones[0].sourceMissing
-                           ? "No sample loaded - drop a file here or click Load..."
-                           : "Sample missing: " + sampleSet->zones[0].sourcePath,
-                       getLocalBounds(), juce::Justification::centred);
-            return;
-        }
-
-        const auto& buffer = *sampleSet->zones[0].sourceBuffer;
-        const auto numSamples = buffer.getNumSamples();
-        const auto bounds = getLocalBounds().toFloat();
-        const auto midY = bounds.getCentreY();
-        const auto halfHeight = bounds.getHeight() * 0.5f;
-        const auto width = getWidth();
-
-        g.setColour(juce::Colours::lightgreen);
-        for (int x = 0; x < width; ++x)
-        {
-            const auto rangeStart = (int) ((double) x / (double) width * numSamples);
-            const auto rangeEnd = juce::jmax(rangeStart + 1,
-                                              (int) ((double) (x + 1) / (double) width * numSamples));
-            float minVal = 0.0f, maxVal = 0.0f;
-            for (int i = rangeStart; i < juce::jmin(rangeEnd, numSamples); ++i)
-            {
-                const auto sample = buffer.getSample(0, i);
-                minVal = juce::jmin(minVal, sample);
-                maxVal = juce::jmax(maxVal, sample);
-            }
-            g.drawVerticalLine(x, midY - maxVal * halfHeight, midY - minVal * halfHeight);
-        }
-    }
-
-private:
-    ConcreteAudioProcessor& processor;
-};
-
+// via the pad grid. Everything below is still Phase 1's plain Attachment-based controls EXCEPT the
+// screen and the pad grid, which are Phase 8's real ConcreteScreen/ConcretePadGrid (see those
+// classes) - hosted here temporarily until the rest of the panel (performance strip, session
+// buttons, machine selector, full chassis-less chrome) replaces this whole editor. See
+// concrete-sampler-plugin-plan.md's Phase 8 and plugins/concrete-sampler/ui-plan.md.
 class ConcreteAudioProcessorEditor : public juce::AudioProcessorEditor,
                                       public juce::FileDragAndDropTarget
 {
@@ -93,29 +42,18 @@ private:
     // in defaults, so this is the fast in-app equivalent of deleting that settings file.
     juce::TextButton resetButton { "Reset" };
 
-    ConcreteWaveformDisplay waveformDisplay;
+    ConcreteScreen concreteScreen;
 
     // Phase 7's Machine selector (see ConcreteMachines.h) - "a single Machine selector as the
     // primary control," per the plan, hence its own row right under the load/reset controls,
     // above every other (secondary) control below. A real APVTS parameter, so this uses the
-    // standard Attachment convention like Pitch Engine/Filter Model/etc, not the manual wiring
-    // Root Note/One-Shot below need (those are zone-list state, not parameters).
+    // standard Attachment convention like Pitch Engine/Filter Model/etc. Root Note/One-Shot (zone-
+    // list state, not parameters) no longer have separate controls here - ConcreteScreen's Sample
+    // page owns them now, calling setRootNoteForZone()/setOneShotForZone() directly, the same
+    // manual-wiring pattern this comment used to describe for the controls that used to be here.
     juce::Label machineLabel { {}, "Machine" };
     juce::ComboBox machineCombo;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> machineAttachment;
-
-    // Root note is zone-list state (Architecture #1), not an APVTS parameter, so this is a plain
-    // Slider with no Attachment - setRootNoteForZone() is called directly on change. Displayed as
-    // a note name (e.g. "C3") rather than a raw MIDI number, per octaveNumForMiddleC=3 (note 60 =
-    // C3, the Yamaha/Roland convention) - see juce::MidiMessage::getMidiNoteName().
-    juce::Label rootNoteLabel { {}, "Root Note" };
-    juce::Slider rootNoteSlider;
-
-    // Also zone-list state (Architecture #1), not an APVTS parameter, for the same reason and with
-    // the same manual-wiring pattern as Root Note above - see ConcreteSampleZone::oneShot and
-    // ConcreteAudioProcessor::setOneShotForZone(). Off (gated/held-note playback) is the existing,
-    // tested default; on plays the zone through to its own end regardless of note-off.
-    juce::ToggleButton oneShotButton { "One-Shot" };
 
     // Phase 2's pitch-engine controls - real APVTS parameters, so these use the standard
     // Attachment classes rather than manual get/set wiring. STANDALONE CHECK 2 needs exactly this:
@@ -174,13 +112,12 @@ private:
     juce::ComboBox filterModelCombo;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterModelAttachment;
 
-    juce::Label filterCutoffLabel { {}, "Filter Cutoff" };
-    juce::Slider filterCutoffSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterCutoffAttachment;
-
-    juce::Label filterResonanceLabel { {}, "Filter Resonance" };
-    juce::Slider filterResonanceSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> filterResonanceAttachment;
+    // Cutoff/Resonance are Phase 8's real performance-strip knobs now (see ConcreteKnob and
+    // Panel.tsx's own comment: "Performance is just Cutoff/Resonance") rather than throwaway
+    // Attachment-based sliders - the one place in this still-mostly-Phase-1 editor a real panel
+    // control has landed alongside the screen and pad grid.
+    ConcreteKnob cutoffKnob;
+    ConcreteKnob resonanceKnob;
 
     juce::Label filterEnvAmountLabel { {}, "Filter Env Amount" };
     juce::Slider filterEnvAmountSlider;
@@ -200,5 +137,5 @@ private:
     juce::ComboBox ampEnvelopeModeCombo;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ampEnvelopeModeAttachment;
 
-    juce::MidiKeyboardComponent keyboardComponent;
+    ConcretePadGrid padGrid;
 };

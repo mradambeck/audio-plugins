@@ -24,4 +24,22 @@ namespace
     };
 }
 
-ConcreteLookAndFeel::ConcreteLookAndFeel() : HardwarePanelLookAndFeel(concreteTheme) {}
+ConcreteLookAndFeel::ConcreteLookAndFeel() : HardwarePanelLookAndFeel(concreteTheme)
+{
+    lcdTypeface = juce::Typeface::createSystemTypefaceFor(
+        BinaryData::VCROSDMonoRegular_ttf, (size_t) BinaryData::VCROSDMonoRegular_ttfSize);
+}
+
+juce::Font ConcreteLookAndFeel::getLcdFont(float height) const
+{
+    // VCR OSD Mono's hhea ascent+descent (1800+0) is 0.8789x its unitsPerEm (2048) - measured with
+    // fontTools, same technique/reasoning as HardwarePanelTheme::EmbeddedTypeface's own
+    // heightCorrectionRatio (see that struct's comment): JUCE's Font height is ascent+descent, not
+    // a CSS-px em box, so a raw height match to the mockup's CSS px would render this font larger
+    // than intended. Not wired through EmbeddedTypeface since this typeface isn't part of the
+    // shared theme struct at all - see this class's header comment.
+    constexpr float heightCorrectionRatio = 0.87890625f;
+    if (lcdTypeface != nullptr)
+        return juce::Font(juce::FontOptions(lcdTypeface).withHeight(height * heightCorrectionRatio));
+    return getDisplayFont(height); // fallback if the typeface somehow failed to load
+}

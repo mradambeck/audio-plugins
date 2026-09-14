@@ -1,53 +1,13 @@
 #include "PluginEditor.h"
 
-#include <map>
-
-namespace
-{
-    // Inverse of juce::MidiMessage::getMidiNoteName(note, useSharps, true, octaveNumForMiddleC=3)'s
-    // own formula (octave = note/12 + (octaveNumForMiddleC - 5)), so typing "C3" back into the
-    // root note box round-trips exactly. Returns -1 on anything unparseable.
-    int parseNoteName(const juce::String& text)
-    {
-        const auto trimmed = text.trim().toUpperCase();
-        if (trimmed.isEmpty())
-            return -1;
-
-        static const std::map<juce::juce_wchar, int> letterToSemitone {
-            { 'C', 0 }, { 'D', 2 }, { 'E', 4 }, { 'F', 5 }, { 'G', 7 }, { 'A', 9 }, { 'B', 11 },
-        };
-
-        const auto it = letterToSemitone.find(trimmed[0]);
-        if (it == letterToSemitone.end())
-            return -1;
-
-        auto semitone = it->second;
-        int index = 1;
-        if (index < trimmed.length() && trimmed[index] == '#')
-        {
-            semitone += 1;
-            ++index;
-        }
-        else if (index < trimmed.length() && trimmed[index] == 'B')
-        {
-            semitone -= 1;
-            ++index;
-        }
-
-        const auto octaveText = trimmed.substring(index);
-        if (octaveText.isEmpty() || !octaveText.containsOnly("-0123456789"))
-            return -1;
-
-        const auto octave = octaveText.getIntValue();
-        const auto note = (octave + 2) * 12 + semitone;
-        return juce::isPositiveAndBelow(note, 128) ? note : -1;
-    }
-}
-
 ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcessor& p)
     : AudioProcessorEditor(&p), processor(p),
-      waveformDisplay(p),
-      keyboardComponent(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
+      concreteScreen(p, lookAndFeel),
+      cutoffKnob(p, lookAndFeel, ConcreteAudioProcessor::filterCutoffParamID, "Cutoff",
+                 [](float v) { return v >= 1000.0f ? juce::String(v / 1000.0f, 1) + "k" : juce::String(juce::roundToInt(v)) + "Hz"; }),
+      resonanceKnob(p, lookAndFeel, ConcreteAudioProcessor::filterResonanceParamID, "Resonance",
+                    [](float v) { return juce::String(v, 2); }),
+      padGrid(p, lookAndFeel)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -66,56 +26,16 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
                                   });
     };
 
-    addAndMakeVisible(waveformDisplay);
-
-    addAndMakeVisible(rootNoteLabel);
-    rootNoteLabel.attachToComponent(&rootNoteSlider, true);
-
-    rootNoteSlider.setRange(0.0, 127.0, 1.0);
-    rootNoteSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    rootNoteSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    rootNoteSlider.textFromValueFunction = [](double value)
-    {
-        return juce::MidiMessage::getMidiNoteName((int) std::round(value), true, true, 3);
-    };
-    rootNoteSlider.valueFromTextFunction = [this](const juce::String& text)
-    {
-        const auto parsed = parseNoteName(text);
-        return (double) (parsed >= 0 ? parsed : (int) rootNoteSlider.getValue());
-    };
-    // setValue() only calls updateText() when the value actually CHANGES (see Slider::Pimpl::
-    // setValue() - it's gated behind an equality check against the previous value), so setting it
-    // to 60 here (its already-initial value of 0 -> 60 does change, so this alone would normally
-    // be enough) is followed by an explicit updateText() as a deliberate belt-and-suspenders: it's
-    // what actually forces the text box to re-render with the functions just assigned above,
-    // rather than relying on setValue()'s side effect.
-    rootNoteSlider.setValue(60.0, juce::dontSendNotification);
-    rootNoteSlider.updateText();
-    rootNoteSlider.onValueChange = [this]
-    {
-        processor.setRootNoteForZone(0, (int) rootNoteSlider.getValue());
-        waveformDisplay.repaint();
-    };
-    addAndMakeVisible(rootNoteSlider);
-
-    addAndMakeVisible(oneShotButton);
-    oneShotButton.onClick = [this]
-    {
-        processor.setOneShotForZone(0, oneShotButton.getToggleState());
-    };
+    addAndMakeVisible(concreteScreen);
 
     addAndMakeVisible(resetButton);
     resetButton.onClick = [this]
     {
-        // sendNotificationSync (not dontSendNotification) so onValueChange actually fires and
-        // calls setRootNoteForZone() - a silent setValue() here would just move the slider's
-        // displayed number without ever telling the processor about it. A no-op if root note is
-        // already 60, same as the APVTS resets below being no-ops at their own defaults.
-        rootNoteSlider.setValue(60.0, juce::sendNotificationSync);
-
-        // setToggleState() doesn't call onClick, so setOneShotForZone() is called directly - same
-        // "no-op if already at default" reasoning as root note above.
-        oneShotButton.setToggleState(false, juce::dontSendNotification);
+        // No UI controls left to reset here for these two - ConcreteScreen just reads zone state
+        // straight from the processor every repaint, so setting it directly is enough (a no-op if
+        // root note/one-shot are already at these values, same as the APVTS resets below being
+        // no-ops at their own defaults).
+        processor.setRootNoteForZone(0, 60);
         processor.setOneShotForZone(0, false);
 
         auto resetParam = [this](const juce::String& paramID)
@@ -245,21 +165,8 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     filterModelAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processor.apvts, ConcreteAudioProcessor::filterModelParamID, filterModelCombo);
 
-    addAndMakeVisible(filterCutoffLabel);
-    filterCutoffLabel.attachToComponent(&filterCutoffSlider, true);
-    filterCutoffSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    filterCutoffSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 60, 20);
-    addAndMakeVisible(filterCutoffSlider);
-    filterCutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::filterCutoffParamID, filterCutoffSlider);
-
-    addAndMakeVisible(filterResonanceLabel);
-    filterResonanceLabel.attachToComponent(&filterResonanceSlider, true);
-    filterResonanceSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    filterResonanceSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 50, 20);
-    addAndMakeVisible(filterResonanceSlider);
-    filterResonanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        processor.apvts, ConcreteAudioProcessor::filterResonanceParamID, filterResonanceSlider);
+    addAndMakeVisible(cutoffKnob);
+    addAndMakeVisible(resonanceKnob);
 
     addAndMakeVisible(filterEnvAmountLabel);
     filterEnvAmountLabel.attachToComponent(&filterEnvAmountSlider, true);
@@ -293,9 +200,9 @@ ConcreteAudioProcessorEditor::ConcreteAudioProcessorEditor(ConcreteAudioProcesso
     ampEnvelopeModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processor.apvts, ConcreteAudioProcessor::ampEnvelopeModeParamID, ampEnvelopeModeCombo);
 
-    addAndMakeVisible(keyboardComponent);
+    addAndMakeVisible(padGrid);
 
-    setSize(700, 726);
+    setSize(980, 726);
 }
 
 ConcreteAudioProcessorEditor::~ConcreteAudioProcessorEditor()
@@ -310,18 +217,33 @@ void ConcreteAudioProcessorEditor::paint(juce::Graphics& g)
 
 void ConcreteAudioProcessorEditor::resized()
 {
-    auto bounds = getLocalBounds().reduced(10);
+    auto fullBounds = getLocalBounds();
+
+    // Reserved up front, as genuinely EXTRA width (see setSize() below), not scavenged from
+    // whatever looked empty in the existing rows - those turned out to already use nearly this
+    // window's full original 700px in several rows (Base Rate/Coarse/Fine Tune alone need ~670),
+    // so there was nowhere to actually fit a 260px pad grid without it overlapping something.
+    // Growing the window WIDER for this rather than TALLER (which the pad grid's own ~280px
+    // height would otherwise have demanded) keeps it closer to fitting on a laptop screen - still
+    // just Phase 1's utility layout, not the real compact panel this becomes later.
+    auto padArea = fullBounds.removeFromRight(280);
+    padGrid.setTopLeftPosition(padArea.getX() + 10, 48);
+
+    auto bounds = fullBounds.reduced(10);
 
     auto topRow = bounds.removeFromTop(30);
     loadButton.setBounds(topRow.removeFromLeft(80));
-    topRow.removeFromLeft(90); // space for the root note label, attached to the left of its slider
-    rootNoteSlider.setBounds(topRow.removeFromLeft(200));
-    topRow.removeFromLeft(20);
-    oneShotButton.setBounds(topRow.removeFromLeft(90));
     topRow.removeFromLeft(20);
     resetButton.setBounds(topRow.removeFromLeft(80));
 
     bounds.removeFromTop(8);
+
+    // ConcreteScreen is fixed at the mockup's own 500x250 - centered in whatever width is left
+    // rather than stretched, so it stays pixel-accurate for screenshot diffing regardless of this
+    // throwaway editor's own window size.
+    concreteScreen.setTopLeftPosition((bounds.getWidth() - concreteScreen.getWidth()) / 2, bounds.getY());
+    bounds.removeFromTop(concreteScreen.getHeight() + 8);
+
 
     auto machineRow = bounds.removeFromTop(28);
     machineRow.removeFromLeft(90); // space for the "Machine" label
@@ -376,11 +298,13 @@ void ConcreteAudioProcessorEditor::resized()
 
     bounds.removeFromTop(8);
 
-    auto filterRow2 = bounds.removeFromTop(28);
-    filterRow2.removeFromLeft(90); // "Filter Cutoff" label
-    filterCutoffSlider.setBounds(filterRow2.removeFromLeft(160));
-    filterRow2.removeFromLeft(110); // "Filter Resonance" label
-    filterResonanceSlider.setBounds(filterRow2.removeFromLeft(130));
+    // Taller than the other rows here (68px, not 28) - ConcreteKnob draws its own label/readout
+    // below its cap rather than needing a separate juce::Label the way every Attachment-based
+    // control on this page still does, but that means it needs real vertical room, not a single
+    // slider-height row.
+    auto filterRow2 = bounds.removeFromTop (cutoffKnob.getHeight());
+    cutoffKnob.setTopLeftPosition (filterRow2.getX(), filterRow2.getY());
+    resonanceKnob.setTopLeftPosition (filterRow2.getX() + cutoffKnob.getWidth() + 20, filterRow2.getY());
 
     bounds.removeFromTop(8);
 
@@ -397,13 +321,6 @@ void ConcreteAudioProcessorEditor::resized()
     voiceCountSlider.setBounds(voiceRow.removeFromLeft(100));
     voiceRow.removeFromLeft(100); // "Amp Envelope" label
     ampEnvelopeModeCombo.setBounds(voiceRow.removeFromLeft(150));
-
-    bounds.removeFromTop(10);
-
-    keyboardComponent.setBounds(bounds.removeFromBottom(80));
-
-    bounds.removeFromBottom(10);
-    waveformDisplay.setBounds(bounds);
 }
 
 bool ConcreteAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files)
@@ -432,18 +349,10 @@ void ConcreteAudioProcessorEditor::filesDropped(const juce::StringArray& files, 
 
 void ConcreteAudioProcessorEditor::loadFile(const juce::File& file)
 {
-    // Called directly on the message thread - acceptable for Phase 1's utility UI (no progress/
-    // background-thread machinery yet; see this class's own header comment on what Phase 8 adds).
-    // loadSample() itself is documented as real-time-unsafe/not-for-the-audio-thread, which this
-    // isn't.
-    if (processor.loadSample(file))
-    {
-        rootNoteSlider.setValue(60.0, juce::dontSendNotification);
-        // loadSample() always builds a fresh zone with oneShot at its default (false) - reflect
-        // that in the UI too, same as the root note reset above.
-        oneShotButton.setToggleState(false, juce::dontSendNotification);
-        waveformDisplay.repaint();
-    }
+    // Delegates to ConcreteScreen, which owns the async load + its own loading-animation display
+    // now (see that class's loadFile()) - both this Load button and the top-level drop target
+    // below funnel through here rather than duplicating that logic at each call site.
+    concreteScreen.loadFile(file);
 }
 
 juce::AudioProcessorEditor* ConcreteAudioProcessor::createEditor()

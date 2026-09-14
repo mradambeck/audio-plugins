@@ -15,6 +15,7 @@
 #include "ConcreteVoiceAllocator.h"
 
 #include <array>
+#include <functional>
 
 // Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
@@ -71,6 +72,14 @@ public:
     // Returns false if the file couldn't be read (the previous sample set, if any, is unchanged).
     bool loadSample(const juce::File& file);
 
+    // Phase 8's message-thread-safe entry point: runs the exact same work as loadSample() above on
+    // a one-shot background thread (juce::Thread::launch()), then delivers onComplete on the
+    // message thread via MessageManager::callAsync. loadSample() itself stays untouched and still
+    // public - tooling (RenderIR, tests) calls it directly and synchronously on purpose, since
+    // there's no audio thread (or UI) to protect there. See pendingAsyncLoads' own comment for how
+    // the destructor waits for an in-flight call here to finish first.
+    void loadSampleAsync(const juce::File& file, std::function<void(bool)> onComplete);
+
     // Changes the (only, in v1) zone's root note and republishes - see Architecture #1: this is
     // zone-list state, not an APVTS parameter.
     void setRootNoteForZone(int zoneIndex, int newRootNote);
@@ -81,6 +90,13 @@ public:
     // that particular sample, not something anyone would automate mid-performance. See
     // ConcreteSampleZone::oneShot.
     void setOneShotForZone(int zoneIndex, bool oneShot);
+
+    // Same zone-list-state category and reasoning as setOneShotForZone() above - whether a zone
+    // loops is a property of that sample, not something automated mid-performance. See
+    // ConcreteSampleZone::loopEnabled. Phase 8's first slice (ConcreteScreen) is the first UI this
+    // has ever had - loopStart/loopEnd themselves stay fixed at load-time defaults (the whole
+    // buffer) until a later slice adds draggable loop-region editing.
+    void setLoopEnabledForZone(int zoneIndex, bool loopEnabled);
 
     // Re-reads a zone's source from a new location (Architecture #2's relocate case) and
     // republishes, preserving that zone's other fields.
@@ -100,6 +116,31 @@ public:
     // Thread-safe snapshot of the RAW (never capture-pass-baked) sample set - see rawSampleSet's
     // own comment. Exposed for tests that need to inspect source-space zone metadata directly.
     ConcreteSampleSet::Ptr getRawSampleSet() const;
+
+    // Phase 8's load animation needs a real bake-in-progress signal, not the private bakeRequested
+    // flag - that one already reads false again WHILE rebakeNow() is still running (see run()'s own
+    // comment), so it can't answer "is a bake happening right now." True only for the span of an
+    // actual rebakeNow() call made from the background bake thread in response to a capture-pass
+    // parameter change - NOT for the (much rarer, currently always-synchronous) bakes triggered by
+    // loadSample()/relocateZone()/setRootNoteForZone()/setOneShotForZone()/setStateInformation(),
+    // which have no in-progress window worth signaling since nothing calls back into the processor
+    // while they run.
+    bool isBakeInProgress() const noexcept { return bakeInProgress.load(); }
+
+    // Fires whenever isBakeInProgress() or getCachedEmbedPayloadSizeBytes() may have changed, from
+    // the background bake thread - the editor should addChangeListener(this) and re-read whichever
+    // of those two it cares about rather than the message carrying which one changed. Never fired
+    // from the audio thread; safe to add/remove listeners from the message thread at any time (see
+    // juce::ChangeBroadcaster's own thread-safety notes - sendChangeMessage() is itself safe to call
+    // from any thread, it always hops to the message thread internally via AsyncUpdater).
+    juce::ChangeBroadcaster processorStateBroadcaster;
+
+    // Cheap accessor for the embed-toggle's live payload readout - always returns immediately
+    // (never runs encodeZoneAsFlac() on the calling thread). Reflects zones[0] (v1's only zone) as
+    // of the last successful publishSampleSet() call; 0 before any sample is loaded. Updated on the
+    // background bake thread whenever the published sample set changes - see publishSampleSet()'s
+    // own comment - and processorStateBroadcaster fires once the new value is ready.
+    juce::int64 getCachedEmbedPayloadSizeBytes() const noexcept { return cachedEmbedPayloadSizeBytes.load(); }
 
     // Test/tooling accessors for Phase 6's voice-count limit and choke-group behavior: how many of
     // the fixed voice pool are currently rendering, and whether a specific MIDI note is one of
@@ -203,6 +244,13 @@ public:
     // deterministic, immediate re-bake instead of waiting on/polling a background thread.
     void rebakeNow();
 
+    // The UI's "Resample Now" entry point (Capture screen page) - re-runs the capture pass on the
+    // CURRENT settings even when nothing has changed, which parameterChanged() below has no way to
+    // trigger (it only fires on an actual value change). Exactly parameterChanged()'s own minimal
+    // response to a capture-pass parameter (set the flag, wake the bake thread) - never blocks the
+    // caller, unlike calling rebakeNow() directly would from the message thread.
+    void triggerBake() { bakeRequested = true; notify(); }
+
     // Bound to the editor's on-screen keyboard (Phase 1's temporary playing surface - see
     // concrete-sampler-plugin-plan.md's Phase 1 deliverables; Phase 8 replaces it with the real
     // pad-grid/keyboard trigger surface). processBlock() merges this into the real MIDI buffer
@@ -213,21 +261,37 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     void handleMidiMessage(const juce::MidiMessage& message, const ConcreteSampleSet::Ptr& sampleSet) noexcept;
+
+    // The ONLY place currentSampleSet is written (publishRawSampleSet() below delegates here rather
+    // than setting the field itself, specifically so this is a real single choke point) - besides
+    // publishing, also requests a background recompute of cachedEmbedPayloadSizeBytes by flipping
+    // sizeCacheRequested and waking the bake thread (run() services both flags off one wait()), so
+    // every path that can change what zones[0] would FLAC-encode to (a capture-pass re-bake, a
+    // fresh load, a relocate, a root-note/one-shot edit, a state restore) keeps that cached value
+    // honest without ever running encodeZoneAsFlac() on the calling thread.
     void publishSampleSet(ConcreteSampleSet::Ptr newSet);
 
     // Sets rawSampleSet to newRawSet and re-derives+publishes currentSampleSet from it via
-    // bakeSampleSet() - the only way rawSampleSet should ever change. Every caller that produces a
-    // genuinely new or changed zone list (loadSample, relocateZone, setRootNoteForZone,
-    // setStateInformation) goes through this, never through publishSampleSet() directly, so
-    // rawSampleSet's start/end/loop points always stay in source-buffer terms - see that member's
-    // own comment for why this split exists.
+    // bakeSampleSet() then publishSampleSet() - the only way rawSampleSet should ever change. Every
+    // caller that produces a genuinely new or changed zone list (loadSample, relocateZone,
+    // setRootNoteForZone, setStateInformation) goes through this, never through publishSampleSet()
+    // directly, so rawSampleSet's start/end/loop points always stay in source-buffer terms - see
+    // that member's own comment for why this split exists.
     void publishRawSampleSet(ConcreteSampleSet::Ptr newRawSet);
 
     ConcreteCapturePass::Settings currentCapturePassSettings() const;
 
-    // juce::Thread override: waits to be notify()'d (from parameterChanged() below) and then
-    // calls rebakeNow(). Runs for the processor's whole lifetime, started in the constructor and
-    // stopped in the destructor.
+    // Runs encodeZoneAsFlac() on zones[0] of the CURRENT sample set (0 if there are no zones yet)
+    // and stores the result in cachedEmbedPayloadSizeBytes, then fires processorStateBroadcaster.
+    // Only ever called from run(), on the background bake thread - see publishSampleSet()'s comment
+    // for how it gets requested.
+    void recomputeCachedEmbedPayloadSize();
+
+    // juce::Thread override: waits to be notify()'d (from parameterChanged() below, or from
+    // publishSampleSet() requesting a size-cache recompute) and then services whichever of
+    // bakeRequested/sizeCacheRequested is set, setting bakeInProgress and firing
+    // processorStateBroadcaster around the former. Runs for the processor's whole lifetime, started
+    // in the constructor and stopped in the destructor.
     void run() override;
 
     // juce::AudioProcessorValueTreeState::Listener override, registered for two DIFFERENT groups
@@ -285,6 +349,25 @@ private:
 
     // Set by parameterChanged(), cleared and acted on by run() - see that function's own comment.
     std::atomic<bool> bakeRequested { false };
+
+    // Set true immediately before, false immediately after, the rebakeNow() call run() makes for a
+    // bakeRequested wakeup - see isBakeInProgress()'s own comment for why bakeRequested itself can't
+    // answer this. Never touched anywhere else.
+    std::atomic<bool> bakeInProgress { false };
+
+    // Set by publishSampleSet(), cleared and acted on by run() - see recomputeCachedEmbedPayloadSize().
+    std::atomic<bool> sizeCacheRequested { false };
+
+    // Backing store for getCachedEmbedPayloadSizeBytes() - see that method's own comment.
+    std::atomic<juce::int64> cachedEmbedPayloadSizeBytes { 0 };
+
+    // Counts loadSampleAsync() calls that have launched their background thread but not yet
+    // delivered onComplete, so the destructor can wait for them to finish (bounded, same 2-second
+    // convention as stopThread() just below it) before this object's members start being destroyed
+    // - a loadSampleAsync() lambda captures `this` and keeps running after the call returns, so
+    // destruction can't just assume "no async load was in flight" the way it safely can for the
+    // synchronous loadSample().
+    std::atomic<int> pendingAsyncLoads { 0 };
 
     // Fixed compile-time CAPACITY of the voice pool, not the current polyphony - see
     // voiceCountParamID above for the runtime-adjustable limit. 18 covers the highest count in the
