@@ -45,19 +45,18 @@ void ConcreteDataKnob::paint (juce::Graphics& g)
     g.setColour (capFill);
     g.fillEllipse (capBounds);
 
-    // Two-tone top/bottom border arc (CSS border-top/border-bottom-4px) - same technique/angle
-    // convention as ConcreteKnob's cap (see that class's own comment on JUCE's clockwise-from-top
-    // addCentredArc angles).
-    const auto halfPi = juce::MathConstants<float>::halfPi;
-    const auto pi = juce::MathConstants<float>::pi;
-    juce::Path topArc, bottomArc;
-    const auto r = capDiameter * 0.5f - 1.0f;
-    topArc.addCentredArc (centre.x, centre.y, r, r, 0.0f, -halfPi, halfPi, true);
-    bottomArc.addCentredArc (centre.x, centre.y, r, r, 0.0f, halfPi, halfPi + pi, true);
-    g.setColour (capBorderTop);
-    g.strokePath (topArc, juce::PathStrokeType (1.0f));
-    g.setColour (capBorderBottom);
-    g.strokePath (bottomArc, juce::PathStrokeType (3.0f));
+    // border-top/border-bottom on a border-radius:50% element blends smoothly around the curve in
+    // a browser, not as two flat-coloured halves meeting at a hard seam - see ConcreteKnob's own
+    // comment on this exact bug (found by Adam: "black outline on the bottom half, light grey on
+    // the top half"). A single vertical gradient stroked around the whole circle approximates the
+    // real blend; stroke width splits the difference between the CSS 1px top/4px bottom values
+    // since a gradient-filled stroke can't easily vary its own width around the path.
+    juce::Path ring;
+    ring.addEllipse (capBounds.reduced (1.0f));
+    juce::ColourGradient borderGradient (capBorderTop, centre.x, capBounds.getY(),
+                                          capBorderBottom, centre.x, capBounds.getBottom(), false);
+    g.setGradientFill (borderGradient);
+    g.strokePath (ring, juce::PathStrokeType (2.0f));
 
     // .indicator: a 5x32 bar near the cap's top edge, rotating continuously - an endless encoder
     // has no fixed "value angle" the way ConcreteKnob's pointer does, so this is purely cosmetic

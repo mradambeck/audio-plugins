@@ -58,24 +58,19 @@ void ConcreteKnob::paint (juce::Graphics& g)
     g.setColour (capFill);
     g.fillEllipse (capBounds);
 
-    // Two-tone top/bottom border arc (CSS border-top/border-bottom) rather than a uniform stroke -
-    // same technique as ConcretePadGrid's pads, for the same reason (a flat single-colour outline
-    // reads noticeably different from the mockup's subtle bevel).
-    // JUCE's addCentredArc angles are clockwise from 0 = top-centre. Sweeping -90deg (left/9
-    // o'clock) to +90deg (right/3 o'clock) passes through 0 (top) in between, giving the TOP
-    // half; +90deg to +270deg passes through 180 (bottom), giving the BOTTOM half - a perfect
-    // circle's CSS border-top/border-bottom split along the horizontal diameter, not diagonally.
-    const auto halfPi = juce::MathConstants<float>::halfPi;
-    const auto pi = juce::MathConstants<float>::pi;
-    juce::Path topArc, bottomArc;
-    topArc.addCentredArc (centre.x, centre.y, capDiameter * 0.5f - 0.5f, capDiameter * 0.5f - 0.5f,
-                           0.0f, -halfPi, halfPi, true);
-    bottomArc.addCentredArc (centre.x, centre.y, capDiameter * 0.5f - 0.5f, capDiameter * 0.5f - 0.5f,
-                             0.0f, halfPi, halfPi + pi, true);
-    g.setColour (capBorderTop);
-    g.strokePath (topArc, juce::PathStrokeType (1.0f));
-    g.setColour (capBorderBottom);
-    g.strokePath (bottomArc, juce::PathStrokeType (1.0f));
+    // border-top/border-bottom on a border-radius:50% element - a browser blends the two colours
+    // smoothly all the way around the curve, not as two flat halves meeting at a hard seam (which
+    // is what two separately-coloured arcs drew here before, at exactly 9 and 3 o'clock - found by
+    // Adam: "black outline on the bottom half, light grey on the top half... on the mock there is
+    // a smooth transition"). A single vertical linear gradient stroked around the WHOLE circle
+    // approximates that: top-centre samples pure capBorderTop, bottom-centre pure capBorderBottom,
+    // and the two side points naturally fall at the gradient's midpoint, same as a real blend.
+    juce::Path ring;
+    ring.addEllipse (capBounds.reduced (0.5f));
+    juce::ColourGradient borderGradient (capBorderTop, centre.x, capBounds.getY(),
+                                          capBorderBottom, centre.x, capBounds.getBottom(), false);
+    g.setGradientFill (borderGradient);
+    g.strokePath (ring, juce::PathStrokeType (1.0f));
 
     const auto norm = param != nullptr ? param->getValue() : 0.0f;
     const auto angleDeg = minAngleDeg + norm * (maxAngleDeg - minAngleDeg);

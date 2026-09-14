@@ -27,24 +27,42 @@ juce::Rectangle<float> ConcreteDirectionalPad::cellBounds (int row, int col) con
     return { (float) col * (cellSize + cellGap), (float) row * (cellSize + cellGap), cellSize, cellSize };
 }
 
+namespace
+{
+    // A hand-drawn triangle, not a Unicode glyph (U+25B2/25BC/25C0/25B6) rendered via a font - both
+    // the browser and JUCE fall back to a system font for these code points (Oswald has no glyphs
+    // for them), and the two fallbacks disagreed sharply on how much of the em-box the ink
+    // actually fills - no font-size value made JUCE's rendering match the mockup's (found by Adam,
+    // twice: first "wrong size", then "still way too big" after a same-technique retry). Drawing
+    // the shape directly removes the font entirely from the equation - `size` is the triangle's
+    // own width/height, chosen to match the mockup's visual proportion within its 24px cell, not a
+    // font metric.
+    juce::Path arrowTriangle (juce::Point<float> centre, float size, int direction /* 0=up,1=left,2=right,3=down */)
+    {
+        const float h = size * 0.5f;
+        juce::Path p;
+        switch (direction)
+        {
+            case 0: p.addTriangle (centre.x, centre.y - h, centre.x - h, centre.y + h, centre.x + h, centre.y + h); break;
+            case 1: p.addTriangle (centre.x - h, centre.y, centre.x + h, centre.y - h, centre.x + h, centre.y + h); break;
+            case 2: p.addTriangle (centre.x + h, centre.y, centre.x - h, centre.y - h, centre.x - h, centre.y + h); break;
+            default: p.addTriangle (centre.x, centre.y + h, centre.x - h, centre.y - h, centre.x + h, centre.y - h); break;
+        }
+        return p;
+    }
+}
+
 void ConcreteDirectionalPad::paint (juce::Graphics& g)
 {
-    struct Key { int row, col; const char* glyphUtf8; };
+    struct Key { int row, col; int direction; };
     static const Key keys[] {
-        { 0, 1, "\xe2\x96\xb2" }, // up
-        { 1, 0, "\xe2\x97\x80" }, // left
-        { 1, 2, "\xe2\x96\xb6" }, // right
-        { 2, 1, "\xe2\x96\xbc" }, // down
+        { 0, 1, 0 }, // up
+        { 1, 0, 1 }, // left
+        { 1, 2, 2 }, // right
+        { 2, 1, 3 }, // down
     };
 
-    // CSS says font-size:11px, but Oswald (the font this size is meant for) has no glyphs for
-    // U+25B2/25BC/25C0/25B6 - both the browser and JUCE fall back to a system font for these
-    // specific characters, and the two picked noticeably different-sized fallbacks at the "same"
-    // nominal size (found by Adam: "Navigate arrows are the wrong size" - confirmed by a direct
-    // crop comparison against the live mockup, not just this comment's say-so). Sized up
-    // empirically to visually match the mockup's own arrow glyphs rather than the nominal CSS
-    // value, since there's no shared font metric to derive an exact number from here.
-    g.setFont (lookAndFeel.getSmallPrintFont (16.0f));
+    constexpr float arrowSize = 11.0f;
     for (const auto& key : keys)
     {
         const auto bounds = cellBounds (key.row, key.col);
@@ -63,7 +81,7 @@ void ConcreteDirectionalPad::paint (juce::Graphics& g)
             g.drawLine (bounds.getX(), bounds.getBottom() - 0.5f, bounds.getRight(), bounds.getBottom() - 0.5f, 1.0f);
         }
         g.setColour (glyphColour);
-        g.drawText (juce::String (juce::CharPointer_UTF8 (key.glyphUtf8)), bounds, juce::Justification::centred);
+        g.fillPath (arrowTriangle (bounds.getCentre(), arrowSize, key.direction));
     }
 
     auto legendArea = getLocalBounds().toFloat();

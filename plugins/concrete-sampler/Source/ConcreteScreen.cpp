@@ -205,35 +205,31 @@ void ConcreteScreen::paint (juce::Graphics& g)
     g.fillRect (bounds);
 
     // Approximates box-shadow: inset 0 0 10px 2px rgba(0,0,0,0.5) - JUCE has no native inner
-    // shadow. recessDepth matches the CSS blur+spread (10+2=12) directly rather than a rounder
-    // guess. The four edge fades' rectangles are kept EXCLUSIVE of each other (left/right stop
-    // short of the top/bottom bands) rather than overlapping in the corners - overlapping normal
-    // alpha-blends each fade on top of the last, so a corner covered by both a 0.5-alpha top fade
-    // AND a 0.5-alpha side fade composited to ~0.75 effective alpha, not the intended 0.5 (found
-    // by Adam: "inner shadow... is too dark"). A real Gaussian blur does darken corners somewhat
-    // more than edges, but not by compounding two independent 50%-alpha layers on top of each
-    // other; this keeps every covered pixel at exactly the intended alpha at its own edge distance.
-    constexpr float recessDepth = 12.0f;
-    const auto recessColour = juce::Colours::black.withAlpha (0.5f);
-
-    juce::ColourGradient topFade (recessColour, 0, bounds.getY(), juce::Colours::transparentBlack, 0, bounds.getY() + recessDepth, false);
-    g.setGradientFill (topFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getX(), bounds.getY(), bounds.getWidth(), recessDepth));
-
-    juce::ColourGradient bottomFade (recessColour, 0, bounds.getBottom(), juce::Colours::transparentBlack, 0, bounds.getBottom() - recessDepth, false);
-    g.setGradientFill (bottomFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getX(), bounds.getBottom() - recessDepth, bounds.getWidth(), recessDepth));
-
-    const auto sideY = bounds.getY() + recessDepth;
-    const auto sideHeight = juce::jmax (0.0f, bounds.getHeight() - 2.0f * recessDepth);
-
-    juce::ColourGradient leftFade (recessColour, bounds.getX(), 0, juce::Colours::transparentBlack, bounds.getX() + recessDepth, 0, false);
-    g.setGradientFill (leftFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getX(), sideY, recessDepth, sideHeight));
-
-    juce::ColourGradient rightFade (recessColour, bounds.getRight(), 0, juce::Colours::transparentBlack, bounds.getRight() - recessDepth, 0, false);
-    g.setGradientFill (rightFade);
-    g.fillRect (juce::Rectangle<float> (bounds.getRight() - recessDepth, sideY, recessDepth, sideHeight));
+    // shadow. Two earlier attempts at faking one with four hand-drawn edge-fade rectangles both
+    // failed: overlapping them at the corners double-composited the alpha there (too dark), and
+    // making them mutually exclusive instead left a visible seam where one fade's flat cutoff met
+    // the next (Adam: "cutting out the corners makes it look awful"). Both were symptoms of the
+    // same root problem - a hand-rolled per-edge fade can't reproduce a real blur's smooth,
+    // continuous falloff around a corner.
+    //
+    // This uses juce::DropShadow instead, which DOES blur smoothly and continuously in every
+    // direction including corners, by giving it something concrete to blur: a "frame" path (a
+    // larger rectangle with this screen's own rectangle cut out of it via even-odd fill) has an
+    // inner edge shaped exactly like this screen - blurring THAT casts a soft, continuous shadow
+    // inward through the hole, which is exactly what an inset shadow looks like. Clipped to
+    // `bounds` so only the inward-facing part of that shadow is visible (the frame shape itself
+    // extends outward too, which must never show). `spread`(2px) is approximated by shrinking the
+    // hole by that much, matching CSS's own effect of a positive inset spread.
+    {
+        juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (bounds.getSmallestIntegerContainer());
+        juce::Path frame;
+        frame.addRectangle (bounds.expanded (40.0f));
+        frame.addRectangle (bounds.reduced (2.0f));
+        frame.setUsingNonZeroWinding (false);
+        juce::DropShadow innerRecess (juce::Colours::black.withAlpha (0.5f), 10, { 0, 0 });
+        innerRecess.drawForPath (g, frame);
+    }
 
     const auto content = bounds.reduced (screenPaddingX, screenPaddingY);
     if (! isBooted)
