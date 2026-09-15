@@ -131,7 +131,12 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
                                                         if (file != juce::File())
                                                             loadFile(file);
                                                     });
-                      })
+                      }),
+      // Not in the mockup - Adam asked for a way to immediately stop any samples currently
+      // playing, e.g. after triggering a long one-shot pad. Forces every voice silent right away
+      // (see ConcreteAudioProcessor::stopAllVoices()), unlike an ordinary note-off which respects
+      // a one-shot zone's "plays through to its own end" behavior.
+      stopButton(lookAndFeel, "Stop", [this] { processor.stopAllVoices(); })
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -143,6 +148,7 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
         "Toggles whether the sample is saved inside this preset (portable, larger) or only "
         "referenced by file path (smaller, breaks if that file moves)");
     loadClearButton.labelSource = [this] { return hasSampleLoaded() ? "Clear Sample" : "Load Sample"; };
+    stopButton.setTooltip("Immediately silences any samples currently playing");
 
     directionalPad.onUp = [this] { concreteScreen.moveSelectionVertical(-1); };
     directionalPad.onDown = [this] { concreteScreen.moveSelectionVertical(1); };
@@ -156,7 +162,7 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
     for (juce::Component* c : std::initializer_list<juce::Component*> {
              &concreteScreen, &softKeys, &padGrid, &cutoffKnob, &resonanceKnob,
              &sampleVolumeFader, &masterVolumeFader, &machineSelector, &directionalPad, &dataKnob,
-             &oneShotButton, &loopButton, &resampleButton, &saveSampleButton, &loadClearButton })
+             &oneShotButton, &loopButton, &resampleButton, &saveSampleButton, &loadClearButton, &stopButton })
         addAndMakeVisible(c);
 
     // Session button LEDs (One-Shot/Loop) and the Load/Clear label can change from the LCD screen's
@@ -366,10 +372,15 @@ void ConcreteEditorContent::resized()
     loopButton.setBounds(oneShotButton.getRight() + (int) buttonGap, (int) sessionTop, (int) buttonWidth, loopButton.getHeight());
     resampleButton.setBounds(loopButton.getRight() + (int) buttonGap, (int) sessionTop, (int) buttonWidth, resampleButton.getHeight());
 
+    // Same 3-equal-column grid as the row above (buttonWidth), not a 2-column halfButtonWidth one -
+    // adding Stop needed a third slot, and lining both rows up on the same columns reads better
+    // than a mismatched second row. ConcretePanelButton's label already wraps/shrinks to fit (see
+    // its own drawFittedText call), so "Save Sample"/"Clear Sample" are still fully legible at the
+    // narrower width.
     const auto secondRowTop = sessionTop + oneShotButton.getHeight() + 8.0f;
-    const auto halfButtonWidth = (rightColumnWidth - buttonGap) / 2.0f;
-    saveSampleButton.setBounds((int) rightColumnArea.getX(), (int) secondRowTop, (int) halfButtonWidth, saveSampleButton.getHeight());
-    loadClearButton.setBounds(saveSampleButton.getRight() + (int) buttonGap, (int) secondRowTop, (int) halfButtonWidth, loadClearButton.getHeight());
+    saveSampleButton.setBounds((int) rightColumnArea.getX(), (int) secondRowTop, (int) buttonWidth, saveSampleButton.getHeight());
+    loadClearButton.setBounds(saveSampleButton.getRight() + (int) buttonGap, (int) secondRowTop, (int) buttonWidth, loadClearButton.getHeight());
+    stopButton.setBounds(loadClearButton.getRight() + (int) buttonGap, (int) secondRowTop, (int) buttonWidth, stopButton.getHeight());
 }
 
 bool ConcreteEditorContent::isInterestedInFileDrag(const juce::StringArray& files)

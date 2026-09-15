@@ -503,6 +503,13 @@ void ConcreteAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
+    // See stopAllVoices()'s own comment - a forced, immediate stop of every voice, overriding
+    // one-shot/release-tail state, checked before anything else in this block so a Stop click
+    // can't be delayed behind whatever MIDI/segment processing this block would otherwise do.
+    if (stopAllRequested.exchange(false))
+        for (auto& voice : voices)
+            voice.stopNote(false, true);
+
     // Merges the on-screen keyboard's notes into the same MIDI buffer real MIDI input uses - the
     // standard JUCE pattern for embedding a MidiKeyboardComponent in a plugin editor (see
     // keyboardState's own comment).

@@ -661,6 +661,88 @@ public:
             file.deleteFile();
         }
 
+        beginTest("A looped zone keeps sounding past its own natural length through the real MIDI dispatch path");
+        {
+            const auto file = writeTempSineWav(1000.0, 0.1); // 4410 samples - short on purpose
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setLoopEnabledForZone(0, true); // loopStart/loopEnd default to 0/full length
+
+            juce::MidiBuffer midi = noteOnBuffer(60);
+            juce::AudioBuffer<float> buffer(2, 8192); // ~1.9x the zone's own un-looped length
+            buffer.clear();
+            processor.processBlock(buffer, midi);
+
+            const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 6000, 2000, 44100.0, 1000.0f);
+            expectWithinAbsoluteError(measured, 1000.0f, 5.0f,
+                "content well past the zone's own un-looped length must still be the same 1000Hz source, "
+                "looped rather than gone silent (previously the Loop toggle changed zone state that no "
+                "DSP code ever actually read)");
+
+            file.deleteFile();
+        }
+
+        beginTest("clearSample() removes only the main (whole-keyboard) zone, leaving a pad's own sample intact");
+        {
+            const auto mainFile = writeTempSineWav(440.0, 1.0);
+            const auto padFile = writeTempSineWav(880.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(mainFile));
+            expect(processor.assignSampleToPad(48, padFile));
+            expectEquals((int) processor.getCurrentSampleSet()->zones.size(), 2);
+
+            processor.clearSample();
+            expectEquals((int) processor.getCurrentSampleSet()->zones.size(), 1,
+                         "clearSample() must remove only the main zone, not the whole zone list - it "
+                         "used to wipe every pad's own sample too, whichever zone the screen happened "
+                         "to be showing when Clear Sample was pressed");
+
+            juce::AudioBuffer<float> buffer(2, 8192);
+            buffer.clear();
+            auto midi = noteOnBuffer(48);
+            processor.processBlock(buffer, midi);
+            const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 880.0f);
+            expectWithinAbsoluteError(measured, 880.0f, 5.0f, "the pad's own sample must survive clearSample() untouched");
+
+            mainFile.deleteFile();
+            padFile.deleteFile();
+        }
+
+        beginTest("stopAllVoices() immediately silences a currently-sounding voice, even a one-shot mid-playback");
+        {
+            const auto file = writeTempSineWav(1000.0, 2.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setOneShotForZone(0, true); // an ordinary note-off alone must NOT stop this
+
+            juce::AudioBuffer<float> firstBlock(2, 512);
+            firstBlock.clear();
+            auto noteOn = noteOnBuffer(60);
+            processor.processBlock(firstBlock, noteOn);
+            float firstBlockEnergy = 0.0f;
+            for (int ch = 0; ch < firstBlock.getNumChannels(); ++ch)
+                for (int i = 0; i < firstBlock.getNumSamples(); ++i)
+                    firstBlockEnergy += std::abs(firstBlock.getSample(ch, i));
+            expect(firstBlockEnergy > 0.0f, "sanity check: the one-shot should actually be sounding before Stop is pressed");
+
+            processor.stopAllVoices();
+
+            juce::AudioBuffer<float> afterStop(2, 512);
+            afterStop.clear();
+            juce::MidiBuffer noMidi;
+            processor.processBlock(afterStop, noMidi);
+            for (int ch = 0; ch < afterStop.getNumChannels(); ++ch)
+                for (int i = 0; i < afterStop.getNumSamples(); ++i)
+                    expectEquals(afterStop.getSample(ch, i), 0.0f,
+                                 "stopAllVoices() must cut a playing voice immediately, overriding even a "
+                                 "one-shot zone's normal 'plays through to its own end' behavior");
+
+            file.deleteFile();
+        }
+
         beginTest("Voice Count limits real polyphony: 6 overlapping notes with a 4-voice limit "
                   "leaves exactly 4 sounding, stealing the oldest first (Phase 6)");
         {

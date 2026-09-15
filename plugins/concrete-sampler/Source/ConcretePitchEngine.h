@@ -45,6 +45,15 @@ public:
 
     double getSourcePhase() const noexcept { return sourcePhase; }
 
+    // Rewinds by exactly one loop length once playback has crossed loopEnd (see
+    // ConcreteVoice::renderNextBlock()'s loop handling) - subtracting rather than snapping to a
+    // fixed position preserves whatever fractional overshoot pitchRatio produced past loopEnd, so
+    // a loop length that doesn't divide evenly by the per-sample phase increment doesn't introduce
+    // a periodic micro-glitch at the seam. Every other piece of state (baseRateTickPhase,
+    // heldSample, the Mode C integrator/filter) ticks independently of sourcePhase's absolute
+    // value and deliberately keeps running across the seam, exactly as it already does mid-buffer.
+    void rewindSourcePhase(double loopLength) noexcept { sourcePhase -= loopLength; }
+
     // Produces one output sample and advances internal state by one host sample's worth.
     //   - pitchRatio: 2^(semitonesTotal/12) - the note's total transposition as a frequency ratio.
     //   - effectiveSourceRateHz: what rate to treat `data` as running at. For Mode::reference this

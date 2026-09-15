@@ -78,12 +78,14 @@ private:
 
     // Session block - see Panel.tsx's own comment on which of these get an LED (One-Shot/Loop,
     // genuine persistent on/off state) versus none at all (Resample/Save Sample/Load-or-Clear,
-    // actions or one-time choices, not state).
+    // actions or one-time choices, not state). Stop is a Phase-8-plus addition with no mockup
+    // counterpart (see stopButton's own comment) - an action button too, so no LED either.
     ConcretePanelButton oneShotButton;
     ConcretePanelButton loopButton;
     ConcretePanelButton resampleButton;
     ConcretePanelButton saveSampleButton;
     ConcretePanelButton loadClearButton;
+    ConcretePanelButton stopButton;
 
     juce::TooltipWindow tooltipWindow { this };
     std::unique_ptr<juce::FileChooser> fileChooser;

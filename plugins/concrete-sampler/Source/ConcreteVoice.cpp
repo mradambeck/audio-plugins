@@ -131,10 +131,31 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     for (int i = 0; i < numSamples; ++i)
     {
         const auto ampEnvelopeActive = usingContourEnvelope ? contourEnvelope.isActive() : adsr.isActive();
-        if (!ampEnvelopeActive || pitchEngines[0].getSourcePhase() >= (double) zoneEndSample)
+        if (!ampEnvelopeActive)
         {
             active = false;
             break;
+        }
+
+        // Loop handling: zone->loopEnabled was carried on every zone since Architecture #1's
+        // schema, but nothing ever read it before now - the DSP always just stopped at
+        // zoneEndSample regardless, which is exactly what made the Loop button look like it did
+        // nothing. loopEnd is clamped against zoneEndSample too, since a zone's own start/end trim
+        // can be narrower than the loop points a file was originally saved with.
+        const auto loopActive = zone->loopEnabled && zone->loopEnd > zone->loopStart;
+        const auto playbackEndSample = loopActive ? (double) juce::jmin(zone->loopEnd, zoneEndSample)
+                                                   : (double) zoneEndSample;
+        if (pitchEngines[0].getSourcePhase() >= playbackEndSample)
+        {
+            if (!loopActive)
+            {
+                active = false;
+                break;
+            }
+
+            const auto loopLength = playbackEndSample - (double) zone->loopStart;
+            for (auto& engine : pitchEngines)
+                engine.rewindSourcePhase(loopLength);
         }
 
         const auto ampEnvelopeValue = usingContourEnvelope ? contourEnvelope.getNextSample() : adsr.getNextSample();

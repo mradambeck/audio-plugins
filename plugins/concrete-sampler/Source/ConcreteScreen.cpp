@@ -1036,7 +1036,14 @@ void ConcreteScreen::moveSelectionHorizontal (int delta)
 
 void ConcreteScreen::clearSample()
 {
-    processor.clearSample();
+    // Clears whichever zone this screen is currently showing (see showZoneForNote()'s own
+    // comment) - a pad's own sample if that's what's displayed, the main sample otherwise -
+    // rather than always wiping the whole zone list, which used to also delete every other pad's
+    // sample regardless of what was on screen.
+    if (showingPadZone)
+        processor.clearPadSample (displayedPadNote);
+    else
+        processor.clearSample();
     selectedFieldId = "root"; // matches loadFile()'s own reset
     repaint();
 }

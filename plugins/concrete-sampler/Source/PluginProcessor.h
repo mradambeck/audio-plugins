@@ -80,10 +80,31 @@ public:
     // the destructor waits for an in-flight call here to finish first.
     void loadSampleAsync(const juce::File& file, std::function<void(bool)> onComplete);
 
-    // The Session block's "Clear Sample" button (see ConcreteScreen::clearSample()). Publishes a
-    // fresh empty ConcreteSampleSet - the exact same state this processor starts in before any
-    // load, so there's no separate "empty" code path to get wrong.
-    void clearSample() { publishRawSampleSet(ConcreteSampleSet::Ptr(new ConcreteSampleSet())); }
+    // The Session block's "Clear Sample" button when the LCD is showing the main (whole-keyboard)
+    // sample rather than a pad's own zone (see ConcreteScreen::clearSample(), which routes to
+    // clearPadSample() instead when a pad's own zone is being shown). Removes only that one zone -
+    // identified by its full keyLo==0/keyHi==127 range rather than by raw index 0, since a pad's
+    // own single-note zone can land at index 0 too if it was assigned before any main sample was
+    // ever loaded - leaving every pad's own sample untouched. Used to unconditionally replace the
+    // WHOLE zone list, which meant hitting Clear Sample while looking at one pad's sample also
+    // silently deleted every other pad's sample and the main sample - not what "clear the sample
+    // showing on the screen" means. A no-op if there's no main zone.
+    void clearSample()
+    {
+        const auto existingRaw = getRawSampleSet();
+        ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+        for (const auto& zone : existingRaw->zones)
+            if (!(zone.keyLo == 0 && zone.keyHi == 127))
+                newRawSet->zones.push_back(zone);
+        publishRawSampleSet(newRawSet);
+    }
+
+    // The new Session "Stop" button - immediately silences every currently-sounding voice
+    // (isForced=true, allowTailOff=false - see ConcreteVoice::stopNote()'s own comment), overriding
+    // even a one-shot zone or a release tail in progress, unlike an ordinary note-off. Just raises
+    // a flag; safe to call from the message thread since it's consumed at the top of the next
+    // processBlock() on the audio thread, never touching `voices` directly from here.
+    void stopAllVoices() { stopAllRequested = true; }
 
     // Per-pad sample loading (ConcretePadGrid's drag-and-drop / right-click Load...) - "add zones
     // and each pad simply resolves to a different one through the same lookup"
@@ -400,6 +421,10 @@ private:
 
     // Set by publishSampleSet(), cleared and acted on by run() - see recomputeCachedEmbedPayloadSize().
     std::atomic<bool> sizeCacheRequested { false };
+
+    // Set by stopAllVoices() (message thread), consumed at the top of processBlock() (audio
+    // thread) - see stopAllVoices()'s own comment.
+    std::atomic<bool> stopAllRequested { false };
 
     // Backing store for getCachedEmbedPayloadSizeBytes() - see that method's own comment.
     std::atomic<juce::int64> cachedEmbedPayloadSizeBytes { 0 };

@@ -43,8 +43,9 @@ public:
 
     // The Session block's "Clear Sample" button (mockup: useSample.tsx's requestClear(), minus
     // the confirmation overlay it arms first - ClearConfirmOverlay.tsx is a real LCD-page addition
-    // deferred to a later slice, not built here). Publishes a fresh empty ConcreteSampleSet - the
-    // exact same state the processor starts in before any load, so this is known-safe.
+    // deferred to a later slice, not built here). Clears only whichever zone this screen is
+    // currently showing (see showZoneForNote()) - a pad's own sample, or the main sample - never
+    // the whole zone list at once.
     void clearSample();
 
     // Physical DataKnob's entry point (see ConcreteDataKnob) - identical to the mouse-wheel stand-

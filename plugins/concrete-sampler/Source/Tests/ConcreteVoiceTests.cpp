@@ -337,6 +337,46 @@ public:
             expect(! voice.isActive(), "a forced stop must cut a one-shot voice immediately, same as any other voice");
         }
 
+        beginTest("A looped zone reaches its own end and loops instead of stopping");
+        {
+            // loopStart/loopEnd default to the loader's own convention (0/full buffer length - see
+            // ConcreteSampleIO.cpp's loadZoneFromFile) - set by hand here since this test builds
+            // its zone directly rather than through the loader.
+            auto set = makeSetWithSineZone(1000.0, 1, 60, 0.5); // 22050 samples
+            set->zones[0].loopStart = 0;
+            set->zones[0].loopEnd = set->zones[0].buffer->getNumSamples();
+            set->zones[0].loopEnabled = true;
+            ConcreteVoice voice;
+            voice.prepare(sampleRate);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+
+            // Render well past the zone's own 22050-sample length (~1.5x), never calling
+            // stopNote() - an un-looped voice would already be silent/inactive by 22050 samples
+            // (see the one-shot test above, which pins exactly that). A looped voice must still be
+            // active AND still producing the same 1000Hz content, not silence or garbage from
+            // reading past the buffer's own end.
+            juce::AudioBuffer<float> out(1, 33000);
+            out.clear();
+            voice.renderNextBlock(out, 0, out.getNumSamples());
+            expect(voice.isActive(), "a looped voice must still be active well past the zone's un-looped end");
+
+            const auto measured = estimateFrequencyHz(out.getReadPointer(0) + 30000, 2048, 1000.0f);
+            expectWithinAbsoluteError(measured, 1000.0f, 5.0f, "content played after looping back must still be the same source material");
+        }
+
+        beginTest("Regression: the same zone with loop disabled still stops normally at its own end");
+        {
+            auto set = makeSetWithSineZone(1000.0, 1, 60, 0.5); // loopEnabled defaults to false
+            ConcreteVoice voice;
+            voice.prepare(sampleRate);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+
+            juce::AudioBuffer<float> out(1, 33000);
+            out.clear();
+            voice.renderNextBlock(out, 0, out.getNumSamples());
+            expect(! voice.isActive(), "an un-looped voice must still stop at the zone's own end, unchanged by the loop feature");
+        }
+
         beginTest("Contoured amp envelope mode keeps decaying while held, unlike ADSR's flat sustain");
         {
             auto contouredSet = makeSetWithSineZone(1000.0, 1, 60, 2.0); // long enough to hold well past 1s
