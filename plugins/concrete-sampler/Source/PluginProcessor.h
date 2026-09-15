@@ -16,6 +16,7 @@
 
 #include <array>
 #include <functional>
+#include <optional>
 
 // Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
@@ -54,6 +55,18 @@ public:
     bool producesMidi() const override;
     bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
+
+    // Host-facing note names - VST2/VST3 hosts (Cubase, Reaper, etc.) call this to label keys in
+    // their own key editors/drum maps, exactly the "23: OpenHH2, 22: Clave, ..." style view Adam
+    // asked about (Logic's equivalent is AU-only and JUCE has no hook for it as of 9.0.2 - checked
+    // directly against JUCE's own source, not just the changelog). Returns the filename of
+    // whichever pad's own independent sample (see assignSampleToPad()'s own comment for how a
+    // pad's zone is identified: keyLo==keyHi==note) covers this note, or nullopt for a "plain" note
+    // that just plays the main sample transposed - nothing distinct to report there, so the host
+    // falls back to its own default label. Mirrors ConcretePadGrid::ownZoneFileNameForPad()'s
+    // identical identity check - same underlying question, asked from a host-facing caller instead
+    // of a paint() call.
+    std::optional<juce::String> getNameForMidiNoteNumber(int note, int midiChannel) override;
 
     int getNumPrograms() override;
     int getCurrentProgram() override;

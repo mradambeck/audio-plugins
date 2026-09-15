@@ -372,6 +372,37 @@ public:
             padFileB.deleteFile();
         }
 
+        beginTest("getNameForMidiNoteNumber() names a pad's own sample for VST2/VST3 hosts, and nothing for a plain note");
+        {
+            const auto mainFile = writeTempSineWav(440.0, 1.0);
+            const auto padFile = writeTempSineWav(880.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(mainFile));
+
+            // Nothing distinct to report yet for note 48 - it just inherits the main sample,
+            // transposed, so the host should fall back to its own default label.
+            expect(! processor.getNameForMidiNoteNumber(48, 1).has_value(),
+                   "a plain note with no zone of its own must report no custom name");
+
+            expect(processor.assignSampleToPad(48, padFile));
+            const auto name = processor.getNameForMidiNoteNumber(48, 1);
+            expect(name.has_value(), "a pad's own zone must report a name");
+            expectEquals(*name, padFile.getFileNameWithoutExtension(),
+                         "the reported name should be that pad's own sample, without its file extension");
+
+            // Every OTHER note must still report nothing, even though 48 now has its own zone.
+            expect(! processor.getNameForMidiNoteNumber(60, 1).has_value(),
+                   "the main sample's own root note must still report no custom name");
+
+            processor.clearPadSample(48);
+            expect(! processor.getNameForMidiNoteNumber(48, 1).has_value(),
+                   "clearing a pad's sample should revert its note back to reporting no custom name");
+
+            mainFile.deleteFile();
+            padFile.deleteFile();
+        }
+
         beginTest("Save state, reload into a fresh processor, render again: numerically identical output");
         {
             const auto file = writeTempSineWav(1234.0, 0.5);

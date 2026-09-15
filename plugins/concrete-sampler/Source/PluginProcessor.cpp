@@ -913,6 +913,25 @@ bool ConcreteAudioProcessor::isMidiEffect() const { return false; }
 // envelope (2ms attack, 50ms release) is short enough that this stays honest.
 double ConcreteAudioProcessor::getTailLengthSeconds() const { return 0.05; }
 
+std::optional<juce::String> ConcreteAudioProcessor::getNameForMidiNoteNumber(int note, int /*midiChannel*/)
+{
+    const auto sampleSet = getCurrentSampleSet();
+    if (sampleSet == nullptr)
+        return std::nullopt;
+
+    const auto zoneIndex = sampleSet->lookup(note, 100);
+    if (zoneIndex < 0)
+        return std::nullopt;
+
+    const auto& zone = sampleSet->zones[(size_t) zoneIndex];
+    if (zone.keyLo != note || zone.keyHi != note)
+        return std::nullopt; // resolved to the inherited main zone, not a pad's own - nothing
+                              // distinct to report, so the host falls back to its own default label
+
+    return zone.sourcePath.isNotEmpty() ? juce::File(zone.sourcePath).getFileNameWithoutExtension()
+                                         : juce::String("(embedded)");
+}
+
 int ConcreteAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int ConcreteAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
 
