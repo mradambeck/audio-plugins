@@ -177,7 +177,10 @@ void ConcretePadGrid::mouseDown (const juce::MouseEvent& event)
     }
 
     litPadIndex = index;
-    processor.keyboardState.noteOn (midiChannel, noteForPad (index), 1.0f);
+    const auto note = noteForPad (index);
+    processor.keyboardState.noteOn (midiChannel, note, 1.0f);
+    if (onPadTriggered)
+        onPadTriggered (note);
     repaint();
 }
 

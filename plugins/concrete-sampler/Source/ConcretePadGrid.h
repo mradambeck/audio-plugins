@@ -35,6 +35,13 @@ public:
     void fileDragExit(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
+    // Fires with a pad's own note every time it's triggered (mouseDown), regardless of whether
+    // that pad has a zone of its own - PluginEditor wires this to
+    // ConcreteScreen::showZoneForNote() so hitting a pad immediately shows (and lets you adjust)
+    // whichever sample it actually plays, matching a real hardware sampler's "the pad you just hit
+    // is what the screen/edit controls now act on" convention.
+    std::function<void(int note)> onPadTriggered;
+
 private:
     static constexpr int padCount = 16;
     static constexpr int rowsCount = 4;

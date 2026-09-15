@@ -45,14 +45,19 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
                     [](float v) { return juce::String(v, 2); }),
       // Real zones[0].level (see PluginProcessor::setLevelForZone) - was a UI-only stand-in with
       // no connection to actual audio at all until Adam reported "Sample volume doesn't appear to
-      // be working," which is exactly what that disconnect looked like from the outside.
+      // be working," which is exactly what that disconnect looked like from the outside. Reads/
+      // writes whichever zone concreteScreen is currently displaying (see its own
+      // getDisplayedZoneIndex()), not always the main zone, so this fader stays in sync with a
+      // pad's own sample once one's been hit.
       sampleVolumeFader(lookAndFeel, "Sample", 0.0f, 120.0f,
                          [this]
                          {
                              const auto sampleSet = processor.getCurrentSampleSet();
-                             return (sampleSet != nullptr && !sampleSet->zones.empty()) ? sampleSet->zones[0].level * 100.0f : 100.0f;
+                             const auto zoneIndex = concreteScreen.getDisplayedZoneIndex();
+                             return (sampleSet != nullptr && zoneIndex < (int) sampleSet->zones.size())
+                                        ? sampleSet->zones[(size_t) zoneIndex].level * 100.0f : 100.0f;
                          },
-                         [this](float v) { processor.setLevelForZone(0, v / 100.0f); },
+                         [this](float v) { processor.setLevelForZone(concreteScreen.getDisplayedZoneIndex(), v / 100.0f); },
                          [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
       // Real masterVolumeParamID (see that constant's own comment) - a host-automatable output
       // gain, unlike Sample Volume's zone-list state above, wired the same convertFrom0to1/
@@ -73,31 +78,38 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
       machineSelector(p, lookAndFeel),
       directionalPad(lookAndFeel),
       dataKnob(lookAndFeel),
+      // Both buttons act on whichever zone concreteScreen is currently displaying (see its own
+      // getDisplayedZoneIndex()), not always the main zone - same reasoning as sampleVolumeFader
+      // above.
       oneShotButton(lookAndFeel, "One-Shot",
                     [this]
                     {
                         const auto sampleSet = processor.getCurrentSampleSet();
-                        if (sampleSet != nullptr && !sampleSet->zones.empty())
-                            processor.setOneShotForZone(0, !sampleSet->zones[0].oneShot);
+                        const auto zoneIndex = concreteScreen.getDisplayedZoneIndex();
+                        if (sampleSet != nullptr && zoneIndex < (int) sampleSet->zones.size())
+                            processor.setOneShotForZone(zoneIndex, !sampleSet->zones[(size_t) zoneIndex].oneShot);
                         concreteScreen.repaint();
                     },
                     [this]
                     {
                         const auto sampleSet = processor.getCurrentSampleSet();
-                        return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].oneShot;
+                        const auto zoneIndex = concreteScreen.getDisplayedZoneIndex();
+                        return sampleSet != nullptr && zoneIndex < (int) sampleSet->zones.size() && sampleSet->zones[(size_t) zoneIndex].oneShot;
                     }),
       loopButton(lookAndFeel, "Loop",
                  [this]
                  {
                      const auto sampleSet = processor.getCurrentSampleSet();
-                     if (sampleSet != nullptr && !sampleSet->zones.empty())
-                         processor.setLoopEnabledForZone(0, !sampleSet->zones[0].loopEnabled);
+                     const auto zoneIndex = concreteScreen.getDisplayedZoneIndex();
+                     if (sampleSet != nullptr && zoneIndex < (int) sampleSet->zones.size())
+                         processor.setLoopEnabledForZone(zoneIndex, !sampleSet->zones[(size_t) zoneIndex].loopEnabled);
                      concreteScreen.repaint();
                  },
                  [this]
                  {
                      const auto sampleSet = processor.getCurrentSampleSet();
-                     return sampleSet != nullptr && !sampleSet->zones.empty() && sampleSet->zones[0].loopEnabled;
+                     const auto zoneIndex = concreteScreen.getDisplayedZoneIndex();
+                     return sampleSet != nullptr && zoneIndex < (int) sampleSet->zones.size() && sampleSet->zones[(size_t) zoneIndex].loopEnabled;
                  }),
       resampleButton(lookAndFeel, "Resample", [this] { processor.triggerBake(); }),
       saveSampleButton(lookAndFeel, "Save Sample",
@@ -124,6 +136,7 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
     setLookAndFeel(&lookAndFeel);
 
     concreteScreen.onPageChanged = [this] { softKeys.repaint(); };
+    padGrid.onPadTriggered = [this](int note) { concreteScreen.showZoneForNote(note); };
 
     resampleButton.setTooltip("Re-runs the capture pass with the current settings");
     saveSampleButton.setTooltip(

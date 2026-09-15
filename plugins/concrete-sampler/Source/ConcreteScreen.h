@@ -65,6 +65,25 @@ public:
     void setPageIndex(int index) { setCurrentPage((ScreenPage) index); }
     std::function<void()> onPageChanged;
 
+    // ConcretePadGrid's per-pad-trigger entry point (see its own onPadTriggered) - if `note`
+    // resolves (via the real ConcreteSampleSet::lookup(), same as an actual note-on) to a pad's own
+    // independent zone, the Sample page switches to showing THAT zone's info (filename, waveform,
+    // Root/One-Shot/Loop/Volume) instead of the main sample, so hitting a pad with its own sample
+    // immediately shows what you'd be adjusting - see Panel.tsx-adjacent design intent: the screen
+    // is how every sample's settings get edited, and that has to include a pad's own sample once
+    // one exists. Hitting a "plain" pad (no zone of its own) switches back to showing the main
+    // sample. See getDisplayedZoneIndex() for how every other bit of Sample-page UI (and the
+    // physical One-Shot/Loop buttons + Sample Volume fader in PluginEditor) stays in sync with
+    // whichever zone this last selected.
+    void showZoneForNote(int note);
+
+    // Which zone index the Sample page (and the physical controls that mirror its own fields -
+    // One-Shot/Loop/Sample Volume) should currently read/write: either the main zone (0) or, after
+    // showZoneForNote() was last called for a pad with its own zone, that pad's zone - resolved
+    // FRESH every call (not cached) so it automatically falls back to the main zone if that pad's
+    // zone gets cleared out from under it. Returns 0 if there's no sample set at all yet.
+    int getDisplayedZoneIndex() const;
+
 private:
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
@@ -84,6 +103,14 @@ private:
 
     enum class ScreenPage { Sample, Machine, Filter, Capture };
     ScreenPage currentPage = ScreenPage::Sample;
+
+    // Backs getDisplayedZoneIndex()/showZoneForNote() - see those methods' own comments. Tracked
+    // by NOTE (not a raw zone index) specifically so it stays meaningful even if the zone list is
+    // mutated later (a pad's zone being cleared, zones being reordered) - a raw index would go
+    // stale in exactly those cases, but re-resolving a note through lookup() every time can't.
+    bool showingPadZone = false;
+    int displayedPadNote = 0;
+    int resolveDisplayedZoneIndex(const ConcreteSampleSet::Ptr& sampleSet) const noexcept;
 
     // Selecting a different page starts back at that page's first field - matches
     // useEditableFields.tsx's own useEffect on view change.

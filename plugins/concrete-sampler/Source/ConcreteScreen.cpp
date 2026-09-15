@@ -549,8 +549,11 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
 
     const auto sampleSet = processor.getCurrentSampleSet();
     const bool hasZone = sampleSet != nullptr && ! sampleSet->zones.empty();
-    const bool isMissing = hasZone && sampleSet->zones[0].sourceMissing;
-    const bool hasSample = hasZone && sampleSet->zones[0].sourceBuffer != nullptr;
+    // Which zone this page shows/edits - the main sample (0), or a pad's own zone if one was hit
+    // more recently (see showZoneForNote()) - resolved fresh so it can't go stale.
+    const auto displayedZoneIndex = resolveDisplayedZoneIndex (sampleSet);
+    const bool isMissing = hasZone && sampleSet->zones[(size_t) displayedZoneIndex].sourceMissing;
+    const bool hasSample = hasZone && sampleSet->zones[(size_t) displayedZoneIndex].sourceBuffer != nullptr;
 
     if (isLoading)
     {
@@ -564,7 +567,7 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
         // Same dashed-box language as the empty state, but naming the missing file and making the
         // whole box a click target - relocateZone() already exists on the processor and already
         // has its own tests; this is the first UI that reaches it.
-        const auto& zone = sampleSet->zones[0];
+        const auto& zone = sampleSet->zones[(size_t) displayedZoneIndex];
         g.setColour (lcdInk);
         const auto dashArea = dropzoneArea.reduced (2.0f);
         float dashLengths[] { 4.0f, 3.0f };
@@ -601,7 +604,7 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
     }
     else
     {
-        const auto& zone = sampleSet->zones[0];
+        const auto& zone = sampleSet->zones[(size_t) displayedZoneIndex];
 
         // .dropzone is `display:flex; align-items:center` with `.player{width:100%}` - the loaded
         // content is full-width but vertically CENTERED within the box, not top-packed. 8px is
@@ -755,12 +758,13 @@ void ConcreteScreen::paintMachinePage (juce::Graphics& g, juce::Rectangle<float>
     const auto* bitDepthParam = apvts.getParameter (ConcreteAudioProcessor::bitDepthParamID);
     const auto* ampEnvParam = apvts.getParameter (ConcreteAudioProcessor::ampEnvelopeModeParamID);
 
-    // Same real zones[0].level the Sample page's own "Volume" field and the physical Sample fader
-    // read/write (see PluginProcessor::setLevelForZone) - 1.0f (100%) matches
-    // ConcreteSampleZone::level's own default for the no-sample-yet case.
+    // Same real DISPLAYED zone's level the Sample page's own "Volume" field and the physical
+    // Sample fader read/write (see PluginProcessor::setLevelForZone and
+    // resolveDisplayedZoneIndex()'s own comment) - 1.0f (100%) matches ConcreteSampleZone::level's
+    // own default for the no-sample-yet case.
     const auto sampleSetForVolume = processor.getCurrentSampleSet();
     const auto currentLevel = (sampleSetForVolume != nullptr && ! sampleSetForVolume->zones.empty())
-                                   ? sampleSetForVolume->zones[0].level : 1.0f;
+                                   ? sampleSetForVolume->zones[(size_t) resolveDisplayedZoneIndex (sampleSetForVolume)].level : 1.0f;
 
     const std::vector<std::vector<GridField>> rows {
         { { "pitchEngine", "Pitch Engine", pitchEngineParam->getCurrentValueAsText() },
@@ -916,6 +920,50 @@ void ConcreteScreen::setCurrentPage (ScreenPage page)
         onPageChanged();
 }
 
+int ConcreteScreen::resolveDisplayedZoneIndex (const ConcreteSampleSet::Ptr& sampleSet) const noexcept
+{
+    if (showingPadZone && sampleSet != nullptr)
+    {
+        const auto zoneIndex = sampleSet->lookup (displayedPadNote, 100);
+        if (zoneIndex >= 0)
+        {
+            const auto& zone = sampleSet->zones[(size_t) zoneIndex];
+            if (zone.keyLo == displayedPadNote && zone.keyHi == displayedPadNote)
+                return zoneIndex;
+        }
+        // That pad's own zone no longer exists (cleared, or the whole sample set changed) - fall
+        // straight through to the main zone below rather than returning a stale/wrong index.
+    }
+    return 0;
+}
+
+int ConcreteScreen::getDisplayedZoneIndex() const
+{
+    return resolveDisplayedZoneIndex (processor.getCurrentSampleSet());
+}
+
+void ConcreteScreen::showZoneForNote (int note)
+{
+    const auto sampleSet = processor.getCurrentSampleSet();
+    if (sampleSet == nullptr)
+        return;
+    const auto zoneIndex = sampleSet->lookup (note, 100);
+    if (zoneIndex < 0)
+        return;
+
+    const auto& zone = sampleSet->zones[(size_t) zoneIndex];
+    showingPadZone = (zone.keyLo == note && zone.keyHi == note);
+    displayedPadNote = note;
+
+    if (currentPage != ScreenPage::Sample)
+        setCurrentPage (ScreenPage::Sample); // already resets selectedFieldId + repaints
+    else
+    {
+        selectedFieldId = "root";
+        repaint();
+    }
+}
+
 std::vector<std::vector<juce::String>> ConcreteScreen::fieldGridForPage (ScreenPage page)
 {
     switch (page)
@@ -1053,13 +1101,17 @@ void ConcreteScreen::adjustSelectedField (int delta)
         const auto sampleSet = processor.getCurrentSampleSet();
         if (sampleSet != nullptr && ! sampleSet->zones.empty())
         {
-            const auto& zone = sampleSet->zones[0];
+            // Edits the DISPLAYED zone (see showZoneForNote()'s own comment), not always zone 0 -
+            // once a pad with its own sample is showing, its Root/One-Shot/Loop are what these
+            // fields (and the mirrored physical DirectionalPad+DataKnob path) should actually edit.
+            const auto zoneIndex = resolveDisplayedZoneIndex (sampleSet);
+            const auto& zone = sampleSet->zones[(size_t) zoneIndex];
             if (selectedFieldId == "root")
-                processor.setRootNoteForZone (0, juce::jlimit (0, 127, zone.rootNote + delta));
+                processor.setRootNoteForZone (zoneIndex, juce::jlimit (0, 127, zone.rootNote + delta));
             else if (selectedFieldId == "oneShot")
-                processor.setOneShotForZone (0, ! zone.oneShot);
+                processor.setOneShotForZone (zoneIndex, ! zone.oneShot);
             else
-                processor.setLoopEnabledForZone (0, ! zone.loopEnabled);
+                processor.setLoopEnabledForZone (zoneIndex, ! zone.loopEnabled);
         }
     }
     else if (selectedFieldId == "coarse")
@@ -1071,8 +1123,9 @@ void ConcreteScreen::adjustSelectedField (int delta)
         const auto sampleSet = processor.getCurrentSampleSet();
         if (sampleSet != nullptr && ! sampleSet->zones.empty())
         {
-            const auto currentPercent = sampleSet->zones[0].level * 100.0f;
-            processor.setLevelForZone (0, juce::jlimit (0.0f, 120.0f, currentPercent + (float) delta) / 100.0f);
+            const auto zoneIndex = resolveDisplayedZoneIndex (sampleSet);
+            const auto currentPercent = sampleSet->zones[(size_t) zoneIndex].level * 100.0f;
+            processor.setLevelForZone (zoneIndex, juce::jlimit (0.0f, 120.0f, currentPercent + (float) delta) / 100.0f);
         }
     }
     // Machine page
@@ -1199,7 +1252,7 @@ void ConcreteScreen::relocateSample()
                                    const auto file = chooser.getResult();
                                    if (file == juce::File())
                                        return;
-                                   self->processor.relocateZone (0, file);
+                                   self->processor.relocateZone (self->getDisplayedZoneIndex(), file);
                                    self->repaint();
                                });
 }
