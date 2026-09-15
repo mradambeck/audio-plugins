@@ -103,6 +103,16 @@ public:
     // buffer) until a later slice adds draggable loop-region editing.
     void setLoopEnabledForZone(int zoneIndex, bool loopEnabled);
 
+    // Same zone-list-state category and reasoning as setOneShotForZone() above - the Volume
+    // section's Sample fader and the Sample/Machine pages' on-screen "Volume" field (both the
+    // physical fader and the on-screen field write this SAME real value, matching Cutoff/
+    // Resonance/Coarse/Fine's two-way binding) drive this real per-sample gain multiplier,
+    // already read live by every voice (see ConcreteVoice.cpp's `zone->level`) - this was
+    // previously a UI-only stand-in (ConcreteScreen's old localVolumePercent) with no connection
+    // to real audio at all, found and fixed after Adam reported "Sample volume doesn't appear to
+    // be working." See ConcreteSampleZone::level.
+    void setLevelForZone(int zoneIndex, float newLevel);
+
     // Re-reads a zone's source from a new location (Architecture #2's relocate case) and
     // republishes, preserving that zone's other fields.
     bool relocateZone(int zoneIndex, const juce::File& newFile);

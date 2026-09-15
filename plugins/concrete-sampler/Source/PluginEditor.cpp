@@ -43,9 +43,16 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
                  [](float v) { return v >= 1000.0f ? juce::String(v / 1000.0f, 1) + "k" : juce::String(juce::roundToInt(v)) + "Hz"; }),
       resonanceKnob(p, lookAndFeel, ConcreteAudioProcessor::filterResonanceParamID, "Resonance",
                     [](float v) { return juce::String(v, 2); }),
+      // Real zones[0].level (see PluginProcessor::setLevelForZone) - was a UI-only stand-in with
+      // no connection to actual audio at all until Adam reported "Sample volume doesn't appear to
+      // be working," which is exactly what that disconnect looked like from the outside.
       sampleVolumeFader(lookAndFeel, "Sample", 0.0f, 120.0f,
-                         [this] { return concreteScreen.getLocalVolumePercent(); },
-                         [this](float v) { concreteScreen.setLocalVolumePercent(v); },
+                         [this]
+                         {
+                             const auto sampleSet = processor.getCurrentSampleSet();
+                             return (sampleSet != nullptr && !sampleSet->zones.empty()) ? sampleSet->zones[0].level * 100.0f : 100.0f;
+                         },
+                         [this](float v) { processor.setLevelForZone(0, v / 100.0f); },
                          [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
       masterVolumeFader(lookAndFeel, "Master", 0.0f, 120.0f,
                          [this] { return masterVolumePercent; },

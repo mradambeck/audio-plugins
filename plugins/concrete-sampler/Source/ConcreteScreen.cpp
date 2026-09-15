@@ -699,7 +699,7 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
             drawField (g, cell (bottomRowColumns[1]), "fine", "Fine",
                        juce::String (fineParam->convertFrom0to1 (fineParam->getValue()), 1));
             drawField (g, cell (bottomRowColumns[2]), "volume", "Volume",
-                       juce::String ((int) std::lround (localVolumePercent)) + "%");
+                       juce::String ((int) std::lround (zone.level * 100.0f)) + "%");
 
             const auto playCell = cell (lastColumnWidth (bottomRowColumns));
             g.setColour (lcdInk);
@@ -726,6 +726,13 @@ void ConcreteScreen::paintMachinePage (juce::Graphics& g, juce::Rectangle<float>
     const auto* bitDepthParam = apvts.getParameter (ConcreteAudioProcessor::bitDepthParamID);
     const auto* ampEnvParam = apvts.getParameter (ConcreteAudioProcessor::ampEnvelopeModeParamID);
 
+    // Same real zones[0].level the Sample page's own "Volume" field and the physical Sample fader
+    // read/write (see PluginProcessor::setLevelForZone) - 1.0f (100%) matches
+    // ConcreteSampleZone::level's own default for the no-sample-yet case.
+    const auto sampleSetForVolume = processor.getCurrentSampleSet();
+    const auto currentLevel = (sampleSetForVolume != nullptr && ! sampleSetForVolume->zones.empty())
+                                   ? sampleSetForVolume->zones[0].level : 1.0f;
+
     const std::vector<std::vector<GridField>> rows {
         { { "pitchEngine", "Pitch Engine", pitchEngineParam->getCurrentValueAsText() },
           { "companding", "Companding", quantModeParam->getCurrentValueAsText() } },
@@ -735,7 +742,7 @@ void ConcreteScreen::paintMachinePage (juce::Graphics& g, juce::Rectangle<float>
             juce::String (juce::roundToInt (voiceCountParam->convertFrom0to1 (voiceCountParam->getValue()))) } },
         { { "bitDepth", "Bit Depth",
             juce::String (juce::roundToInt (bitDepthParam->convertFrom0to1 (bitDepthParam->getValue()))) + "-bit" },
-          { "volume", "Volume", juce::String ((int) std::lround (localVolumePercent)) + "%" } },
+          { "volume", "Volume", juce::String ((int) std::lround (currentLevel * 100.0f)) + "%" } },
     };
     paintFieldGrid (g, area, rows);
 
@@ -1024,7 +1031,14 @@ void ConcreteScreen::adjustSelectedField (int delta)
     else if (selectedFieldId == "fine")
         adjustParam (ConcreteAudioProcessor::fineTuneParamID, 1.0f, -50.0f, 50.0f, delta);
     else if (selectedFieldId == "volume")
-        localVolumePercent = juce::jlimit (0.0f, 120.0f, localVolumePercent + (float) delta);
+    {
+        const auto sampleSet = processor.getCurrentSampleSet();
+        if (sampleSet != nullptr && ! sampleSet->zones.empty())
+        {
+            const auto currentPercent = sampleSet->zones[0].level * 100.0f;
+            processor.setLevelForZone (0, juce::jlimit (0.0f, 120.0f, currentPercent + (float) delta) / 100.0f);
+        }
+    }
     // Machine page
     else if (selectedFieldId == "pitchEngine")
         cycleChoice (ConcreteAudioProcessor::pitchEngineModeParamID, delta);

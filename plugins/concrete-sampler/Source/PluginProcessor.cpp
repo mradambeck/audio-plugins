@@ -666,6 +666,18 @@ void ConcreteAudioProcessor::setLoopEnabledForZone(int zoneIndex, bool loopEnabl
     publishRawSampleSet(newRawSet);
 }
 
+void ConcreteAudioProcessor::setLevelForZone(int zoneIndex, float newLevel)
+{
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
+        return;
+
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].level = newLevel;
+    publishRawSampleSet(newRawSet);
+}
+
 bool ConcreteAudioProcessor::relocateZone(int zoneIndex, const juce::File& newFile)
 {
     const auto existingRaw = getRawSampleSet();

@@ -65,12 +65,6 @@ public:
     void setPageIndex(int index) { setCurrentPage((ScreenPage) index); }
     std::function<void()> onPageChanged;
 
-    // The Volume section's "Sample" fader (see ConcreteFader) two-way-binds to this SAME field the
-    // Sample/Machine pages' own "Volume" row reads/adjusts - matching Panel.tsx's own comment that
-    // moving one moves the other.
-    float getLocalVolumePercent() const noexcept { return localVolumePercent; }
-    void setLocalVolumePercent(float percent) { localVolumePercent = juce::jlimit(0.0f, 120.0f, percent); repaint(); }
-
 private:
     void timerCallback() override;
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
@@ -158,10 +152,4 @@ private:
 
     bool isDraggingFileOver = false;
     bool isLoading = false;
-
-    // No backing APVTS parameter yet - ui-plan.md defers the Volume-section/Volume-parameter work
-    // past this slice ("Panel — performance strip... add a Volume section" is later panel-chrome
-    // work). Purely local UI state so the page's field grid proportions match the mockup now; NOT
-    // wired to real audio yet.
-    float localVolumePercent = 100.0f;
 };

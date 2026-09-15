@@ -68,11 +68,11 @@ private:
     ConcreteFader sampleVolumeFader;
 
     // Panel.tsx's own useVolume() masterVolume - purely local UI state. Unlike Sample Volume
-    // (backed by ConcreteScreen's localVolumePercent, which is itself already a documented "no
-    // DSP yet" stand-in), there's no output-gain stage anywhere in the signal path for Master to
-    // drive either - see useVolume.tsx's own comment: "Master isn't machine/preset state... it
-    // doesn't mark the machine dirty the way Sample Volume does." Wiring a real output-gain DSP
-    // stage to this is later work, not a Phase 8 UI-layout concern.
+    // (now backed by the zone's own real `level` field - see PluginProcessor::setLevelForZone),
+    // there's no output-gain stage anywhere in the signal path for Master to drive - see
+    // useVolume.tsx's own comment: "Master isn't machine/preset state... it doesn't mark the
+    // machine dirty the way Sample Volume does." Wiring a real output-gain DSP stage to this is
+    // later work.
     float masterVolumePercent = 100.0f;
     ConcreteFader masterVolumeFader;
 
