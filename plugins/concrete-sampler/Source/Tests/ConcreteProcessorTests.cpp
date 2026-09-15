@@ -899,6 +899,9 @@ public:
             processor.prepareToPlay(44100.0, 512);
             expect(processor.loadSample(file));
             processor.setLoopEnabledForZone(0, true);
+            processor.setOneShotForZone(0, true); // matches assignSampleToPad()'s own pads - the
+                                                    // note-off below must be a no-op for PLAYBACK,
+                                                    // exactly like a real pad's own zone
 
             juce::MidiBuffer firstHit = noteOnBuffer(60);
             juce::AudioBuffer<float> firstBlock(2, 512);
@@ -910,7 +913,19 @@ public:
                     firstBlockEnergy += std::abs(firstBlock.getSample(ch, i));
             expect(firstBlockEnergy > 0.0f, "sanity check: the pad should actually be sounding after the first hit");
 
-            // Same note again, no note-off in between - exactly what re-clicking the same pad sends.
+            // A pad click's own mouseUp/mouseExit always sends an ordinary note-off shortly after
+            // note-on (see ConcretePadGrid::releaseLitPad()) - a real, previously-missed detail
+            // this test didn't simulate. That note-off is a no-op for playback here (a one-shot
+            // zone ignores it), but it still clears the voice allocator's own note->voice tag as a
+            // side effect regardless - which is exactly what made the retrigger-stop check below
+            // silently do nothing when it looked the note up through that same allocator bookkeeping.
+            juce::MidiBuffer noteOff;
+            noteOff.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+            juce::AudioBuffer<float> releaseBlock(2, 512);
+            releaseBlock.clear();
+            processor.processBlock(releaseBlock, noteOff);
+
+            // Same note again - exactly what re-clicking the same pad sends.
             juce::MidiBuffer secondHit = noteOnBuffer(60);
             juce::AudioBuffer<float> secondBlock(2, 512);
             secondBlock.clear();

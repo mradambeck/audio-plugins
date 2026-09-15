@@ -591,16 +591,26 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
         // stacking a second indefinitely-sustained voice on top of one that's never going to stop
         // on its own. Scoped to loopEnabled zones only: a normal (non-looping) one-shot that's
         // still ringing keeps its existing "hit again = retrigger a new voice" behavior, unchanged.
-        // findVoiceForNoteOff() also clears the allocator's own tag for that slot, which is correct
-        // either way here - whether we stop it below or (voice already finished on its own,
-        // isActive() false) just fall through to a fresh start.
+        //
+        // Deliberately scans `voices` directly rather than going through
+        // voiceAllocator.findVoiceForNoteOff() - a pad click's own mouseUp already sends an
+        // ordinary note-off shortly after every note-on (see ConcretePadGrid::releaseLitPad()),
+        // which clears the allocator's note->voice tag as a side effect regardless of whether the
+        // zone's oneShot flag made stopNote() itself a no-op. By the time a SECOND click's note-on
+        // arrives, that tag is already gone, so asking the allocator here always came back empty -
+        // a real bug: the pad's voice was still actually looping, but nothing could find it, so
+        // every second click silently fell through and stacked a new voice instead of stopping the
+        // first. Checking each voice's own isActive()/getCurrentMidiNote() instead answers "is this
+        // note ACTUALLY still sounding" directly, independent of that bookkeeping.
         if (zone.loopEnabled)
         {
-            const auto existingVoiceIndex = voiceAllocator.findVoiceForNoteOff(note);
-            if (existingVoiceIndex >= 0 && voices[(size_t) existingVoiceIndex].isActive())
+            for (auto& voice : voices)
             {
-                voices[(size_t) existingVoiceIndex].stopNote(false, true); // forced, immediate stop
-                return;
+                if (voice.isActive() && voice.getCurrentMidiNote() == note)
+                {
+                    voice.stopNote(false, true); // forced, immediate stop
+                    return;
+                }
             }
         }
 
