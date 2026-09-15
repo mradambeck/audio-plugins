@@ -76,7 +76,15 @@ struct ConcreteSampleZone
     // voice immediately even though an ordinary note-off can't.
     bool oneShot = false;
 
+    // The Sample page's Coarse (this field, whole-ish semitones - see ConcreteVoice::startNote()'s
+    // own comment on why it's rounded when used) and Fine (fineTuneCents, in cents) controls - per-
+    // zone, like every other Coarse/Fine-adjacent value here, so tuning one pad's sample can't bleed
+    // into another pad's or the main sample's pitch. These used to be a pair of global APVTS
+    // parameters applied identically to every zone (a real reported bug: adjusting Coarse/Fine for
+    // one sample silently retuned every other pad's sample too) - now genuine per-zone state,
+    // mutated the same publish-a-new-zone-list way as level/rootNote/oneShot/loopEnabled.
     float tuneSemitones = 0.0f;
+    float fineTuneCents = 0.0f;
     float level = 1.0f;
     float pan = 0.0f;              // -1 (left) .. +1 (right)
     int chokeGroup = 0;            // 0 = no choke (Phase 6 tests this; unused in v1)

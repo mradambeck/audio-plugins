@@ -77,7 +77,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -92,7 +92,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root + 12 semitones
+            voice.startNote(set, 0, 72, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root + 12 semitones
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -107,7 +107,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root - 12 semitones
+            voice.startNote(set, 0, 48, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr); // root - 12 semitones
 
             juce::AudioBuffer<float> out(1, 16384);
             out.clear();
@@ -125,7 +125,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate); // 44100
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, 48000.0, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 8192);
             out.clear();
@@ -141,7 +141,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 0.05); // short: ~2205 samples
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             expect(voice.isActive(), "should be active immediately after startNote()");
 
@@ -157,7 +157,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(2, 512);
             out.clear();
@@ -186,7 +186,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(2, 256);
             out.clear();
@@ -216,7 +216,7 @@ public:
 
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 256);
             out.clear();
@@ -233,7 +233,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 128);
             out.clear();
@@ -254,7 +254,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1);
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
             voice.stopNote(false, true);
 
             expect(! voice.isActive(), "a hard stop should be immediate");
@@ -265,7 +265,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 1.0); // long enough to reach sustain
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096); // reach sustain, well past the 0.002s attack
             warmup.clear();
@@ -294,7 +294,7 @@ public:
             set->zones[0].oneShot = true;
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096);
             warmup.clear();
@@ -327,7 +327,7 @@ public:
             set->zones[0].oneShot = true;
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> warmup(1, 4096);
             warmup.clear();
@@ -348,7 +348,7 @@ public:
             set->zones[0].loopEnabled = true;
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             // Render well past the zone's own 22050-sample length (~1.5x), never calling
             // stopNote() - an un-looped voice would already be silent/inactive by 22050 samples
@@ -369,7 +369,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 0.5); // loopEnabled defaults to false
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true, ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f, ConcreteAmpEnvelopeMode::adsr);
 
             juce::AudioBuffer<float> out(1, 33000);
             out.clear();
@@ -382,14 +382,14 @@ public:
             auto contouredSet = makeSetWithSineZone(1000.0, 1, 60, 2.0); // long enough to hold well past 1s
             ConcreteVoice contouredVoice;
             contouredVoice.prepare(sampleRate);
-            contouredVoice.startNote(contouredSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+            contouredVoice.startNote(contouredSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true,
                                        ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
                                        ConcreteAmpEnvelopeMode::contoured);
 
             auto adsrSet = makeSetWithSineZone(1000.0, 1, 60, 2.0);
             ConcreteVoice adsrVoice;
             adsrVoice.prepare(sampleRate);
-            adsrVoice.startNote(adsrSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+            adsrVoice.startNote(adsrSet, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true,
                                  ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
                                  ConcreteAmpEnvelopeMode::adsr);
 
@@ -426,7 +426,7 @@ public:
             auto set = makeSetWithSineZone(1000.0, 1, 60, 20.0); // long zone - envelope, not zone end, must finish the note
             ConcreteVoice voice;
             voice.prepare(sampleRate);
-            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, 0, 0.0f, true,
+            voice.startNote(set, 0, 60, 1.0f, ConcretePitchEngine::Mode::reference, sampleRate, true,
                              ConcreteFilterModel::Mode::bypass, 20000.0f, 0.0f, 0.0f, 0.0f,
                              ConcreteAmpEnvelopeMode::contoured);
 

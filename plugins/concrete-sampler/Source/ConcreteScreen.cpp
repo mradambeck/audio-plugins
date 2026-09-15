@@ -660,17 +660,32 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
                 g.fillRect (juce::Rectangle<float> (left + barX, midY - barHeight * 0.5f, barWidth, barHeight));
             }
 
-            // Loop region overlay - static for this slice (drag-to-resize is deferred, see
-            // ui-plan.md's loop-marker scope and this class's header comment). Fixed at the
-            // mockup's own default placement (10%-90% of duration) rather than wired to
-            // zone.loopStart/loopEnd, since there's no editing UI yet to have moved them from
-            // there.
-            if (zone.loopEnabled)
+            // Loop region overlay - now drawn from the zone's REAL loopStart/loopEnd (previously a
+            // hardcoded 10%-90% placeholder, actively misleading once real loop playback was wired
+            // up - see ConcreteVoice::renderNextBlock()). There's no loop-POINT editing UI yet
+            // (drag-to-resize is deferred, see ui-plan.md's loop-marker scope), so this currently
+            // always spans the whole waveform (loopStart=0/loopEnd=full length, per
+            // ConcreteSampleIO's loadZoneFromFile()) - correct rather than coincidental, and will
+            // stay correct automatically if loop-point editing is ever added.
+            if (zone.loopEnabled && numSamples > 0)
             {
-                const auto regionStart = waveformArea.getX() + width * 0.1f;
-                const auto regionEnd = waveformArea.getX() + width * 0.9f;
+                const auto regionStart = waveformArea.getX() + width * (float) zone.loopStart / (float) numSamples;
+                const auto regionEnd = waveformArea.getX() + width * (float) zone.loopEnd / (float) numSamples;
                 g.setColour (juce::Colour (0xff0555eb).withAlpha (0.25f));
                 g.fillRect (juce::Rectangle<float> (regionStart, waveformArea.getY(), regionEnd - regionStart, waveformArea.getHeight()));
+            }
+
+            // Playback playhead - the currently-playing position of whichever active voice is
+            // playing THIS zone (see PluginProcessor::getPlaybackProgressForZone()'s own comment),
+            // read fresh every paint - this component already repaints continuously at 60Hz (see
+            // timerCallback()), so no separate animation plumbing is needed for this to move
+            // smoothly. Absent (-1) whenever nothing is currently playing this zone.
+            const auto playbackProgress = processor.getPlaybackProgressForZone (displayedZoneIndex);
+            if (playbackProgress >= 0.0f)
+            {
+                const auto playheadX = left + width * playbackProgress;
+                g.setColour (juce::Colours::white);
+                g.drawLine (playheadX, waveformArea.getY(), playheadX, waveformArea.getBottom(), 2.0f);
             }
         }
         playerArea.removeFromTop (4.0f);
@@ -713,9 +728,11 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
             drawField (g, cell (topRowColumns[1]), "root", "Root",
                        juce::MidiMessage::getMidiNoteName (zone.rootNote, true, true, 3));
             drawField (g, cell (topRowColumns[2]), "oneShot", "One-Shot", zone.oneShot ? "On" : "Off");
-            drawField (g, cell (lastColumnWidth (topRowColumns)), "loop", "Loop",
-                       zone.loopEnabled ? (formatMinsSecs (durationSeconds * 0.1) + "-" + formatMinsSecs (durationSeconds * 0.9))
-                                        : "Off");
+            // Just On/Off - there's no loop-point-editing UI yet (loopStart/loopEnd always cover
+            // the whole buffer - see ConcreteSampleIO's loadZoneFromFile()), so a fake "10%-90% of
+            // duration" range readout here was actively misleading about what Loop actually does
+            // once real loop playback was wired up (see ConcreteVoice::renderNextBlock()).
+            drawField (g, cell (lastColumnWidth (topRowColumns)), "loop", "Loop", zone.loopEnabled ? "On" : "Off");
         }
 
         playerArea.removeFromTop (4.0f);
@@ -724,12 +741,10 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
             auto x = bottomRow.getX();
             auto cell = [&] (float w) { auto r = juce::Rectangle<float> (x, bottomRow.getY(), w, bottomRow.getHeight()); x += w + gridColumnGap; return r; };
 
-            const auto* coarseParam = processor.apvts.getParameter (ConcreteAudioProcessor::coarseTuneParamID);
-            const auto* fineParam = processor.apvts.getParameter (ConcreteAudioProcessor::fineTuneParamID);
-            drawField (g, cell (bottomRowColumns[0]), "coarse", "Coarse",
-                       juce::String (coarseParam->convertFrom0to1 (coarseParam->getValue()), 2));
-            drawField (g, cell (bottomRowColumns[1]), "fine", "Fine",
-                       juce::String (fineParam->convertFrom0to1 (fineParam->getValue()), 1));
+            // Per-zone now (see PluginProcessor::setCoarseTuneForZone()'s own comment) - reads the
+            // DISPLAYED zone, not a global value shared by every sample.
+            drawField (g, cell (bottomRowColumns[0]), "coarse", "Coarse", juce::String (zone.tuneSemitones, 2));
+            drawField (g, cell (bottomRowColumns[1]), "fine", "Fine", juce::String (zone.fineTuneCents, 1));
             drawField (g, cell (bottomRowColumns[2]), "volume", "Volume",
                        juce::String ((int) std::lround (zone.level * 100.0f)) + "%");
 
@@ -1121,10 +1136,29 @@ void ConcreteScreen::adjustSelectedField (int delta)
                 processor.setLoopEnabledForZone (zoneIndex, ! zone.loopEnabled);
         }
     }
+    // Per-zone now (see PluginProcessor::setCoarseTuneForZone()'s own comment) - edits the
+    // DISPLAYED zone, same reasoning and pattern as root/oneShot/loop/volume above, not a global
+    // value shared by every sample. Same step sizes/ranges these fields always had.
     else if (selectedFieldId == "coarse")
-        adjustParam (ConcreteAudioProcessor::coarseTuneParamID, 1.0f, -24.0f, 24.0f, delta);
+    {
+        const auto sampleSet = processor.getCurrentSampleSet();
+        if (sampleSet != nullptr && ! sampleSet->zones.empty())
+        {
+            const auto zoneIndex = resolveDisplayedZoneIndex (sampleSet);
+            const auto current = sampleSet->zones[(size_t) zoneIndex].tuneSemitones;
+            processor.setCoarseTuneForZone (zoneIndex, juce::jlimit (-24.0f, 24.0f, current + (float) delta));
+        }
+    }
     else if (selectedFieldId == "fine")
-        adjustParam (ConcreteAudioProcessor::fineTuneParamID, 1.0f, -50.0f, 50.0f, delta);
+    {
+        const auto sampleSet = processor.getCurrentSampleSet();
+        if (sampleSet != nullptr && ! sampleSet->zones.empty())
+        {
+            const auto zoneIndex = resolveDisplayedZoneIndex (sampleSet);
+            const auto current = sampleSet->zones[(size_t) zoneIndex].fineTuneCents;
+            processor.setFineTuneForZone (zoneIndex, juce::jlimit (-50.0f, 50.0f, current + (float) delta));
+        }
+    }
     else if (selectedFieldId == "volume")
     {
         const auto sampleSet = processor.getCurrentSampleSet();

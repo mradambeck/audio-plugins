@@ -85,6 +85,7 @@ namespace ConcreteZoneIDs
     inline const juce::Identifier reverse { "reverse" };
     inline const juce::Identifier oneShot { "oneShot" };
     inline const juce::Identifier tune { "tune" };
+    inline const juce::Identifier fineTune { "fineTune" };
     inline const juce::Identifier level { "level" };
     inline const juce::Identifier pan { "pan" };
     inline const juce::Identifier chokeGroup { "chokeGroup" };

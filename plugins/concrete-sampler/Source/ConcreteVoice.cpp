@@ -16,7 +16,7 @@ void ConcreteVoice::prepare(double sampleRateIn) noexcept
 
 void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
                                 ConcretePitchEngine::Mode mode, double effectiveSourceRateHzIn,
-                                int coarseTuneSemitones, float fineTuneCents, bool autoCompensate,
+                                bool autoCompensate,
                                 ConcreteFilterModel::Mode filterModeIn, float filterCutoffHz,
                                 float filterResonance01In, float filterEnvAmountOctavesIn,
                                 float filterKeyTrack01, ConcreteAmpEnvelopeMode ampEnvelopeModeIn) noexcept
@@ -24,6 +24,7 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
     ampEnvelopeMode = ampEnvelopeModeIn;
     sampleSet = set;
     zone = &sampleSet->zones[(size_t) zoneIndex];
+    playingZoneIndex = zoneIndex;
     currentMidiNote = midiNote;
     velocityGain = velocity01;
     pitchMode = mode;
@@ -54,9 +55,18 @@ void ConcreteVoice::startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int mid
     const auto bufferLength = (juce::int64) zone->buffer->getNumSamples();
     zoneEndSample = zone->end > zone->start ? juce::jmin(zone->end, bufferLength) : bufferLength;
 
+    // Seeds refreshLiveLoopState()'s own tracking (see its .h comment) from this zone's values, so
+    // a voice that starts already-looping works correctly even before the caller's first refresh.
+    liveLoopEnabled = zone->loopEnabled;
+    liveLoopStart = zone->loopStart;
+    liveLoopEnd = zone->loopEnd;
+
     const auto compensationSemitones = autoCompensate ? zone->captureTransposeSemitones : 0.0;
-    const auto totalSemitones = (double) (midiNote - zone->rootNote) + (double) zone->tuneSemitones
-                               + (double) coarseTuneSemitones + (double) fineTuneCents / 100.0
+    // zone->tuneSemitones (Coarse) is rounded to the nearest whole semitone, matching this
+    // control's pre-per-zone behavior exactly (it was always truncated at the call site before);
+    // zone->fineTuneCents (Fine) stays a continuous cents-scale fraction.
+    const auto totalSemitones = (double) (midiNote - zone->rootNote) + (double) std::lround(zone->tuneSemitones)
+                               + (double) zone->fineTuneCents / 100.0
                                - compensationSemitones;
     pitchRatio = std::pow(2.0, totalSemitones / 12.0);
 
@@ -140,10 +150,14 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         // Loop handling: zone->loopEnabled was carried on every zone since Architecture #1's
         // schema, but nothing ever read it before now - the DSP always just stopped at
         // zoneEndSample regardless, which is exactly what made the Loop button look like it did
-        // nothing. loopEnd is clamped against zoneEndSample too, since a zone's own start/end trim
-        // can be narrower than the loop points a file was originally saved with.
-        const auto loopActive = zone->loopEnabled && zone->loopEnd > zone->loopStart;
-        const auto playbackEndSample = loopActive ? (double) juce::jmin(zone->loopEnd, zoneEndSample)
+        // nothing. Reads liveLoopEnabled/liveLoopStart/liveLoopEnd (kept current by
+        // refreshLiveLoopState(), not the frozen zone->loopEnabled/loopStart/loopEnd) specifically
+        // so turning Loop off actually stops an already-playing voice from looping again, instead
+        // of it being stuck with whatever loop state existed at note-on like every other control
+        // here deliberately is. loopEnd is clamped against zoneEndSample too, since a zone's own
+        // start/end trim can be narrower than the loop points a file was originally saved with.
+        const auto loopActive = liveLoopEnabled && liveLoopEnd > liveLoopStart;
+        const auto playbackEndSample = loopActive ? (double) juce::jmin(liveLoopEnd, zoneEndSample)
                                                    : (double) zoneEndSample;
         if (pitchEngines[0].getSourcePhase() >= playbackEndSample)
         {
@@ -153,7 +167,7 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 break;
             }
 
-            const auto loopLength = playbackEndSample - (double) zone->loopStart;
+            const auto loopLength = playbackEndSample - (double) liveLoopStart;
             for (auto& engine : pitchEngines)
                 engine.rewindSourcePhase(loopLength);
         }
@@ -208,5 +222,49 @@ void ConcreteVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 outputBuffer.addSample(ch, startSample + i, sampleValue * env);
             }
         }
+    }
+}
+
+void ConcreteVoice::refreshLiveLoopState(const ConcreteSampleZone* liveZone, ConcretePitchEngine::Mode livePitchMode,
+                                           double liveEffectiveSourceRateHz, ConcreteFilterModel::Mode liveFilterMode,
+                                           ConcreteAmpEnvelopeMode liveAmpEnvelopeMode) noexcept
+{
+    if (!active)
+        return;
+
+    liveLoopEnabled = liveZone != nullptr && liveZone->loopEnabled;
+    if (liveLoopEnabled)
+    {
+        liveLoopStart = liveZone->loopStart;
+        liveLoopEnd = liveZone->loopEnd;
+    }
+
+    // Only a currently-looping voice adopts machine changes live (see this method's own .h
+    // comment) - an ordinary one-shot/gated note keeps the "snapshotted at note-on" behavior every
+    // other control in this plugin already has.
+    if (!liveLoopEnabled)
+        return;
+
+    pitchMode = livePitchMode;
+    effectiveSourceRateHz = liveEffectiveSourceRateHz;
+
+    if (filterMode != liveFilterMode)
+    {
+        filterMode = liveFilterMode;
+        for (auto& filter : filters)
+            filter.reset();
+    }
+
+    if (ampEnvelopeMode != liveAmpEnvelopeMode)
+    {
+        ampEnvelopeMode = liveAmpEnvelopeMode;
+        // The envelope object this voice is switching TO may never have been triggered for this
+        // note (see startNote() - only one of adsr/contourEnvelope gets noteOn(), the other just
+        // reset()) - without this, switching live would make isActive() false on the newly
+        // selected envelope and silently cut the voice instead of carrying it over smoothly.
+        if (ampEnvelopeMode == ConcreteAmpEnvelopeMode::contoured)
+            contourEnvelope.noteOn();
+        else
+            adsr.noteOn();
     }
 }

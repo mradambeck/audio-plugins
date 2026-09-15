@@ -60,6 +60,7 @@ namespace ConcreteSampleIO
         updated.velLo = existing.velLo;
         updated.velHi = existing.velHi;
         updated.tuneSemitones = existing.tuneSemitones;
+        updated.fineTuneCents = existing.fineTuneCents;
         updated.level = existing.level;
         updated.pan = existing.pan;
         updated.chokeGroup = existing.chokeGroup;
@@ -146,6 +147,7 @@ namespace ConcreteSampleIO
         tree.setProperty(reverse, zone.reverse, nullptr);
         tree.setProperty(oneShot, zone.oneShot, nullptr);
         tree.setProperty(tune, (double) zone.tuneSemitones, nullptr);
+        tree.setProperty(fineTune, (double) zone.fineTuneCents, nullptr);
         tree.setProperty(level, (double) zone.level, nullptr);
         tree.setProperty(pan, (double) zone.pan, nullptr);
         tree.setProperty(chokeGroup, zone.chokeGroup, nullptr);
@@ -181,6 +183,7 @@ namespace ConcreteSampleIO
         zone.reverse = (bool) zoneTree.getProperty(reverse, false);
         zone.oneShot = (bool) zoneTree.getProperty(oneShot, false);
         zone.tuneSemitones = (float) (double) zoneTree.getProperty(tune, 0.0);
+        zone.fineTuneCents = (float) (double) zoneTree.getProperty(fineTune, 0.0);
         zone.level = (float) (double) zoneTree.getProperty(level, 1.0);
         zone.pan = (float) (double) zoneTree.getProperty(pan, 0.0);
         zone.chokeGroup = (int) zoneTree.getProperty(chokeGroup, 0);

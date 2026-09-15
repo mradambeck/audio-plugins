@@ -743,6 +743,221 @@ public:
             file.deleteFile();
         }
 
+        beginTest("Turning Loop off takes effect immediately on an already-playing looping voice, "
+                  "instead of it looping forever");
+        {
+            const auto file = writeTempSineWav(1000.0, 0.1); // 4410 samples - short on purpose
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setLoopEnabledForZone(0, true);
+
+            juce::MidiBuffer midi = noteOnBuffer(60);
+            juce::AudioBuffer<float> loopingBlock(2, 8192); // ~1.9x the zone's own un-looped length
+            loopingBlock.clear();
+            processor.processBlock(loopingBlock, midi);
+            const auto measured = estimateFrequencyHz(loopingBlock.getReadPointer(0) + 6000, 2000, 44100.0, 1000.0f);
+            expectWithinAbsoluteError(measured, 1000.0f, 5.0f, "sanity check: it should actually be looping first");
+
+            processor.setLoopEnabledForZone(0, false);
+
+            // Render well past where the voice would already have played through its own natural
+            // length TWICE more (had it kept looping) - it must have stopped instead.
+            juce::MidiBuffer noMidi;
+            for (int block = 0; block < 4; ++block) // 4*512 = 2048 samples, plenty past one more lap
+            {
+                juce::AudioBuffer<float> laterBlock(2, 512);
+                laterBlock.clear();
+                processor.processBlock(laterBlock, noMidi);
+            }
+
+            juce::AudioBuffer<float> finalBlock(2, 512);
+            finalBlock.clear();
+            processor.processBlock(finalBlock, noMidi);
+            for (int ch = 0; ch < finalBlock.getNumChannels(); ++ch)
+                for (int i = 0; i < finalBlock.getNumSamples(); ++i)
+                    expectEquals(finalBlock.getSample(ch, i), 0.0f,
+                                 "turning Loop off must stop an already-playing voice from looping again, "
+                                 "not leave it stuck looping forever with whatever loop state existed at note-on");
+
+            file.deleteFile();
+        }
+
+        beginTest("Coarse/Fine tune only affects the zone they're set on, not every other sample (Phase 8)");
+        {
+            const auto mainFile = writeTempSineWav(440.0, 1.0);
+            const auto padFile = writeTempSineWav(880.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(mainFile));
+            expect(processor.assignSampleToPad(48, padFile));
+
+            // +12 semitones on the MAIN zone only.
+            processor.setCoarseTuneForZone(0, 12.0f);
+
+            {
+                juce::AudioBuffer<float> buffer(2, 8192);
+                buffer.clear();
+                auto midi = noteOnBuffer(60);
+                processor.processBlock(buffer, midi);
+                const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 880.0f);
+                expectWithinAbsoluteError(measured, 880.0f, 5.0f, "the main sample's own Coarse tune should apply to it");
+            }
+            {
+                juce::AudioBuffer<float> buffer(2, 8192);
+                buffer.clear();
+                auto midi = noteOnBuffer(48);
+                processor.processBlock(buffer, midi);
+                const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 880.0f);
+                expectWithinAbsoluteError(measured, 880.0f, 5.0f,
+                    "the pad's own sample must stay at its own untransposed pitch - Coarse tune set on the "
+                    "main zone must not bleed into it (previously a single global parameter affected every zone)");
+            }
+
+            mainFile.deleteFile();
+            padFile.deleteFile();
+        }
+
+        beginTest("A looping voice adopts a live amp-envelope-mode change (a machine-derived setting); "
+                  "an ordinary non-looping note does not (Phase 8)");
+        {
+            auto ampEnvelopeModeParam = [](ConcreteAudioProcessor& p)
+            { return p.apvts.getParameter(ConcreteAudioProcessor::ampEnvelopeModeParamID); };
+
+            auto measurePeak = [](ConcreteAudioProcessor& p, int numSamples)
+            {
+                juce::AudioBuffer<float> buffer(2, numSamples);
+                buffer.clear();
+                juce::MidiBuffer noMidi;
+                p.processBlock(buffer, noMidi);
+                return buffer.getMagnitude(0, numSamples - 512, 512);
+            };
+
+            constexpr int warmupSamples = 4096;       // past the 2ms attack, into flat ADSR sustain
+            constexpr int fastForwardSamples = 40960; // ~0.93s further - matches ConcreteVoiceTests'
+                                                       // own contoured-vs-adsr decay test timing
+
+            // Looping voice: switching ampEnvelopeMode live (ADSR -> Contoured) mid-note must make
+            // it start audibly decaying, exactly like ConcreteVoiceTests' own contoured-mode test
+            // measures - proving the switch actually reached an already-playing voice instead of
+            // staying frozen from note-on like every other one-shot/gated note.
+            {
+                const auto file = writeTempSineWav(1000.0, 2.0);
+                ConcreteAudioProcessor processor;
+                processor.prepareToPlay(44100.0, 512);
+                expect(processor.loadSample(file));
+                processor.setLoopEnabledForZone(0, true);
+                ampEnvelopeModeParam(processor)->setValueNotifyingHost(0.0f); // ADSR
+
+                auto midi = noteOnBuffer(60);
+                juce::AudioBuffer<float> warmup(2, warmupSamples);
+                warmup.clear();
+                processor.processBlock(warmup, midi);
+                const auto earlyPeak = warmup.getMagnitude(0, warmupSamples - 512, 512);
+
+                ampEnvelopeModeParam(processor)->setValueNotifyingHost(1.0f); // Contoured
+                const auto laterPeak = measurePeak(processor, fastForwardSamples);
+
+                expect(laterPeak < earlyPeak * 0.9f,
+                       "a looping voice must adopt a live amp-envelope-mode change and audibly decay, "
+                       "the same way changing machines is supposed to retune an already-looping voice's "
+                       "character rather than leaving it stuck on whichever machine was selected at note-on");
+
+                file.deleteFile();
+            }
+
+            // Same setup, but WITHOUT looping enabled - the live change must NOT reach this voice,
+            // preserving the "snapshotted at note-on" behavior every ordinary note already has.
+            {
+                const auto file = writeTempSineWav(1000.0, 2.0);
+                ConcreteAudioProcessor processor;
+                processor.prepareToPlay(44100.0, 512);
+                expect(processor.loadSample(file)); // loopEnabled defaults to false
+                ampEnvelopeModeParam(processor)->setValueNotifyingHost(0.0f); // ADSR
+
+                auto midi = noteOnBuffer(60);
+                juce::AudioBuffer<float> warmup(2, warmupSamples);
+                warmup.clear();
+                processor.processBlock(warmup, midi);
+                const auto earlyPeak = warmup.getMagnitude(0, warmupSamples - 512, 512);
+
+                ampEnvelopeModeParam(processor)->setValueNotifyingHost(1.0f); // Contoured
+                const auto laterPeak = measurePeak(processor, fastForwardSamples);
+
+                expectWithinAbsoluteError(laterPeak, earlyPeak, earlyPeak * 0.05f,
+                    "an ordinary (non-looping) note must NOT pick up a live amp-envelope-mode change - "
+                    "it should keep its own ADSR flat sustain exactly as before, unaffected");
+
+                file.deleteFile();
+            }
+        }
+
+        beginTest("Retriggering an already-looping pad stops it instead of stacking a second iteration (Phase 8)");
+        {
+            const auto file = writeTempSineWav(1000.0, 2.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+            processor.setLoopEnabledForZone(0, true);
+
+            juce::MidiBuffer firstHit = noteOnBuffer(60);
+            juce::AudioBuffer<float> firstBlock(2, 512);
+            firstBlock.clear();
+            processor.processBlock(firstBlock, firstHit);
+            float firstBlockEnergy = 0.0f;
+            for (int ch = 0; ch < firstBlock.getNumChannels(); ++ch)
+                for (int i = 0; i < firstBlock.getNumSamples(); ++i)
+                    firstBlockEnergy += std::abs(firstBlock.getSample(ch, i));
+            expect(firstBlockEnergy > 0.0f, "sanity check: the pad should actually be sounding after the first hit");
+
+            // Same note again, no note-off in between - exactly what re-clicking the same pad sends.
+            juce::MidiBuffer secondHit = noteOnBuffer(60);
+            juce::AudioBuffer<float> secondBlock(2, 512);
+            secondBlock.clear();
+            processor.processBlock(secondBlock, secondHit);
+            for (int ch = 0; ch < secondBlock.getNumChannels(); ++ch)
+                for (int i = 0; i < secondBlock.getNumSamples(); ++i)
+                    expectEquals(secondBlock.getSample(ch, i), 0.0f,
+                                 "hitting an already-looping pad again must stop it, not start a second "
+                                 "overlapping iteration of the loop");
+
+            file.deleteFile();
+        }
+
+        beginTest("getPlaybackProgressForZone() tracks a playing voice's position and returns -1 once it stops (Phase 8)");
+        {
+            const auto file = writeTempSineWav(1000.0, 1.0); // 44100 samples at root
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(file));
+
+            expectEquals(processor.getPlaybackProgressForZone(0), -1.0f, "nothing playing yet");
+
+            auto midi = noteOnBuffer(60);
+            juce::AudioBuffer<float> early(2, 512);
+            early.clear();
+            processor.processBlock(early, midi);
+            const auto earlyProgress = processor.getPlaybackProgressForZone(0);
+            expect(earlyProgress > 0.0f && earlyProgress < 0.05f, "should be near the very start just after triggering");
+
+            juce::MidiBuffer noMidi;
+            juce::AudioBuffer<float> later(2, 22050); // halfway through the 1-second zone
+            later.clear();
+            processor.processBlock(later, noMidi);
+            const auto laterProgress = processor.getPlaybackProgressForZone(0);
+            expect(laterProgress > earlyProgress, "progress must advance as playback continues");
+            expectWithinAbsoluteError(laterProgress, 0.5f, 0.05f, "should be roughly halfway through the zone by now");
+
+            // Render past the zone's own end (no loop) - it should have stopped, and the query
+            // should report nothing playing again rather than a stale position.
+            juce::AudioBuffer<float> toEnd(2, 44100);
+            toEnd.clear();
+            processor.processBlock(toEnd, noMidi);
+            expectEquals(processor.getPlaybackProgressForZone(0), -1.0f, "nothing playing once the voice has finished");
+
+            file.deleteFile();
+        }
+
         beginTest("Voice Count limits real polyphony: 6 overlapping notes with a 4-voice limit "
                   "leaves exactly 4 sounding, stealing the oldest first (Phase 6)");
         {

@@ -136,7 +136,7 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
       // playing, e.g. after triggering a long one-shot pad. Forces every voice silent right away
       // (see ConcreteAudioProcessor::stopAllVoices()), unlike an ordinary note-off which respects
       // a one-shot zone's "plays through to its own end" behavior.
-      stopButton(lookAndFeel, "Stop", [this] { processor.stopAllVoices(); })
+      stopButton(lookAndFeel, "Stop All", [this] { processor.stopAllVoices(); })
 {
     setLookAndFeel(&lookAndFeel);
 

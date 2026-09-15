@@ -41,9 +41,11 @@ public:
     void prepare(double sampleRateIn) noexcept;
 
     // zoneIndex must be a valid index into set->zones - the caller (PluginProcessor) is
-    // responsible for having already resolved it via ConcreteSampleSet::lookup(). coarseTune is in
-    // semitones, fineTune in cents - both combine with the zone's own tuneSemitones and the
-    // played note's distance from the zone's root note into one total pitch ratio.
+    // responsible for having already resolved it via ConcreteSampleSet::lookup(). The zone's own
+    // tuneSemitones (Coarse, rounded to the nearest semitone - see startNote()'s own .cpp comment)
+    // and fineTuneCents (Fine, in cents) combine with the played note's distance from the zone's
+    // root note into one total pitch ratio - both are per-zone state (Architecture #1), not a
+    // performer-facing global control, so tuning one sample can never bleed into another's pitch.
     // effectiveSourceRateHz is the zone's own sourceSampleRate for Mode::reference, or the
     // baseRate parameter for the three machine modes - used ONLY to shape artifact character for
     // those three (how coarse the zero-order hold/decimation is), never root-pitch playback speed,
@@ -61,8 +63,7 @@ public:
     // pitch would). ampEnvelopeMode picks between the flat-sustain ADSR every earlier phase used
     // and Phase 6's K250-style continuously-decaying contour (see ConcreteAmpEnvelopeMode above).
     void startNote(ConcreteSampleSet::Ptr set, int zoneIndex, int midiNote, float velocity01,
-                    ConcretePitchEngine::Mode mode, double effectiveSourceRateHz,
-                    int coarseTuneSemitones, float fineTuneCents, bool autoCompensate,
+                    ConcretePitchEngine::Mode mode, double effectiveSourceRateHz, bool autoCompensate,
                     ConcreteFilterModel::Mode filterMode, float filterCutoffHz, float filterResonance01,
                     float filterEnvAmountOctaves, float filterKeyTrack01,
                     ConcreteAmpEnvelopeMode ampEnvelopeMode) noexcept;
@@ -80,6 +81,24 @@ public:
 
     bool isActive() const noexcept { return active; }
     int getCurrentMidiNote() const noexcept { return currentMidiNote; }
+    int getZoneIndex() const noexcept { return playingZoneIndex; }
+
+    // The Sample page's waveform playhead (ConcreteScreen) - this voice's current position within
+    // its own zone, as a 0..1 fraction of [zone start, zone end). Purely a UI display query, meant
+    // to be called from a UI timer rather than the audio thread: pitchEngines[0].getSourcePhase()
+    // is a plain double with no synchronization here, so a torn/stale read is at worst one
+    // visually-glitched frame, self-correcting the next timer tick - never a real-time-safety or
+    // playback-correctness concern, since nothing about actual audio rendering reads this. Returns
+    // -1 if this voice isn't currently active (nothing to show).
+    float getPlaybackProgress01() const noexcept
+    {
+        if (!active || zone == nullptr)
+            return -1.0f;
+        const auto span = (double) zoneEndSample - (double) zone->start;
+        if (span <= 0.0)
+            return -1.0f;
+        return (float) juce::jlimit(0.0, 1.0, (pitchEngines[0].getSourcePhase() - (double) zone->start) / span);
+    }
 
     // The zone's output destination (for ConcreteBusRouter) - 0 (main bus) if no zone is
     // currently assigned. See PluginProcessor::processBlock() for how this is used.
@@ -94,11 +113,40 @@ public:
     // - dropping the right channel there would fail exactly the case the plan calls out).
     void renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) noexcept;
 
+    // Called once per host block (not per MIDI segment) for every ACTIVE voice, from
+    // PluginProcessor::processBlock() - the ONE deliberate exception to "everything is snapshotted
+    // once at startNote() and held fixed" (see this class's own header comment above). A voice
+    // that's currently looping reads as an open-ended, continuously-playing sound rather than a
+    // one-shot capture, so two things about it are meant to be genuinely live instead of frozen:
+    // turning Loop off should actually stop it from looping (rather than silently doing nothing,
+    // a real reported bug), and changing machines should actually retune its character instead of
+    // it staying stuck on whichever machine was selected when it started.
+    //
+    // `liveZone` is the CURRENT published zone for whatever note this voice is playing - the
+    // caller resolves it via ConcreteSampleSet::lookup(getCurrentMidiNote(), ...), the same
+    // "resolve by note, not a cached index" pattern ConcreteScreen already uses, since a zone-list
+    // mutation (a pad's sample being cleared, a new main sample loaded) can shift indices out from
+    // under a raw one; pass nullptr if that note no longer resolves to any zone at all. The
+    // live*In arguments are the CURRENT machine-derived settings (pitch engine mode, effective
+    // source rate, filter model, amp envelope mode) - everything else a machine sets
+    // (bitDepth/quantizer/captureTranspose) bakes into the buffer offline instead and deliberately
+    // does NOT reach an already-playing voice, unchanged from Architecture #2's "a background
+    // reload can't invalidate the buffer this voice is reading from."
+    //
+    // A voice that isn't currently looping (liveZone == nullptr, or its own loopEnabled is false)
+    // only has its loop-tracking state updated - none of the live*In machine parameters apply,
+    // preserving the normal "snapshotted at note-on" behavior for every ordinary one-shot/gated
+    // note exactly as before.
+    void refreshLiveLoopState(const ConcreteSampleZone* liveZone, ConcretePitchEngine::Mode livePitchMode,
+                               double liveEffectiveSourceRateHz, ConcreteFilterModel::Mode liveFilterMode,
+                               ConcreteAmpEnvelopeMode liveAmpEnvelopeMode) noexcept;
+
 private:
     double sampleRate = 44100.0;
 
     ConcreteSampleSet::Ptr sampleSet; // keeps zone->buffer alive for the whole note
     const ConcreteSampleZone* zone = nullptr;
+    int playingZoneIndex = -1; // see getZoneIndex()'s own comment
     int currentMidiNote = -1;
     bool active = false;
 
@@ -110,6 +158,14 @@ private:
     double pitchRatio = 1.0;
     double effectiveSourceRateHz = 44100.0;
     juce::int64 zoneEndSample = 0;
+
+    // Live loop-tracking state (see refreshLiveLoopState()'s own comment) - seeded from the
+    // zone's own values at startNote() so a voice that starts already-looping works correctly even
+    // before the first refresh call, then kept in sync with whatever the CURRENT published zone
+    // says every block after that, unlike everything else on this voice.
+    bool liveLoopEnabled = false;
+    juce::int64 liveLoopStart = 0;
+    juce::int64 liveLoopEnd = 0;
 
     float velocityGain = 1.0f;
     juce::ADSR adsr;

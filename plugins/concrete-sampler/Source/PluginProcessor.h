@@ -152,6 +152,15 @@ public:
     // be working." See ConcreteSampleZone::level.
     void setLevelForZone(int zoneIndex, float newLevel);
 
+    // Same zone-list-state category as setLevelForZone() above - the Sample page's Coarse (whole-
+    // ish semitones, see ConcreteVoice::startNote()'s own comment on rounding) and Fine (cents)
+    // fields. Used to be a pair of global APVTS parameters applied identically to every zone - a
+    // real reported bug, since tuning one pad's sample silently retuned every other pad's and the
+    // main sample's pitch too (Coarse/Fine simply weren't "which sample" aware at all). Now genuine
+    // per-zone state, exactly like Root/One-Shot/Loop/Volume already were.
+    void setCoarseTuneForZone(int zoneIndex, float newTuneSemitones);
+    void setFineTuneForZone(int zoneIndex, float newFineTuneCents);
+
     // Re-reads a zone's source from a new location (Architecture #2's relocate case) and
     // republishes, preserving that zone's other fields.
     bool relocateZone(int zoneIndex, const juce::File& newFile);
@@ -166,6 +175,21 @@ public:
     // playback, the editor's waveform display, and tests. See currentSampleSet's own comment for
     // the locking rationale.
     ConcreteSampleSet::Ptr getCurrentSampleSet() const;
+
+    // The Sample page's waveform playhead (ConcreteScreen) - the playback progress (0..1 within
+    // the zone's own start/end) of whichever active voice is currently playing this zone index, or
+    // -1 if none is. Called from a UI timer, not the audio thread - see ConcreteVoice::
+    // getPlaybackProgress01()'s own comment on why an unsynchronized read here is fine. If more
+    // than one voice happens to be playing the same zone at once (the same whole-keyboard main
+    // sample played across several notes), this just returns whichever one is found first - exact
+    // fidelity for that rare case isn't worth the extra bookkeeping for a display-only feature.
+    float getPlaybackProgressForZone(int zoneIndex) const noexcept
+    {
+        for (auto& voice : voices)
+            if (voice.isActive() && voice.getZoneIndex() == zoneIndex)
+                return voice.getPlaybackProgress01();
+        return -1.0f;
+    }
 
     // Thread-safe snapshot of the RAW (never capture-pass-baked) sample set - see rawSampleSet's
     // own comment. Exposed for tests that need to inspect source-space zone metadata directly.
@@ -219,11 +243,14 @@ public:
 
     // Phase 2's first real automatable parameters. pitchEngineMode's raw value is the choice
     // INDEX (0..3) as a float - see pitchEngineModeFromParam() for the ConcretePitchEngine::Mode
-    // conversion. baseRate is in Hz; coarseTune in semitones; fineTune in cents.
+    // conversion. baseRate is in Hz. Coarse/Fine tune used to live here too (global APVTS
+    // parameters applied identically to every zone) - a real reported bug, since retuning one
+    // pad's sample silently retuned every other pad's and the main sample's pitch too. They're now
+    // genuine per-zone state instead (ConcreteSampleZone::tuneSemitones/fineTuneCents), mutated via
+    // setCoarseTuneForZone()/setFineTuneForZone() below, the same publish-a-new-zone-list pattern
+    // as setLevelForZone()/setRootNoteForZone().
     static constexpr auto pitchEngineModeParamID = "pitchEngineMode";
     static constexpr auto baseRateParamID = "baseRate";
-    static constexpr auto coarseTuneParamID = "coarseTune";
-    static constexpr auto fineTuneParamID = "fineTune";
 
     // Phase 3's quantization stage (see ConcreteQuantizer.h). bitDepth is the storage word width
     // in bits, 1-16. quantizerMode's raw value is the choice INDEX (0=Linear, 1=Companded) as a
@@ -394,8 +421,6 @@ private:
 
     std::atomic<float>* pitchEngineModeParam = nullptr;
     std::atomic<float>* baseRateParam = nullptr;
-    std::atomic<float>* coarseTuneParam = nullptr;
-    std::atomic<float>* fineTuneParam = nullptr;
     std::atomic<float>* bitDepthParam = nullptr;
     std::atomic<float>* quantizerModeParam = nullptr;
     std::atomic<float>* captureTransposeParam = nullptr;

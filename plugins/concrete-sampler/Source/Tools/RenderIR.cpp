@@ -36,8 +36,11 @@
 // native units, applied via setValueNotifyingHost() BEFORE the note-on so a voice starting picks
 // them up - matches every other plugin's RenderIR convention in this catalog. Phase 2 adds
 // pitchEngineMode (0=Reference, 1=Mode A, 2=Mode B, 3=Mode C - the same index order as the
-// AudioParameterChoice), baseRate (Hz), coarseTune (semitones), fineTune (cents). Phase 3 adds
-// bitDepth (1-16) and quantizerMode (0=Linear, 1=Companded). Phase 4 adds captureTranspose
+// AudioParameterChoice), baseRate (Hz). coarseTune (semitones)/fineTune (cents) are NOT APVTS
+// parameters (they're per-zone state - see PluginProcessor::setCoarseTuneForZone()'s own comment)
+// but are still accepted as flags here, applied to zone 0 right after --sample loads it instead of
+// through the generic loop above. Phase 3 adds bitDepth (1-16) and quantizerMode (0=Linear,
+// 1=Companded). Phase 4 adds captureTranspose
 // (semitones), captureDrive (dB), captureAutoCompensate (0/1), captureBypass (0/1), and
 // captureIterations (1-4). Capture-pass parameters are applied (via setValueNotifyingHost(),
 // same as every other flag here) BEFORE --sample is loaded, so the sample's initial bake already
@@ -92,8 +95,6 @@ namespace
         ConcreteAudioProcessor::machineParamID,
         ConcreteAudioProcessor::pitchEngineModeParamID,
         ConcreteAudioProcessor::baseRateParamID,
-        ConcreteAudioProcessor::coarseTuneParamID,
-        ConcreteAudioProcessor::fineTuneParamID,
         ConcreteAudioProcessor::bitDepthParamID,
         ConcreteAudioProcessor::quantizerModeParamID,
         ConcreteAudioProcessor::captureTransposeParamID,
@@ -216,6 +217,16 @@ int main(int argc, char* argv[])
             std::fprintf(stderr, "Could not load sample \"%s\"\n", sampleIt->second.c_str());
             return 1;
         }
+
+        // coarseTune/fineTune are per-zone state now (see PluginProcessor::setCoarseTuneForZone()'s
+        // own comment), not APVTS parameters like the loop above handles - applied to zone 0 (the
+        // one --sample just loaded) after the fact instead.
+        const auto coarseIt = args.find("coarseTune");
+        if (coarseIt != args.end())
+            processor.setCoarseTuneForZone(0, std::stof(coarseIt->second));
+        const auto fineIt = args.find("fineTune");
+        if (fineIt != args.end())
+            processor.setFineTuneForZone(0, std::stof(fineIt->second));
     }
 
     std::vector<TimedEvent> events;

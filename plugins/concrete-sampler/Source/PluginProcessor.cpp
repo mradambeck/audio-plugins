@@ -107,8 +107,6 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
 
     pitchEngineModeParam = apvts.getRawParameterValue(pitchEngineModeParamID);
     baseRateParam = apvts.getRawParameterValue(baseRateParamID);
-    coarseTuneParam = apvts.getRawParameterValue(coarseTuneParamID);
-    fineTuneParam = apvts.getRawParameterValue(fineTuneParamID);
     bitDepthParam = apvts.getRawParameterValue(bitDepthParamID);
     quantizerModeParam = apvts.getRawParameterValue(quantizerModeParamID);
     captureTransposeParam = apvts.getRawParameterValue(captureTransposeParamID);
@@ -334,20 +332,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
             .withLabel("Hz")
             .withStringFromValueFunction([](float v, int) { return juce::String(juce::roundToInt(v)) + " Hz"; })));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{coarseTuneParamID, 1},
-        "Coarse Tune",
-        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f),
-        0.0f,
-        juce::AudioParameterFloatAttributes().withLabel("st")));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{fineTuneParamID, 1},
-        "Fine Tune",
-        juce::NormalisableRange<float>(-50.0f, 50.0f, 0.1f),
-        0.0f,
-        juce::AudioParameterFloatAttributes().withLabel("ct")));
-
     // Phase 3's quantization stage (see ConcreteQuantizer.h). Default 16-bit/Linear is
     // deliberately transparent - same "no artifacts before the user or a machine preset asks for
     // them" convention as Base Rate's 44.1kHz default above: at 16 bits the quantization noise
@@ -519,6 +503,29 @@ void ConcreteAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // via sampleSetLock, not held during rendering. See currentSampleSet's own comment.
     const auto sampleSet = getCurrentSampleSet();
 
+    // Keeps a currently-looping voice's loop bounds and machine character live rather than frozen
+    // from note-on (see ConcreteVoice::refreshLiveLoopState()'s own comment) - once per block is
+    // plenty responsive (turning Loop off, or switching machines, takes effect within one host
+    // block) and keeps the lookup off the per-sample hot path. Resolves each voice's CURRENT zone
+    // by note (ConcreteSampleSet::lookup(), same as a fresh note-on), not by a cached index, since
+    // a zone-list mutation can shift indices out from under a raw one.
+    {
+        const auto liveMode = pitchEngineModeFromParam(pitchEngineModeParam->load());
+        const auto liveFilterMode = filterModeFromParam(filterModelParam->load());
+        const auto liveAmpEnvelopeMode = ampEnvelopeModeFromParam(ampEnvelopeModeParam->load());
+        for (auto& voice : voices)
+        {
+            if (!voice.isActive())
+                continue;
+
+            const auto liveZoneIndex = sampleSet->lookup(voice.getCurrentMidiNote(), 100);
+            const ConcreteSampleZone* liveZone = liveZoneIndex >= 0 ? &sampleSet->zones[(size_t) liveZoneIndex] : nullptr;
+            const auto liveEffectiveSourceRateHz = (liveMode == ConcretePitchEngine::Mode::reference && liveZone != nullptr)
+                ? liveZone->sourceSampleRate : (double) baseRateParam->load();
+            voice.refreshLiveLoopState(liveZone, liveMode, liveEffectiveSourceRateHz, liveFilterMode, liveAmpEnvelopeMode);
+        }
+    }
+
     int samplePosition = 0;
     auto midiIterator = midiMessages.cbegin();
     const auto midiEnd = midiMessages.cend();
@@ -579,6 +586,24 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
 
         const auto& zone = sampleSet->zones[(size_t) zoneIndex];
 
+        // Retriggering an already-looping note is a toggle-off, not a second overlapping hit -
+        // matches a real hardware sampler pad ("hit it again to stop it") and specifically avoids
+        // stacking a second indefinitely-sustained voice on top of one that's never going to stop
+        // on its own. Scoped to loopEnabled zones only: a normal (non-looping) one-shot that's
+        // still ringing keeps its existing "hit again = retrigger a new voice" behavior, unchanged.
+        // findVoiceForNoteOff() also clears the allocator's own tag for that slot, which is correct
+        // either way here - whether we stop it below or (voice already finished on its own,
+        // isActive() false) just fall through to a fresh start.
+        if (zone.loopEnabled)
+        {
+            const auto existingVoiceIndex = voiceAllocator.findVoiceForNoteOff(note);
+            if (existingVoiceIndex >= 0 && voices[(size_t) existingVoiceIndex].isActive())
+            {
+                voices[(size_t) existingVoiceIndex].stopNote(false, true); // forced, immediate stop
+                return;
+            }
+        }
+
         std::array<bool, maxVoices> isActive{};
         for (int i = 0; i < maxVoices; ++i)
             isActive[(size_t) i] = voices[(size_t) i].isActive();
@@ -606,7 +631,6 @@ void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message,
 
         const auto voiceIndex = voiceAllocator.allocateVoiceForNoteOn(note, zoneIndex, zone.chokeGroup, isActive, activeVoiceLimit);
         voices[(size_t) voiceIndex].startNote(sampleSet, zoneIndex, note, velocity01, mode, effectiveSourceRateHz,
-                                                (int) std::lround(coarseTuneParam->load()), fineTuneParam->load(),
                                                 captureAutoCompensateParam->load() >= 0.5f,
                                                 filterMode, filterCutoffParam->load(), filterResonanceParam->load(),
                                                 filterEnvAmountParam->load(), filterKeyTrackParam->load(),
@@ -767,6 +791,30 @@ void ConcreteAudioProcessor::setLevelForZone(int zoneIndex, float newLevel)
     ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
     newRawSet->zones = existingRaw->zones;
     newRawSet->zones[(size_t) zoneIndex].level = newLevel;
+    publishRawSampleSet(newRawSet);
+}
+
+void ConcreteAudioProcessor::setCoarseTuneForZone(int zoneIndex, float newTuneSemitones)
+{
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
+        return;
+
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].tuneSemitones = newTuneSemitones;
+    publishRawSampleSet(newRawSet);
+}
+
+void ConcreteAudioProcessor::setFineTuneForZone(int zoneIndex, float newFineTuneCents)
+{
+    const auto existingRaw = getRawSampleSet();
+    if (!juce::isPositiveAndBelow(zoneIndex, (int) existingRaw->zones.size()))
+        return;
+
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+    newRawSet->zones[(size_t) zoneIndex].fineTuneCents = newFineTuneCents;
     publishRawSampleSet(newRawSet);
 }
 
