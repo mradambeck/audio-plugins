@@ -570,10 +570,10 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
         const auto& zone = sampleSet->zones[(size_t) displayedZoneIndex];
         g.setColour (lcdInk);
         const auto dashArea = dropzoneArea.reduced (2.0f);
-        // Half the original stroke thickness (1px, was 2px) with the dash marks themselves twice
-        // as long (8px, was 4px) and the gap between them unchanged (3px) - the original 2px/4px/3px
-        // combination read as "bad"/too heavy for a thin dropzone outline.
-        float dashLengths[] { 8.0f, 3.0f };
+        // Half the original stroke thickness (1px, was 2px), dash marks and gaps equal length
+        // (4px/4px, was 4px/3px) - the original 2px/4px/3px combination read as "bad"/too heavy
+        // for a thin dropzone outline.
+        float dashLengths[] { 4.0f, 4.0f };
         juce::Path dashPath;
         dashPath.addRectangle (dashArea);
         juce::PathStrokeType (1.0f).createDashedStroke (dashPath, dashPath, dashLengths, 2);
@@ -597,7 +597,7 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
         // as too heavy here - see the isMissing branch's identical dash treatment above for the
         // exact thickness/dash-length reasoning; the two intentionally stay in sync).
         const auto dashArea = dropzoneArea.reduced (2.0f);
-        float dashLengths[] { 8.0f, 3.0f };
+        float dashLengths[] { 4.0f, 4.0f };
         juce::Path dashPath;
         dashPath.addRectangle (dashArea);
         juce::PathStrokeType (1.0f).createDashedStroke (dashPath, dashPath, dashLengths, 2);
