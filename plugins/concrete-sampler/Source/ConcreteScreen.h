@@ -101,6 +101,11 @@ private:
     juce::Rectangle<float> paintPageChrome(juce::Graphics&, juce::Rectangle<float> content);
 
     void paintBootScreen(juce::Graphics&, juce::Rectangle<float> content);
+    // The missing-file state's "Click to relocate" (see paintSamplePage()'s own comment for why
+    // this UI exists) - opens a file chooser and forwards the result to
+    // ConcreteAudioProcessor::relocateZone().
+    void relocateSample();
+
     void paintSamplePage(juce::Graphics&, juce::Rectangle<float> content);
     void paintMachinePage(juce::Graphics&, juce::Rectangle<float> content);
     void paintFilterPage(juce::Graphics&, juce::Rectangle<float> content);
@@ -152,4 +157,7 @@ private:
 
     bool isDraggingFileOver = false;
     bool isLoading = false;
+
+    std::unique_ptr<juce::FileChooser> fileChooser; // relocateSample()'s own, separate from
+                                                      // PluginEditor's Load-button one
 };

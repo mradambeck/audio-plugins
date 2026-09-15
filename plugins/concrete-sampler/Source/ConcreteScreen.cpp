@@ -548,12 +548,41 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
     }
 
     const auto sampleSet = processor.getCurrentSampleSet();
-    const bool hasSample = sampleSet != nullptr && ! sampleSet->zones.empty()
-                            && sampleSet->zones[0].sourceBuffer != nullptr;
+    const bool hasZone = sampleSet != nullptr && ! sampleSet->zones.empty();
+    const bool isMissing = hasZone && sampleSet->zones[0].sourceMissing;
+    const bool hasSample = hasZone && sampleSet->zones[0].sourceBuffer != nullptr;
 
     if (isLoading)
     {
         paintLoadingOverlay (g, inner, "Loading...");
+    }
+    else if (isMissing)
+    {
+        // concrete-sampler-plugin-plan.md's Phase 8 item 1: "a missing-file state with a relocate
+        // action for a path-only zone whose source has moved... this isn't an edge case" (a
+        // deliberately-unembedded session pointing at a file that's since moved or been deleted).
+        // Same dashed-box language as the empty state, but naming the missing file and making the
+        // whole box a click target - relocateZone() already exists on the processor and already
+        // has its own tests; this is the first UI that reaches it.
+        const auto& zone = sampleSet->zones[0];
+        g.setColour (lcdInk);
+        const auto dashArea = dropzoneArea.reduced (2.0f);
+        float dashLengths[] { 4.0f, 3.0f };
+        juce::Path dashPath;
+        dashPath.addRectangle (dashArea);
+        juce::PathStrokeType (2.0f).createDashedStroke (dashPath, dashPath, dashLengths, 2);
+        g.strokePath (dashPath, juce::PathStrokeType (2.0f));
+
+        auto textArea = dashArea.reduced (12.0f);
+        g.setColour (lcdInk.withAlpha (0.85f));
+        g.setFont (lookAndFeel.getLcdFont (14.0f));
+        g.drawText ("Missing: " + juce::File (zone.sourcePath).getFileName(),
+                     textArea.removeFromTop (textArea.getHeight() * 0.5f), juce::Justification::centredBottom);
+        g.setColour (lcdInk.withAlpha (0.7f));
+        g.setFont (lookAndFeel.getLcdFont (12.0f));
+        g.drawText ("Click to relocate", textArea, juce::Justification::centredTop);
+
+        fieldHitAreas.push_back ({ "relocateSample", dashArea, [this] { relocateSample(); } });
     }
     else if (! hasSample)
     {
@@ -809,8 +838,15 @@ void ConcreteScreen::paintCapturePage (juce::Graphics& g, juce::Rectangle<float>
           { "pitchCompensate", "Pitch Compensate", pitchCompParam->getValue() >= 0.5f ? "On" : "Off" } },
         { { "iterations", "Iterations",
             juce::String (juce::roundToInt (iterationsParam->convertFrom0to1 (iterationsParam->getValue()))) },
+          // concrete-sampler-plugin-plan.md's Phase 8 item 6: "a live payload-size readout beside
+          // it... the size number is the point of the control." The mockup's own "On (large)" is
+          // just a placeholder for where that real number belongs - it has no real audio to size,
+          // this plugin does (getCachedEmbedPayloadSizeBytes(), already kept live on the bake
+          // thread by every publish - see that method's own comment - just never read until now).
           { "saveSample", "Save Sample",
-            processor.getEmbedSamplesOverride() ? "On (large)" : "Off (ref)" } },
+            processor.getEmbedSamplesOverride()
+                ? "On (" + formatMegabytes (processor.getCachedEmbedPayloadSizeBytes()) + ")"
+                : "Off (ref)" } },
     };
     paintFieldGrid (g, area, rows);
 
@@ -1144,4 +1180,26 @@ void ConcreteScreen::loadFile (const juce::File& file)
             self->repaint();
         }
     });
+}
+
+void ConcreteScreen::relocateSample()
+{
+    // The missing-file state's "Click to relocate" (see paintSamplePage()) - relocateZone() is
+    // synchronous (there's no async wrapper the way loadSampleAsync() exists for a fresh load),
+    // which is fine here: this fires rarely (only once a file's gone missing) and is the same
+    // amount of file I/O a normal load already does synchronously via loadSample() internally.
+    fileChooser = std::make_unique<juce::FileChooser> ("Locate the missing sample...", juce::File(), "*.wav;*.aif;*.aiff");
+    juce::Component::SafePointer<ConcreteScreen> safeThis (this);
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                               [safeThis] (const juce::FileChooser& chooser)
+                               {
+                                   auto* self = safeThis.getComponent();
+                                   if (self == nullptr)
+                                       return;
+                                   const auto file = chooser.getResult();
+                                   if (file == juce::File())
+                                       return;
+                                   self->processor.relocateZone (0, file);
+                                   self->repaint();
+                               });
 }
