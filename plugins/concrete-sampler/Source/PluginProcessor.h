@@ -17,6 +17,7 @@
 #include <array>
 #include <functional>
 #include <optional>
+#include <vector>
 
 // Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
 // Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
@@ -227,11 +228,27 @@ public:
     juce::ChangeBroadcaster processorStateBroadcaster;
 
     // Cheap accessor for the embed-toggle's live payload readout - always returns immediately
-    // (never runs encodeZoneAsFlac() on the calling thread). Reflects zones[0] (v1's only zone) as
-    // of the last successful publishSampleSet() call; 0 before any sample is loaded. Updated on the
-    // background bake thread whenever the published sample set changes - see publishSampleSet()'s
-    // own comment - and processorStateBroadcaster fires once the new value is ready.
+    // (never runs encodeZoneAsFlac() on the calling thread). The TOTAL across every zone that
+    // would actually be embedded (see isZoneCachedAsEmbedded() below for the per-zone breakdown -
+    // this used to only ever reflect zones[0], stale since Phase 8's per-pad sample loading added
+    // more zones than that) as of the last successful publishSampleSet() call; 0 before any sample
+    // is loaded. Updated on the background bake thread whenever the published sample set changes -
+    // see publishSampleSet()'s own comment - and processorStateBroadcaster fires once ready.
     juce::int64 getCachedEmbedPayloadSizeBytes() const noexcept { return cachedEmbedPayloadSizeBytes.load(); }
+
+    // Phase 8 plan's "per-zone indicator of whether that zone is embedded or path-referenced" -
+    // whether THIS specific zone ended up embedded (true) or stayed path-only (false) as of the
+    // last bake, replaying ConcreteSampleIO::shouldEmbed()'s own order-dependent cumulative-budget
+    // logic exactly (see recomputeCachedEmbedPayloadSize()) rather than a separate approximation.
+    // A zone can go either way independently of its neighbors once the total size cap is in play -
+    // this is genuinely per-zone state, not derivable from the toggle or the total size alone.
+    // false if zoneIndex is out of range (nothing cached yet, or the zone list has since changed
+    // size) - same cheap, always-returns-immediately guarantee as the total above.
+    bool isZoneCachedAsEmbedded(int zoneIndex) const noexcept
+    {
+        const juce::ScopedLock lock(embedStatusLock);
+        return juce::isPositiveAndBelow(zoneIndex, (int) cachedPerZoneEmbedded.size()) && cachedPerZoneEmbedded[(size_t) zoneIndex];
+    }
 
     // Test/tooling accessors for Phase 6's voice-count limit and choke-group behavior: how many of
     // the fixed voice pool are currently rendering, and whether a specific MIDI note is one of
@@ -466,6 +483,12 @@ private:
 
     // Backing store for getCachedEmbedPayloadSizeBytes() - see that method's own comment.
     std::atomic<juce::int64> cachedEmbedPayloadSizeBytes { 0 };
+
+    // Backing store for isZoneCachedAsEmbedded() - a plain lock rather than another atomic since
+    // it's a whole vector, not a single value; only ever touched from the bake thread (writer) and
+    // the message thread (reader, at paint()-call frequency at most), so contention is a non-issue.
+    mutable juce::CriticalSection embedStatusLock;
+    std::vector<bool> cachedPerZoneEmbedded;
 
     // Counts loadSampleAsync() calls that have launched their background thread but not yet
     // delivered onComplete, so the destructor can wait for them to finish (bounded, same 2-second

@@ -33,6 +33,10 @@ namespace
     const std::array<float, 6> flickerOpacities { 0.0f, 1.0f, 0.15f, 1.0f, 0.4f, 1.0f };
     constexpr double flickerDurationMs = 600.0;
 
+    // How long the "Couldn't load that file" message (loadFile()'s own comment) stays up before
+    // auto-clearing - long enough to actually read, short enough not to feel stuck.
+    constexpr juce::uint32 loadFailedDisplayMs = 2500;
+
     // ---- The ghost logo - identical string/algorithm to BootScreen.tsx's GHOST/isSweepChar/
     // sweepDiagonals/pseudoRandom, translated from the TSX rather than re-derived. ----
     const juce::StringArray& ghostRows()
@@ -159,6 +163,10 @@ void ConcreteScreen::timerCallback()
 {
     if (! isBooted && elapsedBootMs() >= bootTotalDurationMs)
         isBooted = true;
+    // Auto-clears the "Couldn't load that file" message a few seconds after a failed load (see
+    // loadFile()'s own comment) - it's a one-off notice, not a persistent state to show forever.
+    if (loadFailed && juce::Time::getMillisecondCounter() - loadFailedAtMs > loadFailedDisplayMs)
+        loadFailed = false;
     repaint();
 }
 
@@ -559,6 +567,16 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
     {
         paintLoadingOverlay (g, inner, "Loading...");
     }
+    else if (loadFailed)
+    {
+        // Plain, non-flickering - unlike isLoading above, this is a COMPLETED failure, not
+        // something in progress, so the boot-flicker treatment paintLoadingOverlay() uses would
+        // send the wrong signal. Shows regardless of whatever sample state was on screen before
+        // the failed load (see this member's own .h comment).
+        g.setColour (lcdInk.withAlpha (0.8f));
+        g.setFont (lookAndFeel.getLcdFont (14.0f));
+        g.drawText ("Couldn't load that file", inner, juce::Justification::centred);
+    }
     else if (isMissing)
     {
         // concrete-sampler-plugin-plan.md's Phase 8 item 1: "a missing-file state with a relocate
@@ -627,10 +645,19 @@ void ConcreteScreen::paintSamplePage (juce::Graphics& g, juce::Rectangle<float> 
                                                                * (juce::int64) zone.sourceBuffer->getNumChannels()
                                                                * (int) sizeof (float)));
 
+        // Per-zone embed status (Phase 8 plan's "per-zone indicator of whether that zone is
+        // embedded or path-referenced") - only meaningful when there's an actual file path to
+        // compare against; a path-less zone already reads "(embedded)" as its filename above, so
+        // there's nothing else to report for it. Prefixed rather than appended so a long filename's
+        // own ellipsis truncation (drawText's default) can't swallow it.
+        const auto embedStatusPrefix = zone.sourcePath.isNotEmpty()
+            ? juce::String (processor.isZoneCachedAsEmbedded (displayedZoneIndex) ? "(Embedded) " : "(Path) ")
+            : juce::String();
+
         g.setColour (lcdInk);
         g.setFont (lookAndFeel.getLcdFont (14.0f));
         auto fileNameLine = playerArea.removeFromTop (14.0f * 1.2f);
-        g.drawText ("Sample: " + fileName + " - " + sizeText, fileNameLine, juce::Justification::centredLeft);
+        g.drawText ("Sample: " + embedStatusPrefix + fileName + " - " + sizeText, fileNameLine, juce::Justification::centredLeft);
         playerArea.removeFromTop (4.0f);
 
         constexpr float waveformHeight = 40.0f;
@@ -1267,15 +1294,27 @@ void ConcreteScreen::loadFile (const juce::File& file)
     // no reference back to the processor, and juce::Component::SafePointer below for the matching
     // guard on this component's own side.
     isLoading = true;
+    loadFailed = false; // clear any earlier failure message - this is a fresh attempt
     repaint();
 
     juce::Component::SafePointer<ConcreteScreen> safeThis (this);
-    processor.loadSampleAsync (file, [safeThis] (bool /*ok*/)
+    processor.loadSampleAsync (file, [safeThis] (bool ok)
     {
         if (auto* self = safeThis.getComponent())
         {
             self->isLoading = false;
-            self->selectedFieldId = "root"; // matches useSample.tsx's loadFile() reset
+            // `ok` used to be ignored entirely here - a load failure (an extension that slipped
+            // past isInterestedInFileDrag's own filter, a corrupt/unreadable file, an unsupported
+            // codec inside a valid container) just silently left whatever was already loaded (or
+            // the empty state) showing, with no indication anything had even been attempted. Phase
+            // 8's plan explicitly calls for an error state here.
+            if (ok)
+                self->selectedFieldId = "root"; // matches useSample.tsx's loadFile() reset
+            else
+            {
+                self->loadFailed = true;
+                self->loadFailedAtMs = juce::Time::getMillisecondCounter();
+            }
             self->repaint();
         }
     });

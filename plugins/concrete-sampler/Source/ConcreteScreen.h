@@ -186,6 +186,15 @@ private:
     bool isDraggingFileOver = false;
     bool isLoading = false;
 
+    // Phase 8 plan's "error state for unsupported files" - loadFile()'s async completion sets
+    // this when loadSampleAsync() reports failure (a load that never even reaches a real zone:
+    // an extension that slipped past isInterestedInFileDrag's own filter, a corrupt file, an
+    // unsupported codec inside a valid container), auto-cleared by timerCallback() after
+    // loadFailedDisplayMs. Checked ahead of isMissing/hasSample in paintSamplePage() so it shows
+    // regardless of whatever sample state was already on screen when the failed load happened.
+    bool loadFailed = false;
+    juce::uint32 loadFailedAtMs = 0;
+
     std::unique_ptr<juce::FileChooser> fileChooser; // relocateSample()'s own, separate from
                                                       // PluginEditor's Load-button one
 };

@@ -403,6 +403,36 @@ public:
             padFile.deleteFile();
         }
 
+        beginTest("Embed payload size and per-zone embed status track EVERY zone, not just the main one (Phase 8)");
+        {
+            const auto mainFile = writeTempSineWav(440.0, 0.05); // tiny - trivially under the embed cap
+            const auto padFile = writeTempSineWav(880.0, 0.05);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            expect(processor.loadSample(mainFile));
+            expect(processor.assignSampleToPad(48, padFile));
+
+            // recomputeCachedEmbedPayloadSize() runs on the background bake thread - poll for it
+            // to settle (woken by both publishSampleSet() calls above) rather than assuming any
+            // particular timing, same convention as this project's other async-completion tests.
+            juce::int64 totalBytes = 0;
+            for (int i = 0; i < 200 && totalBytes <= 0; ++i)
+            {
+                juce::Thread::sleep(10);
+                totalBytes = processor.getCachedEmbedPayloadSizeBytes();
+            }
+
+            expect(totalBytes > 0, "the total must reflect real encoded data once the background recompute settles");
+            expect(processor.isZoneCachedAsEmbedded(0),
+                   "the main zone must be reported as embedded - it trivially fits the size cap");
+            expect(processor.isZoneCachedAsEmbedded(1),
+                   "the pad's own zone must ALSO be reported as embedded - this used to be silently "
+                   "ignored entirely (the total, and every per-zone query, only ever looked at zones[0])");
+
+            mainFile.deleteFile();
+            padFile.deleteFile();
+        }
+
         beginTest("Save state, reload into a fresh processor, render again: numerically identical output");
         {
             const auto file = writeTempSineWav(1234.0, 0.5);

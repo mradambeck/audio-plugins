@@ -255,11 +255,33 @@ void ConcreteAudioProcessor::run()
 
 void ConcreteAudioProcessor::recomputeCachedEmbedPayloadSize()
 {
+    // Replays ConcreteSampleIO::shouldEmbed()'s own order-dependent cumulative-budget logic
+    // exactly (the same one zoneToValueTree() uses at actual save time), zone by zone, so both the
+    // total (getCachedEmbedPayloadSizeBytes()) and the per-zone breakdown
+    // (isZoneCachedAsEmbedded()) stay consistent with what a real save would actually produce -
+    // used to only ever look at zones[0], stale since per-pad sample loading added more zones than
+    // that.
     const auto set = getCurrentSampleSet();
-    const juce::int64 size = (set != nullptr && !set->zones.empty())
-                                  ? (juce::int64) ConcreteSampleIO::encodeZoneAsFlac(set->zones[0]).getSize()
-                                  : (juce::int64) 0;
-    cachedEmbedPayloadSizeBytes = size;
+    juce::int64 totalEmbeddedBytes = 0;
+    std::vector<bool> perZoneEmbedded;
+    if (set != nullptr)
+    {
+        perZoneEmbedded.reserve(set->zones.size());
+        for (const auto& zone : set->zones)
+        {
+            const auto flacBytes = (juce::int64) ConcreteSampleIO::encodeZoneAsFlac(zone).getSize();
+            const bool embedded = ConcreteSampleIO::shouldEmbed(flacBytes, totalEmbeddedBytes, embedSamplesOverride);
+            perZoneEmbedded.push_back(embedded);
+            if (embedded)
+                totalEmbeddedBytes += flacBytes;
+        }
+    }
+
+    cachedEmbedPayloadSizeBytes = totalEmbeddedBytes;
+    {
+        const juce::ScopedLock lock(embedStatusLock);
+        cachedPerZoneEmbedded = std::move(perZoneEmbedded);
+    }
     processorStateBroadcaster.sendChangeMessage();
 }
 
