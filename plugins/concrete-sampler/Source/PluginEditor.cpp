@@ -195,6 +195,12 @@ void ConcreteEditorContent::timerCallback()
     loopButton.repaint();
     resampleButton.repaint();
     loadClearButton.repaint();
+    // Same reasoning as the buttons above - its value depends on whichever zone the LCD screen is
+    // currently displaying (see sampleVolumeFader's own getValue lambda), which changes from a pad
+    // trigger, not just from dragging this fader itself. Missing here meant the fader kept showing
+    // whichever pad's level was last displayed until you happened to touch it again - reported by
+    // Adam ("click on a different sample... it stays at 25%").
+    sampleVolumeFader.repaint();
 }
 
 void ConcreteEditorContent::paint(juce::Graphics& g)
