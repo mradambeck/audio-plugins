@@ -650,6 +650,71 @@ void ConcreteAudioProcessor::loadSampleAsync(const juce::File& file, std::functi
     });
 }
 
+bool ConcreteAudioProcessor::assignSampleToPad(int midiNote, const juce::File& file)
+{
+    auto zone = ConcreteSampleIO::loadZoneFromFile(formatManager, file, midiNote);
+    if (zone.sourceMissing)
+        return false;
+
+    // A pad's own zone: exactly one key, "its own independent sample" rather than a repitch of
+    // the main one (see assignSampleToPad()'s own header comment) - keyLo==keyHi is also how this
+    // zone is later found again (to replace or clear it) and how ConcretePadGrid tells a pad's own
+    // zone apart from the main whole-keyboard one when painting the "has its own sample" indicator.
+    zone.keyLo = midiNote;
+    zone.keyHi = midiNote;
+    zone.oneShot = true;
+
+    const auto existingRaw = getRawSampleSet();
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    newRawSet->zones = existingRaw->zones;
+
+    bool replaced = false;
+    for (auto& existingZone : newRawSet->zones)
+    {
+        if (existingZone.keyLo == midiNote && existingZone.keyHi == midiNote)
+        {
+            existingZone = zone;
+            replaced = true;
+            break;
+        }
+    }
+    if (!replaced)
+        newRawSet->zones.push_back(zone);
+
+    publishRawSampleSet(newRawSet);
+    return true;
+}
+
+void ConcreteAudioProcessor::assignSampleToPadAsync(int midiNote, const juce::File& file, std::function<void(bool)> onComplete)
+{
+    // Same background-thread/callAsync shape as loadSampleAsync() above - see that method's own
+    // comment for why the completion callback captures no reference back to this processor.
+    ++pendingAsyncLoads;
+    juce::Thread::launch([this, midiNote, file, onComplete]
+    {
+        const bool ok = assignSampleToPad(midiNote, file);
+        --pendingAsyncLoads;
+        juce::MessageManager::callAsync([onComplete, ok]
+        {
+            if (onComplete)
+                onComplete(ok);
+        });
+    });
+}
+
+void ConcreteAudioProcessor::clearPadSample(int midiNote)
+{
+    const auto existingRaw = getRawSampleSet();
+    ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+    for (const auto& existingZone : existingRaw->zones)
+        if (!(existingZone.keyLo == midiNote && existingZone.keyHi == midiNote))
+            newRawSet->zones.push_back(existingZone);
+
+    // A no-op republish (identical zone list) is harmless - publishRawSampleSet()/bakeSampleSet()
+    // don't special-case "nothing actually changed", same as every other zone mutator here.
+    publishRawSampleSet(newRawSet);
+}
+
 void ConcreteAudioProcessor::setRootNoteForZone(int zoneIndex, int newRootNote)
 {
     const auto existingRaw = getRawSampleSet();

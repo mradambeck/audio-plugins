@@ -75,7 +75,7 @@ public:
             expectEquals(set.lookup(60, 100), 1, "high velocity should hit the hard layer");
         }
 
-        beginTest("lookup() returns the FIRST matching zone when ranges overlap");
+        beginTest("lookup() returns the FIRST zone when two equally-specific ranges overlap");
         {
             ConcreteSampleSet set;
             ConcreteSampleZone first;
@@ -85,7 +85,39 @@ public:
             set.zones.push_back(first);
             set.zones.push_back(second);
 
-            expectEquals(set.lookup(60, 100), 0, "an overlapping later zone should never be picked over an earlier match");
+            expectEquals(set.lookup(60, 100), 0, "an overlapping later zone of the SAME specificity should never win over an earlier match");
+        }
+
+        beginTest("lookup() prefers the NARROWER zone when a broad and a narrow zone both match (per-pad override)");
+        {
+            // The exact shape PluginProcessor::assignSampleToPad() creates: a per-pad single-note
+            // zone added AFTER the main whole-keyboard zone (so index 0 stays "the" main sample
+            // for every other bit of UI that reads zones[0] directly), which must still win the
+            // lookup for its own note - "most specific mapping wins", not "first in the list wins".
+            ConcreteSampleSet set;
+            ConcreteSampleZone main;
+            main.keyLo = 0; main.keyHi = 127;
+            ConcreteSampleZone padOverride;
+            padOverride.keyLo = 36; padOverride.keyHi = 36;
+            set.zones.push_back(main);
+            set.zones.push_back(padOverride);
+
+            expectEquals(set.lookup(36, 100), 1, "the narrower per-pad zone should win for its own note even though it's later in the list");
+            expectEquals(set.lookup(37, 100), 0, "every other note should still fall back to the main zone");
+        }
+
+        beginTest("lookup() prefers the narrower zone regardless of which one is added first");
+        {
+            ConcreteSampleSet set;
+            ConcreteSampleZone padOverride;
+            padOverride.keyLo = 36; padOverride.keyHi = 36;
+            ConcreteSampleZone main;
+            main.keyLo = 0; main.keyHi = 127;
+            set.zones.push_back(padOverride);
+            set.zones.push_back(main);
+
+            expectEquals(set.lookup(36, 100), 0, "the narrower zone should still win even when it's already first");
+            expectEquals(set.lookup(37, 100), 1, "and the broad zone should still catch everything else");
         }
     }
 };

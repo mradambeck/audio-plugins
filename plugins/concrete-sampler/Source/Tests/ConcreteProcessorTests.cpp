@@ -302,6 +302,76 @@ public:
             file.deleteFile();
         }
 
+        beginTest("assignSampleToPad() gives one pad its own independent sample without disturbing the main one");
+        {
+            const auto mainFile = writeTempSineWav(440.0, 1.0);
+            const auto padFile = writeTempSineWav(880.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+            processor.loadSample(mainFile); // zone 0: root 60, whole keyboard, 440Hz
+
+            expect(processor.assignSampleToPad(48, padFile)); // zone 1: root 48, key 48 only, 880Hz
+            expectEquals((int) processor.getCurrentSampleSet()->zones.size(), 2,
+                         "assigning a pad's own sample should add a second zone, not replace the main one");
+
+            {
+                juce::AudioBuffer<float> buffer(2, 8192);
+                buffer.clear();
+                auto midi = noteOnBuffer(48);
+                processor.processBlock(buffer, midi);
+                const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 880.0f);
+                expectWithinAbsoluteError(measured, 880.0f, 5.0f, "note 48 should now play the pad's own sample at its own root pitch");
+            }
+            {
+                juce::AudioBuffer<float> buffer(2, 8192);
+                buffer.clear();
+                auto midi = noteOnBuffer(60);
+                processor.processBlock(buffer, midi);
+                const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 440.0f);
+                expectWithinAbsoluteError(measured, 440.0f, 5.0f, "every other note should still play the untouched main sample");
+            }
+
+            processor.clearPadSample(48);
+            expectEquals((int) processor.getCurrentSampleSet()->zones.size(), 1,
+                         "clearing a pad's sample should remove its zone, reverting to just the main one");
+            {
+                juce::AudioBuffer<float> buffer(2, 8192);
+                buffer.clear();
+                auto midi = noteOnBuffer(48);
+                processor.processBlock(buffer, midi);
+                // 48 is 12 semitones below the main zone's root (60), so it should now play that
+                // same 440Hz source transposed down an octave, exactly like any other unmapped pad.
+                const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 220.0f);
+                expectWithinAbsoluteError(measured, 220.0f, 5.0f, "note 48 should fall back to the main sample, transposed, once its own zone is cleared");
+            }
+
+            mainFile.deleteFile();
+            padFile.deleteFile();
+        }
+
+        beginTest("assignSampleToPad() replaces, rather than duplicates, an existing zone for the same pad");
+        {
+            const auto padFileA = writeTempSineWav(880.0, 1.0);
+            const auto padFileB = writeTempSineWav(660.0, 1.0);
+            ConcreteAudioProcessor processor;
+            processor.prepareToPlay(44100.0, 512);
+
+            expect(processor.assignSampleToPad(48, padFileA));
+            expect(processor.assignSampleToPad(48, padFileB));
+            expectEquals((int) processor.getCurrentSampleSet()->zones.size(), 1,
+                         "re-assigning the same pad should replace its zone, not add a second one for the same note");
+
+            juce::AudioBuffer<float> buffer(2, 8192);
+            buffer.clear();
+            auto midi = noteOnBuffer(48);
+            processor.processBlock(buffer, midi);
+            const auto measured = estimateFrequencyHz(buffer.getReadPointer(0) + 2048, 4096, 44100.0, 660.0f);
+            expectWithinAbsoluteError(measured, 660.0f, 5.0f, "the pad should now play the most recently assigned sample");
+
+            padFileA.deleteFile();
+            padFileB.deleteFile();
+        }
+
         beginTest("Save state, reload into a fresh processor, render again: numerically identical output");
         {
             const auto file = writeTempSineWav(1234.0, 0.5);

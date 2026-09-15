@@ -12,12 +12,14 @@
 // replaces the throwaway editor's juce::MidiKeyboardComponent - Phase 8's real trigger surface per
 // concrete-sampler-plugin-plan.md.
 //
-// Per-pad sample assignment (drag-and-drop, right-click Load/Clear/Copy/Paste, usePadZones.tsx in
-// the mockup) is NOT built here - the real plugin's zone list is still single-zone in v1
-// (ConcreteSampleZone.h's own comment: "a v1 instance always has exactly one zone"), and
-// ui-plan.md explicitly defers multi-zone editing past Phase 8. Every pad plays the same one zone,
-// transposed - the mockup's own fallback behavior for a pad with no zone of its own.
-class ConcretePadGrid : public juce::Component
+// Per-pad sample assignment (drag-and-drop, right-click Load/Clear/Copy/Paste - see
+// PadContextMenu.tsx/usePadZones.tsx in the mockup) IS built here: a pad with no zone of its own
+// still plays the one main sample, transposed (v1's original, still-default behavior); dropping a
+// file onto a pad (or using its right-click menu's Load...) "promotes" it to an independent
+// one-shot zone via PluginProcessor::assignSampleToPad() - see that method's own comment for how a
+// pad's zone is represented in the real (not mockup-fake) zone list.
+class ConcretePadGrid : public juce::Component,
+                         public juce::FileDragAndDropTarget
 {
 public:
     ConcretePadGrid(ConcreteAudioProcessor& processorIn, ConcreteLookAndFeel& lookAndFeelIn);
@@ -26,6 +28,12 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
+
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void fileDragEnter(const juce::StringArray& files, int x, int y) override;
+    void fileDragMove(const juce::StringArray& files, int x, int y) override;
+    void fileDragExit(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
 
 private:
     static constexpr int padCount = 16;
@@ -41,9 +49,26 @@ private:
     juce::Rectangle<float> padBounds(int index) const noexcept;
 
     void releaseLitPad();
+    void showContextMenu(int index);
+    void loadFileOntoPad(int index);
+
+    // Looks up (via the real ConcreteSampleSet::lookup(), the same resolution a note-on actually
+    // uses) whether this pad's note currently resolves to a zone of its own (keyLo==keyHi==that
+    // note) rather than the inherited main zone - and if so, that zone's own file name. Returns an
+    // empty string when the pad has no zone of its own.
+    juce::String ownZoneFileNameForPad(int index) const;
 
     ConcreteAudioProcessor& processor;
     ConcreteLookAndFeel& lookAndFeel;
 
     int litPadIndex = -1;
+    int dragOverPadIndex = -1;
+
+    // Copy/Paste's "clipboard" is just the last-copied pad's own source file path - pasting
+    // re-loads from that same path onto the target pad rather than duplicating any in-memory
+    // audio data, matching how Load... already works and avoiding a second in-memory-clone code
+    // path that would only ever be exercised by Paste.
+    juce::File clipboardFile;
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
 };

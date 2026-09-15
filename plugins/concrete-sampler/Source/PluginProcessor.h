@@ -85,6 +85,24 @@ public:
     // load, so there's no separate "empty" code path to get wrong.
     void clearSample() { publishRawSampleSet(ConcreteSampleSet::Ptr(new ConcreteSampleSet())); }
 
+    // Per-pad sample loading (ConcretePadGrid's drag-and-drop / right-click Load...) - "add zones
+    // and each pad simply resolves to a different one through the same lookup"
+    // (concrete-sampler-plugin-plan.md's Phase 8 item 3). Builds a single-note zone (keyLo==keyHi
+    // ==midiNote, one-shot - a pad's own independent sample, not a repitch of the main one) and
+    // adds/replaces it in the raw zone list; ConcreteSampleSet::lookup()'s narrowest-range-wins
+    // rule makes it take priority over the main (whole-keyboard) zone for that one note without
+    // that zone ever needing to know this exists. A pad with no zone of its own keeps inheriting
+    // the main sample, transposed, exactly like v1 always has. Returns false (no change made) if
+    // the file can't be read. Not real-time safe - same caller obligation as loadSample() above;
+    // assignSampleToPadAsync() is the message-thread-safe entry point real UI code should use.
+    bool assignSampleToPad(int midiNote, const juce::File& file);
+    void assignSampleToPadAsync(int midiNote, const juce::File& file, std::function<void(bool)> onComplete);
+
+    // Removes a pad's own zone (if any), reverting it to inheriting the main sample - a no-op if
+    // that pad has no zone of its own. See assignSampleToPad()'s own comment for how a pad's zone
+    // is identified (keyLo==keyHi==midiNote).
+    void clearPadSample(int midiNote);
+
     // Changes the (only, in v1) zone's root note and republishes - see Architecture #1: this is
     // zone-list state, not an APVTS parameter.
     void setRootNoteForZone(int zoneIndex, int newRootNote);

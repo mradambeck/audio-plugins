@@ -4,6 +4,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <limits>
 #include <vector>
 
 // The zone list a ConcreteAudioProcessor plays through - see concrete-sampler-plugin-plan.md's
@@ -28,15 +29,32 @@ public:
 
     std::vector<ConcreteSampleZone> zones;
 
-    // Index of the first zone whose key/velocity range contains (midiNote, velocity), or -1 if
-    // none matches. v1 has exactly one zone spanning the whole keyboard, so this is trivially
-    // satisfied - but it's a real lookup, not a hardcoded buffer access, so multi-zone kits are a
-    // data change only (see Architecture #1).
+    // Index of the NARROWEST-ranged zone whose key/velocity range contains (midiNote, velocity),
+    // or -1 if none matches - "most specific mapping wins", the standard convention when a sampler
+    // lets zones overlap (Kontakt/EXS24/etc). Ties (equal range size) go to the first (lowest-
+    // index) match - see ConcreteSampleSetTests.cpp's "returns the FIRST matching zone when ranges
+    // overlap" for the pinned case this preserves. This is what lets a per-pad override (Phase 8's
+    // per-pad sample loading - see PluginProcessor::assignSampleToPad(), a single-note keyLo==keyHi
+    // zone) take priority over the v1 main zone's whole-keyboard range for that one note, while
+    // leaving v1's own single-zone behavior (only one candidate, so this is trivially satisfied)
+    // and every existing multi-zone test (non-overlapping kick/snare-style ranges, where each note
+    // still only has exactly one candidate) completely unchanged.
     int lookup(int midiNote, int velocity) const noexcept
     {
+        int bestIndex = -1;
+        int bestRangeSize = std::numeric_limits<int>::max();
         for (int i = 0; i < (int) zones.size(); ++i)
-            if (zones[(size_t) i].matches(midiNote, velocity))
-                return i;
-        return -1;
+        {
+            const auto& zone = zones[(size_t) i];
+            if (!zone.matches(midiNote, velocity))
+                continue;
+            const auto rangeSize = (zone.keyHi - zone.keyLo + 1) * (zone.velHi - zone.velLo + 1);
+            if (rangeSize < bestRangeSize)
+            {
+                bestRangeSize = rangeSize;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 };
