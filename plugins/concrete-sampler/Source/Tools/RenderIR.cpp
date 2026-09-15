@@ -48,7 +48,8 @@
 // 1=Contoured - see ConcreteContourEnvelope.h). Phase 7 adds machine (0="(Custom)"/no-op, 1-12
 // select getConcreteMachines()[0-11] in table order - see ConcreteMachines.h and
 // ConcreteAudioProcessor::machineParamID), applied before every other flag above so an explicit
-// flag for one of the params a machine also sets still wins.
+// flag for one of the params a machine also sets still wins. Phase 8 adds masterVolume (0.0-1.2
+// linear gain, 1.0 = unity - see ConcreteAudioProcessor::masterVolumeParamID).
 namespace
 {
     std::map<std::string, std::string> parseArgs(int argc, char* argv[])
@@ -107,6 +108,7 @@ namespace
         ConcreteAudioProcessor::filterKeyTrackParamID,
         ConcreteAudioProcessor::voiceCountParamID,
         ConcreteAudioProcessor::ampEnvelopeModeParamID,
+        ConcreteAudioProcessor::masterVolumeParamID,
     };
 
     struct TimedEvent

@@ -464,6 +464,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConcreteAudioProcessor::crea
         "Machine",
         machineChoices, 0));
 
+    // Phase 8's Master Volume - see masterVolumeParamID's own comment for why this is a real
+    // parameter (host-automatable/session-saved) rather than zone-list state like Sample Volume.
+    // Range/default matches ConcreteSampleZone::level's own linear-gain convention (1.0 = unity).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{masterVolumeParamID, 1},
+        "Master Volume",
+        juce::NormalisableRange<float>(0.0f, 1.2f),
+        1.0f,
+        juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+            [](float v, int) { return juce::String(juce::roundToInt(v * 100.0f)) + "%"; })));
+
     return { params.begin(), params.end() };
 }
 
@@ -536,6 +547,15 @@ void ConcreteAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
 
         samplePosition = segmentEnd;
     }
+
+    // Phase 8's Master Volume (see masterVolumeParamID's own comment) - a flat block-level gain
+    // applied once after every voice has rendered, same "no smoothing" simplicity as
+    // ConcreteVoice's own zone->level multiply (see ConcreteVoice.cpp) rather than a ramped
+    // juce::dsp::Gain - consistent with how little of this signal path smooths anything today, and
+    // a plain fader isn't the kind of control that gets clicked while a note is already ringing
+    // the way a filter cutoff sweep might.
+    if (auto* masterVolumeParam = apvts.getRawParameterValue(masterVolumeParamID))
+        buffer.applyGain(masterVolumeParam->load());
 }
 
 void ConcreteAudioProcessor::handleMidiMessage(const juce::MidiMessage& message, const ConcreteSampleSet::Ptr& sampleSet) noexcept

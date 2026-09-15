@@ -252,6 +252,16 @@ public:
     // factoryPresets.setCurrentProgram() - see that method's own comment.
     static constexpr auto machineParamID = "machine";
 
+    // Phase 8's Master Volume - the panel's overall output level (see ConcreteFader in the
+    // editor), as opposed to Sample Volume (setLevelForZone() above, a per-zone gain baked into
+    // that zone's own playback, not the whole mix). A real automatable/host-saved parameter, not
+    // zone-list state like Sample Volume - it isn't a property of any one sample the way a zone's
+    // own level is, it's closer to "how loud is this instance," which every DAW expects to be
+    // able to automate/recall like any other output-gain control. Range/default (0.0-1.2, 1.0 =
+    // unity) matches ConcreteSampleZone::level's own linear-gain convention exactly, so both
+    // volumes share the same "100% displayed = 1.0x applied" arithmetic in the UI.
+    static constexpr auto masterVolumeParamID = "masterVolume";
+
     // Synchronously re-derives every zone's working buffer from its source buffer using the
     // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
     // private juce::Thread override below) runs this same logic asynchronously whenever a capture-

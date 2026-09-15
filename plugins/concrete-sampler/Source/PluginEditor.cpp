@@ -54,9 +54,21 @@ ConcreteEditorContent::ConcreteEditorContent(ConcreteAudioProcessor& p)
                          },
                          [this](float v) { processor.setLevelForZone(0, v / 100.0f); },
                          [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
+      // Real masterVolumeParamID (see that constant's own comment) - a host-automatable output
+      // gain, unlike Sample Volume's zone-list state above, wired the same convertFrom0to1/
+      // convertTo0to1 way ConcreteScreen's own adjustParam() reads/writes every plain
+      // AudioParameterFloat on the LCD pages.
       masterVolumeFader(lookAndFeel, "Master", 0.0f, 120.0f,
-                         [this] { return masterVolumePercent; },
-                         [this](float v) { masterVolumePercent = juce::jlimit(0.0f, 120.0f, v); },
+                         [this]
+                         {
+                             auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::masterVolumeParamID);
+                             return param->convertFrom0to1(param->getValue()) * 100.0f;
+                         },
+                         [this](float v)
+                         {
+                             auto* param = processor.apvts.getParameter(ConcreteAudioProcessor::masterVolumeParamID);
+                             param->setValueNotifyingHost(param->convertTo0to1(v / 100.0f));
+                         },
                          [](float v) { return juce::String(juce::roundToInt(v)) + "%"; }),
       machineSelector(p, lookAndFeel),
       directionalPad(lookAndFeel),

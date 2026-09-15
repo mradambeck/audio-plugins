@@ -67,13 +67,9 @@ private:
     ConcreteKnob resonanceKnob;
     ConcreteFader sampleVolumeFader;
 
-    // Panel.tsx's own useVolume() masterVolume - purely local UI state. Unlike Sample Volume
-    // (now backed by the zone's own real `level` field - see PluginProcessor::setLevelForZone),
-    // there's no output-gain stage anywhere in the signal path for Master to drive - see
-    // useVolume.tsx's own comment: "Master isn't machine/preset state... it doesn't mark the
-    // machine dirty the way Sample Volume does." Wiring a real output-gain DSP stage to this is
-    // later work.
-    float masterVolumePercent = 100.0f;
+    // Backed by the real masterVolumeParamID APVTS parameter (see that constant's own comment in
+    // PluginProcessor.h for why this is a real automatable/session-saved parameter rather than
+    // zone-list state like Sample Volume) - applied as an output gain in processBlock().
     ConcreteFader masterVolumeFader;
 
     ConcreteMachineSelector machineSelector;
