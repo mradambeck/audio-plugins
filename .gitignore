@@ -54,3 +54,10 @@ Icon?
 installers/stage/
 installers/output/
 *.pkg
+
+# Hardware IR captures. These are recordings of commercial hardware, not source, and the ml-toolkit
+# already keeps its own captures out of git (ml-toolkit/.gitignore > effects/*/captures/). This
+# makes the per-plugin convention match. NOTE: untracking only stops FUTURE commits -- the 19
+# NonLin captures added in 77824fe are still present in this repo's history and this repo is
+# public, so they remain fetchable via `git show`. Removing them for real needs a history rewrite.
+plugins/*/ir-captures/
