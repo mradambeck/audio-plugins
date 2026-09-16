@@ -41,6 +41,8 @@ jobs:
             name: ConcreteProcessor
           - dir: plugins/convolution-base
             name: ConvBase
+          - dir: plugins/inhalt-nonlin
+            name: Inhalt
 
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +87,7 @@ jobs:
           - dir: plugins/aura-reverb
           - dir: plugins/concrete-sampler
           - dir: plugins/convolution-base
+          - dir: plugins/inhalt-nonlin
 
     steps:
       - uses: actions/checkout@v4

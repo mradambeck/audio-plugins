@@ -1,0 +1,179 @@
+#include "../InhaltIRSynth.h"
+
+#include <juce_core/juce_core.h>
+
+#include <cmath>
+#include <numeric>
+
+namespace
+{
+    bool hasNaNOrInf(const std::vector<float>& v)
+    {
+        for (auto x : v)
+            if (! std::isfinite(x))
+                return true;
+        return false;
+    }
+
+    double correlation(const std::vector<float>& a, const std::vector<float>& b)
+    {
+        const auto n = std::min(a.size(), b.size());
+        double meanA = 0.0, meanB = 0.0;
+        for (size_t i = 0; i < n; ++i) { meanA += a[i]; meanB += b[i]; }
+        meanA /= (double) n; meanB /= (double) n;
+
+        double num = 0.0, denomA = 0.0, denomB = 0.0;
+        for (size_t i = 0; i < n; ++i)
+        {
+            const auto da = a[i] - meanA, db = b[i] - meanB;
+            num += da * db;
+            denomA += da * da;
+            denomB += db * db;
+        }
+        const auto denom = std::sqrt(denomA * denomB);
+        return denom > 0.0 ? num / denom : 0.0;
+    }
+}
+
+class InhaltIRSynthTests : public juce::UnitTest
+{
+public:
+    InhaltIRSynthTests() : juce::UnitTest("InhaltIRSynth", "Inhalt") {}
+
+    void runTest() override
+    {
+        constexpr double sampleRate = 44100.0;
+
+        beginTest("A typical render is finite everywhere and produces audible energy");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.8f;
+            params.dampingWeight = 0.4f;
+            params.kneeTimeMs = 150.0f;
+            params.fallRateDbPerSec = -250.0f;
+
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.5 * sampleRate), left, right);
+
+            expect(! hasNaNOrInf(left), "left channel must be finite everywhere");
+            expect(! hasNaNOrInf(right), "right channel must be finite everywhere");
+
+            const auto peakL = *std::max_element(left.begin(), left.end(),
+                [](float a, float b) { return std::abs(a) < std::abs(b); });
+            expect(std::abs(peakL) > 1.0e-4f, "should produce audible energy");
+        }
+
+        beginTest("Left and right channels are genuinely different (delay-set copy-paste guard)");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.8f;
+            params.dampingWeight = 0.4f;
+
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.3 * sampleRate), left, right);
+
+            float maxDiff = 0.0f;
+            for (size_t i = 0; i < left.size(); ++i)
+                maxDiff = std::max(maxDiff, std::abs(left[i] - right[i]));
+            expect(maxDiff > 1.0e-4f, "left and right must not be identical");
+        }
+
+        beginTest("Rendered channels are substantially decorrelated (disjoint delay-set design)");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.85f;
+            params.dampingWeight = 0.4f;
+            params.kneeTimeMs = 300.0f;
+            params.fallRateDbPerSec = -100.0f; // slow fall, so there's plenty of dense signal to correlate
+
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.5 * sampleRate), left, right);
+
+            const auto corr = std::abs(correlation(left, right));
+            expect(corr < 0.3, "L/R correlation should be well below what a shared/split tank would produce");
+        }
+
+        beginTest("The gate crushes energy toward the tail past the knee");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.85f;
+            params.dampingWeight = 0.4f;
+            params.buildUpMs = 3.0f;
+            params.kneeTimeMs = 100.0f;
+            params.fallRateDbPerSec = -400.0f;
+            params.kneeSoftnessMs = 3.0f;
+
+            std::vector<float> left, right;
+            const auto numSamples = (int) (0.5 * sampleRate);
+            inhalt::InhaltIRSynth::render(params, sampleRate, numSamples, left, right);
+
+            auto peakInWindow = [&](double centerSeconds, double windowSeconds)
+            {
+                const auto center = (int) (centerSeconds * sampleRate);
+                const auto half = (int) (windowSeconds * 0.5 * sampleRate);
+                const auto lo = std::max(0, center - half);
+                const auto hi = std::min((int) left.size(), center + half);
+                float peak = 0.0f;
+                for (int i = lo; i < hi; ++i)
+                    peak = std::max(peak, std::abs(left[(size_t) i]));
+                return peak;
+            };
+
+            const auto beforeKnee = peakInWindow(0.06, 0.03);
+            const auto wellPastKnee = peakInWindow(0.45, 0.03);
+            expect(beforeKnee > 0.0f, "should have energy before the knee");
+            expect(wellPastKnee < beforeKnee * 0.1f,
+                "energy well past the knee (with a steep fall rate) should be crushed far below the pre-knee level");
+        }
+
+        beginTest("No inter-sample discontinuity beyond a small tolerance, across the parameter range");
+        {
+            for (float feedbackGain : { 0.1f, 0.5f, inhalt::InhaltIRSynth::maxFeedbackGain })
+            {
+                for (float fallRate : { -20.0f, -500.0f, -2000.0f })
+                {
+                    inhalt::InhaltIRSynth::Params params;
+                    params.feedbackGain = feedbackGain;
+                    params.dampingWeight = 0.4f;
+                    params.fallRateDbPerSec = fallRate;
+                    params.kneeTimeMs = 100.0f;
+
+                    std::vector<float> left, right;
+                    inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.3 * sampleRate), left, right);
+
+                    float maxStep = 0.0f;
+                    for (size_t i = 1; i < left.size(); ++i)
+                        maxStep = std::max(maxStep, std::abs(left[i] - left[i - 1]));
+                    // A generous bound - this guards against a genuine discontinuity bug (a NaN
+                    // sanitisation glitch, an off-by-one in the gate formula), not against the
+                    // FDN's own normal sample-to-sample variation, which at these delay lengths
+                    // and gains can legitimately be large right at the impulse's first arrivals.
+                    expect(maxStep < 2.0f, "no single-sample jump should exceed a generous bound");
+                }
+            }
+        }
+
+        beginTest("feedbackGain/dampingWeight are clamped to their documented ceilings even if given out-of-range input");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 5.0f;   // well past maxFeedbackGain
+            params.dampingWeight = 5.0f;  // well past maxDampingWeight
+
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.2 * sampleRate), left, right);
+
+            expect(! hasNaNOrInf(left), "clamped feedback gain should still produce a finite, stable render");
+            expect(! hasNaNOrInf(right), "clamped feedback gain should still produce a finite, stable render");
+        }
+
+        beginTest("Rendering zero samples is a safe no-op");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, 0, left, right);
+            expect(left.empty() && right.empty(), "zero-length render should produce empty buffers");
+        }
+    }
+};
+
+static InhaltIRSynthTests inhaltIRSynthTests;

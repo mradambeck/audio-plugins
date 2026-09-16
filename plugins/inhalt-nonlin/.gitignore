@@ -1,0 +1,4 @@
+# Offline render-harness output (InhaltRenderIR). Regenerate with:
+#   cmake --build build --config Release --target InhaltRenderIR
+#   ./build/InhaltRenderIR_artefacts/Release/InhaltRenderIR --out rendered-irs/...
+rendered-irs/*.wav
