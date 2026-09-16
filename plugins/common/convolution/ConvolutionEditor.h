@@ -9,14 +9,15 @@
 #include <array>
 #include <memory>
 
-// The shared editor. Like the processor, it is not subclassed per variant: the name it paints and
-// the colours it paints in both come from the variant contract (variantConfig() / variantTheme()),
-// so rebranding changes no code here.
+// Hardware-panel UI for the shared convolution reverb, built from the approved mockup
+// (plugins/convolution-base/mockups/convolution-mockup-v1.html) via the juce-hardware-panel-ui
+// skill. rebuildChassisTexture(), drawHardwareSection(), and the chassis/panel/header/footer chrome
+// in paint() are COPY-VERBATIM from plugins/aura-reverb/Source/PluginEditor.cpp (itself verbatim
+// from Caverns, the skill's canonical reference) - none of it references per-plugin content.
 //
-// NOTE: the layout below is functional scaffolding, not the finished panel. The hardware-panel
-// chrome (chassis texture, section badges, wordmark) comes from the juce-hardware-panel-ui skill's
-// mockup-first process - HTML mockup, user approval, then C++, then a pixel diff. Until that has
-// happened this is a plain arrangement of real, correctly-wired controls.
+// Unlike every other plugin's editor this one is NOT per-plugin: it is shared by every convolution
+// variant, and reads the two things that differ - the product name and the accent colours - from
+// variantConfig() and variantTheme(). There is no per-variant editor or LookAndFeel subclass.
 namespace wildjag::conv
 {
 
@@ -26,41 +27,64 @@ public:
     explicit ConvolutionEditorContent(ConvolutionProcessor& processorToUse);
     ~ConvolutionEditorContent() override;
 
-    // The panel's native size, set once here and never changed - ResizableZoomHandler scales it.
-    static constexpr int nativeWidth = 780;
-    static constexpr int nativeHeight = 470;
-
-    // Pre-Delay, Length, Attack, Low Cut, High Cut, Dry, Wet. No output gain: Wet reaches 200%, so
-    // a master volume would only be a third place to lose level. Public because the knob table in
-    // ConvolutionEditor.cpp is sized from it at file scope.
-    static constexpr int numKnobs = 7;
-
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    // Pulls the latest waveform snapshot and IR metadata from the processor. Normally driven by
+    // this component's own timer; public so the offline renderer (Source/Tools/RenderUI.cpp) can
+    // bring the display up to date deterministically instead of waiting on a timer to fire.
+    void refreshFromProcessor();
+
 private:
     void timerCallback() override;
+    void rebuildChassisTexture();
+    void drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds, const juce::String& label);
+    void setupRotarySlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText);
+    void setupVerticalSlider(juce::Slider& slider, juce::Label& label, const juce::String& labelText);
 
-    struct Knob
+    // Pre-Delay, Length, Attack in SHAPE; Low Cut, High Cut in FILTER. No output gain: Wet reaches
+    // 200%, so a master volume would only be a third place to lose level.
+    enum Knob { preDelay, length, attack, lowCut, highCut, numKnobs };
+
+    struct KnobControl
     {
         juce::Slider slider;
-        juce::Label caption;
+        juce::Label name;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
 
-    void configureKnob(Knob& knob, const juce::String& parameterID, const juce::String& caption);
+    struct FaderControl
+    {
+        juce::Slider slider;
+        juce::Label name;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    };
 
-    ConvolutionProcessor& processor;
+    ConvolutionProcessor& processorRef;
     wildjag::HardwarePanelLookAndFeel lookAndFeel;
 
-    juce::ComboBox irSelector;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> irSelectorAttachment;
+    juce::Label titleLabel, tagLabel;
 
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
+    juce::ComboBox irSelector;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> irSelectorAttachment;
+
+    // "2.41 s - stereo - 44.1 kHz". Says whether the selected IR is being resampled, which is
+    // otherwise invisible once IRLibrary has done its work.
+    juce::Label irMetaLabel;
+
     IRWaveformDisplay waveform;
-    std::array<Knob, numKnobs> knobs;
+
+    std::array<KnobControl, numKnobs> knobs;
+    FaderControl dryFader, wetFader;
+
+    juce::Image chassisTexture;
+    juce::Rectangle<float> impulseSectionBounds, shapeSectionBounds, filterSectionBounds, mixSectionBounds;
+
+    // Guards the 30 Hz repaint: the waveform only changes when the worker publishes a new snapshot.
+    std::shared_ptr<const WaveformSnapshot> lastSnapshot;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ConvolutionEditorContent)
 };

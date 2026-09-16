@@ -23,7 +23,8 @@ public:
         sourceWaveformColourId = 0x1a10002,   // the full recording, dimmed
         shapedWaveformColourId = 0x1a10003,   // the portion actually convolved
         preDelayMarkerColourId = 0x1a10004,
-        gridColourId = 0x1a10005
+        gridColourId = 0x1a10005,
+        outlineColourId = 0x1a10006
     };
 
     IRWaveformDisplay();

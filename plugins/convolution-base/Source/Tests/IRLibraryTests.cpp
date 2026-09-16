@@ -135,8 +135,14 @@ public:
 
             expect(atNewRate != nullptr);
             expect(atNewRate != first, "changing the session rate must invalidate the cache");
-            expect(atNewRate->getNumSamples() > first->getNumSamples(),
+            expect(atNewRate->samples.getNumSamples() > first->samples.getNumSamples(),
                    "the same IR at twice the rate must be about twice as many samples");
+
+            // The native rate travels with the samples so the editor can say "44.1 kHz" about an
+            // IR being convolved at 48 kHz - resampling is otherwise invisible in the buffer.
+            expectWithinAbsoluteError((float) atNewRate->nativeSampleRate,
+                                      (float) first->nativeSampleRate, 0.01f,
+                                      "an IR's native rate must not change with the session rate");
         }
 
         beginTest("IRs are normalised to unit energy, and a Dirac stays an identity");

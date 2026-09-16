@@ -76,29 +76,49 @@ juce::AudioBuffer<float> IRLoadWorker::shapeSynchronously(int irIndex, IRShaper:
     if (decoded == nullptr)
         return {};
 
-    auto shaped = IRShaper::shape(*decoded, sampleRate, params);
+    auto shaped = IRShaper::shape(decoded->samples, sampleRate, params);
     publishSnapshot(irIndex, *decoded, shaped);
     return shaped;
 }
 
-void IRLoadWorker::publishSnapshot(int irIndex, const juce::AudioBuffer<float>& decoded,
+void IRLoadWorker::publishSnapshot(int irIndex, const DecodedIR& decoded,
                                    const juce::AudioBuffer<float>& shaped)
 {
     auto frame = std::make_shared<WaveformSnapshot>();
     frame->irIndex = irIndex;
+    frame->nativeSampleRate = decoded.nativeSampleRate;
+    frame->sourceChannels = decoded.samples.getNumChannels();
     frame->sourceSeconds = library.getTargetSampleRate() > 0.0
-                             ? (double) decoded.getNumSamples() / library.getTargetSampleRate()
+                             ? (double) decoded.samples.getNumSamples() / library.getTargetSampleRate()
                              : 0.0;
-    frame->source = IRShaper::computePeakEnvelope(decoded, envelopePoints);
+    frame->source = IRShaper::computePeakEnvelope(decoded.samples, envelopePoints);
 
     // The shaped envelope is drawn on the source's time axis, so it gets proportionally fewer
     // points rather than being stretched back out to full width - that is what makes a Length cut
     // read as "the tail is gone" instead of "the whole IR got shorter".
-    const auto shapedPoints = decoded.getNumSamples() > 0
+    const auto shapedPoints = decoded.samples.getNumSamples() > 0
                                 ? (int) std::lround((double) envelopePoints * (double) shaped.getNumSamples()
-                                                    / (double) decoded.getNumSamples())
+                                                    / (double) decoded.samples.getNumSamples())
                                 : 0;
     frame->shaped = IRShaper::computePeakEnvelope(shaped, std::max(shapedPoints, 1));
+
+    // Scale both envelopes so the SOURCE's loudest point reaches full height. The display is there
+    // to show an IR's shape - where the onset is, how it decays, what Length and Attack removed -
+    // not its absolute level, and after IRLibrary's unit-energy normalisation the absolute peaks
+    // are tiny (a second-long IR normalises to peaks well under 0.05), which drew as an almost
+    // flat line. Deliberately one shared scale taken from the source, not a per-envelope maximum:
+    // scaling the shaped envelope independently would hide exactly the amplitude change that
+    // Attack is making.
+    const auto peak = frame->source.empty()
+                        ? 0.0f
+                        : *std::max_element(frame->source.begin(), frame->source.end());
+
+    if (peak > 0.0f)
+    {
+        const auto scale = 1.0f / peak;
+        for (auto& value : frame->source) value *= scale;
+        for (auto& value : frame->shaped) value *= scale;
+    }
 
     const juce::SpinLock::ScopedLockType lock(snapshotLock);
     snapshot = std::move(frame);
@@ -155,7 +175,7 @@ void IRLoadWorker::run()
             continue;
         }
 
-        auto shaped = IRShaper::shape(*decoded, sampleRate, params);
+        auto shaped = IRShaper::shape(decoded->samples, sampleRate, params);
 
         if (shaped.getNumSamples() > 0)
         {

@@ -149,3 +149,42 @@ target_link_libraries(ConvBaseRenderIR
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# Headless editor renderer - paints the real editor into a PNG with no window, no audio device and
+# no host. The juce-hardware-panel-ui skill's verification step normally screenshots the Standalone,
+# but macOS re-prompts for microphone access every time the bundle's signature changes (i.e. every
+# rebuild), which makes the fix-and-look-again loop manual. This makes it deterministic, and drops
+# the window chrome and the Standalone's own banner so the output diffs against the mockup directly.
+juce_add_console_app(ConvBaseRenderUI
+    PRODUCT_NAME "ConvBaseRenderUI"
+)
+
+target_sources(ConvBaseRenderUI
+    PRIVATE
+        Source/VariantConfig.cpp
+        Source/VariantTheme.cpp
+        Source/Tools/RenderUI.cpp
+)
+
+wildjag_add_convolution_core(ConvBaseRenderUI)
+wildjag_add_convolution_ui(ConvBaseRenderUI)
+
+target_compile_definitions(ConvBaseRenderUI
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JucePlugin_Name="ConvBase"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
+)
+
+target_link_libraries(ConvBaseRenderUI
+    PRIVATE
+        ConvBaseBinaryData
+        juce::juce_audio_utils
+        juce::juce_audio_formats
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)

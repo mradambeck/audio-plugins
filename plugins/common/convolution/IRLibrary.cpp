@@ -36,7 +36,7 @@ void IRLibrary::setTargetSampleRate(double newSampleRate)
     std::fill(cache.begin(), cache.end(), nullptr);
 }
 
-std::shared_ptr<const juce::AudioBuffer<float>> IRLibrary::getDecodedIR(int index)
+std::shared_ptr<const DecodedIR> IRLibrary::getDecodedIR(int index)
 {
     if (! juce::isPositiveAndBelow(index, (int) variant.irs.size()) || targetSampleRate <= 0.0)
         return nullptr;
@@ -61,7 +61,7 @@ std::shared_ptr<const juce::AudioBuffer<float>> IRLibrary::getDecodedIR(int inde
     // convolved and a 44.1 kHz IR lands at the same level in a 96 kHz session.
     normaliseToUnitEnergy(atSessionRate);
 
-    auto cached = std::make_shared<const juce::AudioBuffer<float>>(std::move(atSessionRate));
+    auto cached = std::make_shared<const DecodedIR>(DecodedIR { std::move(atSessionRate), sourceSampleRate });
     cache[(size_t) index] = cached;
     return cached;
 }

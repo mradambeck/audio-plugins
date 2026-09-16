@@ -22,6 +22,16 @@
 namespace wildjag::conv
 {
 
+// A decoded IR plus where it came from. The native rate is kept alongside the samples so the
+// editor can say "44.1 kHz" about an IR that is being convolved at 48 kHz - the resampling is
+// invisible in the buffer itself, and whether an IR is being resampled is exactly the sort of
+// thing worth being able to see.
+struct DecodedIR
+{
+    juce::AudioBuffer<float> samples;   // at the session rate, normalised
+    double nativeSampleRate = 0.0;      // the rate the blob was authored at
+};
+
 class IRLibrary
 {
 public:
@@ -40,7 +50,7 @@ public:
     //
     // Shared ownership because the same decoded buffer feeds both the shaper and, potentially, a
     // later re-shape at different Length/Attack values without decoding twice.
-    std::shared_ptr<const juce::AudioBuffer<float>> getDecodedIR(int index);
+    std::shared_ptr<const DecodedIR> getDecodedIR(int index);
 
     // Exposed for IRLibraryTests, which need to exercise decode, resample and normalise in
     // isolation from any variant or cache.
@@ -62,7 +72,7 @@ public:
 private:
     const ConvolutionVariant& variant;
     double targetSampleRate = 0.0;
-    std::vector<std::shared_ptr<const juce::AudioBuffer<float>>> cache;
+    std::vector<std::shared_ptr<const DecodedIR>> cache;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IRLibrary)
 };

@@ -27,6 +27,8 @@ struct WaveformSnapshot
     std::vector<float> source;      // the full decoded IR
     std::vector<float> shaped;      // the shaped IR, occupying the first (length%) of the same axis
     double sourceSeconds = 0.0;
+    double nativeSampleRate = 0.0;  // the IR's own rate, which may differ from the session's
+    int sourceChannels = 0;
     int irIndex = -1;
 };
 
@@ -66,7 +68,7 @@ public:
 
 private:
     void run() override;
-    void publishSnapshot(int irIndex, const juce::AudioBuffer<float>& decoded, const juce::AudioBuffer<float>& shaped);
+    void publishSnapshot(int irIndex, const DecodedIR& decoded, const juce::AudioBuffer<float>& shaped);
     void pushPendingIR(juce::AudioBuffer<float>&& shaped);
 
     IRLibrary library;

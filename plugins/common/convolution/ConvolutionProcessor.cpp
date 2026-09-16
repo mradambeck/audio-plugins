@@ -17,7 +17,10 @@ namespace
 
     juce::String msString(float value, int)
     {
-        return juce::String(value, value < 10.0f ? 1 : 0) + " ms";
+        // One decimal at every value, matching Caverns' and Aura's own "350.0 ms" readouts. A
+        // precision that changes with magnitude makes a single knob read "0.0 ms" and then "32 ms"
+        // as it is turned, which looks like a formatting bug rather than a choice.
+        return juce::String(value, 1) + " ms";
     }
 
     juce::String percentString(float value, int)

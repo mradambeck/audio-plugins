@@ -33,7 +33,7 @@ namespace
         if (decoded == nullptr)
             return {};
 
-        return IRShaper::shape(*decoded, sampleRate, params);
+        return IRShaper::shape(decoded->samples, sampleRate, params);
     }
 
     void fillSine(std::vector<float>& signal, float amplitude, float frequencyHz)
