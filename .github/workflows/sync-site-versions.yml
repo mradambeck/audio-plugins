@@ -48,6 +48,7 @@ jobs:
               "plugins/intruder-gated-reverb",
               "plugins/strike-synth",
               "plugins/aura-reverb",
+              "plugins/concrete-sampler",
           ]
 
           HTML_PATH = "site/index.html"
