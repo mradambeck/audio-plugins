@@ -22,6 +22,13 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Aura | [`plugins/aura-reverb/`](plugins/aura-reverb/) | Algorithmic reverb modeled on the AMS RMX16's Ambience program |
 | Concrete | [`plugins/concrete-sampler/`](plugins/concrete-sampler/) | Vintage sampler emulation instrument modeling twelve classic hardware samplers |
 
+[`plugins/convolution-base/`](plugins/convolution-base/) is deliberately absent from that table: it
+is a development harness for the shared convolution reverb in
+[`plugins/common/convolution/`](plugins/common/convolution/), not a product. The plugins actually
+built from that engine are branded variants — one name, one accent colour pair and one bundled IR
+set each — and they live in a separate private repository that consumes this one as a submodule, so
+their impulse responses never enter public git history. See that folder's README.
+
 Each plugin has its own README with build/launch instructions specific to that plugin and a
 description of how it works; this README covers everything shared across the whole monorepo.
 
@@ -33,7 +40,8 @@ audio-plugins/
 │   ├── common/                 # Shared code/assets used by every plugin
 │   │   ├── LookAndFeel/         # HardwarePanelLookAndFeel base class + shared LevelMeterSlider
 │   │   ├── Assets/              # Shared logo + fonts (byte-identical across plugins)
-│   │   └── cmake/               # FetchJUCE.cmake, AddHardwarePanel.cmake
+│   │   ├── convolution/         # The whole shared convolution reverb (see convolution-base/)
+│   │   └── cmake/               # FetchJUCE.cmake, AddHardwarePanel.cmake, AddConvolutionCore.cmake
 │   ├── caverns-delay/           # One folder per plugin, each independently buildable
 │   ├── damage-fuzz/
 │   ├── corrosion-drive/
@@ -44,7 +52,8 @@ audio-plugins/
 │   ├── intruder-gated-reverb/
 │   ├── strike-synth/
 │   ├── aura-reverb/
-│   └── concrete-sampler/
+│   ├── concrete-sampler/
+│   └── convolution-base/        # Dev harness for common/convolution/ -- NOT a shipped plugin
 ├── installers/               # Combined "install everything" .pkg builder
 ├── scripts/                  # build-all.sh / test-all.sh (loop over all plugins)
 ├── .claude/skills/            # Project-scoped Claude Code skills for this catalog's conventions

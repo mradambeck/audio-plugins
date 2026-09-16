@@ -1,0 +1,38 @@
+{
+  "latency": {
+    "impulse_peak_sample": 0,
+    "peak_amplitude": 1.0
+  },
+  "defaults_transparency": {
+    "max_abs_error": 5.350760058883686e-05,
+    "reference_peak": 0.5
+  },
+  "predelay": {
+    "requested_ms": 25.0,
+    "measured_ms": 25.0
+  },
+  "bypass": {
+    "control_max_step": 0.055479735136032104,
+    "toggled_max_step": 0.055463045835494995,
+    "rms_after_control": 1.3609152513639484,
+    "rms_after_toggled": 0.353553388150485
+  },
+  "ir_swap": {
+    "control_max_step": 0.04971842095255852,
+    "swapped_max_step": 0.04971842095255852
+  },
+  "sample_rate_conversion": {
+    "t20_seconds": {
+      "44100": 0.6917460317460318,
+      "48000": 0.6922708333333333,
+      "96000": 0.6922083333333333
+    },
+    "spread_seconds": 0.0005248015873015044
+  },
+  "filters": {
+    "low_80hz_flat_rms": 0.353553385819185,
+    "low_80hz_cut800_rms": 0.0035289647956577184,
+    "high_9khz_flat_rms": 0.35355181101583005,
+    "high_9khz_cut1k_rms": 0.0034042928193171243
+  }
+}

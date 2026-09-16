@@ -1,0 +1,12 @@
+# Offline render-harness output (ConvBaseRenderIR). Regenerate with:
+#   cmake --build build --config Release --target ConvBaseRenderIR
+#   ./build/ConvBaseRenderIR_artefacts/Release/ConvBaseRenderIR rendered-audio/
+rendered-audio/
+
+# analysis/validate.py's virtualenv and its plots. The JSON results and the .md report ARE
+# committed - they're small, and the report is the deliverable.
+analysis/.venv/
+analysis/plots/
+
+# The synthetic IRs in irs/ are deliberately NOT ignored: they are committed fixtures, generated
+# once by tools/make_test_irs.py and consumed by CI. See the README.
