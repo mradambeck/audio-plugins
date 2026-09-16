@@ -28,7 +28,7 @@ mkdir -p "$STAGE_DIR/Resources"
 # convention for both files instead of two.
 sed_args=()
 
-for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/aura-reverb:Aura"; do
+for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/aura-reverb:Aura" "plugins/concrete-sampler:Concrete"; do
     repo="${entry%%:*}"
     name="${entry##*:}"
     echo "==> Building $name component packages"

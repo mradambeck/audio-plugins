@@ -1,0 +1,17 @@
+VCR OSD Mono - provenance notes
+
+Downloaded from: https://www.dafont.com/vcr-osd-mono.font (dl.dafont.com/dl/?f=vcr_osd_mono)
+Downloaded: 2026-09-10
+File: VCR_OSD_MONO_1.001.ttf (renamed VCROSDMono-Regular.ttf here), version 1.001, March 31 2015
+
+Licensing note (unlike every other embedded font in this catalog, there is no OFL.txt here):
+dafont lists this font only under its self-reported "100% Free" category, not as quoted license
+text. The font's own internal `name` table has no copyright, license description, license URL, or
+trademark fields at all (checked with fontTools) - the only relevant field is Designer (nameID 9),
+"MrManet", which does not match "Riciery Leal", the designer widely credited across download-
+aggregator sites. No verified license text could be found for this exact file's redistribution
+rights in a commercial, distributed binary. Shipped anyway per an explicit, informed decision by
+Adam Beck (Wild Jag Audio) made 2026-09-10 after this ambiguity was raised - see
+plugins/concrete-sampler/ui-plan.md's "Open items to resolve during the mockup" (VCR OSD Mono
+licensing) for the original flag, and this plugin's Phase 8 JUCE build-out session for the
+back-and-forth. Revisit if this is ever challenged.

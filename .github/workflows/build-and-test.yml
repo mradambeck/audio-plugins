@@ -35,6 +35,10 @@ jobs:
             name: StrikeProcessor
           - dir: plugins/aura-reverb
             name: Aura
+          - dir: plugins/concrete-sampler
+            name: Concrete
+          - dir: plugins/concrete-sampler
+            name: ConcreteProcessor
 
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +81,7 @@ jobs:
           - dir: plugins/intruder-gated-reverb
           - dir: plugins/strike-synth
           - dir: plugins/aura-reverb
+          - dir: plugins/concrete-sampler
 
     steps:
       - uses: actions/checkout@v4

@@ -59,6 +59,11 @@
             <line choice="choice_aura_vst3"/>
             <line choice="choice_aura_standalone"/>
         </line>
+        <line choice="choice_concrete">
+            <line choice="choice_concrete_au"/>
+            <line choice="choice_concrete_vst3"/>
+            <line choice="choice_concrete_standalone"/>
+        </line>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
@@ -171,6 +176,17 @@
         <pkg-ref id="com.wildjag.aura.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_concrete" title="Concrete" description="Concrete - vintage sampler emulation instrument."/>
+    <choice id="choice_concrete_au" title="Audio Unit (AU)" description="Installs Concrete.component into Library/Audio/Plug-Ins/Components." start_selected="true">
+        <pkg-ref id="com.wildjag.concrete.au.pkg"/>
+    </choice>
+    <choice id="choice_concrete_vst3" title="VST3" description="Installs Concrete.vst3 into Library/Audio/Plug-Ins/VST3." start_selected="true">
+        <pkg-ref id="com.wildjag.concrete.vst3.pkg"/>
+    </choice>
+    <choice id="choice_concrete_standalone" title="Standalone App" description="Installs Concrete.app into Applications." start_selected="true">
+        <pkg-ref id="com.wildjag.concrete.standalone.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -209,4 +225,7 @@
     <pkg-ref id="com.wildjag.aura.au.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.aura.vst3.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.aura.standalone.pkg" version="__AURA_VERSION__" onConclusion="none">Aura-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.concrete.au.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-AU-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.concrete.vst3.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-VST3-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.concrete.standalone.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-Standalone-Component.pkg</pkg-ref>
 </installer-gui-script>

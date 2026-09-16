@@ -7,7 +7,7 @@ Instructions for any AI coding agent (Claude Code, or otherwise) working in this
 
 This is a monorepo of independent JUCE plugins, all under `plugins/` (`caverns-delay`,
 `damage-fuzz`, `corrosion-drive`, `flux-phaser`, `alloy-bass`, `gradient-pitch`, `shields-reverb`,
-`intruder-gated-reverb`, `strike-synth`, `aura-reverb`) plus `plugins/common/` (shared
+`intruder-gated-reverb`, `strike-synth`, `aura-reverb`, `concrete-sampler`) plus `plugins/common/` (shared
 LookAndFeel/assets/CMake helpers) and `installers/` (the combined installer). Each plugin folder
 is a fully independent CMake project — `cd plugins/<plugin> && cmake -B build` works on its own.
 Do not introduce a unified CMake super-build; per-plugin independence is relied on by the

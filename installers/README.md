@@ -2,18 +2,19 @@
 
 macOS `.pkg` installers for the Wild Jag plugins:
 
-| Plugin    | Repo                             | Description                         |
+| Plugin    | Repo                             | Description                          |
 |-----------|----------------------------------|--------------------------------------|
-| Caverns   | `plugins/caverns-delay/`         | Reverb/delay plugin                 |
-| Damage    | `plugins/damage-fuzz/`           | Fuzz/distortion plugin              |
-| Corrosion | `plugins/corrosion-drive/`       | Lo-fi drive plugin                  |
-| Flux      | `plugins/flux-phaser/`           | Analog phase shifter plugin         |
-| Alloy     | `plugins/alloy-bass/`            | Industrial bass synth               |
-| Gradient  | `plugins/gradient-pitch/`        | Pitch shifting delay plugin         |
-| Shields   | `plugins/shields-reverb/`        | Diffuse reverb                      |
-| Intruder  | `plugins/intruder-gated-reverb/` | Non-linear gated reverb             |
-| Strike    | `plugins/strike-synth/`          | Karplus-Strong string synth         |
-| Aura      | `plugins/aura-reverb/`           | AMS RMX16 Ambience reverb emulation |
+| Caverns   | `plugins/caverns-delay/`         | Reverb/delay plugin                  |
+| Damage    | `plugins/damage-fuzz/`           | Fuzz/distortion plugin               |
+| Corrosion | `plugins/corrosion-drive/`       | Lo-fi drive plugin                   |
+| Flux      | `plugins/flux-phaser/`           | Analog phase shifter plugin          |
+| Alloy     | `plugins/alloy-bass/`            | Industrial bass synth                |
+| Gradient  | `plugins/gradient-pitch/`        | Pitch shifting delay plugin          |
+| Shields   | `plugins/shields-reverb/`        | Diffuse reverb                       |
+| Intruder  | `plugins/intruder-gated-reverb/` | Non-linear gated reverb              |
+| Strike    | `plugins/strike-synth/`          | Karplus-Strong string synth          |
+| Aura      | `plugins/aura-reverb/`           | AMS RMX16 Ambience reverb emulation  |
+| Concrete  | `plugins/concrete-sampler/`      | Vintage sampler emulation instrument |
 
 Each plugin builds AU, VST3, and Standalone formats. Every installer (per-plugin and group) lets you choose:
 

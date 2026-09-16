@@ -1,0 +1,543 @@
+#pragma once
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+#include "../../common/Presets/FactoryPreset.h"
+#include "ConcreteBusRouter.h"
+#include "ConcreteCapturePass.h"
+#include "ConcreteFilterModels.h"
+#include "ConcreteMachines.h"
+#include "ConcretePitchEngine.h"
+#include "ConcreteQuantizer.h"
+#include "ConcreteSampleIO.h"
+#include "ConcreteSampleSet.h"
+#include "ConcreteVoice.h"
+#include "ConcreteVoiceAllocator.h"
+
+#include <array>
+#include <functional>
+#include <optional>
+#include <vector>
+
+// Vintage sampler emulation instrument (see concrete-sampler-plugin-plan.md for the full design).
+// Phase 1 added sample loading, a fixed voice pool, and Architecture #2's session-persistence
+// behavior. Phase 2 added the three pitch-engine modes (ConcretePitchEngine.h) plus the base-rate/
+// coarse-tune/fine-tune parameters. Phase 3 added bit-depth reduction and companding
+// (ConcreteQuantizer.h). Phase 4 added the capture pass (ConcreteCapturePass.h): resample -> drive
+// -> quantize, baked offline into each zone's working buffer rather than applied live - Phase 3's
+// quantizer moved from ConcreteVoice into this bake (see ConcreteCapturePass.h's own comment on
+// why quantization is part of this pipeline even when the resample/drive technique is bypassed).
+// Phase 5 adds the playback-side filter models (ConcreteFilterModels.h, live per-voice - see
+// ConcreteVoice.h). Phase 6 adds the voice architecture (ConcreteVoiceAllocator.h's voice-count
+// limit, ConcreteContourEnvelope.h's K250-style amp envelope alternative). Phase 7 adds the twelve
+// machines (ConcreteMachines.h) as a Machine parameter plus host-native factory presets - see
+// machineParamID's own comment for how those two selectors share one apply path.
+class ConcreteAudioProcessor : public juce::AudioProcessor,
+                                private juce::Thread,
+                                private juce::AudioProcessorValueTreeState::Listener
+{
+public:
+    ConcreteAudioProcessor();
+    ~ConcreteAudioProcessor() override;
+
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
+
+    const juce::String getName() const override;
+
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool isMidiEffect() const override;
+    double getTailLengthSeconds() const override;
+
+    // Host-facing note names - VST2/VST3 hosts (Cubase, Reaper, etc.) call this to label keys in
+    // their own key editors/drum maps, exactly the "23: OpenHH2, 22: Clave, ..." style view Adam
+    // asked about (Logic's equivalent is AU-only and JUCE has no hook for it as of 9.0.2 - checked
+    // directly against JUCE's own source, not just the changelog). Returns the filename of
+    // whichever pad's own independent sample (see assignSampleToPad()'s own comment for how a
+    // pad's zone is identified: keyLo==keyHi==note) covers this note, or nullopt for a "plain" note
+    // that just plays the main sample transposed - nothing distinct to report there, so the host
+    // falls back to its own default label. Mirrors ConcretePadGrid::ownZoneFileNameForPad()'s
+    // identical identity check - same underlying question, asked from a host-facing caller instead
+    // of a paint() call.
+    std::optional<juce::String> getNameForMidiNoteNumber(int note, int midiChannel) override;
+
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // Loads a file into the (only, in v1) zone and republishes the sample set. Not real-time
+    // safe (file I/O, allocation) - callers that run on the message thread (the editor's Load
+    // button/drag-drop) are responsible for hopping to a background thread themselves if the file
+    // is large enough that blocking the message thread would matter; tooling (RenderIR, tests)
+    // calls this directly and synchronously, since there's no audio thread to protect there.
+    // Returns false if the file couldn't be read (the previous sample set, if any, is unchanged).
+    bool loadSample(const juce::File& file);
+
+    // Phase 8's message-thread-safe entry point: runs the exact same work as loadSample() above on
+    // a one-shot background thread (juce::Thread::launch()), then delivers onComplete on the
+    // message thread via MessageManager::callAsync. loadSample() itself stays untouched and still
+    // public - tooling (RenderIR, tests) calls it directly and synchronously on purpose, since
+    // there's no audio thread (or UI) to protect there. See pendingAsyncLoads' own comment for how
+    // the destructor waits for an in-flight call here to finish first.
+    void loadSampleAsync(const juce::File& file, std::function<void(bool)> onComplete);
+
+    // The Session block's "Clear Sample" button when the LCD is showing the main (whole-keyboard)
+    // sample rather than a pad's own zone (see ConcreteScreen::clearSample(), which routes to
+    // clearPadSample() instead when a pad's own zone is being shown). Removes only that one zone -
+    // identified by its full keyLo==0/keyHi==127 range rather than by raw index 0, since a pad's
+    // own single-note zone can land at index 0 too if it was assigned before any main sample was
+    // ever loaded - leaving every pad's own sample untouched. Used to unconditionally replace the
+    // WHOLE zone list, which meant hitting Clear Sample while looking at one pad's sample also
+    // silently deleted every other pad's sample and the main sample - not what "clear the sample
+    // showing on the screen" means. A no-op if there's no main zone.
+    void clearSample()
+    {
+        const auto existingRaw = getRawSampleSet();
+        ConcreteSampleSet::Ptr newRawSet(new ConcreteSampleSet());
+        for (const auto& zone : existingRaw->zones)
+            if (!(zone.keyLo == 0 && zone.keyHi == 127))
+                newRawSet->zones.push_back(zone);
+        publishRawSampleSet(newRawSet);
+    }
+
+    // The new Session "Stop" button - immediately silences every currently-sounding voice
+    // (isForced=true, allowTailOff=false - see ConcreteVoice::stopNote()'s own comment), overriding
+    // even a one-shot zone or a release tail in progress, unlike an ordinary note-off. Just raises
+    // a flag; safe to call from the message thread since it's consumed at the top of the next
+    // processBlock() on the audio thread, never touching `voices` directly from here.
+    void stopAllVoices() { stopAllRequested = true; }
+
+    // Per-pad sample loading (ConcretePadGrid's drag-and-drop / right-click Load...) - "add zones
+    // and each pad simply resolves to a different one through the same lookup"
+    // (concrete-sampler-plugin-plan.md's Phase 8 item 3). Builds a single-note zone (keyLo==keyHi
+    // ==midiNote, one-shot - a pad's own independent sample, not a repitch of the main one) and
+    // adds/replaces it in the raw zone list; ConcreteSampleSet::lookup()'s narrowest-range-wins
+    // rule makes it take priority over the main (whole-keyboard) zone for that one note without
+    // that zone ever needing to know this exists. A pad with no zone of its own keeps inheriting
+    // the main sample, transposed, exactly like v1 always has. Returns false (no change made) if
+    // the file can't be read. Not real-time safe - same caller obligation as loadSample() above;
+    // assignSampleToPadAsync() is the message-thread-safe entry point real UI code should use.
+    bool assignSampleToPad(int midiNote, const juce::File& file);
+    void assignSampleToPadAsync(int midiNote, const juce::File& file, std::function<void(bool)> onComplete);
+
+    // Removes a pad's own zone (if any), reverting it to inheriting the main sample - a no-op if
+    // that pad has no zone of its own. See assignSampleToPad()'s own comment for how a pad's zone
+    // is identified (keyLo==keyHi==midiNote).
+    void clearPadSample(int midiNote);
+
+    // Changes the (only, in v1) zone's root note and republishes - see Architecture #1: this is
+    // zone-list state, not an APVTS parameter.
+    void setRootNoteForZone(int zoneIndex, int newRootNote);
+
+    // Changes the (only, in v1) zone's one-shot flag and republishes - same zone-list-state
+    // category as setRootNoteForZone() above, and for the same reason: whether a zone is gated
+    // (plays only while held) or one-shot (plays through regardless of note-off) is a property of
+    // that particular sample, not something anyone would automate mid-performance. See
+    // ConcreteSampleZone::oneShot.
+    void setOneShotForZone(int zoneIndex, bool oneShot);
+
+    // Same zone-list-state category and reasoning as setOneShotForZone() above - whether a zone
+    // loops is a property of that sample, not something automated mid-performance. See
+    // ConcreteSampleZone::loopEnabled. Phase 8's first slice (ConcreteScreen) is the first UI this
+    // has ever had - loopStart/loopEnd themselves stay fixed at load-time defaults (the whole
+    // buffer) until a later slice adds draggable loop-region editing.
+    void setLoopEnabledForZone(int zoneIndex, bool loopEnabled);
+
+    // Same zone-list-state category and reasoning as setOneShotForZone() above - the Volume
+    // section's Sample fader and the Sample/Machine pages' on-screen "Volume" field (both the
+    // physical fader and the on-screen field write this SAME real value, matching Cutoff/
+    // Resonance/Coarse/Fine's two-way binding) drive this real per-sample gain multiplier,
+    // already read live by every voice (see ConcreteVoice.cpp's `zone->level`) - this was
+    // previously a UI-only stand-in (ConcreteScreen's old localVolumePercent) with no connection
+    // to real audio at all, found and fixed after Adam reported "Sample volume doesn't appear to
+    // be working." See ConcreteSampleZone::level.
+    void setLevelForZone(int zoneIndex, float newLevel);
+
+    // Same zone-list-state category as setLevelForZone() above - the Sample page's Coarse (whole-
+    // ish semitones, see ConcreteVoice::startNote()'s own comment on rounding) and Fine (cents)
+    // fields. Used to be a pair of global APVTS parameters applied identically to every zone - a
+    // real reported bug, since tuning one pad's sample silently retuned every other pad's and the
+    // main sample's pitch too (Coarse/Fine simply weren't "which sample" aware at all). Now genuine
+    // per-zone state, exactly like Root/One-Shot/Loop/Volume already were.
+    void setCoarseTuneForZone(int zoneIndex, float newTuneSemitones);
+    void setFineTuneForZone(int zoneIndex, float newFineTuneCents);
+
+    // Re-reads a zone's source from a new location (Architecture #2's relocate case) and
+    // republishes, preserving that zone's other fields.
+    bool relocateZone(int zoneIndex, const juce::File& newFile);
+
+    // The "Embed samples in session" override (Architecture #2) - forces embedding regardless of
+    // the size cap. Session-persisted state, not an APVTS parameter (it's a preference, not
+    // something anyone automates).
+    bool getEmbedSamplesOverride() const noexcept { return embedSamplesOverride; }
+    void setEmbedSamplesOverride(bool shouldForceEmbed) { embedSamplesOverride = shouldForceEmbed; }
+
+    // Thread-safe snapshot of the currently-published (capture-pass-baked) sample set, for
+    // playback, the editor's waveform display, and tests. See currentSampleSet's own comment for
+    // the locking rationale.
+    ConcreteSampleSet::Ptr getCurrentSampleSet() const;
+
+    // The Sample page's waveform playhead (ConcreteScreen) - the playback progress (0..1 within
+    // the zone's own start/end) of whichever active voice is currently playing this zone index, or
+    // -1 if none is. Called from a UI timer, not the audio thread - see ConcreteVoice::
+    // getPlaybackProgress01()'s own comment on why an unsynchronized read here is fine. If more
+    // than one voice happens to be playing the same zone at once (the same whole-keyboard main
+    // sample played across several notes), this just returns whichever one is found first - exact
+    // fidelity for that rare case isn't worth the extra bookkeeping for a display-only feature.
+    float getPlaybackProgressForZone(int zoneIndex) const noexcept
+    {
+        for (auto& voice : voices)
+            if (voice.isActive() && voice.getZoneIndex() == zoneIndex)
+                return voice.getPlaybackProgress01();
+        return -1.0f;
+    }
+
+    // Thread-safe snapshot of the RAW (never capture-pass-baked) sample set - see rawSampleSet's
+    // own comment. Exposed for tests that need to inspect source-space zone metadata directly.
+    ConcreteSampleSet::Ptr getRawSampleSet() const;
+
+    // Phase 8's load animation needs a real bake-in-progress signal, not the private bakeRequested
+    // flag - that one already reads false again WHILE rebakeNow() is still running (see run()'s own
+    // comment), so it can't answer "is a bake happening right now." True only for the span of an
+    // actual rebakeNow() call made from the background bake thread in response to a capture-pass
+    // parameter change - NOT for the (much rarer, currently always-synchronous) bakes triggered by
+    // loadSample()/relocateZone()/setRootNoteForZone()/setOneShotForZone()/setStateInformation(),
+    // which have no in-progress window worth signaling since nothing calls back into the processor
+    // while they run.
+    bool isBakeInProgress() const noexcept { return bakeInProgress.load(); }
+
+    // Fires whenever isBakeInProgress() or getCachedEmbedPayloadSizeBytes() may have changed, from
+    // the background bake thread - the editor should addChangeListener(this) and re-read whichever
+    // of those two it cares about rather than the message carrying which one changed. Never fired
+    // from the audio thread; safe to add/remove listeners from the message thread at any time (see
+    // juce::ChangeBroadcaster's own thread-safety notes - sendChangeMessage() is itself safe to call
+    // from any thread, it always hops to the message thread internally via AsyncUpdater).
+    juce::ChangeBroadcaster processorStateBroadcaster;
+
+    // Cheap accessor for the embed-toggle's live payload readout - always returns immediately
+    // (never runs encodeZoneAsFlac() on the calling thread). The TOTAL across every zone that
+    // would actually be embedded (see isZoneCachedAsEmbedded() below for the per-zone breakdown -
+    // this used to only ever reflect zones[0], stale since Phase 8's per-pad sample loading added
+    // more zones than that) as of the last successful publishSampleSet() call; 0 before any sample
+    // is loaded. Updated on the background bake thread whenever the published sample set changes -
+    // see publishSampleSet()'s own comment - and processorStateBroadcaster fires once ready.
+    juce::int64 getCachedEmbedPayloadSizeBytes() const noexcept { return cachedEmbedPayloadSizeBytes.load(); }
+
+    // Phase 8 plan's "per-zone indicator of whether that zone is embedded or path-referenced" -
+    // whether THIS specific zone ended up embedded (true) or stayed path-only (false) as of the
+    // last bake, replaying ConcreteSampleIO::shouldEmbed()'s own order-dependent cumulative-budget
+    // logic exactly (see recomputeCachedEmbedPayloadSize()) rather than a separate approximation.
+    // A zone can go either way independently of its neighbors once the total size cap is in play -
+    // this is genuinely per-zone state, not derivable from the toggle or the total size alone.
+    // false if zoneIndex is out of range (nothing cached yet, or the zone list has since changed
+    // size) - same cheap, always-returns-immediately guarantee as the total above.
+    bool isZoneCachedAsEmbedded(int zoneIndex) const noexcept
+    {
+        const juce::ScopedLock lock(embedStatusLock);
+        return juce::isPositiveAndBelow(zoneIndex, (int) cachedPerZoneEmbedded.size()) && cachedPerZoneEmbedded[(size_t) zoneIndex];
+    }
+
+    // Test/tooling accessors for Phase 6's voice-count limit and choke-group behavior: how many of
+    // the fixed voice pool are currently rendering, and whether a specific MIDI note is one of
+    // them. Not used by production code (the editor has no polyphony meter) - added because these
+    // are otherwise only observable by rendering audio and inferring voice count from summed
+    // content, which can't reliably distinguish "N voices" from "N+1" without controlling every
+    // zone's pitch, the way ConcreteProcessorTests's other internal-state accessors (e.g.
+    // getCurrentSampleSet()) already trade a small amount of encapsulation for a directly testable
+    // assertion instead of an audio-measurement proxy for it.
+    int getNumActiveVoicesForTest() const noexcept;
+    bool isNoteSoundingForTest(int midiNote) const noexcept;
+
+    // Test-only: publishes an arbitrary raw sample set directly, bypassing the one-zone-only
+    // loadSample() flow - Phase 6's choke-group behavior needs two zones sharing a non-zero
+    // chokeGroup, which v1's UI has no way to construct yet (that's a Phase 8 zone-editing
+    // control). See concrete-sampler-plugin-plan.md's Phase 6 Analysis: "tested even though v1
+    // never sets a non-zero group." Goes through the normal publishRawSampleSet() path, so the
+    // capture pass still bakes it exactly as it would any other raw set.
+    void setRawSampleSetForTest(ConcreteSampleSet::Ptr set) { publishRawSampleSet(std::move(set)); }
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    // Phase 2's first real automatable parameters. pitchEngineMode's raw value is the choice
+    // INDEX (0..3) as a float - see pitchEngineModeFromParam() for the ConcretePitchEngine::Mode
+    // conversion. baseRate is in Hz. Coarse/Fine tune used to live here too (global APVTS
+    // parameters applied identically to every zone) - a real reported bug, since retuning one
+    // pad's sample silently retuned every other pad's and the main sample's pitch too. They're now
+    // genuine per-zone state instead (ConcreteSampleZone::tuneSemitones/fineTuneCents), mutated via
+    // setCoarseTuneForZone()/setFineTuneForZone() below, the same publish-a-new-zone-list pattern
+    // as setLevelForZone()/setRootNoteForZone().
+    static constexpr auto pitchEngineModeParamID = "pitchEngineMode";
+    static constexpr auto baseRateParamID = "baseRate";
+
+    // Phase 3's quantization stage (see ConcreteQuantizer.h). bitDepth is the storage word width
+    // in bits, 1-16. quantizerMode's raw value is the choice INDEX (0=Linear, 1=Companded) as a
+    // float, same convention as pitchEngineMode - see quantizerModeFromParam().
+    static constexpr auto bitDepthParamID = "bitDepth";
+    static constexpr auto quantizerModeParamID = "quantizerMode";
+
+    // Phase 4's capture pass (see ConcreteCapturePass.h). captureTranspose is in semitones, 0-24,
+    // default 5 ("the one people actually want," the 33->45rpm-style ratio - though it has no
+    // effect until captureBypass is turned off). captureDrive is in dB, 0-24. captureBypass
+    // defaults to true ("every preset ships with the capture pass off" - it's a technique the user
+    // applies, not part of a machine's stock behavior); captureAutoCompensate defaults to true.
+    // captureIterations is 1-4 (compounding degradation - see ConcreteCapturePass.h).
+    static constexpr auto captureTransposeParamID = "captureTranspose";
+    static constexpr auto captureDriveParamID = "captureDrive";
+    static constexpr auto captureAutoCompensateParamID = "captureAutoCompensate";
+    static constexpr auto captureBypassParamID = "captureBypass";
+    static constexpr auto captureIterationsParamID = "captureIterations";
+
+    // Phase 5's playback-side filter (see ConcreteFilterModels.h) - live, per-voice, never baked
+    // (Architecture #3: filters are playback-side only). Defaults to Bypass/fully-open/no-
+    // resonance/no-modulation, matching every other control's "no coloration until asked for"
+    // convention. filterEnvAmount is bipolar octaves (negative sweeps down); filterKeyTrack is
+    // 0 (no tracking) to 1 (full 1:1 tracking with the played note, like pitch).
+    static constexpr auto filterModelParamID = "filterModel";
+    static constexpr auto filterCutoffParamID = "filterCutoff";
+    static constexpr auto filterResonanceParamID = "filterResonance";
+    static constexpr auto filterEnvAmountParamID = "filterEnvAmount";
+    static constexpr auto filterKeyTrackParamID = "filterKeyTrack";
+
+    // Phase 6's voice architecture (see ConcreteVoiceAllocator.h and ConcreteContourEnvelope.h).
+    // voiceCount is the runtime polyphony cap (1..maxVoices, default 8 - v1's existing behavior
+    // unchanged until a machine preset or the user dials it down): Architecture #1's point that
+    // running out of voices is emulation, not a bug, so it's a real, automatable-in-principle
+    // parameter rather than compiled-in per-preset data. ampEnvelopeMode's raw value is the choice
+    // INDEX (0=ADSR, 1=Contoured) as a float, same convention as pitchEngineMode/quantizerMode/
+    // filterModel - see ampEnvelopeModeFromParam(). Neither triggers a re-bake (both are live,
+    // per-voice playback behavior, same category as the filter parameters above).
+    static constexpr auto voiceCountParamID = "voiceCount";
+    static constexpr auto ampEnvelopeModeParamID = "ampEnvelopeMode";
+
+    // Phase 7's Machine selector (see ConcreteMachines.h) - "a single Machine selector as the
+    // primary control," per the plan, with everything else (the parameters above) still exposed
+    // underneath as secondary controls, so a machine is a starting point rather than a locked
+    // mode. Raw value is the choice index: 0 is "(Custom)", a deliberate non-machine sentinel, NOT
+    // one of the twelve - without it, an AudioParameterChoice's default would have to BE one of
+    // the twelve machines (a choice parameter always has some concrete default), which would mean
+    // either silently coloring a freshly-loaded instance with that machine's settings before the
+    // user ever touched anything (breaking every earlier phase's "no coloration until asked for"
+    // convention - see e.g. baseRateParamID's own comment on why THIS plugin's default resists
+    // defaulting to any one machine's real rate), or leaving that one machine permanently
+    // unreachable from its own combo box (JUCE's ComboBox doesn't fire onChange when you pick the
+    // item that's already showing - see FactoryPreset.h's setupPresetCombo() for the same gotcha).
+    // Indices 1-12 select machines 0-11 of getConcreteMachines(), in table order.
+    //
+    // This is a SEPARATE mechanism from getNumPrograms()/setCurrentProgram()/getProgramName()
+    // below (JUCE's older, non-automatable "host program list" concept - see FactoryPreset.h) even
+    // though both surfaces list the same twelve machines, because the plan explicitly wants BOTH:
+    // an automatable in-plugin parameter a host's automation lane can ride, AND host-native program
+    // menu compatibility "so host program menus work like every other plugin in the catalog." They
+    // share exactly one application path to stay in sync by construction rather than by duplicating
+    // apply logic: setCurrentProgram() only moves this parameter (to index+1), and
+    // parameterChanged()'s handling of THIS parameter (applyMachine()) is the sole place that
+    // actually pushes a machine's values into the other parameters, via
+    // factoryPresets.setCurrentProgram() - see that method's own comment.
+    static constexpr auto machineParamID = "machine";
+
+    // Phase 8's Master Volume - the panel's overall output level (see ConcreteFader in the
+    // editor), as opposed to Sample Volume (setLevelForZone() above, a per-zone gain baked into
+    // that zone's own playback, not the whole mix). A real automatable/host-saved parameter, not
+    // zone-list state like Sample Volume - it isn't a property of any one sample the way a zone's
+    // own level is, it's closer to "how loud is this instance," which every DAW expects to be
+    // able to automate/recall like any other output-gain control. Range/default (0.0-1.2, 1.0 =
+    // unity) matches ConcreteSampleZone::level's own linear-gain convention exactly, so both
+    // volumes share the same "100% displayed = 1.0x applied" arithmetic in the UI.
+    static constexpr auto masterVolumeParamID = "masterVolume";
+
+    // Synchronously re-derives every zone's working buffer from its source buffer using the
+    // CURRENT capture-pass parameter values, and republishes. The background bake thread (see the
+    // private juce::Thread override below) runs this same logic asynchronously whenever a capture-
+    // pass parameter changes during normal use; exposed publicly so tests/tooling can force a
+    // deterministic, immediate re-bake instead of waiting on/polling a background thread.
+    void rebakeNow();
+
+    // The UI's "Resample Now" entry point (Capture screen page) - re-runs the capture pass on the
+    // CURRENT settings even when nothing has changed, which parameterChanged() below has no way to
+    // trigger (it only fires on an actual value change). Exactly parameterChanged()'s own minimal
+    // response to a capture-pass parameter (set the flag, wake the bake thread) - never blocks the
+    // caller, unlike calling rebakeNow() directly would from the message thread.
+    void triggerBake() { bakeRequested = true; notify(); }
+
+    // Bound to the editor's on-screen keyboard (Phase 1's temporary playing surface - see
+    // concrete-sampler-plugin-plan.md's Phase 1 deliverables; Phase 8 replaces it with the real
+    // pad-grid/keyboard trigger surface). processBlock() merges this into the real MIDI buffer
+    // every block, the same pattern JUCE's own examples use for embedding a
+    // juce::MidiKeyboardComponent in a plugin editor.
+    juce::MidiKeyboardState keyboardState;
+
+private:
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void handleMidiMessage(const juce::MidiMessage& message, const ConcreteSampleSet::Ptr& sampleSet) noexcept;
+
+    // The ONLY place currentSampleSet is written (publishRawSampleSet() below delegates here rather
+    // than setting the field itself, specifically so this is a real single choke point) - besides
+    // publishing, also requests a background recompute of cachedEmbedPayloadSizeBytes by flipping
+    // sizeCacheRequested and waking the bake thread (run() services both flags off one wait()), so
+    // every path that can change what zones[0] would FLAC-encode to (a capture-pass re-bake, a
+    // fresh load, a relocate, a root-note/one-shot edit, a state restore) keeps that cached value
+    // honest without ever running encodeZoneAsFlac() on the calling thread.
+    void publishSampleSet(ConcreteSampleSet::Ptr newSet);
+
+    // Sets rawSampleSet to newRawSet and re-derives+publishes currentSampleSet from it via
+    // bakeSampleSet() then publishSampleSet() - the only way rawSampleSet should ever change. Every
+    // caller that produces a genuinely new or changed zone list (loadSample, relocateZone,
+    // setRootNoteForZone, setStateInformation) goes through this, never through publishSampleSet()
+    // directly, so rawSampleSet's start/end/loop points always stay in source-buffer terms - see
+    // that member's own comment for why this split exists.
+    void publishRawSampleSet(ConcreteSampleSet::Ptr newRawSet);
+
+    ConcreteCapturePass::Settings currentCapturePassSettings() const;
+
+    // Runs encodeZoneAsFlac() on zones[0] of the CURRENT sample set (0 if there are no zones yet)
+    // and stores the result in cachedEmbedPayloadSizeBytes, then fires processorStateBroadcaster.
+    // Only ever called from run(), on the background bake thread - see publishSampleSet()'s comment
+    // for how it gets requested.
+    void recomputeCachedEmbedPayloadSize();
+
+    // juce::Thread override: waits to be notify()'d (from parameterChanged() below, or from
+    // publishSampleSet() requesting a size-cache recompute) and then services whichever of
+    // bakeRequested/sizeCacheRequested is set, setting bakeInProgress and firing
+    // processorStateBroadcaster around the former. Runs for the processor's whole lifetime, started
+    // in the constructor and stopped in the destructor.
+    void run() override;
+
+    // juce::AudioProcessorValueTreeState::Listener override, registered for two DIFFERENT groups
+    // of parameter IDs that need two DIFFERENT responses:
+    //   - The parameters that change what ConcreteCapturePass::apply() produces: bitDepth,
+    //     quantizerMode, captureTranspose, captureDrive, captureBypass, captureIterations - NOT
+    //     captureAutoCompensate or any of the live filterXxx parameters, none of which need a
+    //     re-bake (see their own declaration comments above and ConcreteVoice.h). These do the
+    //     absolute minimum: wake the bake thread. The actual (expensive, allocating) re-bake work
+    //     always happens on that thread, never here - see machineParamID's own comment for why
+    //     THIS group's handling is safe to keep doing the bare minimum even now that a single
+    //     Machine change can touch several of them at once.
+    //   - machineParamID (Phase 7) - see applyMachine(). Unlike the group above, this one's
+    //     response (looping over ~9 setValueNotifyingHost() calls) is real work done directly here
+    //     rather than deferred to the bake thread - each of those calls is a cheap, bounded atomic
+    //     value write plus listener notification (not allocating or blocking I/O, unlike the
+    //     capture pass itself), so it stays acceptable even in the worst case of a host automating
+    //     Machine from inside processBlock(). Every one of THOSE calls may itself synchronously
+    //     re-enter this same override for whichever of the IDs above it touches, which is fine -
+    //     their handling is already just an atomic flag set, safe to re-enter from anywhere.
+    // May fire from ANY thread depending on the host (worst case the audio thread itself).
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
+    // The sole place a machine's values actually get pushed into the other parameters - see
+    // machineParamID's own comment. machineChoiceIndex is the Machine parameter's raw value: <= 0
+    // ("(Custom)") is a deliberate no-op, otherwise index-1 selects getConcreteMachines()[index-1]
+    // via factoryPresets.setCurrentProgram(), the same call a host picking its own native program
+    // makes (see setCurrentProgram() below) - one apply path shared by both entry points.
+    void applyMachine(int machineChoiceIndex);
+
+    // See common/Presets/FactoryPreset.h - getNumPrograms()/getCurrentProgram()/setCurrentProgram()/
+    // getProgramName() above just forward to this.
+    wildjag::FactoryPresetList factoryPresets;
+
+    juce::AudioFormatManager formatManager;
+
+    std::atomic<float>* pitchEngineModeParam = nullptr;
+    std::atomic<float>* baseRateParam = nullptr;
+    std::atomic<float>* bitDepthParam = nullptr;
+    std::atomic<float>* quantizerModeParam = nullptr;
+    std::atomic<float>* captureTransposeParam = nullptr;
+    std::atomic<float>* captureDriveParam = nullptr;
+    std::atomic<float>* captureAutoCompensateParam = nullptr;
+    std::atomic<float>* captureBypassParam = nullptr;
+    std::atomic<float>* captureIterationsParam = nullptr;
+    std::atomic<float>* filterModelParam = nullptr;
+    std::atomic<float>* filterCutoffParam = nullptr;
+    std::atomic<float>* filterResonanceParam = nullptr;
+    std::atomic<float>* filterEnvAmountParam = nullptr;
+    std::atomic<float>* filterKeyTrackParam = nullptr;
+    std::atomic<float>* voiceCountParam = nullptr;
+    std::atomic<float>* ampEnvelopeModeParam = nullptr;
+
+    // Set by parameterChanged(), cleared and acted on by run() - see that function's own comment.
+    std::atomic<bool> bakeRequested { false };
+
+    // Set true immediately before, false immediately after, the rebakeNow() call run() makes for a
+    // bakeRequested wakeup - see isBakeInProgress()'s own comment for why bakeRequested itself can't
+    // answer this. Never touched anywhere else.
+    std::atomic<bool> bakeInProgress { false };
+
+    // Set by publishSampleSet(), cleared and acted on by run() - see recomputeCachedEmbedPayloadSize().
+    std::atomic<bool> sizeCacheRequested { false };
+
+    // Set by stopAllVoices() (message thread), consumed at the top of processBlock() (audio
+    // thread) - see stopAllVoices()'s own comment.
+    std::atomic<bool> stopAllRequested { false };
+
+    // Backing store for getCachedEmbedPayloadSizeBytes() - see that method's own comment.
+    std::atomic<juce::int64> cachedEmbedPayloadSizeBytes { 0 };
+
+    // Backing store for isZoneCachedAsEmbedded() - a plain lock rather than another atomic since
+    // it's a whole vector, not a single value; only ever touched from the bake thread (writer) and
+    // the message thread (reader, at paint()-call frequency at most), so contention is a non-issue.
+    mutable juce::CriticalSection embedStatusLock;
+    std::vector<bool> cachedPerZoneEmbedded;
+
+    // Counts loadSampleAsync() calls that have launched their background thread but not yet
+    // delivered onComplete, so the destructor can wait for them to finish (bounded, same 2-second
+    // convention as stopThread() just below it) before this object's members start being destroyed
+    // - a loadSampleAsync() lambda captures `this` and keeps running after the call returns, so
+    // destruction can't just assume "no async load was in flight" the way it safely can for the
+    // synchronous loadSample().
+    std::atomic<int> pendingAsyncLoads { 0 };
+
+    // Fixed compile-time CAPACITY of the voice pool, not the current polyphony - see
+    // voiceCountParamID above for the runtime-adjustable limit. 18 covers the highest count in the
+    // Phase 7 machine table (Linn 9000, 13 poly / 18 multitimbral - see
+    // concrete-sampler-plugin-plan.md's Phase 7 machine table); every other machine's voice count
+    // fits well inside it.
+    static constexpr int maxVoices = 18;
+    std::array<ConcreteVoice, maxVoices> voices;
+    ConcreteVoiceAllocator<maxVoices> voiceAllocator;
+    ConcreteBusRouter busRouter;
+
+    double currentSampleRate = 44100.0;
+
+    // The zone list voices currently play. Guarded by sampleSetLock for the brief pointer-copy/
+    // refcount-bump needed to hand a stable reference to a starting voice or to the editor's
+    // waveform display - never held during actual audio rendering. This is a deliberate, narrow
+    // exception to "no locking on the audio thread": a juce::SpinLock held only around a
+    // ReferenceCountedObjectPtr copy (a few non-blocking instructions, no syscalls, no
+    // allocation) is the standard pragmatic pattern for this in real-world JUCE plugins, since
+    // C++17 has no atomic<shared_ptr>-equivalent and a hand-rolled lock-free scheme risks a
+    // genuine use-after-free bug for a benefit that doesn't matter in practice here (this lock is
+    // essentially never contended - published once whenever the user loads/edits a sample). Only
+    // ever REPLACED wholesale via publishSampleSet(); never mutated in place (see
+    // ConcreteSampleSet.h's own comment on treating it as immutable by convention).
+    mutable juce::SpinLock sampleSetLock;
+    ConcreteSampleSet::Ptr currentSampleSet;
+
+    // The zone list exactly as loaded/relocated/restored, BEFORE any capture-pass bake - its
+    // zones' start/end/loopStart/loopEnd are always expressed in source-buffer terms, never
+    // rescaled. rebakeNow() always re-bakes FROM this (never from currentSampleSet), which is the
+    // fix for a real bug: bakeZone() rescales start/end by (newWorkingLength / sourceLength) each
+    // time it runs, and rescaling AN ALREADY-RESCALED value on every subsequent re-bake compounds
+    // multiplicatively - repeatedly nudging a capture-pass parameter (e.g. Capture Iterations or
+    // Capture Drive, each triggering its own re-bake) would shrink the zone's audible span toward
+    // nothing over several re-bakes, even though the actual audio content baked correctly every
+    // time (only the start/end bookkeeping compounded). Keeping a stable, never-rescaled source-
+    // space zone list for every re-bake to start from eliminates the compounding entirely. Guarded
+    // by the same sampleSetLock as currentSampleSet since the two are always updated together (see
+    // publishRawSampleSet()).
+    ConcreteSampleSet::Ptr rawSampleSet;
+
+    // Architecture #2's session-persistence override - see getEmbedSamplesOverride().
+    bool embedSamplesOverride = false;
+};
