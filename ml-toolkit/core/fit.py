@@ -40,6 +40,67 @@ def envelope_loss(rendered: torch.Tensor, target: torch.Tensor, window_samples: 
     return F.l1_loss(torch.log(r_energy + 1e-8), torch.log(t_energy + 1e-8))
 
 
+def weighted_envelope_loss(rendered: torch.Tensor, target: torch.Tensor, window_samples: int = 256) -> torch.Tensor:
+    """Like envelope_loss() above, but each frame is weighted by the TARGET's own rate of change
+    (in log-energy, detached - a fitting weight, not something gradients flow through). Added for
+    effects/nonlin: a gate's shape lives almost entirely in its build-up and knee/fall, which span
+    far fewer frames than the long, nearly-flat plateau between them - plain envelope_loss (equal
+    weight per frame) lets the plateau win by sheer frame count and can leave the fit under-
+    penalized for getting the build-up/fall exactly right. rendered/target: [batch, num_samples]
+    (2D, same convention as envelope_loss - flatten a stereo [batch, 2, num_samples] tensor's
+    channel into batch before calling, same as stft_magnitude_loss/envelope_loss)."""
+    hop = max(1, window_samples // 2)
+    r_energy = F.avg_pool1d((rendered ** 2).unsqueeze(1), window_samples, stride=hop).squeeze(1)
+    t_energy = F.avg_pool1d((target ** 2).unsqueeze(1), window_samples, stride=hop).squeeze(1)
+    r_log = torch.log(r_energy + 1e-8)
+    t_log = torch.log(t_energy + 1e-8)
+
+    slope = torch.zeros_like(t_log)
+    if t_log.shape[-1] > 1:
+        diffs = (t_log[:, 1:] - t_log[:, :-1]).abs()
+        slope[:, :-1] = diffs
+        slope[:, -1] = diffs[:, -1]
+    weight = (slope.detach() + 1e-3)
+    weight = weight / weight.mean(dim=-1, keepdim=True).clamp(min=1e-8)
+
+    return (weight * (r_log - t_log).abs()).mean()
+
+
+def mid_side_stft_loss(rendered_stereo: torch.Tensor, target_stereo: torch.Tensor, fft_sizes: tuple[int, ...] = (512, 1024, 2048), hop_divisor: int = 4, log_eps: float = 1e-6) -> torch.Tensor:
+    """stft_magnitude_loss() applied to Mid=(L+R)/2 and Side=(L-R)/2 rather than per-channel L/R.
+    A per-channel magnitude loss is phase-blind and therefore structurally cannot see
+    interchannel correlation at all (two signals can have identical per-channel magnitude spectra
+    while being fully correlated or fully independent) - matching M and S magnitudes is sensitive
+    to both the per-channel content AND the interchannel relationship, which a plain per-channel
+    loss can't distinguish. rendered_stereo/target_stereo: [batch, 2, num_samples]."""
+    r_mid = (rendered_stereo[:, 0] + rendered_stereo[:, 1]) / 2.0
+    r_side = (rendered_stereo[:, 0] - rendered_stereo[:, 1]) / 2.0
+    t_mid = (target_stereo[:, 0] + target_stereo[:, 1]) / 2.0
+    t_side = (target_stereo[:, 0] - target_stereo[:, 1]) / 2.0
+    return (
+        stft_magnitude_loss(r_mid, t_mid, fft_sizes, hop_divisor, log_eps)
+        + stft_magnitude_loss(r_side, t_side, fft_sizes, hop_divisor, log_eps)
+    ) / 2.0
+
+
+def decorrelation_regularizer(rendered_stereo: torch.Tensor, target_correlation: float = 0.0) -> torch.Tensor:
+    """Penalizes the rendered stereo pair's zero-lag normalized correlation away from
+    `target_correlation` - a cheap, explicit guard against an otherwise-invisible degeneracy: the
+    magnitude-only losses above (stft_magnitude_loss/mid_side_stft_loss on their own) could in
+    principle be satisfied by a MORE correlated stereo image than the real hardware has, since
+    per-channel or M/S magnitude alone under-constrains the exact interchannel phase relationship.
+    rendered_stereo: [batch, 2, num_samples]. Belt-and-braces with mid_side_stft_loss, not a
+    replacement for it - names the degeneracy explicitly rather than relying on the M/S loss
+    alone to rule it out."""
+    l = rendered_stereo[:, 0]
+    r = rendered_stereo[:, 1]
+    l = l - l.mean(dim=-1, keepdim=True)
+    r = r - r.mean(dim=-1, keepdim=True)
+    denom = (l.norm(dim=-1) * r.norm(dim=-1)).clamp(min=1e-8)
+    corr = (l * r).sum(dim=-1) / denom
+    return ((corr - target_correlation) ** 2).mean()
+
+
 def build_loss(spectral_weight: float = 1.0, envelope_weight: float = 1.0, fft_sizes: tuple[int, ...] = (512, 1024, 2048)):
     """Returns a loss_fn(rendered, target) -> scalar tensor combining the two terms above."""
 

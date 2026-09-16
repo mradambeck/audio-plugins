@@ -54,6 +54,20 @@ class Capture:
     dry_path: Optional[str] = None  # only set when kind == "paired"
 
 
+def load_audio_channels(path: str) -> tuple[np.ndarray, int]:
+    """Loads a WAV file keeping channels separate. Returns ([n_channels, n_samples] float64, sr).
+
+    Added for effects/nonlin, whose captures have a structurally important stereo property (two
+    fully decorrelated channels) that load_audio's mono mix would destroy. load_audio itself is
+    left alone below rather than changed to call this and transpose - effects/ambience's whole
+    pipeline (features.json, findings.md, fitted_raw.json, cross_validation_report.md) is keyed to
+    its exact current behaviour, and this function's own behaviour must not depend on load_audio's
+    to keep that independence obvious.
+    """
+    data, sr = sf.read(path, always_2d=True)
+    return data.T.astype(np.float64), sr
+
+
 def load_audio(path: str) -> tuple[np.ndarray, int]:
     """Loads a WAV file, mixes to mono float64. Returns (samples, sample_rate)."""
     data, sr = sf.read(path, always_2d=True)
