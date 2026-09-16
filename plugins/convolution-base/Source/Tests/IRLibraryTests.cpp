@@ -139,6 +139,37 @@ public:
                    "the same IR at twice the rate must be about twice as many samples");
         }
 
+        beginTest("IRs are normalised to unit energy, and a Dirac stays an identity");
+        {
+            // Without this, the wet level depends entirely on how much energy a capture happens to
+            // contain - measured at roughly 34x for the harness's room IR, which would make one
+            // Wet knob useless across a variant's whole set. Normalising the WHOLE IR once at
+            // decode (not per shape) is what lets Length and Attack leave the level alone.
+            juce::AudioBuffer<float> noise(2, 4096);
+            juce::Random random(1234);
+            for (int channel = 0; channel < 2; ++channel)
+                for (int i = 0; i < 4096; ++i)
+                    noise.setSample(channel, i, random.nextFloat() * 2.0f - 1.0f);
+
+            IRLibrary::normaliseToUnitEnergy(noise);
+
+            double energy = 0.0;
+            for (int channel = 0; channel < 2; ++channel)
+                for (int i = 0; i < 4096; ++i)
+                    energy += (double) noise.getSample(channel, i) * (double) noise.getSample(channel, i);
+
+            expectWithinAbsoluteError((float) (energy / 2.0), 1.0f, 1.0e-4f,
+                                      "per-channel energy should be unity after normalisation");
+
+            // The property every measurement in ConvolutionEngineTests depends on: a unit impulse
+            // must normalise to itself, or convolving with the Dirac IR stops being an identity.
+            juce::AudioBuffer<float> impulse(1, 1024);
+            impulse.clear();
+            impulse.setSample(0, 0, 1.0f);
+            IRLibrary::normaliseToUnitEnergy(impulse);
+            expectWithinAbsoluteError(impulse.getSample(0, 0), 1.0f, 1.0e-6f);
+        }
+
         beginTest("an out-of-range index returns nothing");
         {
             IRLibrary library(variant);

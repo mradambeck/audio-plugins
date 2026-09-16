@@ -52,14 +52,48 @@ std::shared_ptr<const juce::AudioBuffer<float>> IRLibrary::getDecodedIR(int inde
     if (! decodeBlob(asset.data, asset.dataSize, decoded, sourceSampleRate))
         return nullptr;
 
-    auto atSessionRate = std::make_shared<const juce::AudioBuffer<float>>(
-        resample(decoded, sourceSampleRate, targetSampleRate));
+    auto atSessionRate = resample(decoded, sourceSampleRate, targetSampleRate);
 
-    if (atSessionRate->getNumSamples() <= 0)
+    if (atSessionRate.getNumSamples() <= 0)
         return nullptr;
 
-    cache[(size_t) index] = atSessionRate;
-    return atSessionRate;
+    // After resampling, so the normalisation is computed from the samples that will actually be
+    // convolved and a 44.1 kHz IR lands at the same level in a 96 kHz session.
+    normaliseToUnitEnergy(atSessionRate);
+
+    auto cached = std::make_shared<const juce::AudioBuffer<float>>(std::move(atSessionRate));
+    cache[(size_t) index] = cached;
+    return cached;
+}
+
+void IRLibrary::normaliseToUnitEnergy(juce::AudioBuffer<float>& buffer)
+{
+    const auto numChannels = buffer.getNumChannels();
+    const auto numSamples = buffer.getNumSamples();
+
+    if (numChannels <= 0 || numSamples <= 0)
+        return;
+
+    double energy = 0.0;
+    for (int channel = 0; channel < numChannels; ++channel)
+    {
+        const auto* samples = buffer.getReadPointer(channel);
+        for (int i = 0; i < numSamples; ++i)
+            energy += (double) samples[i] * (double) samples[i];
+    }
+
+    // Per-channel RMS energy rather than the raw sum, so a stereo IR is not made 3 dB quieter than
+    // the mono version of the same capture.
+    const auto perChannelEnergy = energy / (double) numChannels;
+
+    if (perChannelEnergy <= 0.0)
+        return;
+
+    const auto gain = 1.0f / (float) std::sqrt(perChannelEnergy);
+
+    // One gain for every channel, so the IR's own stereo balance survives.
+    for (int channel = 0; channel < numChannels; ++channel)
+        juce::FloatVectorOperations::multiply(buffer.getWritePointer(channel), gain, numSamples);
 }
 
 bool IRLibrary::decodeBlob(const void* data, size_t dataSize,

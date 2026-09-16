@@ -89,6 +89,11 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     IRShaper::Params currentShapeParams() const noexcept;
 
+    // Pushes every continuous parameter into the engine. Called from processBlock (where the
+    // engine's own ramps then smooth the changes) and from prepareToPlay, which follows it with
+    // engine.reset() to snap those ramps to their targets instead of gliding up from zero.
+    void applyParametersToEngine() noexcept;
+
     ConvolutionEngine engine;
     IRLoadWorker worker;
 

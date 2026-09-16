@@ -1,6 +1,7 @@
 #include "ConvolutionProcessor.h"
 
 #include <cmath>
+#include <vector>
 
 // Drives the real shared AudioProcessor: bus negotiation, the mono fan-out, state round-tripping,
 // and the bypass-parameter override. None of this is reachable from the engine-only suite.
@@ -16,6 +17,13 @@ namespace
             for (int i = 0; i < buffer.getNumSamples(); ++i)
                 buffer.setSample(channel, i, amplitude * std::sin(juce::MathConstants<float>::twoPi
                                                                   * frequencyHz * (float) i / (float) sampleRate));
+    }
+
+    // Sets a parameter from a real-world value (percent, ms, Hz) rather than a normalised 0-1 one.
+    void setRaw(wildjag::conv::ConvolutionProcessor& processor, const char* paramID, float rawValue)
+    {
+        if (auto* param = processor.apvts.getParameter(paramID))
+            param->setValueNotifyingHost(param->convertTo0to1(rawValue));
     }
 
     float rms(const juce::AudioBuffer<float>& buffer, int channel)
@@ -80,6 +88,86 @@ public:
             processor.prepareToPlay(sampleRate, blockSize);
 
             expectEquals(processor.getLatencySamples(), 0);
+        }
+
+        beginTest("the very first block is at full level, not ramping up");
+        {
+            // Regression test. The engine smooths its gains and its pre-delay, and prepareToPlay
+            // used to leave those ramps at zero - so the wet signal faded in over the first 20 ms
+            // of every transport start and an impulse escaped before Pre-Delay had moved at all.
+            // Both unit suites missed it because they call engine.reset() by hand; it took
+            // analysis/validate.py rendering actual audio to surface it. The fix is
+            // applyParametersToEngine() + reset() in prepareToPlay.
+            ConvolutionProcessor processor(variantConfig());
+
+            // Dirac IR, wet only: convolution is then an identity, so the output should be the
+            // input untouched from the very first sample.
+            processor.apvts.getParameter(ConvolutionProcessor::irIndexParamID)
+                ->setValueNotifyingHost(1.0f); // last entry in the table is the Dirac
+            setRaw(processor, ConvolutionProcessor::dryParamID, 0.0f);
+            setRaw(processor, ConvolutionProcessor::wetParamID, 100.0f);
+
+            processor.setPlayConfigDetails(1, 1, sampleRate, blockSize);
+            processor.prepareToPlay(sampleRate, blockSize);
+
+            juce::AudioBuffer<float> buffer(1, blockSize);
+            buffer.clear();
+            buffer.setSample(0, 0, 1.0f);
+
+            juce::MidiBuffer midi;
+            processor.processBlock(buffer, midi);
+
+            expectWithinAbsoluteError(buffer.getSample(0, 0), 1.0f, 0.01f,
+                                      "the first sample was attenuated by an unsettled gain ramp");
+        }
+
+        beginTest("pre-delay applies from the first block");
+        {
+            ConvolutionProcessor processor(variantConfig());
+
+            processor.apvts.getParameter(ConvolutionProcessor::irIndexParamID)->setValueNotifyingHost(1.0f);
+            setRaw(processor, ConvolutionProcessor::dryParamID, 0.0f);
+            setRaw(processor, ConvolutionProcessor::wetParamID, 100.0f);
+            setRaw(processor, ConvolutionProcessor::preDelayMsParamID, 5.0f);
+
+            processor.setPlayConfigDetails(1, 1, sampleRate, blockSize);
+            processor.prepareToPlay(sampleRate, blockSize);
+
+            // Rendered across two blocks and searched as one span, so the assertion does not
+            // depend on which block the onset happens to land in.
+            juce::MidiBuffer midi;
+            std::vector<float> rendered;
+
+            for (int block = 0; block < 2; ++block)
+            {
+                juce::AudioBuffer<float> buffer(1, blockSize);
+                buffer.clear();
+                if (block == 0)
+                    buffer.setSample(0, 0, 1.0f);
+
+                processor.processBlock(buffer, midi);
+
+                for (int i = 0; i < blockSize; ++i)
+                    rendered.push_back(buffer.getSample(0, i));
+            }
+
+            expect(std::abs(rendered[0]) < 0.01f, "the impulse escaped before pre-delay was applied");
+
+            auto peakIndex = 0;
+            auto peak = 0.0f;
+            for (int i = 0; i < (int) rendered.size(); ++i)
+            {
+                if (std::abs(rendered[(size_t) i]) > peak)
+                {
+                    peak = std::abs(rendered[(size_t) i]);
+                    peakIndex = i;
+                }
+            }
+
+            const auto expectedIndex = (int) std::lround(0.005 * sampleRate);
+            expect(std::abs(peakIndex - expectedIndex) <= 1,
+                   "onset at sample " + juce::String(peakIndex) + ", expected " + juce::String(expectedIndex));
+            expectWithinAbsoluteError(peak, 1.0f, 0.05f);
         }
 
         beginTest("produces stereo output from a mono input");

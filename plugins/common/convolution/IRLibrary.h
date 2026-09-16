@@ -42,12 +42,22 @@ public:
     // later re-shape at different Length/Attack values without decoding twice.
     std::shared_ptr<const juce::AudioBuffer<float>> getDecodedIR(int index);
 
-    // Exposed for IRLibraryTests, which need to exercise decode and resample in isolation from any
-    // variant or cache.
+    // Exposed for IRLibraryTests, which need to exercise decode, resample and normalise in
+    // isolation from any variant or cache.
     static bool decodeBlob(const void* data, size_t dataSize,
                            juce::AudioBuffer<float>& destination, double& sourceSampleRate);
     static juce::AudioBuffer<float> resample(const juce::AudioBuffer<float>& source,
                                              double sourceSampleRate, double targetSampleRate);
+
+    // Scales an IR to unit energy, in place, so convolving with it roughly preserves the input's
+    // level. Applied once at decode time, to the WHOLE IR, which is the point: a per-shape
+    // normalisation would make Length and Attack change the output level, and no normalisation at
+    // all leaves the wet level at the mercy of how much energy a given capture happens to contain
+    // (measured at ~34x for one of the harness IRs, which makes a shared Wet knob meaningless
+    // across a variant's set). juce::dsp::Convolution is therefore loaded with Normalise::no.
+    //
+    // A unit impulse normalises to itself, so convolution with a Dirac IR stays an identity.
+    static void normaliseToUnitEnergy(juce::AudioBuffer<float>& buffer);
 
 private:
     const ConvolutionVariant& variant;

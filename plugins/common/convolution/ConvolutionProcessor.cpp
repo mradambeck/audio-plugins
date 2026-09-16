@@ -144,6 +144,14 @@ void ConvolutionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     engine.prepare(sampleRate, maxBlockSize, channels, std::move(initialIR));
 
+    // Push the current parameter values in and then snap every ramp to them. Without this the
+    // engine starts each prepare with its smoothers at zero and glides up to the real values over
+    // the first 20-50 ms: the wet signal fades in on every transport start, and an impulse at
+    // sample 0 escapes before Pre-Delay has ramped in at all. Both showed up as failures in
+    // analysis/validate.py and in neither unit test, because the tests call reset() by hand.
+    applyParametersToEngine();
+    engine.reset();
+
     lastRequestedIndex = index;
     lastRequestedLengthPercent = shapeParams.lengthPercent;
     lastRequestedAttackMs = shapeParams.attackMs;
@@ -157,6 +165,16 @@ void ConvolutionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
                           : 0.0);
 
     prepared = true;
+}
+
+void ConvolutionProcessor::applyParametersToEngine() noexcept
+{
+    engine.setPreDelayMs(preDelayMsParam->load());
+    engine.setLowCutHz(lowCutHzParam->load());
+    engine.setHighCutHz(highCutHzParam->load());
+    engine.setDryGain(dryParam->load() * 0.01f);
+    engine.setWetGain(wetParam->load() * 0.01f);
+    engine.setBypassed(bypassParam != nullptr && bypassParam->get());
 }
 
 void ConvolutionProcessor::releaseResources() {}
@@ -241,12 +259,7 @@ void ConvolutionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
                               + ConvolutionEngine::maxPreDelayMs * 0.001);
     }
 
-    engine.setPreDelayMs(preDelayMsParam->load());
-    engine.setLowCutHz(lowCutHzParam->load());
-    engine.setHighCutHz(highCutHzParam->load());
-    engine.setDryGain(dryParam->load() * 0.01f);
-    engine.setWetGain(wetParam->load() * 0.01f);
-    engine.setBypassed(bypassParam != nullptr && bypassParam->get());
+    applyParametersToEngine();
 
     engine.process(buffer, n);
 

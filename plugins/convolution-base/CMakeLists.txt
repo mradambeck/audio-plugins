@@ -112,3 +112,40 @@ target_link_libraries(ConvBaseTests
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# Offline render harness (mirrors shields-reverb's ShieldsRenderIR / aura-reverb's AuraRenderIR) -
+# drives the real ConvolutionProcessor and writes 32-bit float WAV for analysis/validate.py to
+# measure. Unlike ConvBaseTests it needs the editor, because it links the full plugin-side sources;
+# that is also what makes it a useful smoke test that the editor still links.
+juce_add_console_app(ConvBaseRenderIR
+    PRODUCT_NAME "ConvBaseRenderIR"
+)
+
+target_sources(ConvBaseRenderIR
+    PRIVATE
+        Source/VariantConfig.cpp
+        Source/VariantTheme.cpp
+        Source/Tools/RenderIR.cpp
+)
+
+wildjag_add_convolution_core(ConvBaseRenderIR)
+wildjag_add_convolution_ui(ConvBaseRenderIR)
+
+target_compile_definitions(ConvBaseRenderIR
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JucePlugin_Name="ConvBase"
+        JucePlugin_VersionString="${PROJECT_VERSION}"
+)
+
+target_link_libraries(ConvBaseRenderIR
+    PRIVATE
+        ConvBaseBinaryData
+        juce::juce_audio_utils
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
