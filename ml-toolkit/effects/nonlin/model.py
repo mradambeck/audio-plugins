@@ -100,8 +100,18 @@ TILT_PIVOT_MAX_HZ = 6000.0
 
 # Gate envelope parameter bounds - every one of these has a directly-measured twin from
 # core.features.gate_envelope_params(); see build_curves.py's cross-check against it.
-TAU_A_MIN_MS, TAU_A_MAX_MS = 0.5, 60.0
-PLATEAU_DROOP_MIN_DB_S, PLATEAU_DROOP_MAX_DB_S = -60.0, 10.0
+#
+# PLATEAU_DROOP's original range (-60..10 dB/s) was a placeholder guess made before any real
+# capture existed. The real fit against effects/nonlin/findings.md's 9 captures pinned it exactly
+# at -60.0 (the boundary) for several captures and diverged shortly after - findings.md's own
+# direct measurement of the real captures found droop as steep as -215dB/s at short Time, so the
+# original bound wasn't just tight, it was inside the range the data actually needs. Widened with
+# real headroom, not re-guessed narrowly. TAU_A_MAX_MS similarly got pinned at exactly 60.0ms for
+# several captures (real measured build_up_ms only ever reached ~35ms - see findings.md - but the
+# fit wanted more, plausibly to compensate for the tank's own slow density buildup findings.md
+# found via normalized_echo_density, not just the amplitude envelope); widened for the same reason.
+TAU_A_MIN_MS, TAU_A_MAX_MS = 0.5, 150.0
+PLATEAU_DROOP_MIN_DB_S, PLATEAU_DROOP_MAX_DB_S = -400.0, 10.0
 T_KNEE_MIN_MS, T_KNEE_MAX_MS = 5.0, 400.0
 FALL_RATE_MIN_DB_S, FALL_RATE_MAX_DB_S = -2000.0, -20.0
 TAU_K_MIN_MS, TAU_K_MAX_MS = 0.2, 30.0

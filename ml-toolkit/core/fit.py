@@ -16,6 +16,20 @@ import torch
 import torch.nn.functional as F
 
 
+def _safe_complex_abs(z: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    """Numerically-safe replacement for a complex tensor's own .abs(). Plain .abs() computes
+    sqrt(real^2+imag^2) but its GRADIENT is z/|z| - exactly 0/0 (NaN) at any bin that is precisely
+    zero. That never came up while this loss only ever saw AmbienceFDN's render (continuously
+    excited from t=0, so no sample - and therefore no whole STFT window - is ever exactly zero);
+    it broke immediately (backward() raised a RuntimeError, caught by torch.autograd.
+    set_detect_anomaly's diagnostic) once effects/nonlin/model.py's NonLinGatedFDN was fit for
+    real - that render genuinely has exact-zero samples for the first several ms (before its
+    shortest delay line's first arrival), and an early STFT window landing entirely inside that
+    silence hits the singularity. Adding eps^2 inside the sqrt gives a well-defined, bounded
+    gradient everywhere, including at true zero, and is imperceptible for any bin that isn't."""
+    return torch.sqrt(z.real ** 2 + z.imag ** 2 + eps ** 2)
+
+
 def stft_magnitude_loss(rendered: torch.Tensor, target: torch.Tensor, fft_sizes: tuple[int, ...] = (512, 1024, 2048), hop_divisor: int = 4, log_eps: float = 1e-6) -> torch.Tensor:
     """Multi-resolution STFT magnitude loss: linear-magnitude L1 (captures loud/broadband
     differences) + log-magnitude L1 (captures quiet-tail/tonal differences that linear-scale L1
@@ -24,8 +38,8 @@ def stft_magnitude_loss(rendered: torch.Tensor, target: torch.Tensor, fft_sizes:
     for n_fft in fft_sizes:
         hop = max(1, n_fft // hop_divisor)
         window = torch.hann_window(n_fft, device=rendered.device)
-        r_mag = torch.stft(rendered, n_fft=n_fft, hop_length=hop, window=window, return_complex=True).abs()
-        t_mag = torch.stft(target, n_fft=n_fft, hop_length=hop, window=window, return_complex=True).abs()
+        r_mag = _safe_complex_abs(torch.stft(rendered, n_fft=n_fft, hop_length=hop, window=window, return_complex=True))
+        t_mag = _safe_complex_abs(torch.stft(target, n_fft=n_fft, hop_length=hop, window=window, return_complex=True))
         total = total + F.l1_loss(r_mag, t_mag) + F.l1_loss(torch.log(r_mag + log_eps), torch.log(t_mag + log_eps))
     return total / len(fft_sizes)
 

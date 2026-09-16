@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 """Phase 4: builds knob -> fitted-parameter curves from fitted_raw.json.
 
-Split into TWO families, unlike effects/ambience/build_curves.py's single Time-curve-plus-High-
-offset pattern, because findings.md's central structural finding is that Time and High affect
-genuinely DIFFERENT, separable properties here (Time = envelope timing only, High = tone only -
-see the "already measured" section of the project plan and findings.md's own confirmation):
+Split into THREE families (revised after findings.md's real capture analysis - see that file's
+"High: timing-NEUTRAL overall, but NOT damping-neutral" section, which corrected the working
+hypothesis this module originally shipped with):
 
-  - TIMING_PARAMS (the gate envelope shape + tank density/damping) get a single Time curve. This
-    curve is allowed to pool captures across DIFFERENT High settings at the same Time IF, and only
-    if, the H-timing-neutrality check below actually confirms H doesn't move them in this specific
-    fitted data - not assumed from the working hypothesis alone. That's what makes the sparse
-    9-capture cross (see the project plan's "capture design" grid) usable at all: most Time points
-    only exist at one, non-zero-H setting.
+  - TIME_ONLY_PARAMS (the gate envelope's overall timing + tank density/damping) get a single Time
+    curve. Pooled across DIFFERENT High settings at the same Time IF, and only if, the
+    H-timing-neutrality check below actually confirms H doesn't move them in this specific fitted
+    data - findings.md confirmed this directly for gate_length/t_knee_ms (identical to two decimal
+    places across different High at the same Time), which is what makes the sparse 9-capture cross
+    usable at all for these parameters.
   - TONAL_PARAMS (the input tilt) get a High offset curve, built from whichever single Time
-    setting has the richest H sweep in the actual capture set (chosen at runtime, not hardcoded -
-    the plan's grid is a recommendation, not a guarantee of what Adam actually captured).
+    setting has the richest H sweep in the actual capture set.
+  - H_DEPENDENT_TIMING_PARAMS: plateau_droop_db_per_s specifically. findings.md found this is NOT
+    H-neutral (roughly 4-12x different between High=0 and negative High at the same Time, while
+    the OVERALL gate length stays exactly fixed) - High redistributes energy loss between the
+    plateau and the post-knee fall without changing the total time to reach -20dB. Gets the SAME
+    additive Time(H=0 baseline) + High-offset treatment as the tonal params, not pooled into the
+    Time-only curve the way it was before this was measured.
 
-No H*Time interaction curve is built, matching effects/ambience/build_curves.py's refusal to fit
-Low's interaction with High from too few points - see _notes["h_time_interaction"] for the honest
-reading of what the actual captured grid can and can't support, populated with real residual
-numbers rather than left as a bare assertion.
+No H*Time interaction curve is built for anything, matching effects/ambience/build_curves.py's
+refusal to fit Low's interaction with High from too few points - see _notes["h_time_interaction"]
+for the honest reading of what the actual captured grid can and can't support, populated with real
+residual numbers rather than left as a bare assertion.
 """
 from __future__ import annotations
 
@@ -32,11 +36,14 @@ HERE = os.path.dirname(__file__)
 FITTED_RAW_PATH = os.path.join(HERE, "fitted_raw.json")
 CURVES_PATH = os.path.join(HERE, "curves.json")
 
-TIMING_PARAMS = [
+TIME_ONLY_PARAMS = [
     "t_knee_ms", "tau_a_ms", "fall_rate_db_per_s", "tau_k_ms",
-    "plateau_droop_db_per_s", "feedback_gain", "damping_weight_mean",
+    "feedback_gain", "damping_weight_mean",
 ]
 TONAL_PARAMS = ["tilt_low_gain", "tilt_high_gain", "tilt_pivot_hz"]
+# See module docstring - moved out of TIME_ONLY_PARAMS after findings.md measured this specific
+# parameter is NOT H-neutral, unlike every other timing parameter checked.
+H_DEPENDENT_TIMING_PARAMS = ["plateau_droop_db_per_s"]
 
 # How much a timing parameter is allowed to spread across different High settings AT THE SAME
 # Time setting before H is judged to have a real effect on timing after all (contradicting the
@@ -99,7 +106,7 @@ def main() -> None:
         time_points_source = "H=0 only (H-timing-neutrality NOT confirmed in this fitted data)"
     print(f"Timing curves built from: {time_points_source}, {len(by_time)} distinct Time value(s)")
 
-    for param in TIMING_PARAMS:
+    for param in TIME_ONLY_PARAMS:
         pairs = []
         for time_val, group in sorted(by_time.items()):
             values = [c[param] for c in group]
@@ -113,7 +120,25 @@ def main() -> None:
         curves[f"time_to_{param}"] = {"points": curve.points()}
         print(f"  {param}: {[round(v, 3) for _, v in curve.points()]}")
 
-    # --- Tonal curve: additive High offset, from whichever Time setting has the richest H sweep ---
+    # --- H=0-only Time baseline for the H-dependent timing param(s) - see module docstring ---
+    by_time_h0 = {}
+    for c in caps:
+        if c["params"]["high"] == 0:
+            by_time_h0.setdefault(c["params"]["time"], []).append(c)
+    print(f"\nH-dependent timing param(s) use an H=0-only Time baseline: {len(by_time_h0)} distinct Time value(s)")
+    for param in H_DEPENDENT_TIMING_PARAMS:
+        pairs = sorted((t, sum(c[param] for c in group) / len(group)) for t, group in by_time_h0.items())
+        if len(pairs) < 2:
+            print(f"  {param}: only {len(pairs)} H=0 Time point(s) available - skipping curve, "
+                  "using the single available value as a constant instead")
+            curves[f"time_to_{param}"] = {"points": pairs, "constant": len(pairs) == 1}
+        else:
+            curve = fit_curve(pairs)
+            curves[f"time_to_{param}"] = {"points": curve.points()}
+            print(f"  {param} (H=0 baseline): {[round(v, 3) for _, v in curve.points()]}")
+
+    # --- Tonal + H-dependent-timing offset curves: additive High offset, from whichever Time
+    # setting has the richest H sweep in the actual capture set ---
     by_time_high_count = {}
     for c in caps:
         by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
@@ -123,7 +148,7 @@ def main() -> None:
           f"High values {[h for h, _ in high_sweep]}")
 
     has_h0 = any(h == 0 for h, _ in high_sweep)
-    for param in TONAL_PARAMS:
+    for param in TONAL_PARAMS + H_DEPENDENT_TIMING_PARAMS:
         if not has_h0 or len(high_sweep) < 2:
             print(f"  {param}: not enough High points at Time={richest_time}s (need >=2, including "
                   "High=0 to anchor) - skipping curve, using neutral default")
@@ -136,7 +161,7 @@ def main() -> None:
 
     # --- H*Time interaction residual check (report only - no interaction curve is built) ---
     residuals = []
-    time_curve_points = {p: curves.get(f"time_to_{p}") for p in TIMING_PARAMS}
+    time_curve_points = {p: curves.get(f"time_to_{p}") for p in TIME_ONLY_PARAMS}
     for c in caps:
         t, h = c["params"]["time"], c["params"]["high"]
         entry = time_curve_points.get("t_knee_ms")
@@ -173,6 +198,17 @@ def main() -> None:
             "H=0 (T=7.0s and T=9.8s matched to within 0.1dB per band), so a single High offset "
             "curve (built from whichever Time setting had the richest H sweep, printed above) is "
             "used at every Time setting."
+        ),
+        "plateau_droop_combination_model": (
+            "plateau_droop_db_per_s = time_to_plateau_droop_db_per_s(Time) [H=0 baseline] + "
+            "high_to_plateau_droop_db_per_s_offset(High) - moved out of the pooled Time-only "
+            "curve after findings.md measured High has a real, large effect on this specific "
+            "parameter (roughly 4-12x between High=0 and negative High at the same Time) even "
+            "though the OVERALL gate length (t_knee_ms and friends) is exactly High-independent. "
+            "The offset curve uses the same richest-High-sweep Time setting as the tonal params, "
+            "which is a Time-independence assumption for the OFFSET's shape (not the baseline) - "
+            "same caveat as Ambience's own High-offset curves, unconfirmed by a second Time "
+            "setting's full sweep."
         ),
     }
 

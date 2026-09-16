@@ -51,7 +51,7 @@ namespace
 
     juce::AudioBuffer<float> synthesizeAndNormalize(float timeKnob, float highKnob, double sampleRate)
     {
-        const auto gate = InhaltParameterMap::mapTimeKnobToGateParams(timeKnob);
+        const auto gate = InhaltParameterMap::mapTimeAndHighToGateParams(timeKnob, highKnob);
         const auto tank = InhaltParameterMap::mapTimeKnobToTankParams(timeKnob);
         const auto tilt = InhaltParameterMap::mapHighKnobToTilt(highKnob);
 

@@ -78,6 +78,15 @@ ENVELOPE_WEIGHT = 1.0
 MID_SIDE_WEIGHT = 1.0
 DECORRELATION_WEIGHT = 0.5
 
+# Added after the first real fit against findings.md's 9 captures: tilt_low_gain/tilt_high_gain
+# (unconstrained, not in the feedback loop) drifted up to 1.3-1.9 (neutral is 1.0) with no pull
+# back toward neutral - the identical degeneracy fit_ambience.py's own TILT_REGULARIZATION_WEIGHT
+# comment describes (damping/feedback gain and the tilt gains can both shape frequency response,
+# so an unregularized fit distributes that ambiguity inconsistently). Not yet swept against real
+# data the way Ambience's own weight was (0.03/0.3/1.0) - this is a first value, not a final one;
+# re-sweep once a full fit run is cheap enough to iterate on.
+TILT_REGULARIZATION_WEIGHT = 1.0
+
 
 def _logit(fraction: torch.Tensor) -> torch.Tensor:
     fraction = fraction.clamp(1e-4, 1 - 1e-4)
@@ -155,8 +164,16 @@ def initialize_from_measurement(model: NonLinGatedFDN, targets: torch.Tensor, me
         model.tau_k_raw.copy_(_inverse_bounded_range(torch.tensor(tau_k_ms).clamp(TAU_K_MIN_MS, TAU_K_MAX_MS).unsqueeze(-1), TAU_K_MIN_MS, TAU_K_MAX_MS))
 
 
-def nonlin_regularization(model: NonLinGatedFDN) -> torch.Tensor:
-    return DECORRELATION_WEIGHT * decorrelation_regularizer(model(), target_correlation=0.0)
+def nonlin_regularization(model: NonLinGatedFDN, rendered: torch.Tensor) -> torch.Tensor:
+    """Takes the ALREADY-RENDERED output rather than calling model() again - an earlier version
+    called model() a second time here, doubling the per-step compute for no reason (the
+    decorrelation term only needs the same [batch, 2, num_samples] tensor nonlin_loss already
+    has)."""
+    decorrelation = DECORRELATION_WEIGHT * decorrelation_regularizer(rendered, target_correlation=0.0)
+    tilt = TILT_REGULARIZATION_WEIGHT * (
+        ((model.tilt_low_gain - 1.0) ** 2).mean() + ((model.tilt_high_gain - 1.0) ** 2).mean()
+    )
+    return decorrelation + tilt
 
 
 def nonlin_loss(rendered: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -195,7 +212,7 @@ def main() -> None:
     for step in range(ITERS):
         optimizer.zero_grad()
         rendered = model()
-        loss = nonlin_loss(rendered, targets) + nonlin_regularization(model)
+        loss = nonlin_loss(rendered, targets) + nonlin_regularization(model, rendered)
         if not torch.isfinite(loss):
             diverged_at_step = step
             break

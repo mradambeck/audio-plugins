@@ -1,0 +1,336 @@
+{
+  "time_to_t_knee_ms": {
+    "points": [
+      [
+        0.1,
+        125.102
+      ],
+      [
+        0.8,
+        127.143
+      ],
+      [
+        2.2,
+        137.12
+      ],
+      [
+        4.8,
+        204.875
+      ],
+      [
+        7.0,
+        238.889
+      ],
+      [
+        9.8,
+        271.48133333333334
+      ]
+    ],
+    "source": "direct_measurement"
+  },
+  "time_to_tau_a_ms": {
+    "points": [
+      [
+        0.1,
+        13.283059642876045
+      ],
+      [
+        0.8,
+        14.941309366474432
+      ],
+      [
+        2.2,
+        14.941309366474432
+      ],
+      [
+        4.8,
+        16.489063273115747
+      ],
+      [
+        7.0,
+        23.047314997214798
+      ],
+      [
+        9.8,
+        24.398451347211918
+      ]
+    ],
+    "source": "direct_measurement"
+  },
+  "time_to_fall_rate_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -151.11
+      ],
+      [
+        0.8,
+        -143.1
+      ],
+      [
+        2.2,
+        -141.05
+      ],
+      [
+        4.8,
+        -148.29
+      ],
+      [
+        7.0,
+        -177.69
+      ],
+      [
+        9.8,
+        -179.55666666666664
+      ]
+    ],
+    "source": "direct_measurement"
+  },
+  "time_to_tau_k_ms": {
+    "points": [
+      [
+        2.2,
+        1.3292268514633179
+      ],
+      [
+        4.8,
+        2.3301613330841064
+      ],
+      [
+        7.0,
+        1.0611255168914795
+      ],
+      [
+        9.8,
+        0.733187735080719
+      ]
+    ]
+  },
+  "time_to_feedback_gain": {
+    "points": [
+      [
+        2.2,
+        0.834037184715271
+      ],
+      [
+        4.8,
+        0.9084318280220032
+      ],
+      [
+        7.0,
+        0.8920376896858215
+      ],
+      [
+        9.8,
+        0.8931784629821777
+      ]
+    ]
+  },
+  "time_to_damping_weight_mean": {
+    "points": [
+      [
+        2.2,
+        0.8367305994033813
+      ],
+      [
+        4.8,
+        0.8341593742370605
+      ],
+      [
+        7.0,
+        0.9624649882316589
+      ],
+      [
+        9.8,
+        0.9672797918319702
+      ]
+    ]
+  },
+  "time_to_plateau_droop_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -175.555
+      ],
+      [
+        0.8,
+        -175.517
+      ],
+      [
+        2.2,
+        -51.612
+      ],
+      [
+        4.8,
+        -37.255
+      ],
+      [
+        7.0,
+        -28.433500000000002
+      ],
+      [
+        9.8,
+        -33.00366666666667
+      ]
+    ],
+    "source": "direct_measurement"
+  },
+  "high_to_tilt_low_gain_offset": {
+    "points": [
+      [
+        -9.0,
+        0.6771558911531295
+      ],
+      [
+        -4.0,
+        0.2842793598100224
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 1.0
+  },
+  "high_to_tilt_high_gain_offset": {
+    "points": [
+      [
+        -9.0,
+        -0.6636015854521116
+      ],
+      [
+        -4.0,
+        -0.4715363909375674
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 1.0
+  },
+  "high_to_tilt_pivot_hz_offset": {
+    "points": [
+      [
+        -9.0,
+        -94.98828125
+      ],
+      [
+        -4.0,
+        248.96728515625
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 4473.755859375
+  },
+  "high_to_plateau_droop_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -4.57720947265625
+      ],
+      [
+        -4.0,
+        -5.2156982421875
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 4.728302001953125
+  },
+  "_notes": {
+    "h_time_interaction": "No High*Time interaction curve is built - the captured grid (see the project plan's capture design) is a cross, not a full grid, and can't support fitting one honestly. H-timing-neutrality was CHECKED against the actual fitted data (not assumed): NOT confirmed within 10.0ms (per-Time t_knee_ms spreads: {'7.0': 19.15, '9.8': 28.7}). Per-capture residuals against the resulting time_to_t_knee_ms curve are in 'h_time_interaction_residuals' below - a real interaction would show up as residuals that grow with |High|, rather than sitting near the fit's general noise level.",
+    "h_time_interaction_residuals": [
+      {
+        "filename": "NonLin_0.1s_-3H.wav",
+        "time": 0.1,
+        "high": -3,
+        "predicted_t_knee_ms": 536.71,
+        "actual_t_knee_ms": 366.25,
+        "residual_ms": -170.46,
+        "extrapolated": true
+      },
+      {
+        "filename": "NonLin_0.8s_-3H.wav",
+        "time": 0.8,
+        "high": -3,
+        "predicted_t_knee_ms": 480.6,
+        "actual_t_knee_ms": 313.79,
+        "residual_ms": -166.81,
+        "extrapolated": true
+      },
+      {
+        "filename": "NonLin_2.2s_0H.wav",
+        "time": 2.2,
+        "high": 0,
+        "predicted_t_knee_ms": 368.38,
+        "actual_t_knee_ms": 368.38,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_4.8s_0H.wav",
+        "time": 4.8,
+        "high": 0,
+        "predicted_t_knee_ms": 159.97,
+        "actual_t_knee_ms": 159.97,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_7.0s_-7H.wav",
+        "time": 7.0,
+        "high": -7,
+        "predicted_t_knee_ms": 201.31,
+        "actual_t_knee_ms": 220.46,
+        "residual_ms": 19.15,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_7.0s_0H.wav",
+        "time": 7.0,
+        "high": 0,
+        "predicted_t_knee_ms": 201.31,
+        "actual_t_knee_ms": 201.31,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_-4H.wav",
+        "time": 9.8,
+        "high": -4,
+        "predicted_t_knee_ms": 221.5,
+        "actual_t_knee_ms": 199.36,
+        "residual_ms": -22.14,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_-9H.wav",
+        "time": 9.8,
+        "high": -9,
+        "predicted_t_knee_ms": 221.5,
+        "actual_t_knee_ms": 228.06,
+        "residual_ms": 6.56,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_0H.wav",
+        "time": 9.8,
+        "high": 0,
+        "predicted_t_knee_ms": 221.5,
+        "actual_t_knee_ms": 221.5,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      }
+    ],
+    "tonal_time_independence": "tilt_low_gain/tilt_high_gain/tilt_pivot_hz are modeled as depending on High only, not Time - findings.md's onset 4-band breakdown found Time doesn't move tone at H=0 (T=7.0s and T=9.8s matched to within 0.1dB per band), so a single High offset curve (built from whichever Time setting had the richest H sweep, printed above) is used at every Time setting.",
+    "plateau_droop_combination_model": "plateau_droop_db_per_s = time_to_plateau_droop_db_per_s(Time) [H=0 baseline] + high_to_plateau_droop_db_per_s_offset(High) - moved out of the pooled Time-only curve after findings.md measured High has a real, large effect on this specific parameter (roughly 4-12x between High=0 and negative High at the same Time) even though the OVERALL gate length (t_knee_ms and friends) is exactly High-independent. The offset curve uses the same richest-High-sweep Time setting as the tonal params, which is a Time-independence assumption for the OFFSET's shape (not the baseline) - same caveat as Ambience's own High-offset curves, unconfirmed by a second Time setting's full sweep.",
+    "gate_timing_source_correction": "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s / time_to_plateau_droop_db_per_s were REPLACED after this module's own build (see build_measured_gate_curves.py) - the fit's own values for these were compared per-capture against features.json's direct measurement and found systematically wrong (e.g. Time=0.1: measured knee_time_ms=125.1ms, fitted 366.2ms; fall_rate ranged -101 to -1614dB/s fitted vs a real -141 to -187dB/s measured range). Replaced with curves built directly from features.json instead - the exact 'fit numbers don't hold up, use direct measurement' pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain and tilt_high_gain are ALSO replaced (same reasoning, see module docstring - the fit's TILT_REGULARIZATION_WEIGHT suppressed their real magnitude by roughly 2-3x). Only feedback_gain, damping_weight_mean, and tilt_pivot_hz are UNCHANGED from the fit - see build_measured_gate_curves.py's own module docstring for why those three were kept. The two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the real capture set and are pooled into these Time-only curves alongside the High=0 points at longer Time - an honest compromise (documented, not hidden), since findings.md found the internal gate-shape breakdown is NOT as cleanly High-neutral as the overall gate_length_ms_at_20db is.",
+    "tau_k_ms_not_measured": "tau_k_ms (the gate's knee softness/transition width) has no direct measurement - core.features has no function for it. Left as the fit's own value (not cross-checked against ground truth the way the other timing parameters were), flagged here as a real gap rather than a validated number."
+  }
+}

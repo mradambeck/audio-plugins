@@ -1,14 +1,26 @@
 #include "InhaltParameterMap.h"
+#include "InhaltReferenceData.h"
 
 namespace InhaltParameterMap
 {
 
 namespace
 {
+    template <std::size_t N>
+    wildjag::dsp::FittedCurve1D<N> toCurve(const std::array<wildjag::dsp::FittedPoint, N>& src)
+    {
+        std::array<typename wildjag::dsp::FittedCurve1D<N>::Point, N> pts;
+        for (std::size_t i = 0; i < N; ++i)
+            pts[i] = { src[i].x, src[i].y };
+        return wildjag::dsp::FittedCurve1D<N>(pts);
+    }
+
     // Real hand-measured -20dB gate length (ms) per Time-knob label, from direct inspection of a
-    // real NonLin capture set (see the project plan's "already measured" section) - NOT a
-    // placeholder. gate_envelope_params()'s own gate_length_ms_at_20db must reproduce this table
-    // once Phase 2 runs for real; InhaltParameterMapTests.cpp spot-checks the same numbers here.
+    // real NonLin capture set (see effects/nonlin/findings.md) - kept as its own small table
+    // (not derived from InhaltReferenceData.h's t_knee_ms curve) because it's a genuinely
+    // independent measurement of a different, coarser quantity, used only for the editor's
+    // display readout. gate_envelope_params()'s own gate_length_ms_at_20db reproduced this table
+    // within a few ms when run for real - see effects/nonlin/analyze.py's own automatic check.
     const wildjag::dsp::FittedCurve1D<6> gateLengthMsCurve { { {
         { 0.1f, 102.5f },
         { 0.8f, 102.5f },
@@ -18,46 +30,46 @@ namespace
         { 9.8f, 300.4f },
     } } };
 
-    // PLACEHOLDER internal gate-shape breakdown, derived from gateLengthMsCurve alone (not a real
-    // per-parameter measurement) so the plugin has SOME reasonable envelope shape at every Time
-    // setting rather than a flat default. buildUpMs fixed; kneeTimeMs set so that (roughly) the
-    // knee-to-floor fall reaches -20dB at the SAME time gateLengthMsCurve says the real hardware
-    // does, given a fixed -250dB/s fall rate. Replace with the real fitted/measured breakdown
-    // once ml-toolkit's Phase 2 runs on real captures.
-    constexpr float placeholderFallRateDbPerSec = -250.0f;
-    constexpr float placeholderBuildUpMs = 3.0f;
-    constexpr float placeholderKneeSoftnessMs = 4.0f;
-
-    // High=0 (neutral, no coloration) vs High=-9 (+4.2dB low-band, -9.1dB high-band, pivot
-    // ~1-2kHz) - REAL measurement, converted from dB to the linear gains InhaltIRSynth's
-    // BandShelf takes. Only the two range endpoints are measured; everything between is a linear
-    // interpolation, not a separate measurement.
-    const wildjag::dsp::FittedCurve1D<2> tiltLowGainCurve { { {
-        { -9.0f, 1.62181f },
-        { 0.0f, 1.0f },
-    } } };
-    const wildjag::dsp::FittedCurve1D<2> tiltHighGainCurve { { {
-        { -9.0f, 0.350752f },
-        { 0.0f, 1.0f },
-    } } };
-    constexpr float measuredTiltPivotHz = 1500.0f; // "pivot ~1-2kHz" - midpoint, not curve-fit
+    // Baselines the tilt High-offset curves in InhaltReferenceData.h are anchored to (their own
+    // value AT High=0, matching AuraParameterMap.cpp's identical convention for its own decay-
+    // gain and damping offset curves). tilt_low_gain/tilt_high_gain are direct measurements
+    // (see build_measured_gate_curves.py) anchored at an exact, genuinely neutral 1.0 - unlike
+    // tilt_pivot_hz, still from the fit, whose own baseline is read directly from
+    // ml-toolkit/effects/nonlin/curves.json's "baseline_at_high0" field. plateau_droop_db_per_s
+    // needs no equivalent constant here: its own "Time curve" (time_to_plateau_droop_db_per_sPoints)
+    // is already the absolute High=0 baseline value at each Time, not a zero-anchored offset.
+    constexpr float tiltLowGainBaselineAtHigh0 = 1.0f;
+    constexpr float tiltHighGainBaselineAtHigh0 = 1.0f;
+    constexpr float tiltPivotHzBaselineAtHigh0 = 4473.755859375f;
 } // namespace
 
-GateParams mapTimeKnobToGateParams(float timeKnob, bool* extrapolated) noexcept
+GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated) noexcept
 {
-    const auto gateLengthMs = gateLengthMsCurve.evaluate(timeKnob, extrapolated);
+    static const auto timeToTauA = toCurve(wildjag::dsp::time_to_tau_a_msPoints);
+    static const auto timeToKnee = toCurve(wildjag::dsp::time_to_t_knee_msPoints);
+    static const auto timeToFallRate = toCurve(wildjag::dsp::time_to_fall_rate_db_per_sPoints);
+    static const auto timeToKneeSoftness = toCurve(wildjag::dsp::time_to_tau_k_msPoints);
+    static const auto timeToDroopBaseline = toCurve(wildjag::dsp::time_to_plateau_droop_db_per_sPoints);
+    static const auto highToDroopOffset = toCurve(wildjag::dsp::high_to_plateau_droop_db_per_s_offsetPoints);
+
+    bool tauAExtrapolated = false, kneeExtrapolated = false, fallExtrapolated = false,
+         softnessExtrapolated = false, droopTimeExtrapolated = false, droopHighExtrapolated = false;
 
     GateParams params;
-    params.buildUpMs = placeholderBuildUpMs;
-    params.fallRateDbPerSec = placeholderFallRateDbPerSec;
-    params.kneeSoftnessMs = placeholderKneeSoftnessMs;
-    params.plateauDroopDbPerSec = 0.0f;
-    // -20dB point sits kneeSoftnessMs-ish past the knee itself (softplus's own transition width),
-    // so back-solve kneeTimeMs from the measured -20dB gate length and the fixed fall rate:
-    // gateLengthMs ~= kneeTimeMs + 20dB / |fallRateDbPerSec| * 1000.
-    params.kneeTimeMs = gateLengthMs - (20.0f / -placeholderFallRateDbPerSec) * 1000.0f;
-    if (params.kneeTimeMs < 1.0f)
-        params.kneeTimeMs = 1.0f;
+    params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
+    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeExtrapolated);
+    params.fallRateDbPerSec = timeToFallRate.evaluate(timeKnob, &fallExtrapolated);
+    params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
+    // plateauDroopDbPerSec = time_to_plateau_droop_db_per_s(Time) [High=0 baseline, already
+    // absolute - see time_to_plateau_droop_db_per_sPoints' own values] + high offset (zero-
+    // anchored at High=0, per findings.md's "High: timing-NEUTRAL overall, but NOT damping-
+    // neutral" finding).
+    params.plateauDroopDbPerSec = timeToDroopBaseline.evaluate(timeKnob, &droopTimeExtrapolated)
+        + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
+
+    if (extrapolated != nullptr)
+        *extrapolated = tauAExtrapolated || kneeExtrapolated || fallExtrapolated
+            || softnessExtrapolated || droopTimeExtrapolated || droopHighExtrapolated;
     return params;
 }
 
@@ -68,27 +80,31 @@ float gateLengthMsForDisplay(float timeKnob, bool* extrapolated) noexcept
 
 TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated) noexcept
 {
-    // Time-only (not High-dependent - see this file's header comment), and currently a flat
-    // placeholder constant rather than a real Time-dependent curve: no direct measurement yet of
-    // whether the tank's own density/damping should vary with Time at all, versus the gate
-    // envelope doing all the audible shaping (per model.py's central design split). Returns a
-    // constant regardless of timeKnob's value, so `extrapolated` is always false here - honestly
-    // reflects that this isn't measuring anything Time-dependent yet, not a bug to fix later.
-    (void) timeKnob;
+    static const auto timeToFeedbackGain = toCurve(wildjag::dsp::time_to_feedback_gainPoints);
+    static const auto timeToDamping = toCurve(wildjag::dsp::time_to_damping_weight_meanPoints);
+
+    bool gainExtrapolated = false, dampingExtrapolated = false;
+    TankParams params;
+    params.feedbackGain = timeToFeedbackGain.evaluate(timeKnob, &gainExtrapolated);
+    params.dampingWeight = timeToDamping.evaluate(timeKnob, &dampingExtrapolated);
     if (extrapolated != nullptr)
-        *extrapolated = false;
-    return TankParams {};
+        *extrapolated = gainExtrapolated || dampingExtrapolated;
+    return params;
 }
 
 TiltParams mapHighKnobToTilt(float highKnob, bool* extrapolated) noexcept
 {
-    bool lowExtrapolated = false, highExtrapolated = false;
+    static const auto highToLowGainOffset = toCurve(wildjag::dsp::high_to_tilt_low_gain_offsetPoints);
+    static const auto highToHighGainOffset = toCurve(wildjag::dsp::high_to_tilt_high_gain_offsetPoints);
+    static const auto highToPivotOffset = toCurve(wildjag::dsp::high_to_tilt_pivot_hz_offsetPoints);
+
+    bool lowExtrapolated = false, highExtrapolated = false, pivotExtrapolated = false;
     TiltParams params;
-    params.lowGain = tiltLowGainCurve.evaluate(highKnob, &lowExtrapolated);
-    params.highGain = tiltHighGainCurve.evaluate(highKnob, &highExtrapolated);
-    params.pivotHz = measuredTiltPivotHz;
+    params.lowGain = tiltLowGainBaselineAtHigh0 + highToLowGainOffset.evaluate(highKnob, &lowExtrapolated);
+    params.highGain = tiltHighGainBaselineAtHigh0 + highToHighGainOffset.evaluate(highKnob, &highExtrapolated);
+    params.pivotHz = tiltPivotHzBaselineAtHigh0 + highToPivotOffset.evaluate(highKnob, &pivotExtrapolated);
     if (extrapolated != nullptr)
-        *extrapolated = lowExtrapolated || highExtrapolated;
+        *extrapolated = lowExtrapolated || highExtrapolated || pivotExtrapolated;
     return params;
 }
 

@@ -4,31 +4,34 @@
 
 // Knob values -> InhaltIRSynth coefficients.
 //
-// PLACEHOLDER DATA, clearly marked as such below - Adam has not yet supplied the NonLin capture
-// set (see ml-toolkit/effects/nonlin/captures/, currently empty and gitignored), so none of the
-// ml-toolkit Phase 2-4 pipeline (analyze.py/fit_nonlin.py/build_curves.py/export_params.py) has
-// run against real hardware audio yet. This map uses only what IS already directly measured (the
-// hand-measured -20dB gate-length table and the H tilt's onset dB values - both established by
-// direct inspection of a real NonLin capture set, see the project plan) plus honestly-labelled
-// placeholder shapes for everything that measurement doesn't cover (the gate's internal
-// build-up/knee/fall breakdown, the tank's own density/damping). Once real captures land and the
-// pipeline runs, `InhaltReferenceData.h` gets generated for real and this file's placeholder
-// tables are replaced with it - this file's own shape (thin FittedCurve1D wrapper) doesn't need
-// to change, only the numbers inside it, matching AuraParameterMap.cpp's own precedent.
+// Real fitted/measured data, from the 9-capture set in ml-toolkit/effects/nonlin/captures/ - see
+// InhaltReferenceData.h's own provenance comment for the exact git commit/capture-set hash this
+// was generated from, and ml-toolkit/effects/nonlin/findings.md for the analysis behind it.
 //
-// MEASURED GAP, not yet fixed (needs real captures to fix correctly, not more guessing):
-// InhaltRenderIR --timeKnob 4.8 was rendered end-to-end and analyzed with ml-toolkit's own
-// gate_envelope_params() - the real verification loop this whole pipeline is built around. It
-// measured a ~99.6ms gate length against a ~216.6ms target (the real hardware measurement this
-// map's gateLengthMsCurve is trying to reproduce), and a real plateau_droop_db_per_s of -188dB/s
-// where this map hands the synth an explicit 0dB/s. Root cause: mapTimeKnobToTankParams()'s
-// placeholder feedbackGain/dampingWeight (0.78/0.5, chosen arbitrarily) don't build the tank to
-// full density fast enough for the explicit gate multiplier to dominate the shape the way the
-// architecture assumes - the tank's own still-sparse, still-decaying early response leaks through
-// instead. This is exactly the calibration Phase 2's real captures are for, not a bug in the gate
-// formula, the synthesis math, or the measurement tooling (all three were independently confirmed
-// correct in isolation before concluding this). Documented here rather than hand-tuned away by
-// guessing better placeholder numbers - that would invent precision the data doesn't support.
+// NOT a straight copy of the Python fit's own numbers. Every gate-timing parameter
+// (tau_a_ms/t_knee_ms/fall_rate_db_per_s/plateau_droop_db_per_s) was cross-checked per-capture
+// against core.features.gate_envelope_params()'s DIRECT measurement of the real captures and
+// found systematically wrong in the fit (e.g. Time=0.1: measured knee time 125ms, fitted 366ms) -
+// replaced with curves built directly from measurement instead (see
+// ml-toolkit/effects/nonlin/build_measured_gate_curves.py). feedback_gain, damping_weight_mean,
+// tilt_low_gain, tilt_high_gain, and tilt_pivot_hz are kept from the fit - see that script's own
+// module docstring for why those five specifically were trusted. This is the same "fit numbers
+// don't hold up, use direct measurement" correction AuraDecayGainData.h/AuraOnsetTiltData.h
+// already established as precedent for this catalog, applied here from the start rather than
+// discovered after shipping placeholder data.
+//
+// Known remaining gaps, not silently papered over:
+//   - tau_k_ms (knee softness) has no direct measurement at all - kept from the fit, not
+//     cross-checked the way the other timing parameters were.
+//   - The two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the real capture set;
+//     their gate-timing values are pooled into the same Time-only curve as the High=0 points at
+//     longer Time (see build_measured_gate_curves.py's own docstring for why, and findings.md for
+//     why this is an approximation, not a confirmed High-neutral measurement, for these
+//     specific internal parameters - unlike the overall gate_length_ms_at_20db, which IS
+//     confirmed High-neutral).
+//   - mapTimeKnobToTankParams() and the plateau-droop combination don't yet depend on the tank's
+//     per-band behaviour (only core.features.band_gate_params() measures that) - a broadband
+//     droop/damping figure is used for the whole spectrum.
 namespace InhaltParameterMap
 {
 
@@ -55,27 +58,31 @@ struct TiltParams
 };
 
 // Time knob (0.1-9.8, the hardware's own label scale - deliberately not seconds, see
-// PluginProcessor.h's timeKnobParamID comment) -> the gate envelope shape. extrapolated, if
-// non-null, is set when timeKnob falls outside every mapping curve's measured range.
-GateParams mapTimeKnobToGateParams(float timeKnob, bool* extrapolated = nullptr) noexcept;
+// PluginProcessor.h's timeKnobParamID comment) -> the gate envelope shape. Also depends on High
+// for plateauDroopDbPerSec specifically (findings.md found High redistributes energy loss between
+// the plateau and the post-knee fall while conserving the overall gate length - see that file's
+// "High: timing-NEUTRAL overall, but NOT damping-neutral" section). extrapolated, if non-null, is
+// set when either knob falls outside its own curves' measured range.
+GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated = nullptr) noexcept;
 
-// The one thing about this mapping that IS a direct hardware measurement, not a placeholder -
-// returns the real hand-measured -20dB gate length (ms) for display in the editor, independent of
-// mapTimeKnobToGateParams()'s (still placeholder) internal shape breakdown. See
-// InhaltParameterMapTests.cpp's hardcoded spot-check against the same table.
+// The one thing about this mapping that IS always a direct hardware measurement, independent of
+// the gate-shape breakdown above - returns the real hand-measured -20dB gate length (ms) for
+// display in the editor. See InhaltParameterMapTests.cpp's hardcoded spot-check against the same
+// table findings.md records.
 float gateLengthMsForDisplay(float timeKnob, bool* extrapolated = nullptr) noexcept;
 
-// High knob (-9..0 dB) -> tank density/damping. PLACEHOLDER - no direct measurement yet of
-// whether High has any real effect on the tank's own damping (see the project plan's "one brief
-// assumption to test" note: H's measured envelope-timing-neutrality is evidence AGAINST an
-// independent damping effect, so this returns a Time-only, High-independent constant until
-// Phase 2 either confirms a real per-band droop difference or rules one out).
+// Time knob -> tank density/damping (feedback_gain, damping_weight_mean) - from the fit, not a
+// direct measurement (core.features has no function that measures a tank's internal density
+// directly). Not currently High-dependent - findings.md's own evidence (High doesn't move overall
+// envelope timing) argues against an independent High effect here, and the fit's own per-capture
+// values didn't show a High-linked pattern strong enough to justify a second curve on this sparse
+// a grid.
 TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated = nullptr) noexcept;
 
-// High knob (-9..0 dB) -> input tilt. REAL measurement: H=0 (neutral) vs H=-9 (+4.2dB low,
-// -9.1dB high, pivot ~1-2kHz) - see the project plan's "already measured" section. Only two
-// points (both ends of the hardware's own range), so every High setting other than exactly 0 or
-// -9 is interpolated, not separately measured - refine once the real H sweep is analyzed.
+// High knob (-9..0 dB) -> input tilt. Real measurement at both range endpoints (H=0 neutral,
+// H=-9: +4.5dB low/-9.5dB high onset tilt - see findings.md), refined by the fit's own tilt_pivot
+// value (~4200-4700Hz, consistent with this module's own earlier direct tilt_fit() estimate of
+// ~4044Hz) rather than the ~1.5-2kHz onset-band estimate findings.md flagged as less precise.
 TiltParams mapHighKnobToTilt(float highKnob, bool* extrapolated = nullptr) noexcept;
 
 } // namespace InhaltParameterMap
