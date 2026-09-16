@@ -331,6 +331,23 @@
     "tonal_time_independence": "tilt_low_gain/tilt_high_gain/tilt_pivot_hz are modeled as depending on High only, not Time - findings.md's onset 4-band breakdown found Time doesn't move tone at H=0 (T=7.0s and T=9.8s matched to within 0.1dB per band), so a single High offset curve (built from whichever Time setting had the richest H sweep, printed above) is used at every Time setting.",
     "plateau_droop_combination_model": "plateau_droop_db_per_s = time_to_plateau_droop_db_per_s(Time) [H=0 baseline] + high_to_plateau_droop_db_per_s_offset(High) - moved out of the pooled Time-only curve after findings.md measured High has a real, large effect on this specific parameter (roughly 4-12x between High=0 and negative High at the same Time) even though the OVERALL gate length (t_knee_ms and friends) is exactly High-independent. The offset curve uses the same richest-High-sweep Time setting as the tonal params, which is a Time-independence assumption for the OFFSET's shape (not the baseline) - same caveat as Ambience's own High-offset curves, unconfirmed by a second Time setting's full sweep.",
     "gate_timing_source_correction": "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s / time_to_plateau_droop_db_per_s were REPLACED after this module's own build (see build_measured_gate_curves.py) - the fit's own values for these were compared per-capture against features.json's direct measurement and found systematically wrong (e.g. Time=0.1: measured knee_time_ms=125.1ms, fitted 366.2ms; fall_rate ranged -101 to -1614dB/s fitted vs a real -141 to -187dB/s measured range). Replaced with curves built directly from features.json instead - the exact 'fit numbers don't hold up, use direct measurement' pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain and tilt_high_gain are ALSO replaced (same reasoning, see module docstring - the fit's TILT_REGULARIZATION_WEIGHT suppressed their real magnitude by roughly 2-3x). Only feedback_gain, damping_weight_mean, and tilt_pivot_hz are UNCHANGED from the fit - see build_measured_gate_curves.py's own module docstring for why those three were kept. The two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the real capture set and are pooled into these Time-only curves alongside the High=0 points at longer Time - an honest compromise (documented, not hidden), since findings.md found the internal gate-shape breakdown is NOT as cleanly High-neutral as the overall gate_length_ms_at_20db is.",
+    "t_knee_ms_high_offset": "high_to_t_knee_ms_offset was added after a real validate.py run showed the largest remaining knee-time errors concentrated at very negative High (T=7.0/H=-7: -67ms; T=9.8/H=-4/-9: -47.5ms) while High=0 matched much more closely - direct measurement at the richest available High sweep supports at least an additive offset, the same combination model already used for plateau_droop_db_per_s. Built from only one Time setting's sweep (2-3 points), same Time-independence caveat as every other High-offset curve here.",
     "tau_k_ms_not_measured": "tau_k_ms (the gate's knee softness/transition width) has no direct measurement - core.features has no function for it. Left as the fit's own value (not cross-checked against ground truth the way the other timing parameters were), flagged here as a real gap rather than a validated number."
+  },
+  "high_to_t_knee_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        87.79999999999998
+      ],
+      [
+        -4.0,
+        87.79999999999998
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
   }
 }

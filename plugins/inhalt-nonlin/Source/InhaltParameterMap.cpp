@@ -52,12 +52,22 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto timeToDroopBaseline = toCurve(wildjag::dsp::time_to_plateau_droop_db_per_sPoints);
     static const auto highToDroopOffset = toCurve(wildjag::dsp::high_to_plateau_droop_db_per_s_offsetPoints);
 
-    bool tauAExtrapolated = false, kneeExtrapolated = false, fallExtrapolated = false,
-         softnessExtrapolated = false, droopTimeExtrapolated = false, droopHighExtrapolated = false;
+    bool tauAExtrapolated = false, kneeTimeExtrapolated = false,
+         fallExtrapolated = false, softnessExtrapolated = false,
+         droopTimeExtrapolated = false, droopHighExtrapolated = false;
 
     GateParams params;
     params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
-    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeExtrapolated);
+    // Time-only, deliberately NOT combined with high_to_t_knee_ms_offsetPoints (exported but
+    // unused) - that offset was measured only at Time=9.8 and, when tried here, made the two
+    // short-Time captures dramatically WORSE (knee error ~2-4ms -> ~91-93ms) while only
+    // moderately improving the long-Time ones it was measured from. The additive-offset,
+    // Time-independence assumption that works for plateau_droop_db_per_s and the tilt gains does
+    // NOT hold for this specific parameter - reverted after measuring the regression directly,
+    // not assumed. See build_measured_gate_curves.py's own comment on this curve for the numbers.
+    // A real fix needs a High sweep at a short Time setting, which the current 9-capture set
+    // doesn't have.
+    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeTimeExtrapolated);
     params.fallRateDbPerSec = timeToFallRate.evaluate(timeKnob, &fallExtrapolated);
     params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
     // plateauDroopDbPerSec = time_to_plateau_droop_db_per_s(Time) [High=0 baseline, already
@@ -68,8 +78,8 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
         + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
 
     if (extrapolated != nullptr)
-        *extrapolated = tauAExtrapolated || kneeExtrapolated || fallExtrapolated
-            || softnessExtrapolated || droopTimeExtrapolated || droopHighExtrapolated;
+        *extrapolated = tauAExtrapolated || kneeTimeExtrapolated
+            || fallExtrapolated || softnessExtrapolated || droopTimeExtrapolated || droopHighExtrapolated;
     return params;
 }
 

@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         520040de8503a92ce1074167fa1f73fc505cf2bb
+//   git commit:         7ba502aee0b768c71f608ad3e91da88a7add8700
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-16
@@ -132,5 +132,14 @@ static constexpr std::array<FittedPoint, 3> high_to_plateau_droop_db_per_s_offse
 } };
 static_assert(high_to_plateau_droop_db_per_s_offsetPoints.front().x <= high_to_plateau_droop_db_per_s_offsetPoints.back().x,
     "high_to_plateau_droop_db_per_s_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_t_knee_ms_offset
+static constexpr std::array<FittedPoint, 3> high_to_t_knee_ms_offsetPoints { {
+    { -9.0f, 87.79999999999998f },
+    { -4.0f, 87.79999999999998f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_t_knee_ms_offsetPoints.front().x <= high_to_t_knee_ms_offsetPoints.back().x,
+    "high_to_t_knee_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 } // namespace wildjag::dsp

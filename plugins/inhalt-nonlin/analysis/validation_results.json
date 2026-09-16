@@ -4,566 +4,566 @@
     "time": 0.1,
     "high": -3,
     "gate_errors": {
-      "build_up_ms": -15.555,
-      "plateau_level_db": 1.73,
-      "plateau_ripple_db": -0.36,
-      "plateau_droop_db_per_s": -146.528,
-      "knee_time_ms": -1.587,
-      "fall_rate_db_per_s": -308.28,
-      "knee_r2": 0.0236,
-      "gate_length_ms_at_20db": -36.51
+      "build_up_ms": -16.009,
+      "plateau_level_db": 1.29,
+      "plateau_ripple_db": -0.034,
+      "plateau_droop_db_per_s": -116.033,
+      "knee_time_ms": -13.016,
+      "fall_rate_db_per_s": -286.27,
+      "knee_r2": 0.0225,
+      "gate_length_ms_at_20db": -26.98
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": 461.199,
-        "fall_rate_error": -170.11
+        "droop_error": -172.547,
+        "fall_rate_error": -205.88
       },
       "88-177Hz": {
-        "droop_error": 28.86,
-        "fall_rate_error": -1199.47
+        "droop_error": 220.796,
+        "fall_rate_error": -59.92
       },
       "177-354Hz": {
-        "droop_error": 277.371,
-        "fall_rate_error": -171.37
+        "droop_error": 205.561,
+        "fall_rate_error": -200.06
       },
       "354-707Hz": {
-        "droop_error": 945.681,
-        "fall_rate_error": -67.56
+        "droop_error": 504.244,
+        "fall_rate_error": -140.32
       },
       "707-1414Hz": {
-        "droop_error": -162.213,
-        "fall_rate_error": -160.8
+        "droop_error": -99.227,
+        "fall_rate_error": -99.73
       },
       "1414-2828Hz": {
-        "droop_error": -489.916,
-        "fall_rate_error": -126.38
+        "droop_error": -437.796,
+        "fall_rate_error": -96.48
       },
       "2828-5657Hz": {
-        "droop_error": -495.696,
-        "fall_rate_error": -111.16
+        "droop_error": -465.179,
+        "fall_rate_error": -79.81
       },
       "5657-11314Hz": {
-        "droop_error": -458.657,
-        "fall_rate_error": 13.35
+        "droop_error": -414.547,
+        "fall_rate_error": -51.45
       },
       "11314-22049Hz": {
-        "droop_error": -261.617,
-        "fall_rate_error": 301.18
+        "droop_error": -226.206,
+        "fall_rate_error": 293.74
       }
     },
     "time_to_ned_0.9_error_ms": null,
-    "mixing_time_error_ms": -36.3265,
-    "iacc_rendered": 0.1179,
+    "mixing_time_error_ms": null,
+    "iacc_rendered": 0.0752,
     "iacc_reference": 0.0057,
     "coherence_noise_floor_rendered": 0.3466,
     "coherence_noise_floor_reference": 0.3466,
-    "mid_side_ratio_error_db": -0.0474,
-    "log_spectral_distance_db": 7.63,
-    "crest_factor_error_db": 3.4992,
-    "spectral_flatness_error_db": 6.5992
+    "mid_side_ratio_error_db": 0.0454,
+    "log_spectral_distance_db": 7.34,
+    "crest_factor_error_db": 1.4444,
+    "spectral_flatness_error_db": 6.7496
   },
   {
     "filename": "NonLin_0.8s_-3H.wav",
     "time": 0.8,
     "high": -3,
     "gate_errors": {
-      "build_up_ms": -17.596,
-      "plateau_level_db": 1.94,
-      "plateau_ripple_db": -0.467,
-      "plateau_droop_db_per_s": -128.58,
-      "knee_time_ms": -3.628,
-      "fall_rate_db_per_s": -293.45,
-      "knee_r2": 0.0264,
-      "gate_length_ms_at_20db": -37.55
+      "build_up_ms": -18.05,
+      "plateau_level_db": 1.13,
+      "plateau_ripple_db": 0.023,
+      "plateau_droop_db_per_s": -100.322,
+      "knee_time_ms": -15.057,
+      "fall_rate_db_per_s": -283.14,
+      "knee_r2": 0.0255,
+      "gate_length_ms_at_20db": -29.02
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -262.596,
-        "fall_rate_error": -158.49
+        "droop_error": -156.979,
+        "fall_rate_error": -209.98
       },
       "88-177Hz": {
-        "droop_error": 42.128,
-        "fall_rate_error": 181.02
+        "droop_error": 240.89,
+        "fall_rate_error": -37.38
       },
       "177-354Hz": {
-        "droop_error": 296.567,
-        "fall_rate_error": -140.32
+        "droop_error": 222.61,
+        "fall_rate_error": -176.01
       },
       "354-707Hz": {
-        "droop_error": 974.656,
-        "fall_rate_error": -52.71
+        "droop_error": 521.654,
+        "fall_rate_error": -128.25
       },
       "707-1414Hz": {
-        "droop_error": -16.956,
-        "fall_rate_error": -71.33
+        "droop_error": -78.42,
+        "fall_rate_error": -85.38
       },
       "1414-2828Hz": {
-        "droop_error": -471.414,
-        "fall_rate_error": -90.12
+        "droop_error": -367.058,
+        "fall_rate_error": -58.89
       },
       "2828-5657Hz": {
-        "droop_error": -478.1,
-        "fall_rate_error": -98.89
+        "droop_error": -446.743,
+        "fall_rate_error": -67.52
       },
       "5657-11314Hz": {
-        "droop_error": -440.697,
-        "fall_rate_error": 16.13
+        "droop_error": -399.705,
+        "fall_rate_error": -35.63
       },
       "11314-22049Hz": {
-        "droop_error": -282.359,
-        "fall_rate_error": -63.84
+        "droop_error": -261.27,
+        "fall_rate_error": -66.37
       }
     },
     "time_to_ned_0.9_error_ms": null,
-    "mixing_time_error_ms": -39.2744,
-    "iacc_rendered": 0.1062,
+    "mixing_time_error_ms": 35.0113,
+    "iacc_rendered": 0.0706,
     "iacc_reference": 0.0056,
     "coherence_noise_floor_rendered": 0.3797,
     "coherence_noise_floor_reference": 0.3797,
-    "mid_side_ratio_error_db": -0.0504,
-    "log_spectral_distance_db": 7.18,
-    "crest_factor_error_db": 1.3901,
-    "spectral_flatness_error_db": 6.661
+    "mid_side_ratio_error_db": 0.0474,
+    "log_spectral_distance_db": 6.88,
+    "crest_factor_error_db": 0.2811,
+    "spectral_flatness_error_db": 6.8249
   },
   {
     "filename": "NonLin_2.2s_0H.wav",
     "time": 2.2,
     "high": 0,
     "gate_errors": {
-      "build_up_ms": -17.596,
-      "plateau_level_db": 1.41,
-      "plateau_ripple_db": 0.149,
-      "plateau_droop_db_per_s": -110.46,
-      "knee_time_ms": -3.628,
-      "fall_rate_db_per_s": -152.83,
-      "knee_r2": 0.0181,
-      "gate_length_ms_at_20db": -27.57
+      "build_up_ms": -17.052,
+      "plateau_level_db": 1.28,
+      "plateau_ripple_db": 0.121,
+      "plateau_droop_db_per_s": -90.017,
+      "knee_time_ms": -30.022,
+      "fall_rate_db_per_s": -135.66,
+      "knee_r2": 0.0176,
+      "gate_length_ms_at_20db": -25.03
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -94.612,
-        "fall_rate_error": 19.04
+        "droop_error": 38.039,
+        "fall_rate_error": -35.92
       },
       "88-177Hz": {
-        "droop_error": -36.5,
-        "fall_rate_error": 40.81
+        "droop_error": -20.723,
+        "fall_rate_error": 190.17
       },
       "177-354Hz": {
-        "droop_error": 77.763,
-        "fall_rate_error": 33.89
+        "droop_error": 16.703,
+        "fall_rate_error": 8.11
       },
       "354-707Hz": {
-        "droop_error": -164.979,
-        "fall_rate_error": 9.42
+        "droop_error": -135.864,
+        "fall_rate_error": 19.24
       },
       "707-1414Hz": {
-        "droop_error": -143.367,
-        "fall_rate_error": 17.99
+        "droop_error": -121.709,
+        "fall_rate_error": 40.53
       },
       "1414-2828Hz": {
-        "droop_error": -93.548,
-        "fall_rate_error": 34.5
+        "droop_error": -66.775,
+        "fall_rate_error": 57.62
       },
       "2828-5657Hz": {
-        "droop_error": -64.846,
-        "fall_rate_error": 55.73
+        "droop_error": -41.699,
+        "fall_rate_error": 80.3
       },
       "5657-11314Hz": {
-        "droop_error": -181.849,
-        "fall_rate_error": 101.45
+        "droop_error": -165.625,
+        "fall_rate_error": 105.79
       },
       "11314-22049Hz": {
-        "droop_error": -219.208,
-        "fall_rate_error": -69.26
+        "droop_error": -193.673,
+        "fall_rate_error": -114.94
       }
     },
-    "time_to_ned_0.9_error_ms": -89.7959,
-    "mixing_time_error_ms": -99.1383,
-    "iacc_rendered": 0.0602,
+    "time_to_ned_0.9_error_ms": -17.9592,
+    "mixing_time_error_ms": -24.8526,
+    "iacc_rendered": 0.0431,
     "iacc_reference": 0.0212,
     "coherence_noise_floor_rendered": 0.3492,
     "coherence_noise_floor_reference": 0.3492,
-    "mid_side_ratio_error_db": 0.0444,
-    "log_spectral_distance_db": 4.93,
-    "crest_factor_error_db": -0.4847,
-    "spectral_flatness_error_db": 2.3835
+    "mid_side_ratio_error_db": 0.0258,
+    "log_spectral_distance_db": 4.57,
+    "crest_factor_error_db": 0.453,
+    "spectral_flatness_error_db": 2.5324
   },
   {
     "filename": "NonLin_4.8s_0H.wav",
     "time": 4.8,
     "high": 0,
     "gate_errors": {
-      "build_up_ms": -19.501,
-      "plateau_level_db": 0.65,
-      "plateau_ripple_db": 0.299,
-      "plateau_droop_db_per_s": -67.975,
-      "knee_time_ms": -5.533,
-      "fall_rate_db_per_s": -95.76,
+      "build_up_ms": -15.964,
+      "plateau_level_db": 0.87,
+      "plateau_ripple_db": 0.291,
+      "plateau_droop_db_per_s": -65.012,
+      "knee_time_ms": -14.966,
+      "fall_rate_db_per_s": -88.71,
       "knee_r2": 0.0142,
-      "gate_length_ms_at_20db": -31.47
+      "gate_length_ms_at_20db": -23.94
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -106.059,
-        "fall_rate_error": 68.06
+        "droop_error": 63.065,
+        "fall_rate_error": 108.36
       },
       "88-177Hz": {
-        "droop_error": 55.908,
-        "fall_rate_error": 50.71
+        "droop_error": 62.475,
+        "fall_rate_error": 51.2
       },
       "177-354Hz": {
-        "droop_error": -53.836,
-        "fall_rate_error": 74.95
+        "droop_error": -41.115,
+        "fall_rate_error": 91.05
       },
       "354-707Hz": {
-        "droop_error": -42.544,
-        "fall_rate_error": 76.84
+        "droop_error": -31.927,
+        "fall_rate_error": 56.93
       },
       "707-1414Hz": {
-        "droop_error": -51.699,
-        "fall_rate_error": 72.73
+        "droop_error": -50.143,
+        "fall_rate_error": 74.31
       },
       "1414-2828Hz": {
-        "droop_error": -56.328,
-        "fall_rate_error": 73.99
+        "droop_error": -49.725,
+        "fall_rate_error": 86.32
       },
       "2828-5657Hz": {
-        "droop_error": -52.841,
-        "fall_rate_error": 126.15
+        "droop_error": -53.061,
+        "fall_rate_error": 132.29
       },
       "5657-11314Hz": {
-        "droop_error": -110.327,
-        "fall_rate_error": 166.98
+        "droop_error": -95.588,
+        "fall_rate_error": 157.94
       },
       "11314-22049Hz": {
-        "droop_error": -229.171,
-        "fall_rate_error": 366.77
+        "droop_error": -226.552,
+        "fall_rate_error": 422.89
       }
     },
-    "time_to_ned_0.9_error_ms": -167.619,
-    "mixing_time_error_ms": -154.1043,
-    "iacc_rendered": 0.0525,
+    "time_to_ned_0.9_error_ms": -161.6327,
+    "mixing_time_error_ms": -129.7052,
+    "iacc_rendered": 0.0442,
     "iacc_reference": 0.0394,
     "coherence_noise_floor_rendered": 0.3255,
     "coherence_noise_floor_reference": 0.3255,
-    "mid_side_ratio_error_db": 0.0177,
-    "log_spectral_distance_db": 3.95,
-    "crest_factor_error_db": -1.9067,
-    "spectral_flatness_error_db": 1.8343
+    "mid_side_ratio_error_db": -0.0112,
+    "log_spectral_distance_db": 3.3,
+    "crest_factor_error_db": -1.7265,
+    "spectral_flatness_error_db": 2.0049
   },
   {
     "filename": "NonLin_7.0s_-7H.wav",
     "time": 7.0,
     "high": -7,
     "gate_errors": {
-      "build_up_ms": -33.56,
-      "plateau_level_db": 0.53,
-      "plateau_ripple_db": 0.112,
-      "plateau_droop_db_per_s": -31.071,
-      "knee_time_ms": -67.483,
-      "fall_rate_db_per_s": -90.88,
-      "knee_r2": 0.0091,
-      "gate_length_ms_at_20db": -62.5
+      "build_up_ms": -30.022,
+      "plateau_level_db": 1.16,
+      "plateau_ripple_db": 0.192,
+      "plateau_droop_db_per_s": -28.087,
+      "knee_time_ms": -61.95,
+      "fall_rate_db_per_s": -79.33,
+      "knee_r2": 0.0101,
+      "gate_length_ms_at_20db": -53.97
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -219.594,
-        "fall_rate_error": 38.46
+        "droop_error": -57.929,
+        "fall_rate_error": 68.64
       },
       "88-177Hz": {
-        "droop_error": -30.634,
-        "fall_rate_error": 30.17
+        "droop_error": -23.426,
+        "fall_rate_error": 24.86
       },
       "177-354Hz": {
-        "droop_error": -51.307,
-        "fall_rate_error": 35.48
+        "droop_error": -39.147,
+        "fall_rate_error": 72.57
       },
       "354-707Hz": {
-        "droop_error": -48.527,
-        "fall_rate_error": 30.12
+        "droop_error": -39.987,
+        "fall_rate_error": 23.04
       },
       "707-1414Hz": {
-        "droop_error": -75.644,
-        "fall_rate_error": 31.14
+        "droop_error": -48.483,
+        "fall_rate_error": 34.64
       },
       "1414-2828Hz": {
-        "droop_error": -43.783,
-        "fall_rate_error": 43.52
+        "droop_error": -37.136,
+        "fall_rate_error": 59.74
       },
       "2828-5657Hz": {
-        "droop_error": -39.649,
-        "fall_rate_error": 104.5
+        "droop_error": -40.154,
+        "fall_rate_error": 114.34
       },
       "5657-11314Hz": {
-        "droop_error": -58.262,
-        "fall_rate_error": 108.95
+        "droop_error": -54.742,
+        "fall_rate_error": 120.83
       },
       "11314-22049Hz": {
-        "droop_error": -103.64,
-        "fall_rate_error": 17.76
+        "droop_error": -98.107,
+        "fall_rate_error": 9.43
       }
     },
-    "time_to_ned_0.9_error_ms": -245.4422,
-    "mixing_time_error_ms": -233.8322,
-    "iacc_rendered": 0.0438,
+    "time_to_ned_0.9_error_ms": -221.4966,
+    "mixing_time_error_ms": -164.5351,
+    "iacc_rendered": 0.0407,
     "iacc_reference": 0.0115,
     "coherence_noise_floor_rendered": 0.2543,
     "coherence_noise_floor_reference": 0.2543,
-    "mid_side_ratio_error_db": -0.058,
-    "log_spectral_distance_db": 6.18,
-    "crest_factor_error_db": 0.4615,
-    "spectral_flatness_error_db": 6.8784
+    "mid_side_ratio_error_db": -0.0056,
+    "log_spectral_distance_db": 5.32,
+    "crest_factor_error_db": 0.7857,
+    "spectral_flatness_error_db": 7.0368
   },
   {
     "filename": "NonLin_7.0s_0H.wav",
     "time": 7.0,
     "high": 0,
     "gate_errors": {
-      "build_up_ms": -19.592,
-      "plateau_level_db": 0.11,
-      "plateau_ripple_db": 0.132,
-      "plateau_droop_db_per_s": -79.662,
-      "knee_time_ms": 30.295,
-      "fall_rate_db_per_s": -98.12,
-      "knee_r2": 0.0082,
-      "gate_length_ms_at_20db": -61.5
+      "build_up_ms": -16.054,
+      "plateau_level_db": 0.37,
+      "plateau_ripple_db": 0.178,
+      "plateau_droop_db_per_s": -76.203,
+      "knee_time_ms": 35.828,
+      "fall_rate_db_per_s": -85.9,
+      "knee_r2": 0.0094,
+      "gate_length_ms_at_20db": -53.97
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -233.18,
-        "fall_rate_error": 73.84
+        "droop_error": -52.711,
+        "fall_rate_error": 55.67
       },
       "88-177Hz": {
-        "droop_error": -25.5,
-        "fall_rate_error": 33.72
+        "droop_error": -18.713,
+        "fall_rate_error": 30.08
       },
       "177-354Hz": {
-        "droop_error": -33.055,
-        "fall_rate_error": 60.35
+        "droop_error": -34.424,
+        "fall_rate_error": 74.89
       },
       "354-707Hz": {
-        "droop_error": -43.621,
-        "fall_rate_error": 35.43
+        "droop_error": -35.309,
+        "fall_rate_error": 44.12
       },
       "707-1414Hz": {
-        "droop_error": -70.428,
-        "fall_rate_error": 33.9
+        "droop_error": -43.351,
+        "fall_rate_error": 40.2
       },
       "1414-2828Hz": {
-        "droop_error": -39.275,
-        "fall_rate_error": 44.87
+        "droop_error": -32.725,
+        "fall_rate_error": 64.11
       },
       "2828-5657Hz": {
-        "droop_error": -34.797,
-        "fall_rate_error": 110.86
+        "droop_error": -36.022,
+        "fall_rate_error": 123.19
       },
       "5657-11314Hz": {
-        "droop_error": -52.662,
-        "fall_rate_error": 112.55
+        "droop_error": -48.843,
+        "fall_rate_error": 125.6
       },
       "11314-22049Hz": {
-        "droop_error": -100.681,
-        "fall_rate_error": 22.18
+        "droop_error": -94.621,
+        "fall_rate_error": 14.12
       }
     },
-    "time_to_ned_0.9_error_ms": -227.483,
-    "mixing_time_error_ms": -233.8322,
-    "iacc_rendered": 0.0472,
+    "time_to_ned_0.9_error_ms": -161.6327,
+    "mixing_time_error_ms": -109.6599,
+    "iacc_rendered": 0.0487,
     "iacc_reference": 0.0367,
     "coherence_noise_floor_rendered": 0.2375,
     "coherence_noise_floor_reference": 0.2375,
-    "mid_side_ratio_error_db": 0.1185,
-    "log_spectral_distance_db": 4.7,
-    "crest_factor_error_db": -0.0905,
-    "spectral_flatness_error_db": 2.3325
+    "mid_side_ratio_error_db": -0.0164,
+    "log_spectral_distance_db": 3.78,
+    "crest_factor_error_db": 0.381,
+    "spectral_flatness_error_db": 2.4132
   },
   {
     "filename": "NonLin_9.8s_-4H.wav",
     "time": 9.8,
     "high": -4,
     "gate_errors": {
-      "build_up_ms": -33.56,
-      "plateau_level_db": 0.46,
-      "plateau_ripple_db": 0.17,
-      "plateau_droop_db_per_s": -46.31,
-      "knee_time_ms": -47.528,
-      "fall_rate_db_per_s": -98.17,
-      "knee_r2": 0.0056,
-      "gate_length_ms_at_20db": -82.44
+      "build_up_ms": -30.022,
+      "plateau_level_db": 1.08,
+      "plateau_ripple_db": 0.177,
+      "plateau_droop_db_per_s": -42.505,
+      "knee_time_ms": -44.988,
+      "fall_rate_db_per_s": -89.37,
+      "knee_r2": 0.0068,
+      "gate_length_ms_at_20db": -72.92
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -192.254,
-        "fall_rate_error": 28.51
+        "droop_error": -46.895,
+        "fall_rate_error": 23.55
       },
       "88-177Hz": {
-        "droop_error": -47.504,
-        "fall_rate_error": 58.68
+        "droop_error": -51.82,
+        "fall_rate_error": 29.93
       },
       "177-354Hz": {
-        "droop_error": -56.828,
-        "fall_rate_error": 63.05
+        "droop_error": -45.906,
+        "fall_rate_error": 86.8
       },
       "354-707Hz": {
-        "droop_error": -61.036,
-        "fall_rate_error": 74.84
+        "droop_error": -43.66,
+        "fall_rate_error": 39.93
       },
       "707-1414Hz": {
-        "droop_error": -65.311,
-        "fall_rate_error": 29.28
+        "droop_error": -39.127,
+        "fall_rate_error": 32.7
       },
       "1414-2828Hz": {
-        "droop_error": -51.366,
-        "fall_rate_error": 40.11
+        "droop_error": -46.61,
+        "fall_rate_error": 55.15
       },
       "2828-5657Hz": {
-        "droop_error": -50.056,
-        "fall_rate_error": 73.52
+        "droop_error": -49.959,
+        "fall_rate_error": 83.61
       },
       "5657-11314Hz": {
-        "droop_error": -62.359,
-        "fall_rate_error": 108.04
+        "droop_error": -58.61,
+        "fall_rate_error": 114.05
       },
       "11314-22049Hz": {
-        "droop_error": -102.607,
-        "fall_rate_error": 37.72
+        "droop_error": -95.821,
+        "fall_rate_error": 30.16
       }
     },
-    "time_to_ned_0.9_error_ms": -281.3605,
-    "mixing_time_error_ms": -243.8095,
-    "iacc_rendered": 0.0456,
+    "time_to_ned_0.9_error_ms": -263.4014,
+    "mixing_time_error_ms": -119.6372,
+    "iacc_rendered": 0.043,
     "iacc_reference": 0.0158,
     "coherence_noise_floor_rendered": 0.2182,
     "coherence_noise_floor_reference": 0.2182,
-    "mid_side_ratio_error_db": -0.0129,
-    "log_spectral_distance_db": 5.62,
-    "crest_factor_error_db": 1.0893,
-    "spectral_flatness_error_db": 5.2784
+    "mid_side_ratio_error_db": -0.0181,
+    "log_spectral_distance_db": 4.73,
+    "crest_factor_error_db": 1.7972,
+    "spectral_flatness_error_db": 5.4076
   },
   {
     "filename": "NonLin_9.8s_-9H.wav",
     "time": 9.8,
     "high": -9,
     "gate_errors": {
-      "build_up_ms": -33.56,
-      "plateau_level_db": 0.56,
-      "plateau_ripple_db": 0.086,
-      "plateau_droop_db_per_s": -45.129,
-      "knee_time_ms": -47.528,
-      "fall_rate_db_per_s": -88.55,
-      "knee_r2": 0.0095,
-      "gate_length_ms_at_20db": -81.45
+      "build_up_ms": -30.022,
+      "plateau_level_db": 1.24,
+      "plateau_ripple_db": 0.145,
+      "plateau_droop_db_per_s": -41.408,
+      "knee_time_ms": -45.986,
+      "fall_rate_db_per_s": -80.16,
+      "knee_r2": 0.0106,
+      "gate_length_ms_at_20db": -58.95
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -191.601,
-        "fall_rate_error": 27.49
+        "droop_error": -46.385,
+        "fall_rate_error": 25.62
       },
       "88-177Hz": {
-        "droop_error": -46.859,
-        "fall_rate_error": 55.98
+        "droop_error": -51.244,
+        "fall_rate_error": 104.09
       },
       "177-354Hz": {
-        "droop_error": -56.205,
-        "fall_rate_error": 63.92
+        "droop_error": -45.298,
+        "fall_rate_error": 97.1
       },
       "354-707Hz": {
-        "droop_error": -60.688,
-        "fall_rate_error": 69.86
+        "droop_error": -43.223,
+        "fall_rate_error": 43.34
       },
       "707-1414Hz": {
-        "droop_error": -64.845,
-        "fall_rate_error": 29.99
+        "droop_error": -39.554,
+        "fall_rate_error": 43.06
       },
       "1414-2828Hz": {
-        "droop_error": -51.063,
-        "fall_rate_error": 40.54
+        "droop_error": -46.931,
+        "fall_rate_error": 55.12
       },
       "2828-5657Hz": {
-        "droop_error": -49.186,
-        "fall_rate_error": 76.24
+        "droop_error": -49.311,
+        "fall_rate_error": 86.01
       },
       "5657-11314Hz": {
-        "droop_error": -61.09,
-        "fall_rate_error": 109.93
+        "droop_error": -58.273,
+        "fall_rate_error": 111.33
       },
       "11314-22049Hz": {
-        "droop_error": -40.976,
-        "fall_rate_error": 2.43
+        "droop_error": -91.677,
+        "fall_rate_error": 3.98
       }
     },
-    "time_to_ned_0.9_error_ms": -263.4014,
-    "mixing_time_error_ms": -79.1837,
-    "iacc_rendered": 0.0439,
+    "time_to_ned_0.9_error_ms": -251.4286,
+    "mixing_time_error_ms": -9.8866,
+    "iacc_rendered": 0.0389,
     "iacc_reference": 0.0089,
     "coherence_noise_floor_rendered": 0.2375,
     "coherence_noise_floor_reference": 0.2375,
-    "mid_side_ratio_error_db": -0.0806,
-    "log_spectral_distance_db": 6.65,
-    "crest_factor_error_db": 1.8052,
-    "spectral_flatness_error_db": 7.6586
+    "mid_side_ratio_error_db": 0.0001,
+    "log_spectral_distance_db": 5.77,
+    "crest_factor_error_db": 2.0037,
+    "spectral_flatness_error_db": 7.8245
   },
   {
     "filename": "NonLin_9.8s_0H.wav",
     "time": 9.8,
     "high": 0,
     "gate_errors": {
-      "build_up_ms": -17.597,
-      "plateau_level_db": 0.26,
-      "plateau_ripple_db": 0.092,
-      "plateau_droop_db_per_s": -79.581,
-      "knee_time_ms": 40.272,
-      "fall_rate_db_per_s": -101.68,
-      "knee_r2": 0.0048,
-      "gate_length_ms_at_20db": -81.45
+      "build_up_ms": -14.059,
+      "plateau_level_db": 0.49,
+      "plateau_ripple_db": 0.087,
+      "plateau_droop_db_per_s": -75.227,
+      "knee_time_ms": 42.812,
+      "fall_rate_db_per_s": -93.37,
+      "knee_r2": 0.0062,
+      "gate_length_ms_at_20db": -58.95
     },
     "band_errors": {
       "44-89Hz": {
-        "droop_error": -186.983,
-        "fall_rate_error": 36.3
+        "droop_error": -41.822,
+        "fall_rate_error": 25.48
       },
       "88-177Hz": {
-        "droop_error": -42.15,
-        "fall_rate_error": 60.33
+        "droop_error": -46.809,
+        "fall_rate_error": 93.07
       },
       "177-354Hz": {
-        "droop_error": -51.614,
-        "fall_rate_error": 66.77
+        "droop_error": -40.694,
+        "fall_rate_error": 78.83
       },
       "354-707Hz": {
-        "droop_error": -55.853,
-        "fall_rate_error": 72.3
+        "droop_error": -38.737,
+        "fall_rate_error": 43.97
       },
       "707-1414Hz": {
-        "droop_error": -60.097,
-        "fall_rate_error": 34.39
+        "droop_error": -33.92,
+        "fall_rate_error": 36.62
       },
       "1414-2828Hz": {
-        "droop_error": -45.875,
-        "fall_rate_error": 43.0
+        "droop_error": -41.856,
+        "fall_rate_error": 62.02
       },
       "2828-5657Hz": {
-        "droop_error": -46.755,
-        "fall_rate_error": 82.6
+        "droop_error": -45.235,
+        "fall_rate_error": 89.18
       },
       "5657-11314Hz": {
-        "droop_error": -58.002,
-        "fall_rate_error": 109.23
+        "droop_error": -53.556,
+        "fall_rate_error": 119.3
       },
       "11314-22049Hz": {
-        "droop_error": -96.272,
-        "fall_rate_error": 20.12
+        "droop_error": -88.146,
+        "fall_rate_error": 9.6
       }
     },
-    "time_to_ned_0.9_error_ms": -251.4286,
-    "mixing_time_error_ms": -238.8209,
-    "iacc_rendered": 0.0472,
+    "time_to_ned_0.9_error_ms": -149.6599,
+    "mixing_time_error_ms": -94.6939,
+    "iacc_rendered": 0.0489,
     "iacc_reference": 0.0356,
     "coherence_noise_floor_rendered": 0.2298,
     "coherence_noise_floor_reference": 0.2298,
-    "mid_side_ratio_error_db": 0.1815,
-    "log_spectral_distance_db": 4.81,
-    "crest_factor_error_db": 0.2264,
-    "spectral_flatness_error_db": 2.1811
+    "mid_side_ratio_error_db": 0.0432,
+    "log_spectral_distance_db": 3.89,
+    "crest_factor_error_db": 0.7377,
+    "spectral_flatness_error_db": 2.2579
   }
 ]

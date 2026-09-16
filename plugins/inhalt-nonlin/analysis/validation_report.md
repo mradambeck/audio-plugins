@@ -8,41 +8,41 @@
 
 | Metric | All | High=0 | High!=0 |
 |---|---|---|---|
-| Knee time error (ms) | -11.816 | 15.351 | -33.551 |
-| Fall rate error (dB/s) | -147.524 | -112.098 | -175.866 |
-| Plateau droop error (dB/s) | -81.7 | -84.419 | -79.524 |
-| Build-up error (ms) | -23.124 | -18.572 | -26.766 |
-| Time-to-NED=0.9 error (ms) | -218.076 | -184.082 | -263.401 |
-| Mixing time error (ms) | -150.925 | -181.474 | -126.485 |
-| Mid/side ratio error (dB) | 0.013 | 0.091 | -0.05 |
-| Log-spectral distance (dB, unsigned) | 5.739 | 4.597 | 6.652 |
-| Crest factor error (dB) | 0.666 | -0.564 | 1.649 |
-| Spectral flatness error (dB) | 4.645 | 2.183 | 6.615 |
+| Knee time error (ms) | -16.372 | 8.413 | -36.199 |
+| Fall rate error (dB/s) | -135.768 | -100.91 | -163.654 |
+| Plateau droop error (dB/s) | -70.535 | -76.615 | -65.671 |
+| Build-up error (ms) | -20.806 | -15.782 | -24.825 |
+| Time-to-NED=0.9 error (ms) | -175.316 | -122.721 | -245.442 |
+| Mixing time error (ms) | -77.245 | -89.728 | -64.762 |
+| Mid/side ratio error (dB) | 0.012 | 0.01 | 0.014 |
+| Log-spectral distance (dB, unsigned) | 5.064 | 3.885 | 6.008 |
+| Crest factor error (dB) | 0.684 | -0.039 | 1.262 |
+| Spectral flatness error (dB) | 4.784 | 2.302 | 6.769 |
 
 ## Stereo (IACC, rendered vs. reference, per capture)
 
 | File | IACC rendered | IACC reference | Coherence floor (r/ref) |
 |---|---|---|---|
-| NonLin_0.1s_-3H.wav | 0.1179 | 0.0057 | 0.3466 / 0.3466 |
-| NonLin_0.8s_-3H.wav | 0.1062 | 0.0056 | 0.3797 / 0.3797 |
-| NonLin_2.2s_0H.wav | 0.0602 | 0.0212 | 0.3492 / 0.3492 |
-| NonLin_4.8s_0H.wav | 0.0525 | 0.0394 | 0.3255 / 0.3255 |
-| NonLin_7.0s_-7H.wav | 0.0438 | 0.0115 | 0.2543 / 0.2543 |
-| NonLin_7.0s_0H.wav | 0.0472 | 0.0367 | 0.2375 / 0.2375 |
-| NonLin_9.8s_-4H.wav | 0.0456 | 0.0158 | 0.2182 / 0.2182 |
-| NonLin_9.8s_-9H.wav | 0.0439 | 0.0089 | 0.2375 / 0.2375 |
-| NonLin_9.8s_0H.wav | 0.0472 | 0.0356 | 0.2298 / 0.2298 |
+| NonLin_0.1s_-3H.wav | 0.0752 | 0.0057 | 0.3466 / 0.3466 |
+| NonLin_0.8s_-3H.wav | 0.0706 | 0.0056 | 0.3797 / 0.3797 |
+| NonLin_2.2s_0H.wav | 0.0431 | 0.0212 | 0.3492 / 0.3492 |
+| NonLin_4.8s_0H.wav | 0.0442 | 0.0394 | 0.3255 / 0.3255 |
+| NonLin_7.0s_-7H.wav | 0.0407 | 0.0115 | 0.2543 / 0.2543 |
+| NonLin_7.0s_0H.wav | 0.0487 | 0.0367 | 0.2375 / 0.2375 |
+| NonLin_9.8s_-4H.wav | 0.043 | 0.0158 | 0.2182 / 0.2182 |
+| NonLin_9.8s_-9H.wav | 0.0389 | 0.0089 | 0.2375 / 0.2375 |
+| NonLin_9.8s_0H.wav | 0.0489 | 0.0356 | 0.2298 / 0.2298 |
 
 ## Per-capture gate errors
 
 | File | Knee error (ms) | Fall rate error (dB/s) | Droop error (dB/s) | Build-up error (ms) | LSD (dB) |
 |---|---|---|---|---|---|
-| NonLin_0.1s_-3H.wav | -1.587 | -308.28 | -146.528 | -15.555 | 7.63 |
-| NonLin_0.8s_-3H.wav | -3.628 | -293.45 | -128.58 | -17.596 | 7.18 |
-| NonLin_2.2s_0H.wav | -3.628 | -152.83 | -110.46 | -17.596 | 4.93 |
-| NonLin_4.8s_0H.wav | -5.533 | -95.76 | -67.975 | -19.501 | 3.95 |
-| NonLin_7.0s_-7H.wav | -67.483 | -90.88 | -31.071 | -33.56 | 6.18 |
-| NonLin_7.0s_0H.wav | 30.295 | -98.12 | -79.662 | -19.592 | 4.7 |
-| NonLin_9.8s_-4H.wav | -47.528 | -98.17 | -46.31 | -33.56 | 5.62 |
-| NonLin_9.8s_-9H.wav | -47.528 | -88.55 | -45.129 | -33.56 | 6.65 |
-| NonLin_9.8s_0H.wav | 40.272 | -101.68 | -79.581 | -17.597 | 4.81 |
+| NonLin_0.1s_-3H.wav | -13.016 | -286.27 | -116.033 | -16.009 | 7.34 |
+| NonLin_0.8s_-3H.wav | -15.057 | -283.14 | -100.322 | -18.05 | 6.88 |
+| NonLin_2.2s_0H.wav | -30.022 | -135.66 | -90.017 | -17.052 | 4.57 |
+| NonLin_4.8s_0H.wav | -14.966 | -88.71 | -65.012 | -15.964 | 3.3 |
+| NonLin_7.0s_-7H.wav | -61.95 | -79.33 | -28.087 | -30.022 | 5.32 |
+| NonLin_7.0s_0H.wav | 35.828 | -85.9 | -76.203 | -16.054 | 3.78 |
+| NonLin_9.8s_-4H.wav | -44.988 | -89.37 | -42.505 | -30.022 | 4.73 |
+| NonLin_9.8s_-9H.wav | -45.986 | -80.16 | -41.408 | -30.022 | 5.77 |
+| NonLin_9.8s_0H.wav | 42.812 | -93.37 | -75.227 | -14.059 | 3.89 |

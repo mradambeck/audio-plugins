@@ -5,16 +5,31 @@
 namespace inhalt
 {
 
-// Two disjoint, mutually non-simple-ratio delay sets, mean ~16-17ms - directly from
+// Two disjoint, mutually non-simple-ratio delay sets - directly from
 // ml-toolkit/effects/nonlin/model.py's LEFT_DELAY_SAMPLES_AT_44K / RIGHT_DELAY_SAMPLES_AT_44K
-// (471,503,589,639,735,817,941,1067 and 483,549,607,699,781,867,979,1133 samples @44.1kHz),
+// (447,479,521,577,667,739,803,891 and 707,789,833,941,1005,1103,1221,1321 samples @44.1kHz),
 // converted to milliseconds here so they scale to any session rate the same way every other
 // engine in this catalog scales its own ms delay table (e.g. AuraFDNEngine::baseLineLengthsMs).
+//
+// DELIBERATELY ASYMMETRIC ranges (left mean ~14.5ms, right ~22.4ms), not two similar-range sets
+// - a real, measured, and chosen trade-off, not an oversight. Empirically swept (see
+// ml-toolkit's own diagnostic scripts from that session): two independent 8-line tanks with
+// SIMILAR delay ranges (the original ~10-25ms/~11-26ms pair, and 30 other random pairs in that
+// same range) floor out around IACC~0.045-0.05 no matter which specific values are chosen -
+// more lines in the same range measured WORSE (16 lines: 0.051; 64 lines: 0.063), and removing
+// the shared gate envelope entirely barely moved it (0.044 vs 0.039) - so neither line count nor
+// the gate was the cause. Only genuinely NON-OVERLAPPING delay RANGES reduced it further (this
+// "moderate shift" pair measured ~0.038 vs the original's ~0.052, a real ~27% reduction, chosen
+// over a more extreme "full split" pair that measured slightly better (~0.035) but pushed the two
+// channels' mean delay twice as far apart). Real hardware measures 0.006-0.04 - this narrows the
+// gap without fully closing it, and asymmetric ranges do mean the two channels are not
+// perfectly matched in density/brightness by construction, an audible trade-off made
+// deliberately, with Adam's approval, not a side effect.
 const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::leftDelaysMs { {
-    10.680272f, 11.405896f, 13.356009f, 14.489796f, 16.666667f, 18.526077f, 21.337868f, 24.195011f,
+    10.136054f, 10.861678f, 11.814059f, 13.083900f, 15.124717f, 16.757370f, 18.208617f, 20.204082f,
 } };
 const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::rightDelaysMs { {
-    10.952381f, 12.448980f, 13.764172f, 15.850340f, 17.709751f, 19.659864f, 22.199546f, 25.691610f,
+    16.031746f, 17.891156f, 18.888889f, 21.337868f, 22.789116f, 25.011338f, 27.687075f, 29.954649f,
 } };
 
 // Same fixed 8x8 Hadamard matrix as AuraFDNEngine.h/ShieldsFDNEngine.h - Sylvester construction,

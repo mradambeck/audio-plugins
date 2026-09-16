@@ -76,14 +76,23 @@ NUM_LINES = 8
 #
 # Odd sample counts, no shared factor within each set (gcd=1) and no overlap between the two sets
 # - the usual FDN convention against shared resonances (matches ShieldsFDNEngine/IntruderFDNEngine/
-# AmbienceFDN's own non-whole-millisecond, geometrically-spaced delays). Mean ~16-17ms - much
-# shorter than Ambience's 30-76ms, chosen for a short/tight gated program that needs to build
-# diffuse density within ~100-200ms rather than Ambience's multi-second room-sized decay.
+# AmbienceFDN's own non-whole-millisecond, geometrically-spaced delays). Much shorter overall than
+# Ambience's 30-76ms, chosen for a short/tight gated program that needs to build diffuse density
+# within ~100-200ms rather than Ambience's multi-second room-sized decay.
+#
+# DELIBERATELY ASYMMETRIC ranges (left mean ~14.5ms, right ~22.4ms) - see
+# plugins/inhalt-nonlin/Source/InhaltIRSynth.cpp's own comment (these two arrays must be kept in
+# sync with that file's leftDelaysMs/rightDelaysMs) for the full empirical justification: two
+# independent tanks with SIMILAR delay ranges floor out around IACC~0.045-0.05 regardless of the
+# specific values chosen (30 random pairs swept), and neither more lines nor removing the shared
+# gate envelope moved that floor - only non-overlapping delay RANGES did, at the cost of the two
+# channels no longer being matched in density/brightness by construction, a real trade-off made
+# deliberately with Adam's approval.
 LEFT_DELAY_SAMPLES_AT_44K = torch.tensor(
-    [471.0, 503.0, 589.0, 639.0, 735.0, 817.0, 941.0, 1067.0]
+    [447.0, 479.0, 521.0, 577.0, 667.0, 739.0, 803.0, 891.0]
 )
 RIGHT_DELAY_SAMPLES_AT_44K = torch.tensor(
-    [483.0, 549.0, 607.0, 699.0, 781.0, 867.0, 979.0, 1133.0]
+    [707.0, 789.0, 833.0, 941.0, 1005.0, 1103.0, 1221.0, 1321.0]
 )
 
 # See module docstring's "Feedback gain ceiling" section - empirically derived, not inherited

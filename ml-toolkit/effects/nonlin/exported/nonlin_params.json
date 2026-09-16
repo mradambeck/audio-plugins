@@ -1,6 +1,6 @@
 {
   "manifest": {
-    "git_commit": "520040de8503a92ce1074167fa1f73fc505cf2bb",
+    "git_commit": "7ba502aee0b768c71f608ad3e91da88a7add8700",
     "capture_set_hash": "3802e6e0ad0b96de",
     "fit_config_hash": "60a6e3a299ef08b5",
     "fit_date": "2026-09-16",
@@ -215,6 +215,20 @@
       [
         -4.0,
         -5.2156982421875
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "high_to_t_knee_ms_offset": [
+      [
+        -9.0,
+        87.79999999999998
+      ],
+      [
+        -4.0,
+        87.79999999999998
       ],
       [
         0.0,

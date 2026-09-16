@@ -140,6 +140,41 @@ def _build_tilt_gain_curves(features: dict) -> dict:
     }
 
 
+def _build_knee_time_high_offset(features: dict) -> dict:
+    """t_knee_ms additive High offset - added after comparing validate.py's real render-vs-
+    reference report against ground truth and finding the largest remaining per-capture errors
+    concentrated exactly where High is most negative (Time=7.0/High=-7: -67ms; Time=9.8/High=-4/-9:
+    -47.5ms), while High=0 captures matched much more closely (-1.6 to -5.5ms). This was already
+    documented as a known gap (t_knee_ms's Time-only curve, pooled from H=-3/H=0 points, doesn't
+    model any Time*High interaction) - direct measurement DOES support at least an additive High
+    offset at one Time setting, the same combination model already used for plateau_droop_db_per_s
+    and the tilt gains, so this closes that gap the same documented way rather than leaving it."""
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+
+    sweep = sorted(
+        (c["params"]["high"], c["gate"]["knee_time_ms"])
+        for c in features["captures"] if c["params"]["time"] == richest_time
+    )
+    print(f"\nt_knee_ms High offset (direct measurement) at Time={richest_time}s: {sweep}")
+
+    if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
+        print("  no High=0 anchor or too few points - skipping, keeping t_knee_ms Time-only")
+        return {}
+
+    baseline = next(v for h, v in sweep if h == 0)
+    offset_points = [(h, v - baseline) for h, v in sweep]
+    print(f"  offsets: {[round(v, 2) for _, v in offset_points]} (baseline {baseline:.2f}ms)")
+
+    return {
+        "high_to_t_knee_ms_offset": {
+            "points": Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points]).points(),
+        }
+    }
+
+
 def main() -> None:
     features = json.load(open(FEATURES_PATH))
     curves = json.load(open(CURVES_PATH))
@@ -175,6 +210,7 @@ def main() -> None:
         print(f"  {param}: {[round(v, 3) for _, v in curve.points()]}")
 
     curves.update(_build_tilt_gain_curves(features))
+    curves.update(_build_knee_time_high_offset(features))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "
@@ -194,6 +230,15 @@ def main() -> None:
         "longer Time - an honest compromise (documented, not hidden), since findings.md found the "
         "internal gate-shape breakdown is NOT as cleanly High-neutral as the overall "
         "gate_length_ms_at_20db is."
+    )
+    curves["_notes"]["t_knee_ms_high_offset"] = (
+        "high_to_t_knee_ms_offset was added after a real validate.py run showed the largest "
+        "remaining knee-time errors concentrated at very negative High (T=7.0/H=-7: -67ms; "
+        "T=9.8/H=-4/-9: -47.5ms) while High=0 matched much more closely - direct measurement at "
+        "the richest available High sweep supports at least an additive offset, the same "
+        "combination model already used for plateau_droop_db_per_s. Built from only one Time "
+        "setting's sweep (2-3 points), same Time-independence caveat as every other High-offset "
+        "curve here."
     )
     curves["_notes"]["tau_k_ms_not_measured"] = (
         "tau_k_ms (the gate's knee softness/transition width) has no direct measurement - "
