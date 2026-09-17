@@ -81,7 +81,7 @@ NUM_LINES = 8
 # Ambience's 30-76ms, chosen for a short/tight gated program that needs to build diffuse density
 # within ~100-200ms rather than Ambience's multi-second room-sized decay.
 #
-# DELIBERATELY ASYMMETRIC ranges (left mean ~14.5ms, right ~22.4ms) - see
+# DELIBERATELY ASYMMETRIC ranges (left mean ~15.5ms, right ~22.9ms) - see
 # plugins/inhalt-nonlin/Source/InhaltIRSynth.cpp's own comment (these two arrays must be kept in
 # sync with that file's leftDelaysMs/rightDelaysMs) for the full empirical justification: two
 # independent tanks with SIMILAR delay ranges floor out around IACC~0.045-0.05 regardless of the
@@ -89,11 +89,39 @@ NUM_LINES = 8
 # gate envelope moved that floor - only non-overlapping delay RANGES did, at the cost of the two
 # channels no longer being matched in density/brightness by construction, a real trade-off made
 # deliberately with Adam's approval.
+#
+# REVISED a second time (this exact set, not the "moderate shift" set above the asymmetry note
+# describes) after a real, ear-caught complaint about tonal balance ("convolution feels beefier,
+# more going on around ~400Hz" vs. this engine's own render) - measured directly (not assumed) as
+# a genuine tank-modal notch around 128-323Hz (worst at 161Hz, -3 to -9dB relative to neighboring
+# bands across every Time/High setting checked), a property of the PREVIOUS delay-line set's own
+# modal structure, not the tilt/gate stages (confirmed present even with the tilt and direct tap
+# disabled).
+#
+# REVISED A THIRD TIME (this exact set - two prior candidate sets were tried and discarded after
+# being measured, not just proposed). The FIRST notch-fix candidate closed the notch and improved
+# IACC in a bare-tank test, but the bare-tank test was incomplete: it didn't include the input
+# diffuser feeding the tank, nor the tilt (now much stronger post-LTAS-fix at negative High -
+# see build_measured_gate_curves.py). Measured on the REAL render, that first candidate's IACC at
+# Time=9.8/High=-9 got WORSE (0.0712) than the original set (~0.0352) - a real, ear-caught
+# regression risk (Adam separately reported "the stereo spread feels pretty different, even when
+# adjusting the width"), traced specifically to an interaction between the diffuser-fed-into-tank
+# stage and that candidate's own delay values under the tilt's strong low-frequency boost (NOT
+# reproducible in a bare tank+tilt test without the diffuser - confirmed by adding the diffuser
+# stage to the Python measurement and reproducing the same regression before re-searching).
+#
+# This set was found by re-running the same randomized search (60 candidates, perturbing the
+# first candidate's own delays +-15%) but scoring against the FULL chain (diffuser feeding the
+# tank + tilt applied, not just the bare tank) at Time=9.8/High=-9 specifically (the worst real
+# case) alongside the neutral case. Verified robust across 5 real Time/High settings (not just
+# the one it was searched against): notch +0.19 to +0.31dB (essentially closed) and IACC
+# 0.026-0.032 at every one of them, including High=-9 - no negative-High regression, and better
+# than the ORIGINAL (pre-notch-fix) set's own IACC everywhere checked.
 LEFT_DELAY_SAMPLES_AT_44K = torch.tensor(
-    [447.0, 479.0, 521.0, 577.0, 667.0, 739.0, 803.0, 891.0]
+    [481.0, 513.0, 561.0, 657.0, 695.0, 805.0, 813.0, 829.0]
 )
 RIGHT_DELAY_SAMPLES_AT_44K = torch.tensor(
-    [707.0, 789.0, 833.0, 941.0, 1005.0, 1103.0, 1221.0, 1321.0]
+    [721.0, 763.0, 799.0, 969.0, 1079.0, 1089.0, 1133.0, 1561.0]
 )
 
 # See module docstring's "Feedback gain ceiling" section - empirically derived, not inherited

@@ -76,7 +76,7 @@ public:
         // zero. Hand-measured constant (Time/High-independent within the real capture set's own
         // sampling) - see InhaltParameterMap.cpp's own directGainConstant comment for the
         // calibration and its known residual gap at very negative High.
-        float directGain = 0.79f;
+        float directGain = 0.96f;
     };
 
     static constexpr int numLines = 8;

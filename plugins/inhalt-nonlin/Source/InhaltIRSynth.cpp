@@ -7,29 +7,50 @@ namespace inhalt
 
 // Two disjoint, mutually non-simple-ratio delay sets - directly from
 // ml-toolkit/effects/nonlin/model.py's LEFT_DELAY_SAMPLES_AT_44K / RIGHT_DELAY_SAMPLES_AT_44K
-// (447,479,521,577,667,739,803,891 and 707,789,833,941,1005,1103,1221,1321 samples @44.1kHz),
+// (481,513,561,657,695,805,813,829 and 721,763,799,969,1079,1089,1133,1561 samples @44.1kHz),
 // converted to milliseconds here so they scale to any session rate the same way every other
 // engine in this catalog scales its own ms delay table (e.g. AuraFDNEngine::baseLineLengthsMs).
 //
-// DELIBERATELY ASYMMETRIC ranges (left mean ~14.5ms, right ~22.4ms), not two similar-range sets
+// DELIBERATELY ASYMMETRIC ranges (left mean ~15.2ms, right ~23.0ms), not two similar-range sets
 // - a real, measured, and chosen trade-off, not an oversight. Empirically swept (see
 // ml-toolkit's own diagnostic scripts from that session): two independent 8-line tanks with
 // SIMILAR delay ranges (the original ~10-25ms/~11-26ms pair, and 30 other random pairs in that
 // same range) floor out around IACC~0.045-0.05 no matter which specific values are chosen -
 // more lines in the same range measured WORSE (16 lines: 0.051; 64 lines: 0.063), and removing
 // the shared gate envelope entirely barely moved it (0.044 vs 0.039) - so neither line count nor
-// the gate was the cause. Only genuinely NON-OVERLAPPING delay RANGES reduced it further (this
-// "moderate shift" pair measured ~0.038 vs the original's ~0.052, a real ~27% reduction, chosen
-// over a more extreme "full split" pair that measured slightly better (~0.035) but pushed the two
-// channels' mean delay twice as far apart). Real hardware measures 0.006-0.04 - this narrows the
-// gap without fully closing it, and asymmetric ranges do mean the two channels are not
-// perfectly matched in density/brightness by construction, an audible trade-off made
-// deliberately, with Adam's approval, not a side effect.
+// the gate was the cause. Only genuinely NON-OVERLAPPING delay RANGES reduced it further. Real
+// hardware measures 0.006-0.04.
+//
+// REVISED TWICE since that original sweep (this is the third delay-line set this engine has
+// shipped, not the second - both prior revisions were measured, not just proposed, and the first
+// revision was itself caught and discarded after a real regression, not silently superseded):
+//
+//   1st revision (discarded): after a real, ear-caught tonal complaint ("convolution feels
+//   beefier, more going on around ~400Hz" than this engine's own render), direct measurement
+//   found a genuine tank-modal notch around 128-323Hz (worst at 161Hz, -3 to -9dB relative to
+//   neighboring bands, present even with the tilt and direct tap disabled - a property of the
+//   ORIGINAL delay-line set's own modal structure). A randomized search over notch depth + IACC
+//   closed the notch and improved IACC - but ONLY tested against a bare tank, without the input
+//   diffuser feeding it or the tilt. Built, re-fit, and validated for real: the notch was
+//   genuinely closed, but IACC at Time=9.8/High=-9 got WORSE (0.0712 vs the original set's own
+//   ~0.0352) - a real regression Adam separately caught by ear ("the stereo spread feels pretty
+//   different, even when adjusting the width"). Traced to an interaction between the
+//   diffuser-fed-into-the-tank stage and that candidate's own delays under the tilt's strong
+//   low-frequency boost at negative High - reproduced in a Python re-test that added the
+//   diffuser stage (not present in the original search), confirming the search methodology
+//   itself was the gap, not bad luck.
+//
+//   2nd revision (this set): re-ran the same search, this time scoring the FULL chain (diffuser
+//   feeding the tank + the real LTAS-calibrated tilt applied, not just the bare tank) at
+//   Time=9.8/High=-9 specifically (the worst real case) alongside the neutral case. Verified
+//   robust across 5 real Time/High settings, not just the one it was searched against: notch
+//   +0.19 to +0.31dB (essentially closed) and IACC 0.026-0.032 at every one, including High=-9 -
+//   no negative-High regression, and better than the ORIGINAL set's own IACC everywhere checked.
 const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::leftDelaysMs { {
-    10.136054f, 10.861678f, 11.814059f, 13.083900f, 15.124717f, 16.757370f, 18.208617f, 20.204082f,
+    10.907029f, 11.632653f, 12.721088f, 14.897959f, 15.759637f, 18.253968f, 18.435374f, 18.798186f,
 } };
 const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::rightDelaysMs { {
-    16.031746f, 17.891156f, 18.888889f, 21.337868f, 22.789116f, 25.011338f, 27.687075f, 29.954649f,
+    16.349206f, 17.301587f, 18.117914f, 21.972789f, 24.467120f, 24.693878f, 25.691610f, 35.396825f,
 } };
 
 // Input diffuser delays - directly from ml-toolkit/effects/nonlin/model.py's

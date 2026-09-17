@@ -138,6 +138,48 @@ relative to it), but it means `InhaltRenderIR`'s raw WAV output is not sample-ac
 true t=0 - worth fixing in `RenderIR.cpp` before any future measurement that needs an ABSOLUTE
 (not onset-relative) time reference.
 
+**Tank delay-line set - revised a third time, after a real, ear-caught complaint comparing this
+render directly against the real IR loaded into the catalog's convolution reverb**: "the stereo
+spread feels pretty different, even when adjusting the width of the new plugin... Conv has more
+going on around ~400Hz, while the algo has more going on around ~3-4k Hz." Measured directly
+(level-matched LTAS, 4 Time/High settings): NOT excess energy at 3-4kHz (the render is actually
+slightly *below* real there too) - a genuine, consistent deficit at 128-323Hz instead (worst at
+161Hz: -5 to -9dB relative to neighboring bands), which reads as "more going on up top" only
+because the low-mid is comparatively thin. Confirmed via direct A/B (tilt and direct tap both
+disabled) that this is a tank-topology/modal property, not a downstream stage.
+
+A randomized search (40 candidates, perturbing the existing delay-line set +-15%) over notch
+depth and IACC found a set that closed the notch AND improved IACC - in a **bare-tank test**.
+Built, re-fit (~42min), and validated for real: the notch was genuinely closed, but IACC at
+Time=9.8/High=-9 got WORSE (0.0712 vs. the original's own ~0.0352) - the exact "stereo spread
+feels different" complaint, not fixed but made WORSE by the first attempt. Investigated rather
+than shipped: isolated the direct tap (not the cause - IACC was slightly worse with it OFF) and
+then added the input diffuser stage to the Python search harness (the actual missing piece,
+confirmed by reproducing the same regression in Python once the diffuser was included) - the
+first candidate's own delay values interact badly with the diffuser-fed-into-tank stage under the
+tilt's strong low-frequency boost at negative High, an effect invisible in a bare-tank test.
+
+Re-ran the search scoring the FULL chain (diffuser + the real LTAS-calibrated tilt at High=-9,
+not just the bare tank) and found a second candidate, verified across 5 real Time/High settings
+before committing to another re-fit:
+
+| Metric (Time=9.8/High=-9) | Original set | 1st candidate (discarded) | Final set |
+|---|---|---|---|
+| 128-323Hz notch (dB, relative to neighbors) | -5.47 | +0.20 (fixed) | +0.31 (fixed) |
+| IACC | ~0.0352 | 0.0712 (regressed) | 0.0547 |
+
+Net result across all 9 real captures after the final set: the specific 161Hz notch is gone
+(flows smoothly with its neighbors now, not a standout dip), log-spectral distance improved
+2.93dB (from 3.19dB before this delay-line work), and IACC at High=0 settings measurably
+IMPROVED (e.g. 0.0429->0.0307 at Time=4.8) while negative-High settings, though still above real
+hardware's own very low values (a persisting, already-documented gap - see the stereo
+decorrelation item above), are clearly better than the discarded first candidate and only
+modestly behind the original set's own negative-High numbers - a real, disclosed three-way
+trade-off (EQ vs. neutral-IACC vs. negative-High-IACC) resolved without a straightforward win on
+every single axis, not pretended otherwise. A broader, milder ~3-6dB low-mid softness across
+100-400Hz remains (a real gap, distinct from the sharp notch that's now fixed) - not chased
+further in this pass.
+
 Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 
 - Rendered stereo decorrelation (IACC ~0.04-0.08) is closer to the real hardware's (~0.006-0.04)
