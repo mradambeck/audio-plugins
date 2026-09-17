@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         ab32c0a8d7395bfdf548e6b1be7d54e599c012a8
+//   git commit:         9a96b938f39c49c35f0fed403d809c70c7154e3c
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-17
@@ -104,13 +104,11 @@ static_assert(time_to_diffuser_gainPoints.front().x <= time_to_diffuser_gainPoin
     "time_to_diffuser_gainPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // time_to_plateau_droop_db_per_s
-static constexpr std::array<FittedPoint, 6> time_to_plateau_droop_db_per_sPoints { {
-    { 0.1f, -175.555f },
-    { 0.8f, -175.517f },
-    { 2.2f, -51.612f },
-    { 4.8f, -37.255f },
-    { 7.0f, -28.433500000000002f },
-    { 9.8f, -33.00366666666667f },
+static constexpr std::array<FittedPoint, 4> time_to_plateau_droop_db_per_sPoints { {
+    { 2.2f, -62.214f },
+    { 4.8f, 16.323999999999998f },
+    { 7.0f, 32.812999999999995f },
+    { 9.8f, 28.198f },
 } };
 static_assert(time_to_plateau_droop_db_per_sPoints.front().x <= time_to_plateau_droop_db_per_sPoints.back().x,
     "time_to_plateau_droop_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
@@ -135,8 +133,8 @@ static_assert(high_to_tilt_high_gain_offsetPoints.front().x <= high_to_tilt_high
 
 // high_to_plateau_droop_db_per_s_offset
 static constexpr std::array<FittedPoint, 3> high_to_plateau_droop_db_per_s_offsetPoints { {
-    { -9.0f, -0.982452392578125f },
-    { -4.0f, -2.26995849609375f },
+    { -9.0f, -33.332f },
+    { -4.0f, -34.752f },
     { 0.0f, 0.0f },
 } };
 static_assert(high_to_plateau_droop_db_per_s_offsetPoints.front().x <= high_to_plateau_droop_db_per_s_offsetPoints.back().x,

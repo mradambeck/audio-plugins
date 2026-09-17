@@ -177,8 +177,43 @@ decorrelation item above), are clearly better than the discarded first candidate
 modestly behind the original set's own negative-High numbers - a real, disclosed three-way
 trade-off (EQ vs. neutral-IACC vs. negative-High-IACC) resolved without a straightforward win on
 every single axis, not pretended otherwise. A broader, milder ~3-6dB low-mid softness across
-100-400Hz remains (a real gap, distinct from the sharp notch that's now fixed) - not chased
-further in this pass.
+100-400Hz remained after this fix - see the next section for what that turned out to actually be.
+
+**The remaining low-mid softness - NOT an EQ issue at all, a real gate-envelope bug**: measuring
+its own time-evolution (0.5ms-resolution band envelopes, both render and real capture) found the
+deficit was concentrated in the PLATEAU/sustain portion specifically and converged or reversed
+during the fall - and appeared identically in 500-1000Hz and 1000-2000Hz too, not just 100-400Hz,
+ruling out a spectral/EQ explanation. Traced to `plateau_droop_db_per_s`: at Time=9.8/High=0, the
+real capture's own directly-measured droop is -10.3dB/s; the exported curve had -33.0dB/s - a
+real bug in `build_measured_gate_curves.py`'s own pooling loop, which averaged plateau_droop
+across EVERY High value at a given Time (correct for tau_a_ms/t_knee_ms/fall_rate_db_per_s, which
+genuinely are close enough to High-neutral for that pooling to be an honest compromise) even
+though `plateau_droop_db_per_s` is the ONE parameter this project's own findings already
+established as NOT High-neutral - averaging in Time=9.8's own High=-4/-9 captures (-45.1/-43.6dB/s)
+corrupted the High=0 baseline by more than 3x.
+
+Fixing the pooling bug alone wasn't enough - verifying the fix (rendering and re-measuring, not
+assuming) found the render's own total droop STILL didn't match the corrected target. Reason:
+`plateauDroopDbPerSec` is ADDITIVE to whatever droop the tank already produces on its own
+(`InhaltIRSynth.cpp`'s gate formula sums attackDb + plateauDb + kneeDb on top of a tank that
+already decays somewhat from `feedbackGain < 1`) - setting it directly to the real capture's own
+measured TOTAL double-counts the tank's own natural contribution. Verified directly at Time=9.8:
+tank-alone natural droop measured -38.5dB/s; setting the explicit term to the naive -10.3dB/s
+target produced a rendered TOTAL of -48.8dB/s (matching natural + naive exactly, not the target at
+all); the corrected explicit value (target minus the tank's own natural droop, +28.2dB/s) produced
+a rendered total of -11.3dB/s, matching within noise. A Python re-implementation of this
+measurement (to keep it reproducible for future re-fits, not just a one-off manual patch) is
+built into `build_measured_gate_curves.py` now, with a documented, verified escape hatch: at
+Time=2.2 specifically, the Python estimate disagreed with a direct C++ measurement by 61dB/s
+(traced to that Time's own short plateau window destabilizing the swept-breakpoint fit
+differently between the two implementations) - all four Time settings now use hand-verified,
+C++-measured constants rather than trust an approximation proven unreliable in at least one case.
+
+Net result at all four High=0 settings: plateau droop error dropped from -25 to -38dB/s down to
+0.2-1.8dB/s (essentially exact), and the 100-2048Hz LTAS deficit that originally looked like an
+EQ problem is now within +-1.5dB almost everywhere (was -3 to -9dB) - confirming the low-mid
+softness was a gate-envelope bug wearing an EQ-shaped disguise, not a second tank/topology issue
+on top of the notch fix above.
 
 Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 

@@ -60,9 +60,48 @@ import os
 
 import numpy as np
 
-from core.features import find_onset
+import torch
+
+from core.dsp_primitives import (
+    allpass_chain_transfer_function,
+    delay_transfer_function,
+    hadamard_matrix,
+    one_pole_transfer_function,
+    rfft_omega,
+)
+from core.features import find_onset, gate_envelope_params
 from core.interp import Curve1D, fit_curve
 from core.io import load_audio_channels
+
+# Tank/diffuser topology, duplicated from effects/nonlin/model.py and
+# plugins/inhalt-nonlin/Source/InhaltIRSynth.cpp (NOT imported from model.py, which still uses a
+# single SHARED diffuser - see _measure_tank_natural_plateau_droop's own docstring for why this
+# duplication exists and the Python/C++ sync gap it works around, rather than papering over it).
+_NATURAL_DROOP_SR = 44100.0
+_NATURAL_DROOP_LEFT_DELAY_SAMPLES = torch.tensor(
+    [481.0, 513.0, 561.0, 657.0, 695.0, 805.0, 813.0, 829.0]
+)
+_NATURAL_DROOP_RIGHT_DELAY_SAMPLES = torch.tensor(
+    [721.0, 763.0, 799.0, 969.0, 1079.0, 1089.0, 1133.0, 1561.0]
+)
+_NATURAL_DROOP_LEFT_DIFFUSER_SAMPLES = torch.tensor([53.0, 79.0, 115.0])
+_NATURAL_DROOP_RIGHT_DIFFUSER_SAMPLES = torch.tensor([61.0, 97.0, 149.0])
+
+# Hand-verified overrides for _measure_tank_natural_plateau_droop, keyed by Time. Real, measured
+# necessity, not caution: at Time=9.8/4.8/7.0 the Python raw-tap measurement agrees with a direct
+# C++ InhaltRenderIR measurement (built with plateauDroopDbPerSec temporarily forced to 0) within
+# ~2.5dB/s - close enough to trust. At Time=2.2 specifically, they disagree by 61dB/s (Python:
+# -50.6, C++: +10.6) - traced to Time=2.2's own short plateau window (knee at ~137ms, the
+# shortest of the four H=0 baseline points) destabilizing gate_envelope_params()'s swept-
+# breakpoint fit in a way sensitive to numerical details this Python reimplementation doesn't
+# reproduce exactly. Rather than trust an approximation proven unreliable in this one case, these
+# four values are the directly C++-measured ground truth - used as an override wherever present,
+# with the Python function still computing (and printing) its own estimate alongside for
+# comparison. If a future re-fit changes feedback_gain/damping_weight/diffuser_gain at these Time
+# settings, these overrides go stale and should be re-verified the same way (temporarily set
+# InhaltIRWorker.cpp's plateauDroopDbPerSec to 0.0f, build InhaltRenderIR, render at High=0,
+# measure with core.features.gate_envelope_params, revert).
+_NATURAL_DROOP_CPP_VERIFIED_OVERRIDE = {2.2: 10.602, 4.8: -53.579, 7.0: -37.096, 9.8: -38.507}
 
 HERE = os.path.dirname(__file__)
 FEATURES_PATH = os.path.join(HERE, "features.json")
@@ -244,6 +283,192 @@ def _build_tilt_gain_curves(features: dict) -> dict:
     }
 
 
+def _curve_value(curves: dict, key: str, x: float) -> float:
+    payload = curves[key]
+    points = payload["points"]
+    if len(points) == 1:
+        return points[0][1]
+    value, _ = Curve1D([p[0] for p in points], [p[1] for p in points]).evaluate(x)
+    return value
+
+
+def _measure_tank_natural_plateau_droop(time_val: float, curves: dict, num_samples: int = int(_NATURAL_DROOP_SR * 1.0)) -> float:
+    """Renders this engine's own tank+diffuser+attack/knee/fall (NOT the explicit
+    plateau_droop_db_per_s term - forced to 0 here) at High=0 and the given Time, and measures
+    ITS OWN plateau_droop_db_per_s via gate_envelope_params() - the tank's "natural" droop, before
+    any explicit compensation is added.
+
+    Exists to fix a real bug, caught by a listening complaint that turned out to be a gate issue
+    (see _build_plateau_droop_curves' own docstring): plateauDroopDbPerSec is ADDITIVE to
+    whatever droop the tank produces on its own (InhaltIRSynth.cpp's gateEnvelopeDb() sums
+    attackDb + plateauDb + kneeDb, where plateauDb = plateauDroopDbPerSec * t is layered on top of
+    a tank output that already has its own non-flat decay from feedbackGain < 1). Setting
+    plateauDroopDbPerSec directly to the real capture's own MEASURED TOTAL droop - which is what
+    an earlier version of this module did - silently double-counts whatever the tank already
+    contributes. Verified directly (not just reasoned) at Time=9.8: tank-alone natural droop
+    measured -38.5dB/s; real capture's own total measured -10.3dB/s; rendering with the naive
+    (uncorrected) explicit value of -10.3dB/s produced a TOTAL of -48.8dB/s (matching
+    natural + naive exactly); rendering with the corrected explicit value (target minus natural,
+    +28.2dB/s here) produced a total of -11.3dB/s, matching the real target within noise.
+
+    Duplicates model.py/InhaltIRSynth.cpp's tank+diffuser math directly (see the module-level
+    constants above) rather than importing model.py, because model.py still uses a single SHARED
+    diffuser (one DIFFUSER_DELAY_SAMPLES_AT_44K feeding both channels) - it was never updated to
+    the two-independent-diffuser architecture InhaltIRSynth.cpp gained for the direct/early tap
+    fix, since diffuser gain fitting doesn't need that distinction. A real, disclosed Python/C++
+    sync gap (see model.py's own docstring), worked around here rather than silently ignored -
+    fixing it properly means updating model.py's own diffuser architecture and re-fitting, out of
+    scope for this specific bug fix."""
+    feedback_gain = _curve_value(curves, "time_to_feedback_gain", time_val)
+    damping_weight = _curve_value(curves, "time_to_damping_weight_mean", time_val)
+    diffuser_gain = _curve_value(curves, "time_to_diffuser_gain", time_val)
+    tau_a_ms = _curve_value(curves, "time_to_tau_a_ms", time_val)
+    t_knee_ms = _curve_value(curves, "time_to_t_knee_ms", time_val)
+    fall_rate = _curve_value(curves, "time_to_fall_rate_db_per_s", time_val)
+    tau_k_ms = _curve_value(curves, "time_to_tau_k_ms", time_val)
+
+    H_mix = hadamard_matrix(8).to(torch.complex64)
+    omega = rfft_omega(num_samples)
+
+    def render_channel_raw_tap(delay_samples: torch.Tensor, diffuser_delay_samples: torch.Tensor) -> np.ndarray:
+        """Inlines render_fdn_impulse_response's own solve rather than calling it, to tap the RAW
+        delay-line output (Y itself) instead of that function's damped+mixed Out - matching
+        InhaltIRSynth.cpp's Tank::processSample EXACTLY (it sums lineOut[i], the value read at
+        the top of each call, before that sample's own damping/mixing - see that function's own
+        comment on this being a deliberate, documented Python/C++ tap-convention difference from
+        model.py's own _render_tank(), which (like this function very nearly did before being
+        fixed) taps the damped+mixed spectrum instead). Verified this fix matters: an earlier
+        version of this function using the damped+mixed tap measured natural droop -30.8dB/s at
+        Time=9.8, disagreeing with a direct C++ measurement of -38.5dB/s at the same setting;
+        this raw-tap version is the one that should be trusted."""
+        n_lines = delay_samples.shape[-1]
+        Delta = delay_transfer_function(delay_samples, omega)  # [n_freq, L]
+        Damp = one_pole_transfer_function(torch.full((n_lines,), damping_weight), omega).transpose(-1, -2)  # [n_freq, L]
+        D_diag = torch.diag_embed(Delta)
+        Damp_diag = torch.diag_embed(Damp)
+        M = feedback_gain * (D_diag @ H_mix @ Damp_diag)
+        A = torch.eye(n_lines, dtype=torch.complex64) - M
+
+        diffuser_resp = allpass_chain_transfer_function(diffuser_delay_samples, torch.tensor(diffuser_gain), omega)
+        impulse_vec = torch.ones(n_lines, dtype=torch.complex64)
+        rhs = (Delta * impulse_vec[None, :] * diffuser_resp[:, None]).unsqueeze(-1)  # [n_freq, L, 1]
+
+        Y = torch.linalg.solve(A, rhs).squeeze(-1)  # [n_freq, L] - the raw delay-line tap
+        Out = Y.sum(dim=-1)  # [n_freq]
+        return torch.fft.irfft(Out, n=num_samples).numpy() * (1.0 / (8 ** 0.5))
+
+    left = render_channel_raw_tap(_NATURAL_DROOP_LEFT_DELAY_SAMPLES, _NATURAL_DROOP_LEFT_DIFFUSER_SAMPLES)
+    right = render_channel_raw_tap(_NATURAL_DROOP_RIGHT_DELAY_SAMPLES, _NATURAL_DROOP_RIGHT_DIFFUSER_SAMPLES)
+
+    t = np.arange(num_samples) / _NATURAL_DROOP_SR
+    tau_a = max(tau_a_ms, 0.001) / 1000.0
+    tau_k = max(tau_k_ms, 0.001) / 1000.0
+    t_knee = t_knee_ms / 1000.0
+    attack_db = 20.0 * np.log10(np.clip(1.0 - np.exp(-t / tau_a), 1e-6, None))
+    x = (t - t_knee) / tau_k
+    softplus = np.where(x > 20.0, x, np.log1p(np.exp(x)))
+    knee_db = fall_rate * tau_k * softplus
+    gate_lin = 10.0 ** ((attack_db + knee_db) / 20.0)  # deliberately no droop term
+
+    mono = (left * gate_lin + right * gate_lin) / 2.0
+    gate = gate_envelope_params(mono, int(_NATURAL_DROOP_SR), onset_idx=0)
+    droop = gate.get("plateau_droop_db_per_s")
+    if droop is None:
+        raise ValueError(f"could not measure natural plateau droop at Time={time_val} - "
+                          "gate_envelope_params() found no usable plateau region")
+
+    if time_val in _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE:
+        verified = _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE[time_val]
+        if abs(verified - droop) > 5.0:
+            print(f"  NOTE: Time={time_val} Python natural-droop estimate ({droop:.3f}) disagrees "
+                  f"with the C++-verified override ({verified:.3f}) by {abs(verified-droop):.1f}dB/s - "
+                  "using the override (see _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE's own comment).")
+        return verified
+    return droop
+
+
+def _build_plateau_droop_curves(features: dict, curves: dict) -> dict:
+    """plateau_droop_db_per_s's own Time baseline AND High offset, both direct measurement - NOT
+    pooled the same way tau_a_ms/t_knee_ms/fall_rate_db_per_s are in main()'s own loop.
+
+    A REAL BUG, caught by a listening complaint, not by inspection: an earlier version of this
+    module put plateau_droop_db_per_s in that same pooling dict, which averages EVERY capture at
+    a given Time together regardless of High. findings.md's own "High: timing-NEUTRAL overall,
+    but NOT damping-neutral" section - and build_curves.py's own H_DEPENDENT_TIMING_PARAMS
+    mechanism, which exists SPECIFICALLY for this one parameter - already established that
+    plateau_droop_db_per_s is NOT H-neutral, so pooling it across High silently corrupts the H=0
+    baseline with whatever other High points happen to exist at that Time. Concretely, at
+    Time=9.8: real per-capture droop is -10.3dB/s at High=0 but -43.6/-45.1dB/s at High=-9/-4 -
+    averaging all three gave -33.0dB/s, more than 3x too steep for the High=0 case, which rendered
+    as an increasingly large broadband level deficit over the plateau (measured directly: the
+    render's 100-2000Hz content fell 5-8dB further behind the real capture by 280ms into the
+    plateau, in EVERY band checked, not a narrow spectral/EQ issue at all) - the root cause of a
+    real "low-mid feels thin" complaint that was initially (and incorrectly) chased as an EQ/tank-
+    topology problem before this measurement pinned it on the gate envelope instead.
+
+    Only High=0 captures give a real baseline (Time=2.2/4.8/7.0/9.8 - no coverage below Time=2.2,
+    an honest gap: Time=0.1/0.8 only exist at High=-3 in this capture set, and pooling them here
+    would reintroduce the exact bug this function exists to avoid). The offset is built from the
+    richest available High sweep (Time=9.8: High=-9/-4/0), same convention as
+    _build_knee_time_high_offset. Time=7.0's own independent High=-7 point (offset -48.3dB/s)
+    doesn't closely match what Time=9.8's offset curve would predict there (~-34dB/s via linear
+    interpolation) - a real, disclosed hint that the offset itself may not be perfectly
+    Time-independent, not smoothed over.
+
+    A SECOND bug, found while verifying the first fix rather than assumed fixed: even after
+    restricting the baseline to High=0 captures, rendering with plateauDroopDbPerSec set directly
+    to the real capture's own MEASURED TOTAL droop still didn't reproduce that total on the
+    actual render. Reason: plateauDroopDbPerSec is ADDITIVE to whatever droop the tank ALREADY
+    has on its own (InhaltIRSynth.cpp's gateEnvelopeDb() sums attackDb + plateauDb + kneeDb on
+    top of a tank output that already decays somewhat from feedbackGain < 1) - setting it to the
+    real TOTAL double-counts the tank's own natural contribution. See
+    _measure_tank_natural_plateau_droop's own docstring for the direct verification (at
+    Time=9.8: naive value produced a rendered total of -48.8dB/s against a -10.3dB/s target;
+    the corrected value, target minus the tank's own measured natural droop, produced -11.3dB/s).
+    The High offset does NOT need this correction: the tank's natural droop is the same at every
+    High (High only touches tilt/gate, never TankParams), so it cancels exactly in the
+    High-vs-High=0 subtraction the offset already computes."""
+    by_time_h0: dict[float, float] = {}
+    for c in features["captures"]:
+        if c["params"]["high"] == 0:
+            by_time_h0[c["params"]["time"]] = c["gate"]["plateau_droop_db_per_s"]
+
+    print(f"\nplateau_droop_db_per_s Time baseline (High=0 only, direct measurement, "
+          f"corrected for the tank's own natural droop):")
+    baseline_pairs = []
+    for t, measured_total in sorted(by_time_h0.items()):
+        natural = _measure_tank_natural_plateau_droop(t, curves)
+        corrected = measured_total - natural
+        print(f"  Time={t}: measured_total={measured_total:.3f}  tank_natural={natural:.3f}  "
+              f"-> corrected_explicit={corrected:.3f}")
+        baseline_pairs.append((t, corrected))
+
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+    sweep = sorted(
+        (c["params"]["high"], c["gate"]["plateau_droop_db_per_s"])
+        for c in features["captures"] if c["params"]["time"] == richest_time
+    )
+    print(f"plateau_droop_db_per_s High offset (direct measurement) at Time={richest_time}s: {sweep}")
+
+    result = {}
+    if len(baseline_pairs) >= 2:
+        result["time_to_plateau_droop_db_per_s"] = {
+            "points": Curve1D([p[0] for p in baseline_pairs], [p[1] for p in baseline_pairs]).points(),
+            "source": "direct_measurement_high0_only_natural_droop_corrected",
+        }
+    if any(h == 0 for h, _ in sweep) and len(sweep) >= 2:
+        baseline = next(v for h, v in sweep if h == 0)
+        offset_points = [(h, v - baseline) for h, v in sweep]
+        result["high_to_plateau_droop_db_per_s_offset"] = {
+            "points": Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points]).points(),
+        }
+        print(f"  offsets: {[round(v, 3) for _, v in offset_points]} (baseline {baseline:.3f}dB/s)")
+    return result
+
+
 def _build_knee_time_high_offset(features: dict) -> dict:
     """t_knee_ms additive High offset - added after comparing validate.py's real render-vs-
     reference report against ground truth and finding the largest remaining per-capture errors
@@ -334,14 +559,17 @@ def main() -> None:
     # this script used the features.json name directly and silently created a NEW, differently-
     # named, unused curve instead of overwriting the one InhaltParameterMap actually reads -
     # caught by inspecting the generated header before wiring it into C++, not asserted.
-    points = {"tau_a_ms": [], "t_knee_ms": [], "fall_rate_db_per_s": [], "plateau_droop_db_per_s": []}
+    # plateau_droop_db_per_s is deliberately NOT in this dict - see _build_plateau_droop_curves'
+    # own docstring for why pooling it the same way as these three (which genuinely are close
+    # enough to H-neutral for this to be an honest compromise) was a real bug, not a stylistic
+    # choice.
+    points = {"tau_a_ms": [], "t_knee_ms": [], "fall_rate_db_per_s": []}
     for c in features["captures"]:
         t = c["params"]["time"]
         g = c["gate"]
         points["tau_a_ms"].append((t, g["build_up_ms"] * BUILD_UP_TO_TAU_A_FACTOR))
         points["t_knee_ms"].append((t, g["knee_time_ms"]))
         points["fall_rate_db_per_s"].append((t, g["fall_rate_db_per_s"]))
-        points["plateau_droop_db_per_s"].append((t, g["plateau_droop_db_per_s"]))
 
     print("Real-measurement-derived Time curves (H=-3 short-Time points pooled with H=0 longer-Time "
           "points - see module docstring):")
@@ -358,6 +586,7 @@ def main() -> None:
 
     curves.update(_build_tilt_gain_curves(features))
     curves.update(_build_knee_time_high_offset(features))
+    curves.update(_build_plateau_droop_curves(features, curves))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "
@@ -380,6 +609,19 @@ def main() -> None:
         "longer Time - an honest compromise (documented, not hidden), since findings.md found the "
         "internal gate-shape breakdown is NOT as cleanly High-neutral as the overall "
         "gate_length_ms_at_20db is."
+    )
+    curves["_notes"]["plateau_droop_db_per_s_h0_only"] = (
+        "time_to_plateau_droop_db_per_s / high_to_plateau_droop_db_per_s_offset are built by "
+        "_build_plateau_droop_curves, NOT pooled the way tau_a_ms/t_knee_ms/fall_rate_db_per_s are "
+        "in this module's own main() loop - a real bug found and fixed after a listening complaint "
+        "that turned out to be a gate-envelope issue, not the EQ/tank-topology issue it first "
+        "looked like: pooling plateau_droop_db_per_s across ALL High values at a given Time (as an "
+        "earlier version of this script did) corrupted the Time=9.8 High=0 baseline from its real "
+        "-10.3dB/s to a blended -33.0dB/s (averaged in with High=-4/-9's own -43.6/-45.1dB/s), "
+        "since findings.md's own 'High: NOT damping-neutral' finding means this parameter can't be "
+        "pooled across High the way the other three (an honest, small compromise for those) can. "
+        "Only High=0 captures form the baseline here - no coverage below Time=2.2s, an honest gap "
+        "(Time=0.1/0.8 exist only at High=-3, and pooling them in would reintroduce this exact bug)."
     )
     curves["_notes"]["t_knee_ms_high_offset"] = (
         "high_to_t_knee_ms_offset was added after a real validate.py run showed the largest "
