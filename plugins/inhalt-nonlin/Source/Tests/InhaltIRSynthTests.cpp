@@ -126,6 +126,56 @@ public:
                 "energy well past the knee (with a steep fall rate) should be crushed far below the pre-knee level");
         }
 
+        beginTest("Direct/early tap measurably raises energy in the first ~1ms vs. the tank alone");
+        {
+            // Guards the actual reason the direct tap exists: a real, ear-caught complaint that
+            // this plugin's render "retains the pluck/attack/envelope of the synth" where the
+            // real hardware's convolution "sounds almost like a bow across strings" - traced to
+            // the tank alone being EXACTLY ZERO until its shortest delay line's first round trip
+            // (~10ms), a true silence gap the real captures don't have (they measure 13-16% of
+            // eventual peak within the first sample or two). Checked over a short WINDOW (first
+            // ~50 samples/~1.1ms), not literally sample 0 - the gate's own build-up envelope
+            // (gateEnvelopeDb's attack term) forces sample 0 itself to a ~-120dB floor by
+            // construction regardless of the direct tap, then ramps up rapidly over the next
+            // several dozen samples; a window-based RMS check is what the real calibration (see
+            // InhaltParameterMap.cpp's own directGainConstant comment) actually measured.
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.85f;
+            params.dampingWeight = 0.4f;
+            params.diffuserGain = 0.6f;
+
+            auto windowRms = [](const std::vector<float>& buf, int length)
+            {
+                double sumSq = 0.0;
+                for (int i = 0; i < length && i < (int) buf.size(); ++i)
+                    sumSq += (double) buf[(size_t) i] * (double) buf[(size_t) i];
+                return std::sqrt(sumSq / (double) length);
+            };
+
+            params.directGain = 0.0f;
+            std::vector<float> leftNoDirect, rightNoDirect;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.02 * sampleRate), leftNoDirect, rightNoDirect);
+            const auto rmsNoDirect = windowRms(leftNoDirect, 50);
+
+            params.directGain = 0.79f;
+            std::vector<float> leftWithDirect, rightWithDirect;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.02 * sampleRate), leftWithDirect, rightWithDirect);
+            const auto rmsWithDirect = windowRms(leftWithDirect, 50);
+
+            expect(rmsWithDirect > rmsNoDirect * 5.0f,
+                "the direct tap should measurably raise energy in the first ~1ms, not just add noise");
+            // Each allpass stage's own impulse response is a decaying comb (nonzero only at
+            // multiples of its own delay), so a SINGLE sample index can coincidentally match
+            // between the two differently-delayed diffusers even though their overall responses
+            // differ - checked as a max-abs-difference over a window instead of one index.
+            float maxDiff = 0.0f;
+            for (int i = 0; i < 300 && i < (int) leftWithDirect.size(); ++i)
+                maxDiff = std::max(maxDiff, std::abs(leftWithDirect[(size_t) i] - rightWithDirect[(size_t) i]));
+            expect(maxDiff > 1.0e-4f,
+                "left and right channels must diverge once their differently-delayed diffusers "
+                "have each round-tripped (independent per-channel diffusers, not a shared mono tap)");
+        }
+
         beginTest("Input diffuser measurably increases onset density vs. no diffuser");
         {
             // Guards the actual reason the diffuser chain exists: a real, ear-caught gap where

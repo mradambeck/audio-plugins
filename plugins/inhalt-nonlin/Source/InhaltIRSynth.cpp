@@ -39,8 +39,19 @@ const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::rightDelaysMs { 
 // Python prototype before being adopted as this chain's fixed topology - 3 stages at these delays
 // tracked the real captures' onset density shape far better than 1, 2, or 4 stages tried at the
 // same task.
-const std::array<float, InhaltIRSynth::numDiffuserStages> InhaltIRSynth::diffuserDelaysMs { {
+const std::array<float, InhaltIRSynth::numDiffuserStages> InhaltIRSynth::leftDiffuserDelaysMs { {
     1.201814f, 1.791383f, 2.607710f,
+} };
+
+// A second, DIFFERENT diffuser delay set for the right channel (61, 97, 149 samples @44.1kHz) -
+// added alongside Params::directGain (see that field's own comment): each channel's diffuser
+// output is now also tapped directly for an early-arrival component, so a shared left/right
+// diffuser would have correlated that tap between channels, undoing the asymmetric-tank
+// decorrelation work already done. Same non-simple-ratio-delay convention as every other delay
+// set in this engine, chosen close in magnitude to the left set (so both channels' early taps
+// arrive in a comparable window) but genuinely different values, not a scaled copy.
+const std::array<float, InhaltIRSynth::numDiffuserStages> InhaltIRSynth::rightDiffuserDelaysMs { {
+    1.383220f, 2.199546f, 3.378685f,
 } };
 
 // Same fixed 8x8 Hadamard matrix as AuraFDNEngine.h/ShieldsFDNEngine.h - Sylvester construction,
@@ -199,9 +210,11 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     leftTank.prepare(leftDelaysMs, sampleRate);
     rightTank.prepare(rightDelaysMs, sampleRate);
 
-    Diffuser diffuser;
-    diffuser.prepare(diffuserDelaysMs, sampleRate);
+    Diffuser leftDiffuser, rightDiffuser;
+    leftDiffuser.prepare(leftDiffuserDelaysMs, sampleRate);
+    rightDiffuser.prepare(rightDiffuserDelaysMs, sampleRate);
     const auto diffuserGain = std::min(std::max(params.diffuserGain, 0.0f), 0.9f);
+    const auto directGain = std::max(params.directGain, 0.0f);
 
     const auto feedbackGain = std::min(std::max(params.feedbackGain, 0.0f), maxFeedbackGain);
     const auto dampingWeight = std::min(std::max(params.dampingWeight, 1e-6f), maxDampingWeight);
@@ -215,15 +228,24 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     for (int n = 0; n < numSamples; ++n)
     {
         const auto impulse = (n == 0) ? 1.0f : 0.0f;
-        const auto diffusedImpulse = diffuser.processSample(impulse, diffuserGain);
+        const auto diffusedImpulseL = leftDiffuser.processSample(impulse, diffuserGain);
+        const auto diffusedImpulseR = rightDiffuser.processSample(impulse, diffuserGain);
 
-        const auto tankL = leftTank.processSample(diffusedImpulse, feedbackGain, dampingWeight);
-        const auto tankR = rightTank.processSample(diffusedImpulse, feedbackGain, dampingWeight);
+        const auto tankL = leftTank.processSample(diffusedImpulseL, feedbackGain, dampingWeight);
+        const auto tankR = rightTank.processSample(diffusedImpulseR, feedbackGain, dampingWeight);
+
+        // Direct/early-arrival tap - see Params::directGain's own comment: the tank alone is
+        // exactly zero until its shortest delay line's first round trip (~10ms), a true silence
+        // gap the real hardware doesn't have. Each channel's OWN diffuser output (already spread
+        // over the first few ms, decorrelated from the other channel by construction) stands in
+        // for that immediate response.
+        const auto combinedL = tankL + diffusedImpulseL * directGain;
+        const auto combinedR = tankR + diffusedImpulseR * directGain;
 
         // Input tilt - see the Params struct's own comment on why this is applied here, to the
         // closed-loop tank output, rather than recirculated inside the loop.
-        const auto tiltedL = tiltL.processSample(tankL);
-        const auto tiltedR = tiltR.processSample(tankR);
+        const auto tiltedL = tiltL.processSample(combinedL);
+        const auto tiltedR = tiltR.processSample(combinedR);
 
         const auto tSeconds = (float) n / (float) sampleRate;
         const auto gateLin = std::pow(10.0f, gateEnvelopeDb(tSeconds, params) / 20.0f);

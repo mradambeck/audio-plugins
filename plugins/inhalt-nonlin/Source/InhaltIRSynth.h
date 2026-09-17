@@ -54,11 +54,29 @@ public:
         float fallRateDbPerSec = -250.0f;
         float kneeSoftnessMs = 4.0f;
 
-        // Input diffuser (ahead of both tanks, shared - see the Diffuser struct's own comment).
-        // Fitted jointly with feedbackGain/dampingWeight, not hand-tuned - see
+        // Input diffuser (ahead of both tanks - see the Diffuser struct's own comment; TWO
+        // independent instances, one per channel, since the direct tap below reads their raw
+        // output). Fitted jointly with feedbackGain/dampingWeight, not hand-tuned - see
         // ml-toolkit/effects/nonlin/model.py's DIFFUSER_DELAY_SAMPLES_AT_44K/MAX_DIFFUSER_GAIN and
         // core.fit.onset_density_loss for why this exists and how it's fit.
         float diffuserGain = 0.45f;
+
+        // Direct/early-arrival tap - each channel's OWN diffuser output, scaled by this gain and
+        // summed with that channel's tank output BEFORE tilt/gate. Added after a real, ear-caught
+        // complaint ("the convolution version sounds almost like a bow across strings, while the
+        // version you built still retains the pluck/attack/envelope of the synth"): direct
+        // measurement of the real captures found their own response starts at 13-16% of eventual
+        // peak on the VERY FIRST SAMPLE (RMS over the first 10ms averaging ~35-49% of the
+        // established 40-50ms RMS) - genuinely immediate, not built up from silence. This engine's
+        // tank alone cannot reproduce that: its shortest delay line (~10ms) means the tank's own
+        // output is EXACTLY ZERO until that first round trip completes, a true silence gap the
+        // real hardware doesn't have. Convolving that silent gap with a percussive input passes
+        // the input's own attack through completely unprocessed for ~10ms, before the reverb
+        // "catches up" - audibly different from real hardware, which starts blending from sample
+        // zero. Hand-measured constant (Time/High-independent within the real capture set's own
+        // sampling) - see InhaltParameterMap.cpp's own directGainConstant comment for the
+        // calibration and its known residual gap at very negative High.
+        float directGain = 0.79f;
     };
 
     static constexpr int numLines = 8;
@@ -99,13 +117,16 @@ private:
         void reset() noexcept;
     };
 
-    // A short chain of Schroeder allpass diffusers, applied ONCE to the impulse before it feeds
-    // BOTH tanks identically (matches model.py's allpass_chain_transfer_function, applied to the
-    // shared `impulse_vec` rhs term before either tank's own solve - see that function's
-    // docstring for the full "why this exists" story: a bare impulse into an 8-line FDN measured a
-    // real, ear-caught onset-density gap against the real hardware captures). Delays are FIXED
+    // A short chain of Schroeder allpass diffusers, applied to the impulse before it feeds a tank
+    // (matches model.py's allpass_chain_transfer_function - see that function's docstring for the
+    // full "why this exists" story: a bare impulse into an 8-line FDN measured a real, ear-caught
+    // onset-density gap against the real hardware captures). TWO independent instances (different
+    // delay sets, matching leftDelaysMs/rightDelaysMs's own asymmetric-decorrelation convention) -
+    // each channel's OWN diffuser output also feeds that channel's own direct/early tap (see
+    // Params::directGain), so a shared mono diffuser would have correlated the two channels'
+    // earliest arrivals, undoing the stereo decorrelation work already done. Delays are FIXED
     // (topology, like the tank's own delay lines - not fitted); diffuserGain is the one fitted
-    // parameter, shared across every stage.
+    // parameter, shared across both instances and every stage.
     struct Diffuser
     {
         std::array<wildjag::dsp::CircularDelayBuffer, numDiffuserStages> stageBuffers;
@@ -119,7 +140,8 @@ private:
     static const std::array<float, numLines> leftDelaysMs;
     static const std::array<float, numLines> rightDelaysMs;
     static const std::array<std::array<float, numLines>, numLines> hadamard;
-    static const std::array<float, numDiffuserStages> diffuserDelaysMs;
+    static const std::array<float, numDiffuserStages> leftDiffuserDelaysMs;
+    static const std::array<float, numDiffuserStages> rightDiffuserDelaysMs;
 };
 
 } // namespace inhalt

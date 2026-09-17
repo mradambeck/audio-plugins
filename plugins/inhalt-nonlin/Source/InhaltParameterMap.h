@@ -56,6 +56,10 @@ struct TankParams
     // jointly with feedback_gain/damping_weight_mean rather than hand-tuned, per
     // core.fit.onset_density_loss - see that function's docstring.
     float diffuserGain = 0.45f;
+    // Direct/early-arrival tap gain (see InhaltIRSynth.h's own Params::directGain comment) - a
+    // hand-measured CONSTANT (Time/High-independent within the real capture set's own sampling),
+    // not fit-derived, matching InhaltParameterMap.cpp's tiltPivotHz convention.
+    float directGain = 0.35f;
 };
 
 struct TiltParams

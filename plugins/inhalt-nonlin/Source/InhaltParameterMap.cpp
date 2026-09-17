@@ -55,6 +55,17 @@ namespace
     // measured LTAS band levels at High=-4/-9 with a small residual; the same search at the old
     // ~4.5kHz pivot could not, no matter how extreme the gain.
     constexpr float tiltPivotHz = 1500.0f;
+
+    // Direct/early-arrival tap gain (see InhaltIRSynth.h's own Params::directGain comment) - a
+    // hand-measured constant, not fit-derived, matching tiltPivotHz's own convention. Calibrated
+    // by rendering candidate values and matching the real captures' own measured
+    // RMS[0-10ms]/RMS[40-50ms] ratio: 5 real captures measured 0.35-0.49 (H=0 clustering
+    // 0.44-0.49; the one H=-9 capture measured 0.35, on its own not enough to justify a
+    // High-dependent curve). 0.79 reproduces 0.46 at Time=2.2/High=0 (within the H=0 cluster) and
+    // 0.27 at Time=9.8/High=-9 (short of that single point's own 0.35, a known, documented
+    // residual gap - see README.md) - chosen as the best single constant across both rather than
+    // over-fitting the one H=-9 measurement.
+    constexpr float directGainConstant = 0.79f;
 } // namespace
 
 GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated) noexcept
@@ -113,6 +124,7 @@ TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated) noexcept
     params.feedbackGain = timeToFeedbackGain.evaluate(timeKnob, &gainExtrapolated);
     params.dampingWeight = timeToDamping.evaluate(timeKnob, &dampingExtrapolated);
     params.diffuserGain = timeToDiffuserGain.evaluate(timeKnob, &diffuserExtrapolated);
+    params.directGain = directGainConstant;
     if (extrapolated != nullptr)
         *extrapolated = gainExtrapolated || dampingExtrapolated || diffuserExtrapolated;
     return params;

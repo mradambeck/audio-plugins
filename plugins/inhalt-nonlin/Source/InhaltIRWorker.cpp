@@ -59,6 +59,7 @@ namespace
         params.feedbackGain = tank.feedbackGain;
         params.dampingWeight = tank.dampingWeight;
         params.diffuserGain = tank.diffuserGain;
+        params.directGain = tank.directGain;
         params.tiltLowGain = tilt.lowGain;
         params.tiltHighGain = tilt.highGain;
         params.tiltPivotHz = tilt.pivotHz;

@@ -89,6 +89,55 @@ Net effect across all 9 captures: log-spectral distance improved 3.45dB -> 2.71d
 flagged at all) and spectral flatness improved 4.29dB -> 3.48dB, with no regression to onset
 density or gate timing (both fixes are independent signal-chain stages).
 
+**Direct/early-arrival tap - added after a real, ear-caught complaint about playing a synth line
+through the plugin at 100% wet**: "the convolution version sounds almost like a bow across
+strings, while the version you built still retains the pluck/attack/envelope of the synth."
+Measured the real captures' own very first few ms directly (not just their onset-density
+statistic) and found a genuine, consistent property across 5 captures spanning different Time/
+High settings: the real hardware's response starts at 13-16% of its eventual peak on the FIRST
+SAMPLE, with the first 10ms already averaging ~35-49% of the established 40-50ms RMS level - a
+genuinely immediate response, not built up from silence. This engine's tank alone cannot produce
+that: its shortest delay line (~10ms) means the tank's own output is EXACTLY ZERO until that first
+round trip completes - a true silence gap the real hardware doesn't have. Convolving that silence
+with a percussive input passes the input's own attack through completely unprocessed for the
+first ~10ms, before the reverb "catches up" - a real, structural explanation for the complaint.
+
+Fixed by tapping each channel's own input diffuser output directly (in addition to feeding the
+tank) and summing it into that channel's output before tilt/gate - see `InhaltIRSynth.h`'s own
+`Params::directGain` comment. Each channel now has its OWN diffuser instance with a different
+delay set (previously a single shared diffuser fed both tanks), so this early tap doesn't
+correlate the two channels the way a shared mono tap would have. `directGain` (0.79) is a
+hand-measured constant (not fit-derived), calibrated by rendering candidates and matching the
+real captures' own RMS[0-10ms]/RMS[40-50ms] ratio - reaches ~0.46 at Time=2.2/High=0 (within the
+real 0.44-0.49 cluster) but only ~0.27 at Time=9.8/High=-9 (short of that single point's own
+0.35), a known residual gap given only one real High!=0 data point to calibrate against.
+
+**A real, understood side effect, not silently absorbed**: `validate.py`'s automated knee-time
+error got measurably WORSE at High!=0 (-36.8ms -> -49.5ms), concentrated in specific captures (the
+two shortest-Time ones worsened most). Investigated directly rather than assumed: comparing the
+render's own early-envelope shape (0.5ms-resolution RMS) against the real capture's own shows BOTH
+are genuinely spiky/discrete in the first 20ms (individual early-reflection-like peaks and dips,
+not a smooth ramp) - the render's onset shape is now qualitatively MORE like the real hardware's,
+not a new artifact. `core.features.gate_envelope_params()`'s swept two-segment breakpoint fit was
+implicitly validated against a smoother, more monotonic build-up shape; it is measurably less
+stable against this newly-spikier (and more realistic) onset, which best explains the knee-time
+regression as an analysis-algorithm sensitivity rather than an audible DSP regression. Not fixed
+in this pass - `gate_envelope_params()`'s own robustness to a textured onset is a separate,
+un-started investigation, flagged here rather than left undocumented.
+
+**A separate caveat found while investigating the above, unrelated to whether it explains the
+regression**: `Source/Tools/RenderIR.cpp` calls `processor.processBlock()` directly and writes
+its raw output, without reading or compensating for `processor.getLatencySamples()` (the
+convolution engine's own real, reported FFT-partition latency - a real DAW host applies this
+compensation automatically, shifting the whole track earlier by that amount before the user ever
+hears it). Every `InhaltRenderIR` render is therefore delayed by a small, fixed amount (~3ms
+observed) relative to what a real host would actually play. This does NOT invalidate the
+onset-relative measurements in this README (`core.features.find_onset` re-detects the true start
+of content in every render independently, so a constant shift washes out of anything measured
+relative to it), but it means `InhaltRenderIR`'s raw WAV output is not sample-accurate against
+true t=0 - worth fixing in `RenderIR.cpp` before any future measurement that needs an ABSOLUTE
+(not onset-relative) time reference.
+
 Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 
 - Rendered stereo decorrelation (IACC ~0.04-0.08) is closer to the real hardware's (~0.006-0.04)
