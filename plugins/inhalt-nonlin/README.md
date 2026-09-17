@@ -243,6 +243,35 @@ correcting them to an H=0-equivalent baseline and then re-adding the same offset
 captured High reconstructs their original values exactly, so this fix doesn't touch their already-
 documented gap at all.
 
+**Harmonics/saturation - reopened after being explicitly scoped out at the project's start**: a
+real, ear-caught complaint ("the convolution still has more brassiness and maybe like harmonic
+richness") led to three separate linear-architecture experiments, each measuring
+`core.features.resonant_peaks()`'s own peak count/Q against the real captures' own (real hardware:
+~7 peaks, mean Q~6.6; this engine before this fix: ~11-14 peaks, mean Q~10-11) - reducing
+`dampingWeight`, reducing `feedbackGain`, and even HALVING the tank's own line count (8 lines -> 4,
+a quick Python-only diagnostic, not shipped) all left peak count/Q essentially unmoved. A linear
+FDN, however tuned, can only redistribute and delay energy already present in its input - it
+cannot manufacture new harmonic content, which is exactly what "brassiness"/"harmonic richness" as
+descriptors point at. This is real, if indirect, evidence the remaining gap is the actual
+hardware's own nonlinear saturation character, not a reachable modal/EQ property of this engine's
+tank - the same territory the project plan's original "Skip harmonics entirely" decision
+deliberately excluded (0.002-0.03% THD+N wasn't judged worth a dedicated capture session at the
+time).
+
+Reopened with Adam's explicit go-ahead, SPEC-DERIVED rather than measured (no capture exists that
+isolates the real unit's own saturation curve - the 9 NonLin captures are single-impulse-response
+style, not the level-swept sine material a real THD curve needs): a simple, standard, unity-gain
+tanh waveshaper (`y = tanh(drive*x)/tanh(drive)`, no hard clipping) added to the existing Converter
+stage (Vintage/Modern), with `drive` numerically solved so a 0dBFS sine produces the spec sheet's
+own worst-case THD at each position - 0.03% for Vintage, 0.002% for Modern, the same "Vintage is
+the more colored position" asymmetry the bandwidth/quantization figures already use. Deliberately
+NOT calibrated against `resonant_peaks()`'s own count/Q numbers (that would just be curve-fitting a
+linear-domain metric with a nonlinear knob, the same mismatch the three ruled-out experiments
+already demonstrated) - this is a first, honest, spec-grounded pass, not a verified match to the
+real hardware's own harmonic character. A future dedicated capture session (level-swept sine or
+similar through the real unit) would be needed to measure and refine this properly, per Adam's own
+"wait for new captures" option, deferred rather than chosen this session.
+
 Two further things are documented as genuine, open gaps rather than silently fixed or hidden:
 
 - Rendered stereo decorrelation (IACC ~0.04-0.08) is closer to the real hardware's (~0.006-0.04)
@@ -312,7 +341,7 @@ correction, not stylistic).
 | High Frequency | -9-0 dB | Real hardware measurement (input tilt, both range endpoints) |
 | Pre-Delay | 0-200 ms | Catalog convention |
 | Low Cut | 0-300 Hz (0 = off) | Catalog convention |
-| Converter | Vintage / Modern | AMS RMX16 spec sheet (bandwidth + noise floor only, no saturation - harmonics are out of scope, see the project plan) |
+| Converter | Vintage / Modern | AMS RMX16 spec sheet (bandwidth + noise floor + a spec-derived saturation stage, ~0.03%/~0.002% THD - see "Status" below for why harmonics were reopened) |
 | Width | 0-150% (100% = measured hardware width) | Real hardware measurement (stereo decorrelation) |
 | Dry / Wet | 0-100% each | Catalog convention |
 | Bypass | - | Click-free, via `ConvolutionEngine`'s own ramped bypass |

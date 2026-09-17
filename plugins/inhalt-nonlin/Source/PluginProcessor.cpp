@@ -25,6 +25,28 @@ namespace
     constexpr float vintageBandwidthHz = 18000.0f;   // 20Hz-18kHz -3/+0dB (original unit)
     constexpr float modernBandwidthHz = 21000.0f;    // effectively flat to 18kHz (500-series reissue)
     constexpr float vintageQuantizationLevels = 32768.0f; // ~16-bit-class, matching a ~90dB DR unit
+
+    // Saturation - see PluginProcessor.h's converterSaturationDrive comment for the full story
+    // (added after "brassiness"/"harmonic richness" was found, via direct measurement, to survive
+    // three separate linear-architecture experiments - damping, feedback gain, halving the tank's
+    // own line count - none of which moved the render's resonant-peak character at all, strong
+    // evidence the remaining gap is the real hardware's own nonlinear saturation, not a modal/EQ
+    // issue reachable through the FDN's own linear parameters). SPEC-DERIVED, not measured: no
+    // capture exists that isolates the real unit's own saturation curve (the 9 NonLin captures are
+    // single-impulse-response style, not the level-swept sine material a real THD curve needs) -
+    // see the spec sheet's own THD+N range (Adam-supplied: ~0.002-0.03%). A simple, standard
+    // tanh waveshaper (y = tanh(drive*x)/tanh(drive), unity-gain-preserving, no hard clipping) with
+    // `drive` numerically solved (see ml-toolkit's own throwaway calibration script - a 1kHz sine
+    // swept in level, FFT'd, harmonic energy measured) so a 0dBFS sine produces the spec's own
+    // worst-case THD at each position: 0.03% for Vintage, 0.002% for Modern - the same "Vintage is
+    // the more colored position" asymmetry the bandwidth/quantization figures above already use.
+    constexpr float vintageSaturationDrive = 0.060027f;
+    constexpr float modernSaturationDrive = 0.015492f;
+
+    inline float saturate(float x, float drive) noexcept
+    {
+        return std::tanh(drive * x) / std::tanh(drive);
+    }
 } // namespace
 
 InhaltAudioProcessor::InhaltAudioProcessor()
@@ -99,7 +121,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout InhaltAudioProcessor::create
             .withLabel("Hz")
             .withStringFromValueFunction([](float v, int) { return v <= 0.0f ? juce::String("Off") : juce::String((int) v) + " Hz"; })));
 
-    // Bandwidth + noise-floor only, NOT a saturation stage - see PluginProcessor.h's
+    // Bandwidth + noise-floor + a gentle spec-derived saturation stage - see PluginProcessor.h's
     // converterBandwidthL/R comment. Both positions are documented spec-sheet numbers, not
     // calibrated against a capture (no bypass/converter-isolating capture exists yet).
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
@@ -280,11 +302,15 @@ void InhaltAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         }
     }
 
-    // --- Converter: bandwidth + quantization only, no saturation (see this file's own comment
-    // above and PluginProcessor.h's converterBandwidthL/R comment). Vintage is index 0. Wet-only,
-    // same reasoning as Width above. ---
+    // --- Converter: saturation + bandwidth + quantization (see this file's own comment above and
+    // PluginProcessor.h's converterBandwidthL/R comment). Vintage is index 0. Wet-only, same
+    // reasoning as Width above. Saturation runs FIRST (an early-circuit-stage nonlinearity, ahead
+    // of the output filter/quantization that follows it in a real signal path), though for a
+    // spec-derived effect this subtle the exact order is not itself a measured/load-bearing
+    // choice. ---
     const auto isVintage = converterParam->load() < 0.5f;
     const auto bandwidthHz = isVintage ? vintageBandwidthHz : modernBandwidthHz;
+    const auto saturationDrive = isVintage ? vintageSaturationDrive : modernSaturationDrive;
     converterBandwidthL.setCutoffHz(bandwidthHz, currentSampleRate);
     converterBandwidthR.setCutoffHz(bandwidthHz, currentSampleRate);
 
@@ -293,6 +319,8 @@ void InhaltAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         auto* right = buffer.getWritePointer(1);
         for (int i = 0; i < numSamples; ++i)
         {
+            left[i] = saturate(left[i], saturationDrive);
+            right[i] = saturate(right[i], saturationDrive);
             left[i] = converterBandwidthL.processSample(left[i]);
             right[i] = converterBandwidthR.processSample(right[i]);
             if (isVintage)

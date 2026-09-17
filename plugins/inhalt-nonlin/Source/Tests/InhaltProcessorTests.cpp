@@ -54,6 +54,57 @@ public:
     {
         constexpr double sampleRate = 44100.0;
 
+        beginTest("Converter saturation formula is bounded, monotonic, and unity-gain-preserving at small input");
+        {
+            // Duplicates PluginProcessor.cpp's own one-line saturate() formula rather than
+            // exposing it from an anonymous namespace - matches this project's own established
+            // precedent (see ml-toolkit's _measure_tank_natural_plateau_droop) for verifying a
+            // small, easily-transcribed formula directly rather than adding test-only coupling.
+            // The wiring/isolation (wet-only, Dry=100/Wet=0 passthrough unaffected) is already
+            // covered by this file's own "Dry=100/Wet=0" test above; this test is specifically
+            // about the formula's own mathematical properties, which is what the spec-derived
+            // THD calibration (see PluginProcessor.cpp's own converterSaturationDrive comment)
+            // actually depends on.
+            auto saturate = [](float x, float drive) { return std::tanh(drive * x) / std::tanh(drive); };
+            constexpr float vintageDrive = 0.060027f;
+            constexpr float modernDrive = 0.015492f;
+
+            expect(std::abs(saturate(0.0f, vintageDrive)) < 1.0e-6f, "zero input must produce zero output (no DC offset)");
+            expect(std::abs(saturate(1.0f, vintageDrive) - 1.0f) < 1.0e-5f,
+                "0dBFS input must map to exactly unity output, by construction (that's what drive was solved against)");
+
+            // Unity gain preserved for a small input (the vast majority of real program material
+            // never approaches 0dBFS) - within 0.5% relative error for a -20dBFS-ish input. (Not
+            // tighter: at this drive, tanh's own cubic term already contributes ~0.12% at x=0.1 -
+            // exactly the intended, spec-matched amount of gentle nonlinearity, not test noise.)
+            const auto smallIn = 0.1f;
+            const auto smallOut = saturate(smallIn, vintageDrive);
+            expect(std::abs(smallOut - smallIn) / smallIn < 0.005f,
+                "a small input should pass through at very close to unity gain");
+
+            // Monotonic (a real saturator must not fold back on itself) - checked well past
+            // 0dBFS too. NOTE: this formula does NOT hard-bound its output to +-1.0 - for these
+            // deliberately tiny, spec-matched drive values (0.03%/0.002% THD AT 0dBFS), tanh
+            // stays in its own near-linear region for a long stretch past x=1 (the true
+            // asymptotic ceiling is 1/tanh(drive), ~16.7x for Vintage - not a hard limiter, just
+            // a gentle, spec-derived coloration at nominal level, which is the actual design goal
+            // here, not headroom protection).
+            float previous = -1000.0f;
+            for (float x = -20.0f; x <= 20.0f; x += 0.5f)
+            {
+                const auto y = saturate(x, vintageDrive);
+                expect(y > previous, "saturate() must be strictly monotonic increasing");
+                previous = y;
+            }
+
+            // Vintage's own drive constant is larger than Modern's, by construction (solved from
+            // the spec sheet's own 0.03% vs 0.002% THD figures) - the actual, simple fact that
+            // makes Vintage "the more colored position", rather than eyeballing curve shape at a
+            // single point (unreliable this close to x=1.0, where both curves are forced to
+            // agree by construction regardless of drive).
+            expect(vintageDrive > modernDrive, "Vintage's drive constant should exceed Modern's");
+        }
+
         beginTest("Every declared parameter ID resolves to a real parameter");
         {
             InhaltAudioProcessor processor;
