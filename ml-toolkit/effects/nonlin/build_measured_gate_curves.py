@@ -11,23 +11,29 @@ measurement instead" pattern this project's own AuraDecayGainData.h/AuraOnsetTil
 established as precedent - not a new kind of gap.
 
 KEPT from the fit (fitted_raw.json, via build_curves.py's own curves.json), NOT overwritten here:
-feedback_gain, damping_weight_mean, diffuser_gain, tilt_pivot_hz - none of these have as complete
-a direct-measurement replacement (the tank's internal density/damping isn't something core.features
-measures directly at all), and the fitted pivot values look physically plausible (clustering
-4200-4700Hz, consistent with this module's own earlier direct tilt_fit() estimate of ~4044Hz).
+feedback_gain, damping_weight_mean, diffuser_gain - none of these have as complete a
+direct-measurement replacement (the tank's internal density/damping isn't something core.features
+measures directly at all).
 
-tilt_low_gain/tilt_high_gain ARE overwritten here too, for the same reason as the gate-timing
-parameters: TILT_REGULARIZATION_WEIGHT (added to fit_nonlin.py after the first fit diverged, to
-stop tilt_low_gain/tilt_high_gain drifting unboundedly - see that module's own comment) pulled the
+tilt_low_gain/tilt_high_gain/tilt_pivot_hz are ALL overwritten here, not just the two gains as an
+earlier version of this module did. Original reasoning for replacing the gains still applies:
+TILT_REGULARIZATION_WEIGHT (added to fit_nonlin.py after the first fit diverged, to stop
+tilt_low_gain/tilt_high_gain drifting unboundedly - see that module's own comment) pulled the
 fitted tilt magnitude back toward neutral so strongly that it undershot the real measured tilt by
-roughly 2-3x (fit's own High=-9 offset: lowGain +0.034/highGain -0.022; findings.md's direct onset
-5-band measurement at the same setting: lowGain +0.68/highGain -0.66, from a real +4.5dB/-9.5dB
-onset tilt). The regularization weight was never swept against real data before this run (flagged
-as a known gap in its own comment) - rather than re-sweep it now, this replaces the tilt GAIN
-curves with direct measurement (the same real onset-band numbers findings.md already reports),
-which needs no regularization tuning at all. tilt_pivot_hz is kept from the fit since it isn't
-subject to this same regularizer and its own value already lines up with an independent direct
-estimate.
+roughly 2-3x. tilt_pivot_hz was ORIGINALLY kept from the fit (~4200-4700Hz, "physically plausible",
+consistent with this module's own earlier direct tilt_fit() estimate of ~4044Hz) - that turned out
+to be wrong in a way that mattered a lot more than "slightly off": a real, ear-caught complaint
+("Bringing it down to -9dB to match a -9dB IR it is still much brighter and clear") led to
+measuring the REAL captures' whole-decay average spectrum (LTAS), not just the onset window the
+original tilt_low_gain/tilt_high_gain replacement used - and found a ~4.5kHz pivot puts the
+one-pole shelf's transition too close to the 6-16kHz band being darkened for a first-order slope to
+achieve the real captures' own measured spread, EVEN AT EXTREME GAIN (a structural ceiling of
+~8.8dB vs. the real ~10-16dB needed at High=-4/-9, not a calibration shortfall). Lowering the pivot
+to 1500Hz (an onset-band pivot ESTIMATE this catalog's own earlier work flagged as "less precise"
+and discarded in favor of the fit's value) raises the achievable ceiling enough to actually reach
+the real target - see _build_tilt_gain_curves' own docstring for the full derivation, including how
+the gains themselves are now solved numerically at this new pivot (not read off a closed-form
+formula), calibrated against the LTAS rather than the onset window.
 
 Honest compromise, not invented precision: the two shortest Time settings (0.1s, 0.8s) only exist
 at High=-3 in the real capture set - there is no High=0 measurement at short Time at all. Rather
@@ -78,34 +84,87 @@ FIT_ONLY_TIME_PARAMS = ["feedback_gain", "damping_weight_mean", "diffuser_gain",
 # below plateau" threshold) => tau = build_up_ms / -ln(1 - 10^(-3/20)).
 BUILD_UP_TO_TAU_A_FACTOR = -1.0 / math.log(1.0 - 10 ** (-3.0 / 20.0))
 
-# Same 5-band onset breakdown as findings.md's own "High: broadband tilt" section, recomputed
-# here (not hand-copied from that file's prose) so the exact numbers stay reproducible from the
-# real captures rather than transcribed. Mean-subtracted per capture - controls for overall onset
-# level differences between captures, isolating the TILT SHAPE rather than raw level.
-_TILT_BANDS_HZ = ((20, 120), (120, 500), (500, 2000), (2000, 6000), (6000, 16000))
-_TILT_LOW_BAND_INDEX = 0
-_TILT_HIGH_BAND_INDEX = 4
+# Fixed tilt pivot (Hz) - see this module's own docstring section on why this replaced the fit's
+# own ~4200-4700Hz value and TONAL_PARAMS' removal of "tilt_pivot_hz" in build_curves.py. Same
+# hand-measured-constant convention as tiltLowGainBaselineAtHigh0/tiltHighGainBaselineAtHigh0 in
+# InhaltParameterMap.cpp (which this value must be kept in sync with).
+TILT_PIVOT_HZ = 1500.0
+
+# Split of the single "tilt strength" scalar (see _build_tilt_gain_curves' own docstring on the
+# scale gauge-freedom this exists to break) between low-band boost and high-band cut, in dB:
+# lowGain_dB = TILT_SPLIT_LOW_FRACTION * s, highGain_dB = -(1 - TILT_SPLIT_LOW_FRACTION) * s.
+# Chosen to match this catalog's own earlier onset-band measurement of the real asymmetry
+# (+4.5dB low / -9.5dB high at High=-9 - see findings.md and this module's original
+# _onset_band_energy_db-based tilt gains, superseded but not contradicted by the LTAS fix below),
+# rather than picking an arbitrary 0.5 symmetric split - confirmed numerically that the CHOICE of
+# this fraction has ZERO effect on fit quality (the achieved LTAS band levels depend only on the
+# ratio lowGain:highGain, i.e. only on `s`, not on how it's split), so this is purely about
+# matching a real, previously-measured physical asymmetry, not a fit parameter.
+TILT_SPLIT_LOW_FRACTION = 4.5 / (4.5 + 9.5)
 
 
-def _onset_band_energy_db(path: str, window_ms: float = 20.0) -> np.ndarray:
-    channels, sr = load_audio_channels(path)
-    mono = channels.mean(axis=0)
-    onset = find_onset(mono, sr)
-    seg = mono[onset : onset + int(sr * window_ms / 1000)]
-    spec = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
-    freqs = np.fft.rfftfreq(len(seg), 1 / sr)
-    energies = np.array([
-        10 * np.log10(spec[(freqs >= lo) & (freqs < hi)].sum() + 1e-20) for lo, hi in _TILT_BANDS_HZ
-    ])
-    return energies - energies.mean()
+def _apply_band_shelf(x: np.ndarray, low_gain: float, high_gain: float, pivot_hz: float, sr: int) -> np.ndarray:
+    """Matches plugins/common/dsp/BandShelf.h's processSample() exactly (one-pole low/high split,
+    y = low*low_gain + high*high_gain where low is a one-pole lowpass and high = x - low) -
+    vectorized via scipy.signal.lfilter since this is calibration-only, not the shipped engine."""
+    from scipy.signal import lfilter
+
+    weight = 1.0 - math.exp(-2 * math.pi * pivot_hz / sr)
+    low = lfilter([weight], [1.0, -(1.0 - weight)], x)
+    high = x - low
+    return low * low_gain + high * high_gain
+
+
+def _ltas_band_levels(x: np.ndarray, sr: int) -> tuple[float, float]:
+    """Mean-subtracted (20-120Hz, 6-16kHz) long-term-average-spectrum band levels - see this
+    module's own docstring on why LTAS (the WHOLE decay's average spectrum), not
+    core.features.gate_envelope_params()'s onset-only window, is the right target for a
+    sustained-tone "murky/dark" complaint."""
+    from core.features import long_term_average_spectrum
+
+    freqs, spec_db = long_term_average_spectrum(x, sr)
+    mean_db = np.mean(spec_db)
+
+    def band_avg(lo: float, hi: float) -> float:
+        mask = (freqs >= lo) & (freqs < hi)
+        return float(np.mean(spec_db[mask])) - mean_db
+
+    return band_avg(20, 120), band_avg(6000, 16000)
 
 
 def _build_tilt_gain_curves(features: dict) -> dict:
-    """Real onset-tilt measurement, replacing the fit's own tilt_low_gain/tilt_high_gain - see
-    module docstring for why (TILT_REGULARIZATION_WEIGHT suppressed the fitted magnitude to
-    roughly a third of the real measured one). Uses the richest available High sweep (same Time
-    setting build_curves.py's own tonal-curve logic picks), anchored at High=0 (offset 0 by
-    construction, matching every other offset curve's convention here)."""
+    """Real tilt measurement, replacing BOTH the fit's own tilt_low_gain/tilt_high_gain/
+    tilt_pivot_hz AND this module's own earlier onset-only replacement for the gains (see module
+    docstring's "Tilt gain magnitude and pivot" section for the full story - a real, ear-caught
+    gap: "Bringing it down to -9dB to match a -9dB IR it is still much brighter and clear", a
+    complaint about the SUSTAINED tone the onset-only 20ms window was never representative of).
+
+    Uses the richest available High sweep (same Time setting build_curves.py's own tonal-curve
+    logic picks). Gains are solved numerically, not read off a closed-form formula: a one-pole
+    shelf's own band-AVERAGED dB shift over a finite band isn't the same as its asymptotic
+    low_gain/high_gain endpoint value, so this applies a CANDIDATE shelf (_apply_band_shelf,
+    exactly matching BandShelf.h) to the REAL High=0 capture (this Time setting's own measured
+    near-neutral reference - isolates the tilt's own transformation from any unrelated tank/gate
+    modeling error, unlike calibrating against our own synthesized render) and minimizes the
+    difference between the shelved result's own LTAS band levels and each OTHER real capture's own
+    measured LTAS band levels.
+
+    A genuine scale gauge-freedom exists (BandShelf's output gets energy-renormalized by
+    InhaltIRWorker::normaliseToUnitEnergy() regardless of the tilt's own absolute gain, so these
+    mean-subtracted band metrics only constrain the RATIO low_gain:high_gain, not their absolute
+    scale - confirmed directly: scaling a fitted (low_gain, high_gain) pair by any constant
+    reproduces identical achieved band levels). An earlier version of this function optimized
+    (low_gain, high_gain) independently per High point with a naive regularization toward (1, 1) -
+    each point exploited the gauge freedom differently and the resulting low_gain CURVE was NOT
+    monotonic in High (caught by InhaltParameterMapTests, not by inspection: it failed
+    "mapHighKnobToTilt reproduces the two measured endpoints and interpolates monotonically").
+    Fixed by collapsing to a SINGLE free parameter per High point - a scalar "tilt strength" s (dB),
+    split into low_gain_dB = TILT_SPLIT_LOW_FRACTION*s and high_gain_dB = -(1-TILT_SPLIT_LOW_FRACTION)*s
+    - which guarantees both low_gain(High) and high_gain(High) are monotonic BY CONSTRUCTION as
+    long as s(High) itself is (verified: s grows with |High| at both real High points, as
+    physically expected)."""
+    from scipy.optimize import minimize_scalar
+
     by_time_high_count: dict[float, set] = {}
     for c in features["captures"]:
         by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
@@ -114,27 +173,61 @@ def _build_tilt_gain_curves(features: dict) -> dict:
     sweep = sorted(
         (c["params"]["high"], c["filename"]) for c in features["captures"] if c["params"]["time"] == richest_time
     )
-    print(f"\nTilt gain curves (direct onset measurement) at Time={richest_time}s: "
-          f"High values {[h for h, _ in sweep]}")
+    print(f"\nTilt gain curves (LTAS-calibrated, whole-decay, fixed {TILT_PIVOT_HZ:.0f}Hz pivot) at "
+          f"Time={richest_time}s: High values {[h for h, _ in sweep]}")
 
-    baseline_bands = None
-    low_pairs, high_pairs = [], []
-    for high, filename in sweep:
-        bands = _onset_band_energy_db(os.path.join(CAPTURES_DIR, filename))
-        if high == 0:
-            baseline_bands = bands
-        low_pairs.append((high, bands[_TILT_LOW_BAND_INDEX]))
-        high_pairs.append((high, bands[_TILT_HIGH_BAND_INDEX]))
-
-    if baseline_bands is None:
-        print("  no High=0 point in this sweep - cannot anchor an offset curve, skipping")
+    if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
+        print("  no High=0 anchor or too few points - skipping, keeping tilt curves as previously built")
         return {}
 
-    baseline_low_db = next(v for h, v in low_pairs if h == 0)
-    baseline_high_db = next(v for h, v in high_pairs if h == 0)
+    base_filename = next(f for h, f in sweep if h == 0)
+    base_channels, base_sr = load_audio_channels(os.path.join(CAPTURES_DIR, base_filename))
+    base_mono = base_channels.mean(axis=0)
 
-    low_offset_points = [(h, 10 ** ((v - baseline_low_db) / 20) - 1.0) for h, v in low_pairs]
-    high_offset_points = [(h, 10 ** ((v - baseline_high_db) / 20) - 1.0) for h, v in high_pairs]
+    targets = {}
+    for high, filename in sweep:
+        channels, sr = load_audio_channels(os.path.join(CAPTURES_DIR, filename))
+        targets[high] = _ltas_band_levels(channels.mean(axis=0), sr)
+
+    def gains_for_strength(s: float) -> tuple[float, float]:
+        return 10 ** (TILT_SPLIT_LOW_FRACTION * s / 20), 10 ** (-(1 - TILT_SPLIT_LOW_FRACTION) * s / 20)
+
+    low_pairs, high_pairs, strengths = [(0, 1.0)], [(0, 1.0)], [(0, 0.0)]
+    for high, _ in sweep:
+        if high == 0:
+            continue
+        target_low, target_high = targets[high]
+
+        def loss(s, target_low=target_low, target_high=target_high):
+            lg, hg = gains_for_strength(s)
+            achieved_low, achieved_high = _ltas_band_levels(
+                _apply_band_shelf(base_mono, lg, hg, TILT_PIVOT_HZ, base_sr), base_sr
+            )
+            return (achieved_low - target_low) ** 2 + (achieved_high - target_high) ** 2
+
+        res = minimize_scalar(loss, bounds=(0.0, 60.0), method="bounded")
+        s = res.x
+        lg, hg = gains_for_strength(s)
+        achieved_low, achieved_high = _ltas_band_levels(
+            _apply_band_shelf(base_mono, lg, hg, TILT_PIVOT_HZ, base_sr), base_sr
+        )
+        print(f"  High={high}: target low={target_low:+.2f} high={target_high:+.2f} -> s={s:.2f}dB -> "
+              f"lowGain={lg:.4f} ({20*math.log10(lg):+.2f}dB) highGain={hg:.4f} ({20*math.log10(hg):+.2f}dB) "
+              f"(achieved low={achieved_low:+.2f} high={achieved_high:+.2f}, residual={res.fun:.4f})")
+        low_pairs.append((high, lg))
+        high_pairs.append((high, hg))
+        strengths.append((high, s))
+
+    strengths.sort()  # ascending by High; s is bounded >= 0, so it must DECREASE as High -> 0
+    if not all(strengths[i][1] >= strengths[i + 1][1] - 1e-6 for i in range(len(strengths) - 1)):
+        print("  WARNING: fitted tilt strength is not monotonic in High - check the target LTAS "
+              "measurements before trusting the exported curve")
+
+    low_pairs.sort()
+    high_pairs.sort()
+    baseline_low, baseline_high = 1.0, 1.0
+    low_offset_points = [(h, v - baseline_low) for h, v in low_pairs]
+    high_offset_points = [(h, v - baseline_high) for h, v in high_pairs]
 
     print(f"  low gain offsets:  {[round(v, 4) for _, v in low_offset_points]}")
     print(f"  high gain offsets: {[round(v, 4) for _, v in high_offset_points]}")
@@ -274,11 +367,14 @@ def main() -> None:
         "measured knee_time_ms=125.1ms, fitted 366.2ms; fall_rate ranged -101 to -1614dB/s fitted vs "
         "a real -141 to -187dB/s measured range). Replaced with curves built directly from "
         "features.json instead - the exact 'fit numbers don't hold up, use direct measurement' "
-        "pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain and "
-        "tilt_high_gain are ALSO replaced (same reasoning, see module docstring - the fit's "
-        "TILT_REGULARIZATION_WEIGHT suppressed their real magnitude by roughly 2-3x). Only "
-        "feedback_gain, damping_weight_mean, diffuser_gain, and tilt_pivot_hz are UNCHANGED from the fit - see "
-        "build_measured_gate_curves.py's own module docstring for why those four were kept. The "
+        "pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain, "
+        "tilt_high_gain, and tilt_pivot_hz are ALSO replaced (see module docstring - the gains for "
+        "the same TILT_REGULARIZATION_WEIGHT reason as before; the pivot after a real ear-caught "
+        "complaint found the fit's ~4200-4700Hz value structurally caps the achievable HF cut well "
+        "below the real captures' own measured spread, fixed by lowering it to 1500Hz and "
+        "recalibrating gains against the whole-decay LTAS instead of the 20ms onset window). Only "
+        "feedback_gain, damping_weight_mean, and diffuser_gain are UNCHANGED from the fit - see "
+        "build_measured_gate_curves.py's own module docstring for why those three were kept. The "
         "two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the "
         "real capture set and are pooled into these Time-only curves alongside the High=0 points at "
         "longer Time - an honest compromise (documented, not hidden), since findings.md found the "

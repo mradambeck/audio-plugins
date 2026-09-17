@@ -57,17 +57,22 @@ public:
             const auto atZero = InhaltParameterMap::mapHighKnobToTilt(0.0f, &ex0);
             const auto atNine = InhaltParameterMap::mapHighKnobToTilt(-9.0f, &ex9);
 
-            // Real onset 5-band measurement (see findings.md's "High: broadband tilt" section and
-            // build_measured_gate_curves.py, which computes these same numbers from the real
-            // captures rather than transcribing them): H=0 is exactly neutral by construction
-            // (the offset curve is anchored there); H=-9's magnitude reflects the real measured
-            // +4.5dB low / -9.5dB high onset tilt, NOT the earlier placeholder's rough dB->gain
-            // conversion of the same measurement, and NOT the fit's own value (which
-            // TILT_REGULARIZATION_WEIGHT suppressed to roughly a third of the real magnitude).
+            // LTAS (whole-decay average spectrum) calibration - see build_measured_gate_curves.py's
+            // own docstring. Superseded the real onset 5-band measurement this test originally
+            // checked (+4.5dB low/-9.5dB high, findings.md's "High: broadband tilt" section) after
+            // a real, ear-caught complaint ("Bringing it down to -9dB to match a -9dB IR it is
+            // still much brighter and clear") - the onset-only window wasn't representative of the
+            // SUSTAINED tone, and the fit's own tilt_pivot_hz (kept at the time because it "looked
+            // physically plausible") turned out to structurally cap the achievable darkness well
+            // below what the real captures measure over their whole decay. H=0 is exactly neutral
+            // by construction (the offset curve is anchored there); H=-9's magnitude (+7.90dB low/
+            // -16.67dB high) is now solved numerically against the real captures' own LTAS band
+            // levels at a lowered (1500Hz, not ~4500Hz) pivot - see InhaltParameterMap.cpp's own
+            // tiltPivotHz comment for why the pivot itself had to move, not just the gains.
             expect(std::abs(atZero.lowGain - 1.0f) < 1.0e-4f, "H=0 low gain should be neutral (1.0)");
             expect(std::abs(atZero.highGain - 1.0f) < 1.0e-4f, "H=0 high gain should be neutral (1.0)");
-            expect(std::abs(atNine.lowGain - 1.6772f) < 1.0e-3f, "H=-9 low gain should match the direct onset measurement");
-            expect(std::abs(atNine.highGain - 0.3364f) < 1.0e-3f, "H=-9 high gain should match the direct onset measurement");
+            expect(std::abs(atNine.lowGain - 2.4817f) < 1.0e-3f, "H=-9 low gain should match the LTAS calibration");
+            expect(std::abs(atNine.highGain - 0.1468f) < 1.0e-3f, "H=-9 high gain should match the LTAS calibration");
             expect(! ex0 && ! ex9, "both range endpoints must not report extrapolation");
 
             bool first = true;

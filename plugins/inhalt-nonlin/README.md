@@ -57,10 +57,37 @@ that motivated this whole investigation is now well within its own interpretatio
 (0.076 vs. the 0.15 concern threshold) and the High=0/High!=0 split has shrunk from ~2-3x to a
 small, unflagged residual - a genuinely closed gap, not just a relabeled one.
 
-Spectral flatness/"grit" remains a flagged, open gap (4.29dB mean error, worse at negative High)
-and is the next thing to investigate - likely NOT via a High-dependent diffuser gain (the same
-tilt-confound risk applies there too, and hasn't been checked yet), so check for an analogous
-confound before assuming it needs a new fitted parameter.
+Spectral flatness/"grit" remains a flagged, open gap (3.48dB mean error, worse at negative High)
+and is unexamined so far - see the "attack/pluck vs. bow" gap below, under active investigation.
+
+**Tilt pivot and gain magnitude - fixed after a real, ear-caught complaint about playing a synth
+line through the plugin at 100% wet**: "The High Frequency cutoff doesn't seem to get as murky and
+dark as the convolution [i.e. the real captured IR]... Bringing it down to -9dB to match a -9dB IR
+it is still much brighter and clear." Measuring the real captures' WHOLE-DECAY average spectrum
+(LTAS), not just the onset window `tilt_low_gain`/`tilt_high_gain` were calibrated from, found the
+render's own low/high band spread was roughly HALF the real hardware's at negative High (e.g.
+Time=9.8/High=-9: real 16.3dB spread, render only 7.3dB). This was not a gain-calibration
+shortfall: the fit's own `tilt_pivot_hz` (~4200-4700Hz, kept because it "looked physically
+plausible") puts `BandShelf`'s one-pole transition too close to the 6-16kHz band being darkened -
+verified directly that even at extreme gain, that pivot structurally caps the achievable spread at
+~8.8dB, short of the ~10-16dB the real captures need at High=-4/-9. Lowering the pivot to 1500Hz
+(an onset-band pivot ESTIMATE this project's own earlier work flagged as "less precise" and
+discarded in favor of the fit's value) raises the achievable ceiling to ~17-28dB - enough headroom
+to actually reach the target instead of asymptoting toward it. Gains are now solved numerically
+against the real captures' own LTAS (not a closed-form formula, since a one-pole shelf's
+band-averaged dB shift isn't its own asymptotic endpoint value) - see
+`build_measured_gate_curves.py`'s own docstring, including a real bug caught along the way (the
+first version's per-High-point gain optimization exploited an inherent scale gauge-freedom
+inconsistently, breaking monotonicity - caught by `InhaltParameterMapTests`, fixed by collapsing to
+a single monotonic "tilt strength" scalar per High point).
+
+| Metric (Time=9.8/High=-9, low/high band spread) | Before | After | Real hardware |
+|---|---|---|---|
+| LTAS spread (dB) | 7.3 | 15.8 | 16.3 |
+
+Net effect across all 9 captures: log-spectral distance improved 3.45dB -> 2.71dB (no longer
+flagged at all) and spectral flatness improved 4.29dB -> 3.48dB, with no regression to onset
+density or gate timing (both fixes are independent signal-chain stages).
 
 Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 

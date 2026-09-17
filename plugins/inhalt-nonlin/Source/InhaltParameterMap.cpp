@@ -30,17 +30,31 @@ namespace
         { 9.8f, 300.4f },
     } } };
 
-    // Baselines the tilt High-offset curves in InhaltReferenceData.h are anchored to (their own
-    // value AT High=0, matching AuraParameterMap.cpp's identical convention for its own decay-
-    // gain and damping offset curves). tilt_low_gain/tilt_high_gain are direct measurements
-    // (see build_measured_gate_curves.py) anchored at an exact, genuinely neutral 1.0 - unlike
-    // tilt_pivot_hz, still from the fit, whose own baseline is read directly from
-    // ml-toolkit/effects/nonlin/curves.json's "baseline_at_high0" field. plateau_droop_db_per_s
-    // needs no equivalent constant here: its own "Time curve" (time_to_plateau_droop_db_per_sPoints)
-    // is already the absolute High=0 baseline value at each Time, not a zero-anchored offset.
+    // Baselines the tilt gain High-offset curves in InhaltReferenceData.h are anchored to (their
+    // own value AT High=0, matching AuraParameterMap.cpp's identical convention for its own
+    // decay-gain and damping offset curves). tilt_low_gain/tilt_high_gain are direct measurements
+    // (see build_measured_gate_curves.py) anchored at an exact, genuinely neutral 1.0.
+    // plateau_droop_db_per_s needs no equivalent constant here: its own "Time curve"
+    // (time_to_plateau_droop_db_per_sPoints) is already the absolute High=0 baseline value at
+    // each Time, not a zero-anchored offset.
     constexpr float tiltLowGainBaselineAtHigh0 = 1.0f;
     constexpr float tiltHighGainBaselineAtHigh0 = 1.0f;
-    constexpr float tiltPivotHzBaselineAtHigh0 = 4473.755859375f;
+
+    // Fixed tilt pivot, NOT a fitted/High-dependent curve (see build_measured_gate_curves.py's own
+    // module docstring for the full story). Originally kept from the fit (~4200-4700Hz), which
+    // "looked physically plausible" but turned out to be structurally wrong: a real complaint
+    // ("Bringing it down to -9dB to match a -9dB IR it is still much brighter and clear") led to
+    // measuring the real captures' WHOLE-DECAY average spectrum (LTAS), not just the onset window
+    // the tilt gains themselves were calibrated from - a ~4.5kHz pivot puts the one-pole shelf's
+    // transition too close to the 6-16kHz band being darkened, capping the achievable low/high
+    // spread at ~8.8dB EVEN AT EXTREME GAIN, well short of the real captures' own measured
+    // 10-16dB spread at High=-4/-9. 1500Hz - an onset-band pivot ESTIMATE this catalog's own
+    // earlier work flagged as "less precise" and discarded in favor of the fit's value - raises
+    // the achievable ceiling enough to actually reach the real target. Verified directly (not
+    // just reasoned): a bounded numerical search at this pivot reproduces the real captures' own
+    // measured LTAS band levels at High=-4/-9 with a small residual; the same search at the old
+    // ~4.5kHz pivot could not, no matter how extreme the gain.
+    constexpr float tiltPivotHz = 1500.0f;
 } // namespace
 
 GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated) noexcept
@@ -108,15 +122,14 @@ TiltParams mapHighKnobToTilt(float highKnob, bool* extrapolated) noexcept
 {
     static const auto highToLowGainOffset = toCurve(wildjag::dsp::high_to_tilt_low_gain_offsetPoints);
     static const auto highToHighGainOffset = toCurve(wildjag::dsp::high_to_tilt_high_gain_offsetPoints);
-    static const auto highToPivotOffset = toCurve(wildjag::dsp::high_to_tilt_pivot_hz_offsetPoints);
 
-    bool lowExtrapolated = false, highExtrapolated = false, pivotExtrapolated = false;
+    bool lowExtrapolated = false, highExtrapolated = false;
     TiltParams params;
     params.lowGain = tiltLowGainBaselineAtHigh0 + highToLowGainOffset.evaluate(highKnob, &lowExtrapolated);
     params.highGain = tiltHighGainBaselineAtHigh0 + highToHighGainOffset.evaluate(highKnob, &highExtrapolated);
-    params.pivotHz = tiltPivotHzBaselineAtHigh0 + highToPivotOffset.evaluate(highKnob, &pivotExtrapolated);
+    params.pivotHz = tiltPivotHz;
     if (extrapolated != nullptr)
-        *extrapolated = lowExtrapolated || highExtrapolated || pivotExtrapolated;
+        *extrapolated = lowExtrapolated || highExtrapolated;
     return params;
 }
 

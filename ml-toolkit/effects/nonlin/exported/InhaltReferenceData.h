@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         89927bc0cb921438c282132d168b54b367af304d
+//   git commit:         4cf4e034801c699a5632a82fd73c4ccadc61f138
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-17
@@ -117,8 +117,8 @@ static_assert(time_to_plateau_droop_db_per_sPoints.front().x <= time_to_plateau_
 
 // high_to_tilt_low_gain_offset
 static constexpr std::array<FittedPoint, 3> high_to_tilt_low_gain_offsetPoints { {
-    { -9.0f, 0.6771558911531295f },
-    { -4.0f, 0.2842793598100224f },
+    { -9.0f, 1.481746372405031f },
+    { -4.0f, 0.4292329094050229f },
     { 0.0f, 0.0f },
 } };
 static_assert(high_to_tilt_low_gain_offsetPoints.front().x <= high_to_tilt_low_gain_offsetPoints.back().x,
@@ -126,21 +126,12 @@ static_assert(high_to_tilt_low_gain_offsetPoints.front().x <= high_to_tilt_low_g
 
 // high_to_tilt_high_gain_offset
 static constexpr std::array<FittedPoint, 3> high_to_tilt_high_gain_offsetPoints { {
-    { -9.0f, -0.6636015854521116f },
-    { -4.0f, -0.4715363909375674f },
+    { -9.0f, -0.8532347375050937f },
+    { -4.0f, -0.5294992531650122f },
     { 0.0f, 0.0f },
 } };
 static_assert(high_to_tilt_high_gain_offsetPoints.front().x <= high_to_tilt_high_gain_offsetPoints.back().x,
     "high_to_tilt_high_gain_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
-
-// high_to_tilt_pivot_hz_offset
-static constexpr std::array<FittedPoint, 3> high_to_tilt_pivot_hz_offsetPoints { {
-    { -9.0f, 17.556396484375f },
-    { -4.0f, 758.64599609375f },
-    { 0.0f, 0.0f },
-} };
-static_assert(high_to_tilt_pivot_hz_offsetPoints.front().x <= high_to_tilt_pivot_hz_offsetPoints.back().x,
-    "high_to_tilt_pivot_hz_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // high_to_plateau_droop_db_per_s_offset
 static constexpr std::array<FittedPoint, 3> high_to_plateau_droop_db_per_s_offsetPoints { {

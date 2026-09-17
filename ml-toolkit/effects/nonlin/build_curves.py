@@ -40,7 +40,14 @@ TIME_ONLY_PARAMS = [
     "t_knee_ms", "tau_a_ms", "fall_rate_db_per_s", "tau_k_ms",
     "feedback_gain", "damping_weight_mean", "diffuser_gain",
 ]
-TONAL_PARAMS = ["tilt_low_gain", "tilt_high_gain", "tilt_pivot_hz"]
+TONAL_PARAMS = ["tilt_low_gain", "tilt_high_gain"]
+# tilt_pivot_hz used to be here too, fit-derived. Removed after direct measurement (see
+# build_measured_gate_curves.py's own docstring) found the fit's own pivot (~4200-4700Hz) puts the
+# one-pole shelf's transition too close to the 6-16kHz band a "murky/dark" complaint is measured
+# in - even at extreme gain, that pivot structurally caps the achievable low/high spread well below
+# the real captures' own measured spread at negative High. tilt_pivot_hz is now a hand-measured
+# CONSTANT (1500Hz, matching tiltLowGainBaselineAtHigh0/tiltHighGainBaselineAtHigh0's own existing
+# convention), not a fit-derived High-dependent curve - see InhaltParameterMap.cpp.
 # See module docstring - moved out of TIME_ONLY_PARAMS after findings.md measured this specific
 # parameter is NOT H-neutral, unlike every other timing parameter checked.
 H_DEPENDENT_TIMING_PARAMS = ["plateau_droop_db_per_s"]

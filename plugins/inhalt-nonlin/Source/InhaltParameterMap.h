@@ -14,9 +14,11 @@
 // found systematically wrong in the fit (e.g. Time=0.1: measured knee time 125ms, fitted 366ms) -
 // replaced with curves built directly from measurement instead (see
 // ml-toolkit/effects/nonlin/build_measured_gate_curves.py). feedback_gain, damping_weight_mean,
-// tilt_low_gain, tilt_high_gain, and tilt_pivot_hz are kept from the fit - see that script's own
-// module docstring for why those five specifically were trusted. This is the same "fit numbers
-// don't hold up, use direct measurement" correction AuraDecayGainData.h/AuraOnsetTiltData.h
+// and diffuser_gain are kept from the fit - see that script's own module docstring for why those
+// three specifically were trusted. tilt_low_gain/tilt_high_gain/tilt_pivot_hz were ALSO originally
+// kept from the fit, but the pivot turned out to be structurally wrong (see InhaltParameterMap.cpp's
+// own comment on tiltPivotHz) and is now a hand-measured constant, not fit-derived. This is the
+// same "fit numbers don't hold up, use direct measurement" correction AuraDecayGainData.h/AuraOnsetTiltData.h
 // already established as precedent for this catalog, applied here from the start rather than
 // discovered after shipping placeholder data.
 //
@@ -90,10 +92,13 @@ float gateLengthMsForDisplay(float timeKnob, bool* extrapolated = nullptr) noexc
 // a grid.
 TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated = nullptr) noexcept;
 
-// High knob (-9..0 dB) -> input tilt. Real measurement at both range endpoints (H=0 neutral,
-// H=-9: +4.5dB low/-9.5dB high onset tilt - see findings.md), refined by the fit's own tilt_pivot
-// value (~4200-4700Hz, consistent with this module's own earlier direct tilt_fit() estimate of
-// ~4044Hz) rather than the ~1.5-2kHz onset-band estimate findings.md flagged as less precise.
+// High knob (-9..0 dB) -> input tilt. Gains are LTAS-calibrated (whole-decay average spectrum,
+// not just the onset window) against the real captures - see build_measured_gate_curves.py's own
+// docstring. Pivot is a fixed, hand-measured 1500Hz constant (InhaltParameterMap.cpp's own
+// tiltPivotHz comment) - the ~4200-4700Hz value findings.md originally preferred (over a
+// ~1.5-2kHz onset-band estimate it flagged as "less precise") turned out to structurally cap the
+// achievable High=-4/-9 darkness well below what the real hardware measures, a real, ear-caught
+// gap the LTAS measurement traced back to the pivot, not just the gain magnitude.
 TiltParams mapHighKnobToTilt(float highKnob, bool* extrapolated = nullptr) noexcept;
 
 } // namespace InhaltParameterMap
