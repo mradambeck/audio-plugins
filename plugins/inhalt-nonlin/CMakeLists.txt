@@ -28,7 +28,16 @@ juce_add_plugin(Inhalt
     MICROPHONE_PERMISSION_TEXT "Inhalt needs microphone access to process live audio input in the Standalone app."
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE WJag
-    PLUGIN_CODE Inhl
+    # NOT "Inhl" - already claimed by ~/code/wildjag-convolution-variants/variants/inhalt-rmx-nonlin
+    # (a separate, pre-existing product: the shared convolution engine loaded with the same 9 real
+    # NonLin captures directly, no modeling). Apple identifies an AU by its (type, subtype,
+    # manufacturer) triple regardless of bundle ID or product name, so two plugins sharing
+    # PLUGIN_CODE Inhl + WJag genuinely collide in the system AudioComponent registry - found by
+    # checking `PLUGIN_CODE` across BOTH this repo and the private variants repo (a private-repo
+    # check the usual "grep plugins/*/CMakeLists.txt" habit in this catalog misses entirely). This
+    # plugin is the newer, still-pre-release one (see README's Status), so it changed rather than
+    # the already-installer-ready variant.
+    PLUGIN_CODE Nlin
     FORMATS AU VST3 Standalone
     PRODUCT_NAME "Inhalt - Reverb"
 )
