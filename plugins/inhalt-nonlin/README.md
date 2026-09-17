@@ -289,6 +289,61 @@ Two further things are documented as genuine, open gaps rather than silently fix
   this was never audible, but it's a real architectural coupling worth knowing about before adding
   another loss term that could shift `t_knee_ms` again.
 
+**`fall_rate_db_per_s` (the delay tail's own post-knee decay rate) - fixed after a real "the delay
+tail still isn't quite a match" listening complaint**, this parameter's own version of the exact
+same two-bug pattern already found and fixed for `plateau_droop_db_per_s` and `t_knee_ms` (see
+those two sections' own history), never re-examined for this one until now. **Bug 1**: it was
+still sitting in `build_measured_gate_curves.py`'s naive `main()` pooling loop, averaging every
+capture at a given Time across ALL High values - confirmed exactly (Time=9.8's old curve value,
+-179.557dB/s, was precisely the mean of its three real captures at High=0/-4/-9). **Bug 2**: the
+same additive-vs-total double-counting `plateau_droop_db_per_s` had -
+`InhaltIRSynth.cpp::gateEnvelopeDb()`'s `plateauDb(t) = plateauDroopDbPerSec * t` term never turns
+off at the knee, so the render's own post-knee slope is the tank's implicit natural decay PLUS
+`plateauDroopDbPerSec`'s own (already-corrected) contribution PLUS `fallRateDbPerSec` - writing
+the real measured total directly into `fallRateDbPerSec` double-counts the first two terms a
+second time. Fixed with a new `_build_fall_rate_curves` (mirroring `_build_t_knee_ms_curves`'
+H=0-equivalent-baseline-plus-offset architecture, and `_build_plateau_droop_curves`' additive
+correction), verified by the same direct-C++-measurement procedure as
+`_NATURAL_DROOP_CPP_VERIFIED_OVERRIDE`: temporarily hardcode a candidate value, rebuild
+`InhaltRenderIR`, render, remeasure, iterate. The analytical correction alone
+(`target_fall_total - target_plateau_droop_total`) undershoots by a fairly consistent ~5-12% -
+`kneeDb(t)`'s softplus term isn't fully in its linear asymptotic regime across the whole post-knee
+fit window - so `_FALL_RATE_CPP_VERIFIED_OVERRIDE` supplies empirically-converged values for
+Time=4.8/7.0/9.8 (final residuals 0.12/-2.50/-0.67dB/s); Time=2.2 is a known-unstable case (its
+render hits the swept-breakpoint fit's float32-noise-floor cliff well inside the segment-B window
+at every correction magnitude tried, so the "measured total" swings wildly regardless of the
+actual parameter) and keeps its analytical estimate rather than being chased further, the same
+practical call already made for this Time setting in `_NATURAL_DROOP_CPP_VERIFIED_OVERRIDE`'s own
+history. One implementation bug caught mid-fix, not shipped: `_isotonic_nondecreasing` (built for
+`t_knee_ms`, which increases with Time) collapsed all 6 `fall_rate_db_per_s` Time points to a
+single flat value when applied directly, because this parameter DECREASES (gets steeper) with
+Time - fixed by negating before/after, the standard trick, rather than writing a second
+monotonicity function.
+
+Real, measured effect (`analysis/validate.py`, mean signed error across all 9 captures):
+
+| Metric | Before | After |
+|---|---|---|
+| Fall rate error (dB/s) | -60.304 | -10.829 |
+| Plateau droop error (dB/s) | 21.921 | 7.559 (improved too - see below) |
+| Knee time error (ms) | -13.069 | -37.569 (regressed - see below) |
+
+Per-capture, 6 of 9 settings landed under 5dB/s error (Time=7.0/9.8 across every measured High);
+the three short-Time settings (0.1s/0.8s/2.2s) improved from -179.6/-163.1/-103.4dB/s to a
+still-imperfect but much closer -29.9/-38.4/-36.2dB/s, consistent with Time=2.2's own known-unstable
+fit (and 0.1s/0.8s inheriting an extrapolated `plateau_droop_db_per_s` baseline below its lowest
+measured Time point, an honest, compounding gap, not a new one). `plateau_droop_db_per_s`'s own
+error improved too, unexpectedly - both parameters are measured from the SAME swept-breakpoint
+two-segment fit on the render, so making segment B's slope more accurate also improved segment A's
+own least-squares fit. `knee_time_ms`'s error crossed `validate.py`'s own 30ms concern threshold as
+a side effect - flagged, not hidden, but very likely a fit-artifact rather than a real regression:
+the actual `params.kneeTimeMs` value written into the render is completely unchanged by this fix
+(only `fallRateDbPerSec` was touched), so a shift in the two-segment breakpoint search's own
+estimate of "where the knee is" most plausibly reflects the render's post-knee segment now being
+correctly much steeper, not the configured knee moving. Not independently re-verified by a direct
+C++ diagnostic the way the fall-rate fix itself was - a reasonable next step if a future listening
+pass finds the gate length itself (not just the tail's decay character) audibly off.
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

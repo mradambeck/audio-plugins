@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         a0275f1c22fbdf129b67828def8b6ae0824b2f5b
+//   git commit:         2ad9da182d5fc61f4a87906cb3397a70c89da7c6
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-17
@@ -45,12 +45,12 @@ static_assert(time_to_tau_a_msPoints.front().x <= time_to_tau_a_msPoints.back().
 
 // time_to_fall_rate_db_per_s
 static constexpr std::array<FittedPoint, 6> time_to_fall_rate_db_per_sPoints { {
-    { 0.1f, -151.11f },
-    { 0.8f, -143.1f },
-    { 2.2f, -141.05f },
-    { 4.8f, -148.29f },
-    { 7.0f, -177.69f },
-    { 9.8f, -179.55666666666664f },
+    { 0.1f, -15.713128205128186f },
+    { 0.8f, -36.85797435897433f },
+    { 2.2f, -79.14766666666665f },
+    { 4.8f, -135.814f },
+    { 7.0f, -177.713f },
+    { 9.8f, -170.18f },
 } };
 static_assert(time_to_fall_rate_db_per_sPoints.front().x <= time_to_fall_rate_db_per_sPoints.back().x,
     "time_to_fall_rate_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
@@ -148,5 +148,14 @@ static constexpr std::array<FittedPoint, 3> high_to_t_knee_ms_offsetPoints { {
 } };
 static_assert(high_to_t_knee_ms_offsetPoints.front().x <= high_to_t_knee_ms_offsetPoints.back().x,
     "high_to_t_knee_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_fall_rate_db_per_s_offset
+static constexpr std::array<FittedPoint, 3> high_to_fall_rate_db_per_s_offsetPoints { {
+    { -9.0f, 18.052f },
+    { -4.0f, 27.301999999999985f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_fall_rate_db_per_s_offsetPoints.front().x <= high_to_fall_rate_db_per_s_offsetPoints.back().x,
+    "high_to_fall_rate_db_per_s_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 } // namespace wildjag::dsp

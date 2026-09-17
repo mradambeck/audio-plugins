@@ -103,6 +103,24 @@ _NATURAL_DROOP_RIGHT_DIFFUSER_SAMPLES = torch.tensor([61.0, 97.0, 149.0])
 # measure with core.features.gate_envelope_params, revert).
 _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE = {2.2: 10.602, 4.8: -53.579, 7.0: -37.096, 9.8: -38.507}
 
+# fall_rate_db_per_s's own additive-vs-total correction (see _build_fall_rate_curves' docstring)
+# has the same shape as plateau_droop's, but its analytical estimate (target_fall_total minus
+# this Time's own target_plateau_droop_total) has a second-order error the plateau_droop fix
+# didn't: kneeDb(t)'s softplus term isn't fully in its asymptotic-linear regime across the whole
+# post-knee fit window (particularly at short Time, where the window is short relative to
+# tau_k_ms), so the analytical estimate is measurably too shallow. Verified by direct C++
+# measurement (same procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE: temporarily hardcode
+# InhaltIRWorker.cpp's params.fallRateDbPerSec to a candidate, build InhaltRenderIR, render at
+# High=0, remeasure with core.features.gate_envelope_params, iterate to convergence, revert).
+# Time=2.2 is a KNOWN-UNSTABLE case, not a converged one: its render hits the swept-breakpoint
+# fit's float32-noise-floor cliff (~-197dB) well inside the segment-B window at every correction
+# magnitude tried (-89 to -94dB/s), so the measured "total" swings wildly (-186 to -190dB/s)
+# regardless of the actual parameter - the analytical estimate is kept here deliberately rather
+# than chased further, the same practical call _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE's own
+# docstring made for this same Time setting. Time=4.8/7.0/9.8 converged cleanly (final residuals
+# 0.12dB/s, -2.50dB/s, -0.67dB/s respectively).
+_FALL_RATE_CPP_VERIFIED_OVERRIDE = {4.8: -135.814, 7.0: -177.713, 9.8: -170.180}
+
 HERE = os.path.dirname(__file__)
 FEATURES_PATH = os.path.join(HERE, "features.json")
 CAPTURES_DIR = os.path.join(HERE, "captures")
@@ -587,6 +605,146 @@ def _build_t_knee_ms_curves(features: dict) -> dict:
     }
 
 
+def _build_fall_rate_curves(features: dict, curves: dict) -> dict:
+    """fall_rate_db_per_s's own Time baseline AND High offset - REPLACES its entry in main()'s
+    naive pooling loop, which had BOTH bugs already found and fixed for plateau_droop_db_per_s and
+    t_knee_ms (see those functions' own docstrings), never re-examined here until a real "the delay
+    tail still isn't quite a match" listening complaint prompted it.
+
+    Bug 1 (naive High-pooling): the naive loop averaged fall_rate_db_per_s across EVERY High value
+    at a given Time, exactly like plateau_droop_db_per_s's own Bug 1. Confirmed directly:
+    Time=9.8's old curve value (-179.557dB/s) is exactly the mean of its three real captures
+    (-171.98 at High=0, -179.43 at High=-4, -187.26 at High=-9); Time=7.0's (-177.69) is exactly
+    the mean of -173.11 (High=0) and -182.27 (High=-7). Fixed the same way as t_knee_ms: every
+    capture is converted to an H=0-equivalent TARGET first (raw - offset_curve(High), offset curve
+    built from Time=9.8's own richest sweep), THEN averaged per Time, THEN isotonic-regressed.
+
+    Bug 2 (additive-vs-total double-counting): the SAME architectural bug plateau_droop_db_per_s
+    had. InhaltIRSynth.cpp's gateEnvelopeDb() is attackDb + plateauDb(t) + kneeDb(t), where
+    plateauDb(t) = plateauDroopDbPerSec * t NEVER turns off at the knee - it keeps contributing
+    for the whole render. So the render's own post-knee slope (what gate_envelope_params() calls
+    fall_rate_db_per_s when it re-measures the render) is the tank's implicit natural decay PLUS
+    plateauDroopDbPerSec's own (already natural-droop-corrected) explicit contribution PLUS
+    fallRateDbPerSec - and by construction of the earlier plateau_droop_db_per_s fix, the first two
+    terms already sum to exactly this Time's real target_plateau_droop_total. Setting
+    fallRateDbPerSec directly to the real measured target_fall_total therefore double-counts the
+    plateau's own ongoing contribution a second time. Verified directly (same procedure as
+    _measure_tank_natural_plateau_droop, see _FALL_RATE_CPP_VERIFIED_OVERRIDE's own docstring for
+    the exact steps): at Time=9.8/High=0, writing the raw target (-171.98) produced a rendered
+    total of roughly -217dB/s (extrapolating from the -143.65 to -164.83 range measured at smaller
+    magnitudes); the corrected value (target_fall_total minus this Time's own target_plateau_droop_
+    total, then empirically refined - see the override dict) produced -172.65dB/s, a 0.67dB/s
+    residual.
+
+    The analytical estimate (target_fall - plateau_target) undershoots the needed magnitude by a
+    fairly consistent ~5-12% - not the tank's natural droop (already accounted for), but
+    kneeDb(t)'s own softplus term not being fully in its linear asymptotic regime across the whole
+    post-knee fit window. _FALL_RATE_CPP_VERIFIED_OVERRIDE supplies the empirically-converged
+    value per Time; the analytical estimate is printed alongside it as a sanity check (and used
+    as-is for any Time not in the override, same fallback convention as
+    _measure_tank_natural_plateau_droop).
+
+    The WRITTEN High offset (added on top of the Time baseline by InhaltParameterMap.cpp, mirroring
+    t_knee_ms's own architecture) is target_fall_offset(High) - target_plateau_offset(High): both
+    already-measured TARGET offsets (this function's own sweep; plateau_droop_db_per_s's own
+    high_to_plateau_droop_db_per_s_offset, already in curves by the time this runs). The tank's
+    natural-droop term cancels in a High-vs-High=0 subtraction the same way it does for
+    plateau_droop's own offset (see that function's docstring), so this doesn't need its own
+    override table - verified directly at Time=9.8/High=-4 (predicted written value -142.878dB/s,
+    measured render total -175.34 vs. the real target -179.43, a 4.09dB/s residual - a real but
+    modest gap, consistent with the offset's own "assumed roughly Time-independent" caveat every
+    other High-offset curve in this module already carries)."""
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+
+    sweep = sorted(
+        (c["params"]["high"], c["gate"]["fall_rate_db_per_s"])
+        for c in features["captures"] if c["params"]["time"] == richest_time
+    )
+    print(f"\nfall_rate_db_per_s High offset (direct measurement, TARGET total) at "
+          f"Time={richest_time}s: {sweep}")
+
+    if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
+        print("  no High=0 anchor or too few points - skipping, keeping fall_rate_db_per_s "
+              "Time-only (naively pooled, the known-imperfect fallback)")
+        return {}
+
+    baseline_at_richest_time = next(v for h, v in sweep if h == 0)
+    target_offset_points = [(h, v - baseline_at_richest_time) for h, v in sweep]
+    print(f"  target offsets: {[round(v, 2) for _, v in target_offset_points]} "
+          f"(baseline {baseline_at_richest_time:.2f}dB/s)")
+    target_offset_curve = Curve1D([p[0] for p in target_offset_points], [p[1] for p in target_offset_points])
+
+    print("fall_rate_db_per_s TARGET Time baseline (every capture converted to an H0-equivalent "
+          "target first):")
+    by_time: dict[float, list[float]] = {}
+    for c in features["captures"]:
+        t = c["params"]["time"]
+        high = c["params"]["high"]
+        offset, extrapolated = target_offset_curve.evaluate(high)
+        corrected_target = c["gate"]["fall_rate_db_per_s"] - offset
+        flag = " (offset extrapolated)" if extrapolated else ""
+        print(f"  Time={t} High={high}: raw={c['gate']['fall_rate_db_per_s']:.3f}  "
+              f"offset(High)={offset:.3f}  -> H0_target={corrected_target:.3f}{flag}")
+        by_time.setdefault(t, []).append(corrected_target)
+    target_baseline_pairs = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+    print(f"  target averaged per Time: {[(t, round(v, 3)) for t, v in target_baseline_pairs]}")
+
+    # fall_rate_db_per_s gets MORE NEGATIVE (steeper) as Time increases - the OPPOSITE direction
+    # from t_knee_ms's own non-decreasing trend - so isotonic regression is applied to the negated
+    # sequence (enforcing non-decreasing there = non-increasing in the real, signed values), then
+    # negated back. Applying _isotonic_nondecreasing directly here was a real bug caught while
+    # verifying this fix, not assumed correct from the t_knee_ms precedent: it collapsed all 6
+    # points to a single flat value, because a large early violation (Time=0.1 -> 0.8 going from
+    # -145.5 to -137.5, less steep) chained through the whole non-decreasing constraint,
+    # overriding the real Time=4.8/7.0/9.8 trend it should never have touched.
+    negated_monotonic = _isotonic_nondecreasing([(t, -v) for t, v in target_baseline_pairs])
+    monotonic_target_pairs = [(t, -v) for t, v in negated_monotonic]
+    if monotonic_target_pairs != target_baseline_pairs:
+        print(f"  NOTE: target baseline was not monotonic in Time - applied isotonic regression "
+              f"(negated, since this parameter decreases with Time): "
+              f"{[(t, round(v, 3)) for t, v in monotonic_target_pairs]}")
+
+    print("fall_rate_db_per_s WRITTEN correction (subtracting this Time's own target plateau "
+          "droop total, since plateauDb(t) keeps contributing after the knee - see docstring):")
+    written_pairs = []
+    for t, target_fall in monotonic_target_pairs:
+        plateau_target, plateau_extrapolated = Curve1D(
+            [p[0] for p in curves["time_to_plateau_droop_db_per_s"]["points"]],
+            [p[1] for p in curves["time_to_plateau_droop_db_per_s"]["points"]],
+        ).evaluate(t)
+        analytical = target_fall - plateau_target
+        override = _FALL_RATE_CPP_VERIFIED_OVERRIDE.get(t)
+        written = override if override is not None else analytical
+        flag = " (plateau extrapolated)" if plateau_extrapolated else ""
+        note = "" if override is None else f"  [C++-verified override, analytical was {analytical:.3f}]"
+        print(f"  Time={t}: target_fall={target_fall:.3f}  plateau_target={plateau_target:.3f}{flag}  "
+              f"-> written={written:.3f}{note}")
+        written_pairs.append((t, written))
+
+    plateau_offset_points = curves.get("high_to_plateau_droop_db_per_s_offset", {}).get("points", [])
+    written_offset_points = target_offset_points
+    if len(plateau_offset_points) >= 2:
+        plateau_offset_curve = Curve1D([p[0] for p in plateau_offset_points], [p[1] for p in plateau_offset_points])
+        written_offset_points = []
+        for h, fall_offset in target_offset_points:
+            plateau_offset, _ = plateau_offset_curve.evaluate(h)
+            written_offset_points.append((h, fall_offset - plateau_offset))
+    print(f"  written offsets: {[round(v, 3) for _, v in written_offset_points]}")
+
+    return {
+        "time_to_fall_rate_db_per_s": {
+            "points": fit_curve(written_pairs).points(),
+            "source": "direct_measurement_h0_equivalent_additive_corrected",
+        },
+        "high_to_fall_rate_db_per_s_offset": {
+            "points": Curve1D([p[0] for p in written_offset_points], [p[1] for p in written_offset_points]).points(),
+        },
+    }
+
+
 def _repool_fit_only_time_params(fitted_raw: dict) -> dict:
     """Rebuilds FIT_ONLY_TIME_PARAMS' Time curves by pooling ALL 9 fitted captures (not just
     High=0), regardless of build_curves.py's own H-timing-neutrality check outcome.
@@ -642,16 +800,16 @@ def main() -> None:
     # this script used the features.json name directly and silently created a NEW, differently-
     # named, unused curve instead of overwriting the one InhaltParameterMap actually reads -
     # caught by inspecting the generated header before wiring it into C++, not asserted.
-    # plateau_droop_db_per_s and t_knee_ms are deliberately NOT in this dict - see
-    # _build_plateau_droop_curves' and _build_t_knee_ms_curves' own docstrings for why pooling
-    # them the same naive way as tau_a_ms/fall_rate_db_per_s (which genuinely are close enough to
-    # H-neutral for this to be an honest compromise) was a real bug, not a stylistic choice.
-    points = {"tau_a_ms": [], "fall_rate_db_per_s": []}
+    # plateau_droop_db_per_s, t_knee_ms, and fall_rate_db_per_s are deliberately NOT in this dict -
+    # see _build_plateau_droop_curves', _build_t_knee_ms_curves', and _build_fall_rate_curves' own
+    # docstrings for why pooling them the same naive way as tau_a_ms (which genuinely is close
+    # enough to H-neutral for this to be an honest compromise) was a real bug, not a stylistic
+    # choice, for each of the other three.
+    points = {"tau_a_ms": []}
     for c in features["captures"]:
         t = c["params"]["time"]
         g = c["gate"]
         points["tau_a_ms"].append((t, g["build_up_ms"] * BUILD_UP_TO_TAU_A_FACTOR))
-        points["fall_rate_db_per_s"].append((t, g["fall_rate_db_per_s"]))
 
     print("Real-measurement-derived Time curves (H=-3 short-Time points pooled with H=0 longer-Time "
           "points - see module docstring):")
@@ -669,6 +827,7 @@ def main() -> None:
     curves.update(_build_tilt_gain_curves(features))
     curves.update(_build_t_knee_ms_curves(features))
     curves.update(_build_plateau_droop_curves(features, curves))
+    curves.update(_build_fall_rate_curves(features, curves))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "
@@ -687,15 +846,17 @@ def main() -> None:
         "feedback_gain, damping_weight_mean, and diffuser_gain are UNCHANGED from the fit - see "
         "build_measured_gate_curves.py's own module docstring for why those three were kept. The "
         "two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the "
-        "real capture set and are pooled into these Time-only curves alongside the High=0 points at "
-        "longer Time - an honest compromise (documented, not hidden), since findings.md found the "
-        "internal gate-shape breakdown is NOT as cleanly High-neutral as the overall "
-        "gate_length_ms_at_20db is."
+        "real capture set - tau_a_ms pools them straight into its Time-only curve alongside the "
+        "High=0 points at longer Time, an honest compromise (documented, not hidden), since "
+        "findings.md found the internal gate-shape breakdown is NOT as cleanly High-neutral as the "
+        "overall gate_length_ms_at_20db is. t_knee_ms/fall_rate_db_per_s/plateau_droop_db_per_s "
+        "instead correct those two Time settings via each parameter's own High-offset curve - see "
+        "their own _notes entries."
     )
     curves["_notes"]["plateau_droop_db_per_s_h0_only"] = (
         "time_to_plateau_droop_db_per_s / high_to_plateau_droop_db_per_s_offset are built by "
-        "_build_plateau_droop_curves, NOT pooled the way tau_a_ms/t_knee_ms/fall_rate_db_per_s are "
-        "in this module's own main() loop - a real bug found and fixed after a listening complaint "
+        "_build_plateau_droop_curves, NOT pooled the way tau_a_ms is in this module's own main() "
+        "loop - a real bug found and fixed after a listening complaint "
         "that turned out to be a gate-envelope issue, not the EQ/tank-topology issue it first "
         "looked like: pooling plateau_droop_db_per_s across ALL High values at a given Time (as an "
         "earlier version of this script did) corrupted the Time=9.8 High=0 baseline from its real "
@@ -713,6 +874,20 @@ def main() -> None:
         "combination model already used for plateau_droop_db_per_s. Built from only one Time "
         "setting's sweep (2-3 points), same Time-independence caveat as every other High-offset "
         "curve here."
+    )
+    curves["_notes"]["fall_rate_db_per_s_h0_only_additive_corrected"] = (
+        "time_to_fall_rate_db_per_s / high_to_fall_rate_db_per_s_offset are built by "
+        "_build_fall_rate_curves, NOT pooled the way tau_a_ms is in this module's own main() loop "
+        "- the same two bugs plateau_droop_db_per_s and t_knee_ms already had, never re-examined "
+        "for this parameter until a real 'the delay tail still isn't quite a match' listening "
+        "complaint prompted it. Bug 1 (naive High-pooling): Time=9.8's old curve value (-179.557dB/"
+        "s) was exactly the mean of its three real captures at High=0/-4/-9; Time=7.0's (-177.69) "
+        "was exactly the mean of its two. Bug 2 (additive-vs-total): fallRateDbPerSec is layered on "
+        "top of plateauDb(t), which never turns off at the knee, so what's written must be "
+        "target_fall_total minus this Time's own target_plateau_droop_total, not the raw target - "
+        "see _build_fall_rate_curves' and _FALL_RATE_CPP_VERIFIED_OVERRIDE's own docstrings for the "
+        "direct-measurement verification and the one known-unstable case (Time=2.2, kept at its "
+        "analytical estimate rather than chased further)."
     )
     curves["_notes"]["fit_only_time_params_repooled"] = (
         "feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms are re-pooled across all 9 "
