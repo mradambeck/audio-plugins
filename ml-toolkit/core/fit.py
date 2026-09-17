@@ -135,7 +135,8 @@ def _windowed_kurtosis(x: torch.Tensor, win: int, hop: int) -> torch.Tensor:
 
 
 def onset_density_loss(rendered: torch.Tensor, target: torch.Tensor, sample_rate: float,
-                        onset_ms: float = 20.0, win_ms: float = 10.0, hop_ms: float = 2.0) -> torch.Tensor:
+                        onset_ms: float = 20.0, win_ms: float = 10.0, hop_ms: float = 2.0,
+                        pre_emphasis: float = 0.0) -> torch.Tensor:
     """L1 loss on _windowed_kurtosis's differentiable diffuseness proxy, restricted to just the
     first `onset_ms` of rendered/target - the direct fit-time countermeasure to a real, ear-caught
     gap on effects/nonlin: the render's initial attack measured audibly and measurably thinner/
@@ -148,7 +149,25 @@ def onset_density_loss(rendered: torch.Tensor, target: torch.Tensor, sample_rate
     has no gradient, so it cannot be used as a loss term directly - windowed kurtosis measures a
     closely related property (departure from Gaussian/diffuse statistics) and IS differentiable,
     making it the fit-time stand-in. rendered/target: [..., num_samples], same convention as
-    stft_magnitude_loss (flatten batch/channel into the leading dims before calling)."""
+    stft_magnitude_loss (flatten batch/channel into the leading dims before calling).
+
+    `pre_emphasis` defaults to 0.0 (disabled) - a DELIBERATE, MEASURED reversal, not the naive
+    choice. core.features.onset_echo_density's own tilt-confound fix (see that function's
+    docstring) was tried here too on the reasonable hypothesis that the fit's diffuser_gain was
+    being pulled around by the same tilt-driven kurtosis bias. Tested at full scale (a real ~44min
+    refit, not just reasoning): it made things WORSE, not better - diffuser_gain converged to
+    0.57-0.64 (vs. 0.23-0.29 without pre-emphasis), driving the render's onset statistics to
+    within noise of the theoretical white-noise ceiling (~1.0 on the same pre-emphasized
+    onset_echo_density metric) while the real captures sit at ~0.45-0.50 even after the SAME
+    whitening. Measured mean onset-density error under the identical (correctly whitened) yardstick:
+    0.076 without loss-side pre-emphasis vs. 0.536 with it - keeping this default at 0.0 is the
+    empirically-better choice, even though decoupling the loss from the tilt confound was a
+    reasonable thing to try. Left adjustable (rather than removed) in case a future weight/
+    architecture change makes it worth retrying, but do not re-enable it without repeating this
+    same full-scale before/after check."""
+    if pre_emphasis:
+        rendered = rendered[..., 1:] - pre_emphasis * rendered[..., :-1]
+        target = target[..., 1:] - pre_emphasis * target[..., :-1]
     win = max(4, int(sample_rate * win_ms / 1000))
     hop = max(1, int(sample_rate * hop_ms / 1000))
     n_onset = max(win, int(sample_rate * onset_ms / 1000))

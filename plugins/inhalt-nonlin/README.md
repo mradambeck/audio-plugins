@@ -34,21 +34,33 @@ interpretation thresholds on both. Real, measured effect, not just "should help 
 
 | Metric (mean, all 9 captures) | Before diffuser | After |
 |---|---|---|
-| Onset NED signed error (0-20ms) | -0.153 (systematically too sparse) | +0.169 (mild overshoot, direction flipped) |
+| Onset NED signed error (0-20ms) | -0.153 | +0.076 |
 | Log-spectral distance (dB) | ~5.06 | 3.45 |
 | Spectral flatness error (dB) | 4.78 | 4.29 |
 
-At the flagship Time=2.2/High=0 setting specifically (the one compared by ear), onset density
-error dropped from -0.262 to +0.103 - a real fix for the complaint that prompted this work. Per-
-capture data shows the improvement is NOT uniform: long-Time/High=0 captures improved ~60%, but
-short-Time (0.1s/0.8s, High=-3 only in this capture set) and very-negative-High captures now
-OVERSHOOT (worse absolute error than before at those specific settings) - the single fitted
-diffuser gain doesn't yet vary with High the way the real hardware's own onset density apparently
-does. **Not an exact match yet** - flatness/grit remains flagged as a concern (4.29dB mean error,
-worse at negative High) and is the next thing to investigate, likely via a High-dependent diffuser
-gain or gain-stage, which the current 9-capture set doesn't have enough negative-High points at
-non-9.8s Time settings to fit reliably (same capture-coverage gap the gate-timing High-offset
-below already ran into).
+**A real confound was found and fixed along the way, not just the diffuser itself**: the render's
+onset-density error initially looked strongly High-dependent (~0.10 at High=0 vs. ~0.20-0.26 at
+High!=0), which looked like it needed a High-dependent diffuser gain. A direct A/B render test
+(tilt forced neutral vs. normal, same Time/High settings) proved this was almost entirely an
+artifact of `BandShelf`'s own tilt filter biasing the windowed onset-density statistic's effective
+degrees of freedom, NOT a real diffusion gap - with tilt forced neutral, three different High
+settings at the same Time produced IDENTICAL onset density. `core.features.onset_echo_density` now
+applies a first-order pre-emphasis/whitening filter (`pre_emphasis=0.95`) before measuring, which
+removes most of this confound (see that function's own docstring). Applying the SAME whitening to
+`core.fit.onset_density_loss` was tried next (a reasonable-looking fix) and tested at full scale -
+a real ~44min refit, not just reasoning - and made things WORSE: it drove the fitted `diffuser_gain`
+from 0.23-0.29 up to 0.57-0.64, overshooting the render's onset statistics to within noise of the
+theoretical white-noise ceiling. Reverted; `onset_density_loss`'s own `pre_emphasis` now defaults
+to 0.0, with the full before/after numbers (0.076 vs. 0.536 mean error under the identical
+corrected metric) recorded in its docstring as the reason. **Net result: the onset-density gap
+that motivated this whole investigation is now well within its own interpretation threshold**
+(0.076 vs. the 0.15 concern threshold) and the High=0/High!=0 split has shrunk from ~2-3x to a
+small, unflagged residual - a genuinely closed gap, not just a relabeled one.
+
+Spectral flatness/"grit" remains a flagged, open gap (4.29dB mean error, worse at negative High)
+and is the next thing to investigate - likely NOT via a High-dependent diffuser gain (the same
+tilt-confound risk applies there too, and hasn't been checked yet), so check for an analogous
+confound before assuming it needs a new fitted parameter.
 
 Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 

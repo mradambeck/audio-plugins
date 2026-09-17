@@ -12,8 +12,8 @@
 | Fall rate error (dB/s) | -99.141 | -75.785 | -117.826 |
 | Plateau droop error (dB/s) | -38.832 | -58.323 | -23.24 |
 | Build-up error (ms) | -20.362 | -15.782 | -24.027 |
-| Onset NED mean error (0-20ms) | 0.169 | 0.099 | 0.226 |
-| Onset NED first-window error | 0.067 | -0.005 | 0.126 |
+| Onset NED mean error (0-20ms) | 0.076 | 0.057 | 0.091 |
+| Onset NED first-window error | 0.122 | 0.155 | 0.096 |
 | Time-to-NED=0.9 error (ms) | -199.546 | -193.061 | -204.735 |
 | Mixing time error (ms) | -151.801 | -170.295 | -137.007 |
 | Mid/side ratio error (dB) | -0.006 | -0.005 | -0.006 |
@@ -25,10 +25,8 @@
 
 The following aggregate values exceed a threshold picked from the magnitude of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - worth listening to, not just noting:
 
-- **Onset NED mean error (0-20ms) (all)**: 0.169 exceeds +/-0.15 - the render's initial-attack density measurably diverges from the real hardware's - the exact 'thin/sparse attack' gap found by ear on this plugin's first pass.
 - **Spectral flatness error (dB) (all)**: 4.292 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
 - **Spectral flatness error (dB) (High=0)**: 2.074 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
-- **Onset NED mean error (0-20ms) (High!=0)**: 0.226 exceeds +/-0.15 - the render's initial-attack density measurably diverges from the real hardware's - the exact 'thin/sparse attack' gap found by ear on this plugin's first pass.
 - **Spectral flatness error (dB) (High!=0)**: 6.066 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
 - **Log-spectral distance (dB, unsigned) (High!=0)**: 4.128 exceeds +/-4.0 - overall tonal balance is audibly off, not just a narrow band - see the per-band table for where.
 - **Knee time error (ms) (High!=0)**: -34.004 exceeds +/-30.0 - the gate's fall doesn't land where the real hardware's does - audible as the wrong overall gate length.

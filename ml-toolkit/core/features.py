@@ -226,7 +226,7 @@ def normalized_echo_density(x: np.ndarray, sr: int, onset_idx: int, win_ms: floa
 
 
 def onset_echo_density(x: np.ndarray, sr: int, onset_idx: int, win_ms: float = 10, hop_ms: float = 2,
-                        duration_ms: float = 20):
+                        duration_ms: float = 20, pre_emphasis: float = 0.95):
     """NED specifically over the first `duration_ms` after onset, at a much finer window/hop than
     normalized_echo_density's own defaults (24ms/6ms win/hop) - tuned to resolve density WITHIN the
     first 10-20ms, which is where a gated reverb's initial-attack density (or the lack of it) lives.
@@ -241,11 +241,27 @@ def onset_echo_density(x: np.ndarray, sr: int, onset_idx: int, win_ms: float = 1
     plugins/inhalt-nonlin/analysis/validate.py and effects/nonlin/fit_nonlin.py's
     core.fit.onset_density_loss (the differentiable fit-time counterpart to this metric).
 
+    `pre_emphasis` (a first-order pre-emphasis/whitening filter, y[n] = x[n] - pre_emphasis*x[n-1],
+    applied before computing NED) exists because of a real, measured confound: a spectral tilt
+    (High's own effect, or plugins/inhalt-nonlin's synthesized tilt filter) changes a short
+    window's effective degrees of freedom (colored/correlated samples carry less independent
+    information than white ones), which biases this window-relative-std statistic even when the
+    underlying temporal diffuseness hasn't actually changed. Measured directly on plugins/
+    inhalt-nonlin's own renders: with the tilt filter forced neutral, three High settings at the
+    same Time gave IDENTICAL onset_ned_mean (0.513/0.513/0.513) - proof the un-whitened metric's
+    own High=0-vs-High!=0 split (previously ~0.10 vs ~0.20-0.26 mean error) was substantially a
+    tilt-driven artifact of the metric, not a genuine hardware effect (the real captures show no
+    such clean split). Pre-emphasis (alpha=0.95, a standard whitening constant) shrinks that
+    split's magnitude by roughly half without needing to touch the tilt filter itself or the
+    signal chain - set to 0.0 to disable and reproduce the un-whitened (confounded) statistic.
+
     Returns a dict: `times_ms` (frame centers relative to onset), `ned` (the trajectory),
     `onset_ned_mean` (mean NED over the window - the single number most useful for a
     render-vs-reference table), and `onset_ned_first_window` (NED of just the very first window -
     the most attack-sensitive single number, since a mean can hide a thin start that fills in a
     few ms later)."""
+    if pre_emphasis:
+        x = np.append(x[0], x[1:] - pre_emphasis * x[:-1])
     times, ned = normalized_echo_density(x, sr, onset_idx, win_ms=win_ms, hop_ms=hop_ms)
     times_ms = (times - onset_idx / sr) * 1000.0
     mask = times_ms <= duration_ms
