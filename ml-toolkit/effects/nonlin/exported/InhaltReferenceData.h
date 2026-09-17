@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         9a96b938f39c49c35f0fed403d809c70c7154e3c
+//   git commit:         a0275f1c22fbdf129b67828def8b6ae0824b2f5b
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-17
@@ -21,12 +21,12 @@ struct FittedPoint { float x; float y; };
 
 // time_to_t_knee_ms
 static constexpr std::array<FittedPoint, 6> time_to_t_knee_msPoints { {
-    { 0.1f, 125.102f },
-    { 0.8f, 127.143f },
+    { 0.1f, 59.25200000000001f },
+    { 0.8f, 61.293000000000006f },
     { 2.2f, 137.12f },
-    { 4.8f, 204.875f },
-    { 7.0f, 238.889f },
-    { 9.8f, 271.48133333333334f },
+    { 4.8f, 199.93200000000002f },
+    { 7.0f, 199.93200000000002f },
+    { 9.8f, 212.948f },
 } };
 static_assert(time_to_t_knee_msPoints.front().x <= time_to_t_knee_msPoints.back().x,
     "time_to_t_knee_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");

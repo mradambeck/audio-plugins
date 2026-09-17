@@ -71,13 +71,13 @@ struct TiltParams
 
 // Time knob (0.1-9.8, the hardware's own label scale - deliberately not seconds, see
 // PluginProcessor.h's timeKnobParamID comment) -> the gate envelope shape. Also depends on High
-// for plateauDroopDbPerSec specifically (findings.md found High redistributes energy loss between
-// the plateau and the post-knee fall while conserving the overall gate length - see that file's
-// "High: timing-NEUTRAL overall, but NOT damping-neutral" section). kneeTimeMs stays Time-only,
-// deliberately NOT given the same additive High offset - that was tried (a real, measured High
-// dependence exists at Time=9.8) and found NOT to generalize to short Time settings when actually
-// rendered and compared against the real captures (see InhaltParameterMap.cpp's own comment on
-// this specific reversal - a genuine "the data doesn't support this" finding, not an oversight).
+// for plateauDroopDbPerSec (findings.md found High redistributes energy loss between the plateau
+// and the post-knee fall while conserving the overall gate length - see that file's "High:
+// TIMING-neutral overall, but NOT damping-neutral" section) and for kneeTimeMs (a real, ear-caught
+// "reverb rings out too long at High=0" complaint traced to a genuine High-dependence at
+// Time=7.0/9.8 - see InhaltParameterMap.cpp's own comment on kneeTimeMs for the earlier, reverted
+// attempt at this and the double-counting bug that caused the regression, now fixed at the source
+// in build_measured_gate_curves.py's own _build_t_knee_ms_curves).
 // extrapolated, if non-null, is
 // set when either knob falls outside its own curves' measured range.
 GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated = nullptr) noexcept;

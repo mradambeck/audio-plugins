@@ -74,27 +74,31 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
 {
     static const auto timeToTauA = toCurve(wildjag::dsp::time_to_tau_a_msPoints);
     static const auto timeToKnee = toCurve(wildjag::dsp::time_to_t_knee_msPoints);
+    static const auto highToKneeOffset = toCurve(wildjag::dsp::high_to_t_knee_ms_offsetPoints);
     static const auto timeToFallRate = toCurve(wildjag::dsp::time_to_fall_rate_db_per_sPoints);
     static const auto timeToKneeSoftness = toCurve(wildjag::dsp::time_to_tau_k_msPoints);
     static const auto timeToDroopBaseline = toCurve(wildjag::dsp::time_to_plateau_droop_db_per_sPoints);
     static const auto highToDroopOffset = toCurve(wildjag::dsp::high_to_plateau_droop_db_per_s_offsetPoints);
 
-    bool tauAExtrapolated = false, kneeTimeExtrapolated = false,
+    bool tauAExtrapolated = false, kneeTimeExtrapolated = false, kneeHighExtrapolated = false,
          fallExtrapolated = false, softnessExtrapolated = false,
          droopTimeExtrapolated = false, droopHighExtrapolated = false;
 
     GateParams params;
     params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
-    // Time-only, deliberately NOT combined with high_to_t_knee_ms_offsetPoints (exported but
-    // unused) - that offset was measured only at Time=9.8 and, when tried here, made the two
-    // short-Time captures dramatically WORSE (knee error ~2-4ms -> ~91-93ms) while only
-    // moderately improving the long-Time ones it was measured from. The additive-offset,
-    // Time-independence assumption that works for plateau_droop_db_per_s and the tilt gains does
-    // NOT hold for this specific parameter - reverted after measuring the regression directly,
-    // not assumed. See build_measured_gate_curves.py's own comment on this curve for the numbers.
-    // A real fix needs a High sweep at a short Time setting, which the current 9-capture set
-    // doesn't have.
-    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeTimeExtrapolated);
+    // NOW combined with high_to_t_knee_ms_offsetPoints - a first attempt at this (Time-only
+    // baseline + offset, both taken at face value from their own separate measurements) was tried
+    // and REVERTED after it made the two short-Time captures dramatically WORSE (knee error
+    // ~2-4ms -> ~91-93ms): a real, ear-caught "reverb rings out too long at High=0" complaint led
+    // to tracing that regression to its actual root cause - the Time-only baseline was never a
+    // clean High=0 reference to begin with (Time=0.1s/0.8s only exist at High=-3 in the real
+    // capture set, so their raw H=-3 knee_time_ms was being pooled straight into the "Time-only"
+    // curve), so adding a further High-dependent offset on top double-counted that capture's own
+    // High=-3 effect. build_measured_gate_curves.py's own _build_t_knee_ms_curves now converts
+    // EVERY capture to an H=0-equivalent value (subtracting this same offset curve) before
+    // building the Time baseline, so the two are self-consistent and can be safely combined here.
+    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeTimeExtrapolated)
+        + highToKneeOffset.evaluate(highKnob, &kneeHighExtrapolated);
     params.fallRateDbPerSec = timeToFallRate.evaluate(timeKnob, &fallExtrapolated);
     params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
     // plateauDroopDbPerSec = time_to_plateau_droop_db_per_s(Time) [High=0 baseline, already
@@ -105,7 +109,7 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
         + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
 
     if (extrapolated != nullptr)
-        *extrapolated = tauAExtrapolated || kneeTimeExtrapolated
+        *extrapolated = tauAExtrapolated || kneeTimeExtrapolated || kneeHighExtrapolated
             || fallExtrapolated || softnessExtrapolated || droopTimeExtrapolated || droopHighExtrapolated;
     return params;
 }

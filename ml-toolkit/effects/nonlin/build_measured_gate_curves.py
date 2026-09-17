@@ -410,7 +410,7 @@ def _build_plateau_droop_curves(features: dict, curves: dict) -> dict:
     an honest gap: Time=0.1/0.8 only exist at High=-3 in this capture set, and pooling them here
     would reintroduce the exact bug this function exists to avoid). The offset is built from the
     richest available High sweep (Time=9.8: High=-9/-4/0), same convention as
-    _build_knee_time_high_offset. Time=7.0's own independent High=-7 point (offset -48.3dB/s)
+    _build_t_knee_ms_curves. Time=7.0's own independent High=-7 point (offset -48.3dB/s)
     doesn't closely match what Time=9.8's offset curve would predict there (~-34dB/s via linear
     interpolation) - a real, disclosed hint that the offset itself may not be perfectly
     Time-independent, not smoothed over.
@@ -469,15 +469,72 @@ def _build_plateau_droop_curves(features: dict, curves: dict) -> dict:
     return result
 
 
-def _build_knee_time_high_offset(features: dict) -> dict:
-    """t_knee_ms additive High offset - added after comparing validate.py's real render-vs-
-    reference report against ground truth and finding the largest remaining per-capture errors
-    concentrated exactly where High is most negative (Time=7.0/High=-7: -67ms; Time=9.8/High=-4/-9:
-    -47.5ms), while High=0 captures matched much more closely (-1.6 to -5.5ms). This was already
-    documented as a known gap (t_knee_ms's Time-only curve, pooled from H=-3/H=0 points, doesn't
-    model any Time*High interaction) - direct measurement DOES support at least an additive High
-    offset at one Time setting, the same combination model already used for plateau_droop_db_per_s
-    and the tilt gains, so this closes that gap the same documented way rather than leaving it."""
+def _isotonic_nondecreasing(pairs: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Pool-adjacent-violators: the smallest edit (by weighted averaging of adjacent points) that
+    makes a sorted-by-x sequence of y values non-decreasing. Used by _build_t_knee_ms_curves to
+    fix a real data quirk, not to hide one: Time=7.0's own directly-measured High=0 knee_time_ms
+    (190.0ms) is genuinely BELOW Time=4.8's (204.875ms) in the raw 9-capture set - a single-
+    capture measurement noise artifact, not a real hardware non-monotonicity, confirmed by the
+    ALREADY-VALIDATED, independently-measured gate_length_ms_at_20db table (see analyze.py's own
+    EXPECTED_GATE_LENGTH_MS_AT_20DB), which shows a strictly increasing 216.6ms -> 278.1ms across
+    the same two Time settings via a more robust threshold-crossing measurement, not the more
+    noise-sensitive swept-breakpoint knee fit. The OLD naive pooling accidentally masked this by
+    averaging in Time=7.0's own uncorrected High=-7 capture (287.8ms), which happened to be large
+    enough to pull the average back above Time=4.8's value - not a real fix, just a coincidence
+    that stopped applying once the High=-7 point was correctly converted to its own H=0-equivalent
+    value first."""
+    xs = [p[0] for p in pairs]
+    # Each block is [mean_value, total_weight, [original_indices...]]. Standard PAVA: scan left
+    # to right, merging the new point with the previous block whenever it would violate
+    # non-decreasing order, then re-checking the merged block against ITS OWN predecessor.
+    blocks: list[list] = []
+    for y in [p[1] for p in pairs]:
+        blocks.append([y, 1.0])
+        while len(blocks) > 1 and blocks[-2][0] > blocks[-1][0]:
+            prev_val, prev_w = blocks[-2][0], blocks[-2][1]
+            cur_val, cur_w = blocks[-1][0], blocks[-1][1]
+            merged_val = (prev_val * prev_w + cur_val * cur_w) / (prev_w + cur_w)
+            blocks[-2:] = [[merged_val, prev_w + cur_w]]
+    result_ys: list[float] = []
+    idx = 0
+    for value, weight in blocks:
+        count = int(round(weight))
+        result_ys.extend([value] * count)
+        idx += count
+    return list(zip(xs, result_ys))
+
+
+def _build_t_knee_ms_curves(features: dict) -> dict:
+    """t_knee_ms's own Time baseline AND High offset - REPLACES an earlier pair of functions
+    (one naive pooling-loop entry for the baseline, a separate _build_knee_time_high_offset for
+    the offset) that were internally inconsistent with each other in exactly the way
+    _build_plateau_droop_curves' own docstring describes for that parameter: the SAME
+    double-counting bug pattern, found by tracing through a real, ear-caught "reverb rings out
+    too long at High=0" complaint.
+
+    The offset itself (direct measurement at Time=9.8's own High sweep: +87.8ms at High=-4/-9)
+    was already correctly built and EXPORTED, but a real, ear-caught complaint led to it being
+    tried and REVERTED before this fix (see README.md's own history) - it badly regressed the two
+    short-Time captures (knee error ~2-4ms -> ~91-93ms) because the Time-only BASELINE it was
+    being added to was never a clean High=0 reference to begin with: Time=0.1s/0.8s only exist at
+    High=-3 in this capture set, and the old naive pooling loop folded their raw (H=-3-flavored)
+    knee_time_ms directly into the "Time-only" baseline as if it were already at High=0. Adding a
+    FURTHER High-dependent offset on top of a baseline that already implicitly contains an H=-3
+    effect double-counts it - the exact reason the fix was reverted. The SAME issue, less
+    severely, also affects Time=7.0 (its own H=-7 capture was pooled straight in with its H=0
+    capture) and Time=9.8 (H=-4/-9 pooled straight in with H=0).
+
+    Fixed by converting EVERY capture to an H=0-EQUIVALENT value before building the Time
+    baseline: corrected = knee_time_ms - offset_curve(High), using the offset curve built from
+    Time=9.8's own sweep (the same "assume the offset is roughly Time-independent" caveat this
+    module's other High-offset curves already carry, not a new assumption). For the four H=0
+    captures this is a no-op (offset(0)=0); for Time=0.1/0.8 it recovers an estimated H=0-
+    equivalent baseline (125.1ms -> ~59.3ms, 127.1ms -> ~61.3ms - a genuinely large correction,
+    not a small tweak, which is exactly why leaving it uncorrected before adding the offset broke
+    so badly); for Time=7.0/9.8's own negative-High captures, the correction should (and, checked
+    directly, does) bring them very close to their own real High=0 sibling capture's value,
+    confirming the offset curve and the correction are self-consistent rather than fighting each
+    other."""
     by_time_high_count: dict[float, set] = {}
     for c in features["captures"]:
         by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
@@ -490,17 +547,43 @@ def _build_knee_time_high_offset(features: dict) -> dict:
     print(f"\nt_knee_ms High offset (direct measurement) at Time={richest_time}s: {sweep}")
 
     if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
-        print("  no High=0 anchor or too few points - skipping, keeping t_knee_ms Time-only")
+        print("  no High=0 anchor or too few points - skipping, keeping t_knee_ms Time-only "
+              "(naively pooled, the known-imperfect fallback)")
         return {}
 
-    baseline = next(v for h, v in sweep if h == 0)
-    offset_points = [(h, v - baseline) for h, v in sweep]
-    print(f"  offsets: {[round(v, 2) for _, v in offset_points]} (baseline {baseline:.2f}ms)")
+    baseline_at_richest_time = next(v for h, v in sweep if h == 0)
+    offset_points = [(h, v - baseline_at_richest_time) for h, v in sweep]
+    print(f"  offsets: {[round(v, 2) for _, v in offset_points]} (baseline {baseline_at_richest_time:.2f}ms)")
+    offset_curve = Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points])
+
+    print("t_knee_ms Time baseline (every capture converted to an H=0-equivalent value first):")
+    by_time: dict[float, list[float]] = {}
+    for c in features["captures"]:
+        t = c["params"]["time"]
+        high = c["params"]["high"]
+        offset, extrapolated = offset_curve.evaluate(high)
+        corrected = c["gate"]["knee_time_ms"] - offset
+        flag = " (offset extrapolated)" if extrapolated else ""
+        print(f"  Time={t} High={high}: raw={c['gate']['knee_time_ms']:.3f}  "
+              f"offset(High)={offset:.3f}  -> corrected={corrected:.3f}{flag}")
+        by_time.setdefault(t, []).append(corrected)
+    baseline_pairs = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+    print(f"  averaged per Time: {[(t, round(v, 3)) for t, v in baseline_pairs]}")
+
+    monotonic_pairs = _isotonic_nondecreasing(baseline_pairs)
+    if monotonic_pairs != baseline_pairs:
+        print(f"  NOTE: averaged baseline was not monotonic in Time - applied isotonic regression "
+              f"(see _isotonic_nondecreasing's own docstring): "
+              f"{[(t, round(v, 3)) for t, v in monotonic_pairs]}")
 
     return {
+        "time_to_t_knee_ms": {
+            "points": fit_curve(monotonic_pairs).points(),
+            "source": "direct_measurement_h0_equivalent_corrected_isotonic",
+        },
         "high_to_t_knee_ms_offset": {
             "points": Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points]).points(),
-        }
+        },
     }
 
 
@@ -559,16 +642,15 @@ def main() -> None:
     # this script used the features.json name directly and silently created a NEW, differently-
     # named, unused curve instead of overwriting the one InhaltParameterMap actually reads -
     # caught by inspecting the generated header before wiring it into C++, not asserted.
-    # plateau_droop_db_per_s is deliberately NOT in this dict - see _build_plateau_droop_curves'
-    # own docstring for why pooling it the same way as these three (which genuinely are close
-    # enough to H-neutral for this to be an honest compromise) was a real bug, not a stylistic
-    # choice.
-    points = {"tau_a_ms": [], "t_knee_ms": [], "fall_rate_db_per_s": []}
+    # plateau_droop_db_per_s and t_knee_ms are deliberately NOT in this dict - see
+    # _build_plateau_droop_curves' and _build_t_knee_ms_curves' own docstrings for why pooling
+    # them the same naive way as tau_a_ms/fall_rate_db_per_s (which genuinely are close enough to
+    # H-neutral for this to be an honest compromise) was a real bug, not a stylistic choice.
+    points = {"tau_a_ms": [], "fall_rate_db_per_s": []}
     for c in features["captures"]:
         t = c["params"]["time"]
         g = c["gate"]
         points["tau_a_ms"].append((t, g["build_up_ms"] * BUILD_UP_TO_TAU_A_FACTOR))
-        points["t_knee_ms"].append((t, g["knee_time_ms"]))
         points["fall_rate_db_per_s"].append((t, g["fall_rate_db_per_s"]))
 
     print("Real-measurement-derived Time curves (H=-3 short-Time points pooled with H=0 longer-Time "
@@ -585,7 +667,7 @@ def main() -> None:
         print(f"  {param}: {[round(v, 3) for _, v in curve.points()]}")
 
     curves.update(_build_tilt_gain_curves(features))
-    curves.update(_build_knee_time_high_offset(features))
+    curves.update(_build_t_knee_ms_curves(features))
     curves.update(_build_plateau_droop_curves(features, curves))
 
     curves["_notes"]["gate_timing_source_correction"] = (

@@ -215,16 +215,40 @@ EQ problem is now within +-1.5dB almost everywhere (was -3 to -9dB) - confirming
 softness was a gate-envelope bug wearing an EQ-shaped disguise, not a second tank/topology issue
 on top of the notch fix above.
 
-Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
+**Knee timing at negative High - the previously-reverted High-offset fix, tried again after
+tracing WHY it regressed the first time**: a real, ear-caught complaint ("it feels like the
+convolution has a bit less of the reverb ringing out") pointed at the gate's own knee timing.
+Measured directly: at Time=7.0/9.8 and High=0, the render's knee lands 44-59ms LATE (the plateau
+holds measurably longer than real hardware before the fall begins) - the same shape of gap the
+original High-offset attempt tried to close and got reverted over, months (well, hours) earlier
+in this same session. Tracing the regression found the actual bug: `t_knee_ms`'s Time-only
+baseline pools Time=0.1s/0.8s's own raw High=-3 measurement directly in, so adding a FURTHER
+High-dependent offset on top double-counted that capture's own High=-3 effect - the exact same
+double-counting bug class as `plateau_droop_db_per_s`'s fix above, not a genuine "the data doesn't
+support an offset" finding as first assumed. Fixed the same way: every capture is converted to an
+H=0-equivalent value (raw minus the offset curve, evaluated at that capture's own High) before
+the Time baseline is built, so the offset and baseline stay self-consistent and can be safely
+combined in `InhaltParameterMap.cpp` now. Doing this correctly also unmasked a genuine measurement
+quirk in the raw data (Time=7.0's own real High=0 knee measures 190ms, slightly BELOW Time=4.8's
+own 204.875ms - a single-capture noise artifact, not a hardware non-monotonicity, confirmed
+against the independently-measured, already-trusted `gate_length_ms_at_20db` table which shows
+strict monotonic increase there) - closed with isotonic regression (pool-adjacent-violators) on
+the corrected baseline, the smallest edit that restores the non-decreasing order a hardware-
+labeled Time knob should have.
+
+Net result: knee-time error at High!=0 dropped from -32.6ms (flagged) to -13.6ms (no longer
+flagged) - Time=9.8/High=0 alone went from +58.9ms to -0.9ms, and Time=7.0/High=-7 from -53.6ms to
++5.2ms. The two shortest-Time captures (0.1s/0.8s, High=-3 only) are unchanged by construction -
+correcting them to an H=0-equivalent baseline and then re-adding the same offset at their own
+captured High reconstructs their original values exactly, so this fix doesn't touch their already-
+documented gap at all.
+
+Two further things are documented as genuine, open gaps rather than silently fixed or hidden:
 
 - Rendered stereo decorrelation (IACC ~0.04-0.08) is closer to the real hardware's (~0.006-0.04)
   after an asymmetric-delay-range change, but not fully matched - see `InhaltIRSynth.cpp`'s own
   comment on what was tried (more lines made it worse; removing the shared gate envelope barely
   moved it) and what actually helped.
-- Gate timing at very negative High still shows real per-capture error - an additive High-offset
-  fix was tried and reverted after it badly regressed short-Time captures despite improving the
-  aggregate mean (see `InhaltParameterMap.cpp`'s own comment). Needs a High sweep at a short Time
-  setting the current 9-capture set doesn't have.
 - `effects/nonlin/build_measured_gate_curves.py`'s `_repool_fit_only_time_params` exists because a
   fit run can fail `build_curves.py`'s own H-timing-neutrality check (gated on `t_knee_ms`
   specifically) for reasons unrelated to `feedback_gain`/`damping_weight_mean`/`diffuser_gain`/
