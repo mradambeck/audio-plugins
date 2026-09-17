@@ -115,6 +115,74 @@ def decorrelation_regularizer(rendered_stereo: torch.Tensor, target_correlation:
     return ((corr - target_correlation) ** 2).mean()
 
 
+def _windowed_kurtosis(x: torch.Tensor, win: int, hop: int) -> torch.Tensor:
+    """[..., num_windows] excess-kurtosis-like proxy per window: E[x^4]/E[x^2]^2 - 3, computed
+    batched and fully differentiably (no scipy bias-correction terms - only relative ordering and
+    render-vs-target agreement matter for a loss, not an unbiased population estimate). Assumes
+    each window's own mean is ~0, true for post-onset reverb energy. Lower kurtosis = closer to
+    Gaussian = denser/more diffuse - the same statistic core.features.mixing_time_ms already uses
+    as an independent diffuseness estimator, reimplemented here so it can carry a gradient."""
+    n = x.shape[-1]
+    n_windows = max(0, (n - win) // hop + 1)
+    if n_windows == 0:
+        return x.new_zeros(*x.shape[:-1], 0)
+    starts = torch.arange(n_windows, device=x.device) * hop
+    idx = starts[:, None] + torch.arange(win, device=x.device)[None, :]  # [n_windows, win]
+    frames = x[..., idx]  # [..., n_windows, win]
+    m2 = (frames ** 2).mean(dim=-1)
+    m4 = (frames ** 4).mean(dim=-1)
+    return m4 / (m2 ** 2 + 1e-12) - 3.0
+
+
+def onset_density_loss(rendered: torch.Tensor, target: torch.Tensor, sample_rate: float,
+                        onset_ms: float = 20.0, win_ms: float = 10.0, hop_ms: float = 2.0) -> torch.Tensor:
+    """L1 loss on _windowed_kurtosis's differentiable diffuseness proxy, restricted to just the
+    first `onset_ms` of rendered/target - the direct fit-time countermeasure to a real, ear-caught
+    gap on effects/nonlin: the render's initial attack measured audibly and measurably thinner/
+    less dense than the real hardware captures (core.features.normalized_echo_density climbing
+    ~0.02->0.12 over the first ~20ms on the render vs. the real captures' own near-flat ~0.38-0.43
+    from the first analysis frame - see core.features.onset_echo_density, the non-differentiable
+    analysis-side counterpart this loss is meant to agree with post-fit).
+
+    normalized_echo_density's own hard threshold (fraction of samples exceeding a window's std)
+    has no gradient, so it cannot be used as a loss term directly - windowed kurtosis measures a
+    closely related property (departure from Gaussian/diffuse statistics) and IS differentiable,
+    making it the fit-time stand-in. rendered/target: [..., num_samples], same convention as
+    stft_magnitude_loss (flatten batch/channel into the leading dims before calling)."""
+    win = max(4, int(sample_rate * win_ms / 1000))
+    hop = max(1, int(sample_rate * hop_ms / 1000))
+    n_onset = max(win, int(sample_rate * onset_ms / 1000))
+    rendered_k = _windowed_kurtosis(rendered[..., :n_onset], win, hop)
+    target_k = _windowed_kurtosis(target[..., :n_onset], win, hop)
+    return (rendered_k - target_k).abs().mean()
+
+
+def spectral_flatness_loss(rendered: torch.Tensor, target: torch.Tensor, fft_size: int = 512,
+                            hop: int | None = None) -> torch.Tensor:
+    """L1 loss on log spectral flatness (Wiener entropy: geometric_mean(|X|)/arithmetic_mean(|X|)
+    per STFT frame, in dB) between rendered and target - the differentiable fit-time proxy for the
+    "openness vs. grit" gap found by ear on effects/nonlin (plugins/inhalt-nonlin/analysis/
+    validate.py measured the render's own plateau flatness at -1.43dB vs. the real captures'
+    -3.77dB - a smoother, less resonant/textured spectrum than the real hardware's). Computed in
+    dB, log-domain, for the same scale-invariance reason stft_magnitude_loss's log term exists.
+    rendered/target: [..., num_samples]."""
+    if hop is None:
+        hop = fft_size // 4
+    window = torch.hann_window(fft_size, device=rendered.device)
+
+    def flatness_db(x: torch.Tensor) -> torch.Tensor:
+        flat = x.reshape(-1, x.shape[-1])
+        spec = torch.stft(flat, n_fft=fft_size, hop_length=hop, window=window, return_complex=True)
+        mag = _safe_complex_abs(spec) + 1e-8
+        log_mag = torch.log(mag)
+        geo_mean = torch.exp(log_mag.mean(dim=-2))
+        arith_mean = mag.mean(dim=-2)
+        flatness = geo_mean / (arith_mean + 1e-8)
+        return 10.0 * torch.log10(flatness + 1e-8)
+
+    return (flatness_db(rendered) - flatness_db(target)).abs().mean()
+
+
 def build_loss(spectral_weight: float = 1.0, envelope_weight: float = 1.0, fft_sizes: tuple[int, ...] = (512, 1024, 2048)):
     """Returns a loss_fn(rendered, target) -> scalar tensor combining the two terms above."""
 

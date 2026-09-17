@@ -58,6 +58,7 @@ from core.features import (  # noqa: E402
     mixing_time_ms,
     normalized_echo_density,
     octave_bands,
+    onset_echo_density,
     time_to_ned_threshold,
 )
 from core.io import load_audio_channels  # noqa: E402
@@ -141,6 +142,20 @@ def compare_one(capture: dict, render_path: str) -> dict:
         fall_err = signed_error(band_r[key]["fall_rate_db_per_s"], band_ref.get(key, {}).get("fall_rate_db_per_s"))
         band_errors[f"{key[0]:.0f}-{key[1]:.0f}Hz"] = {"droop_error": droop_err, "fall_rate_error": fall_err}
 
+    # Onset-specific density (fine window/hop, first 20ms only) - distinct from the coarser
+    # normalized_echo_density comparison below, which measures TIME-TO-full-diffuseness, not
+    # instantaneous density at the onset itself. Added after a real, ear-caught gap on this
+    # plugin's first render (a thin/sparse initial attack that the coarser metric's own aggregate
+    # didn't surface until checked at this finer resolution) - see core.features.
+    # onset_echo_density's own docstring and core.fit.onset_density_loss, the fit-time
+    # differentiable counterpart meant to catch this during the ML phase rather than after.
+    onset_density_r = onset_echo_density(render_mono, sr_r, onset_r)
+    onset_density_ref = onset_echo_density(ref_mono, sr_ref, onset_ref)
+    onset_ned_mean_error = signed_error(onset_density_r["onset_ned_mean"], onset_density_ref["onset_ned_mean"])
+    onset_ned_first_window_error = signed_error(
+        onset_density_r["onset_ned_first_window"], onset_density_ref["onset_ned_first_window"]
+    )
+
     ned_times_r, ned_r = normalized_echo_density(render_mono, sr_r, onset_r)
     ned_times_ref, ned_ref = normalized_echo_density(ref_mono, sr_ref, onset_ref)
     t_ned_r = time_to_ned_threshold(ned_times_r, ned_r)
@@ -188,6 +203,10 @@ def compare_one(capture: dict, render_path: str) -> dict:
         "high": capture["high"],
         "gate_errors": gate_errors,
         "band_errors": band_errors,
+        "onset_ned_mean_rendered": onset_density_r["onset_ned_mean"],
+        "onset_ned_mean_reference": onset_density_ref["onset_ned_mean"],
+        "onset_ned_mean_error": onset_ned_mean_error,
+        "onset_ned_first_window_error": onset_ned_first_window_error,
         "time_to_ned_0.9_error_ms": time_to_ned_error_ms,
         "mixing_time_error_ms": mixing_error_ms,
         "iacc_rendered": round(iacc_r, 4),
@@ -199,6 +218,46 @@ def compare_one(capture: dict, render_path: str) -> dict:
         "crest_factor_error_db": crest_error,
         "spectral_flatness_error_db": flatness_error,
     }
+
+
+# Interpretation thresholds - flags a concerning AGGREGATE value explicitly in the report instead
+# of leaving it sitting quietly in a table for someone to notice (or not) by eye. Added after this
+# plugin's first real render passed every existing metric's "looks plausible" bar while still
+# having an audible, ear-caught onset-density/tonal/texture gap - the numbers were all THERE in
+# validation_report.md, just not called out. Thresholds are a first pass, not a formal statistical
+# bound - picked from the magnitude of the real gap this plugin actually had (see
+# ml-toolkit/effects/nonlin/findings.md and this file's own onset_echo_density addition), meant to
+# catch a comparably-sized regression, not to certify perfection.
+CONCERN_THRESHOLDS: list[tuple[str, list[str], float, str]] = [
+    ("Onset NED mean error (0-20ms)", ["onset_ned_mean_error"], 0.15,
+     "the render's initial-attack density measurably diverges from the real hardware's - the "
+     "exact 'thin/sparse attack' gap found by ear on this plugin's first pass."),
+    ("Spectral flatness error (dB)", ["spectral_flatness_error_db"], 1.5,
+     "the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than "
+     "the real hardware - the qualitative 'openness vs. grit' complaint."),
+    ("Crest factor error (dB)", ["crest_factor_error_db"], 2.0,
+     "a texture mismatch consistent with the flatness gap above (a smoother/less peaky signal "
+     "usually has a lower crest factor too)."),
+    ("Log-spectral distance (dB, unsigned)", ["log_spectral_distance_db"], 4.0,
+     "overall tonal balance is audibly off, not just a narrow band - see the per-band table for "
+     "where."),
+    ("Knee time error (ms)", ["gate_errors", "knee_time_ms"], 30.0,
+     "the gate's fall doesn't land where the real hardware's does - audible as the wrong overall "
+     "gate length."),
+    ("Fall rate error (dB/s)", ["gate_errors", "fall_rate_db_per_s"], 300.0,
+     "the gate's post-knee fall is audibly too fast or too slow relative to the real hardware."),
+]
+
+
+def _flag_concerns(results: list[dict], group_label: str) -> list[str]:
+    """Returns human-readable flag lines for every CONCERN_THRESHOLDS metric whose aggregate
+    |value| exceeds its threshold on this group of results - empty list if nothing is flagged."""
+    flags = []
+    for label, path, threshold, interpretation in CONCERN_THRESHOLDS:
+        value = _aggregate(results, path)
+        if value is not None and abs(value) > threshold:
+            flags.append(f"**{label} ({group_label})**: {value} exceeds +/-{threshold} - {interpretation}")
+    return flags
 
 
 def _aggregate(results: list[dict], field_path: list[str]) -> float | None:
@@ -238,6 +297,8 @@ def write_report(results: list[dict]) -> None:
         ("Fall rate error (dB/s)", ["gate_errors", "fall_rate_db_per_s"]),
         ("Plateau droop error (dB/s)", ["gate_errors", "plateau_droop_db_per_s"]),
         ("Build-up error (ms)", ["gate_errors", "build_up_ms"]),
+        ("Onset NED mean error (0-20ms)", ["onset_ned_mean_error"]),
+        ("Onset NED first-window error", ["onset_ned_first_window_error"]),
         ("Time-to-NED=0.9 error (ms)", ["time_to_ned_0.9_error_ms"]),
         ("Mixing time error (ms)", ["mixing_time_error_ms"]),
         ("Mid/side ratio error (dB)", ["mid_side_ratio_error_db"]),
@@ -250,6 +311,24 @@ def write_report(results: list[dict]) -> None:
         for group in (all_results, h0_results, hneg_results):
             row.append(str(_aggregate(group, path)) if group else "-")
         lines.append("| " + " | ".join(row) + " |")
+    lines.append("")
+
+    lines.append("## Flagged concerns")
+    lines.append("")
+    all_flags = (
+        _flag_concerns(all_results, "all")
+        + _flag_concerns(h0_results, "High=0")
+        + _flag_concerns(hneg_results, "High!=0")
+    )
+    if all_flags:
+        lines.append("The following aggregate values exceed a threshold picked from the magnitude "
+                      "of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - "
+                      "worth listening to, not just noting:")
+        lines.append("")
+        for flag in all_flags:
+            lines.append(f"- {flag}")
+    else:
+        lines.append("None of the tracked metrics exceed their interpretation threshold.")
     lines.append("")
 
     lines.append("## Stereo (IACC, rendered vs. reference, per capture)")
@@ -297,6 +376,20 @@ def main() -> None:
     write_report(results)
     print(f"\nWrote {RESULTS_PATH}")
     print(f"Wrote {REPORT_PATH}")
+
+    h0_results = [r for r in results if r["high"] == 0]
+    hneg_results = [r for r in results if r["high"] != 0]
+    all_flags = (
+        _flag_concerns(results, "all")
+        + _flag_concerns(h0_results, "High=0")
+        + _flag_concerns(hneg_results, "High!=0")
+    )
+    if all_flags:
+        print(f"\n{len(all_flags)} concern(s) flagged (see validation_report.md's own section):")
+        for flag in all_flags:
+            print(f"  - {flag}")
+    else:
+        print("\nNo concerns flagged against the current thresholds.")
 
 
 if __name__ == "__main__":

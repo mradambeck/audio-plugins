@@ -125,6 +125,24 @@ public:
                 previous = gate.kneeTimeMs;
             }
         }
+
+        beginTest("mapTimeKnobToTankParams produces sane, in-range values across the whole Time range");
+        {
+            // diffuserGain in particular is a new fitted parameter (see InhaltParameterMap.h's own
+            // comment on why it exists) - this guards it lands in-range even if a future fit run
+            // pins it at an extreme raw value, the same ceiling InhaltIRSynth::render() itself
+            // clamps to defensively.
+            for (float t = 0.1f; t <= 9.8f; t += 0.5f)
+            {
+                const auto tank = InhaltParameterMap::mapTimeKnobToTankParams(t);
+                expect(std::isfinite(tank.feedbackGain) && tank.feedbackGain > 0.0f && tank.feedbackGain <= 0.95f,
+                    "feedbackGain must be finite and within (0, 0.95]");
+                expect(std::isfinite(tank.dampingWeight) && tank.dampingWeight > 0.0f && tank.dampingWeight <= 0.99f,
+                    "dampingWeight must be finite and within (0, 0.99]");
+                expect(std::isfinite(tank.diffuserGain) && tank.diffuserGain >= 0.0f && tank.diffuserGain <= 0.9f,
+                    "diffuserGain must be finite and within [0, 0.9]");
+            }
+        }
     }
 };
 

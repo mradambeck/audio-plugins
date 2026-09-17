@@ -6,10 +6,10 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         7ba502aee0b768c71f608ad3e91da88a7add8700
+//   git commit:         89927bc0cb921438c282132d168b54b367af304d
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
-//   fit date:           2026-09-16
+//   fit date:           2026-09-17
 //   ml-toolkit version: 0.1.0
 
 #include <array>
@@ -56,34 +56,52 @@ static_assert(time_to_fall_rate_db_per_sPoints.front().x <= time_to_fall_rate_db
     "time_to_fall_rate_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // time_to_tau_k_ms
-static constexpr std::array<FittedPoint, 4> time_to_tau_k_msPoints { {
-    { 2.2f, 1.3292268514633179f },
-    { 4.8f, 2.3301613330841064f },
-    { 7.0f, 1.0611255168914795f },
-    { 9.8f, 0.733187735080719f },
+static constexpr std::array<FittedPoint, 6> time_to_tau_k_msPoints { {
+    { 0.1f, 0.6691259145736694f },
+    { 0.8f, 0.3866204023361206f },
+    { 2.2f, 0.6921746134757996f },
+    { 4.8f, 29.764934539794922f },
+    { 7.0f, 4.533920884132385f },
+    { 9.8f, 2.4752639134724936f },
 } };
 static_assert(time_to_tau_k_msPoints.front().x <= time_to_tau_k_msPoints.back().x,
     "time_to_tau_k_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // time_to_feedback_gain
-static constexpr std::array<FittedPoint, 4> time_to_feedback_gainPoints { {
-    { 2.2f, 0.834037184715271f },
-    { 4.8f, 0.9084318280220032f },
-    { 7.0f, 0.8920376896858215f },
-    { 9.8f, 0.8931784629821777f },
+static constexpr std::array<FittedPoint, 6> time_to_feedback_gainPoints { {
+    { 0.1f, 0.9485952854156494f },
+    { 0.8f, 0.948706865310669f },
+    { 2.2f, 0.9476547241210938f },
+    { 4.8f, 0.9025763273239136f },
+    { 7.0f, 0.947564423084259f },
+    { 9.8f, 0.947330892086029f },
 } };
 static_assert(time_to_feedback_gainPoints.front().x <= time_to_feedback_gainPoints.back().x,
     "time_to_feedback_gainPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // time_to_damping_weight_mean
-static constexpr std::array<FittedPoint, 4> time_to_damping_weight_meanPoints { {
-    { 2.2f, 0.8367305994033813f },
-    { 4.8f, 0.8341593742370605f },
-    { 7.0f, 0.9624649882316589f },
-    { 9.8f, 0.9672797918319702f },
+static constexpr std::array<FittedPoint, 6> time_to_damping_weight_meanPoints { {
+    { 0.1f, 0.746536374092102f },
+    { 0.8f, 0.7334905862808228f },
+    { 2.2f, 0.8294105529785156f },
+    { 4.8f, 0.8682268857955933f },
+    { 7.0f, 0.8864913582801819f },
+    { 9.8f, 0.8854131102561951f },
 } };
 static_assert(time_to_damping_weight_meanPoints.front().x <= time_to_damping_weight_meanPoints.back().x,
     "time_to_damping_weight_meanPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_diffuser_gain
+static constexpr std::array<FittedPoint, 6> time_to_diffuser_gainPoints { {
+    { 0.1f, 0.24501697719097137f },
+    { 0.8f, 0.2507514953613281f },
+    { 2.2f, 0.262243390083313f },
+    { 4.8f, 0.22596129775047302f },
+    { 7.0f, 0.27080777287483215f },
+    { 9.8f, 0.25937453409036f },
+} };
+static_assert(time_to_diffuser_gainPoints.front().x <= time_to_diffuser_gainPoints.back().x,
+    "time_to_diffuser_gainPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 // time_to_plateau_droop_db_per_s
 static constexpr std::array<FittedPoint, 6> time_to_plateau_droop_db_per_sPoints { {
@@ -117,8 +135,8 @@ static_assert(high_to_tilt_high_gain_offsetPoints.front().x <= high_to_tilt_high
 
 // high_to_tilt_pivot_hz_offset
 static constexpr std::array<FittedPoint, 3> high_to_tilt_pivot_hz_offsetPoints { {
-    { -9.0f, -94.98828125f },
-    { -4.0f, 248.96728515625f },
+    { -9.0f, 17.556396484375f },
+    { -4.0f, 758.64599609375f },
     { 0.0f, 0.0f },
 } };
 static_assert(high_to_tilt_pivot_hz_offsetPoints.front().x <= high_to_tilt_pivot_hz_offsetPoints.back().x,
@@ -126,8 +144,8 @@ static_assert(high_to_tilt_pivot_hz_offsetPoints.front().x <= high_to_tilt_pivot
 
 // high_to_plateau_droop_db_per_s_offset
 static constexpr std::array<FittedPoint, 3> high_to_plateau_droop_db_per_s_offsetPoints { {
-    { -9.0f, -4.57720947265625f },
-    { -4.0f, -5.2156982421875f },
+    { -9.0f, 0.382293701171875f },
+    { -4.0f, -2.980316162109375f },
     { 0.0f, 0.0f },
 } };
 static_assert(high_to_plateau_droop_db_per_s_offsetPoints.front().x <= high_to_plateau_droop_db_per_s_offsetPoints.back().x,

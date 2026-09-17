@@ -225,6 +225,39 @@ def normalized_echo_density(x: np.ndarray, sr: int, onset_idx: int, win_ms: floa
     return times, ned
 
 
+def onset_echo_density(x: np.ndarray, sr: int, onset_idx: int, win_ms: float = 10, hop_ms: float = 2,
+                        duration_ms: float = 20):
+    """NED specifically over the first `duration_ms` after onset, at a much finer window/hop than
+    normalized_echo_density's own defaults (24ms/6ms win/hop) - tuned to resolve density WITHIN the
+    first 10-20ms, which is where a gated reverb's initial-attack density (or the lack of it) lives.
+    A wider window there averages across the whole thing it's meant to resolve, so a genuinely
+    sparse first few ms can be invisible in the coarser metric's own first frame or two.
+
+    Written to catch the specific gap plugins/inhalt-nonlin's first render had: qualitatively
+    described as "denser quality... in the initial attack" and "more gritty" missing from the
+    render (real captures measured near-flat NED ~0.38-0.43 from the very first analysis frame;
+    the render's own coarse NED only reached that range 80-120ms in). Meant to be called on both a
+    render and its reference capture and compared directly - see
+    plugins/inhalt-nonlin/analysis/validate.py and effects/nonlin/fit_nonlin.py's
+    core.fit.onset_density_loss (the differentiable fit-time counterpart to this metric).
+
+    Returns a dict: `times_ms` (frame centers relative to onset), `ned` (the trajectory),
+    `onset_ned_mean` (mean NED over the window - the single number most useful for a
+    render-vs-reference table), and `onset_ned_first_window` (NED of just the very first window -
+    the most attack-sensitive single number, since a mean can hide a thin start that fills in a
+    few ms later)."""
+    times, ned = normalized_echo_density(x, sr, onset_idx, win_ms=win_ms, hop_ms=hop_ms)
+    times_ms = (times - onset_idx / sr) * 1000.0
+    mask = times_ms <= duration_ms
+    windowed_ned = ned[mask]
+    return {
+        "times_ms": times_ms[mask],
+        "ned": windowed_ned,
+        "onset_ned_mean": float(np.mean(windowed_ned)) if len(windowed_ned) else None,
+        "onset_ned_first_window": float(windowed_ned[0]) if len(windowed_ned) else None,
+    }
+
+
 def time_to_ned_threshold(times: np.ndarray, ned: np.ndarray, threshold: float = 0.9, hold_frames: int = 3):
     """First time NED reaches `threshold` and STAYS there for `hold_frames` consecutive frames
     (a single frame crossing is common noise even for a genuinely sparse signal - requiring a

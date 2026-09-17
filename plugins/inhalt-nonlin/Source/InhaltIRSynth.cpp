@@ -32,6 +32,17 @@ const std::array<float, InhaltIRSynth::numLines> InhaltIRSynth::rightDelaysMs { 
     16.031746f, 17.891156f, 18.888889f, 21.337868f, 22.789116f, 25.011338f, 27.687075f, 29.954649f,
 } };
 
+// Input diffuser delays - directly from ml-toolkit/effects/nonlin/model.py's
+// DIFFUSER_DELAY_SAMPLES_AT_44K (53,79,115 samples @44.1kHz), converted to ms here for the same
+// any-session-rate scaling reason leftDelaysMs/rightDelaysMs are in ms. Empirically swept (see
+// that module's own comment) against the real captures' onset NED trajectory in a throwaway
+// Python prototype before being adopted as this chain's fixed topology - 3 stages at these delays
+// tracked the real captures' onset density shape far better than 1, 2, or 4 stages tried at the
+// same task.
+const std::array<float, InhaltIRSynth::numDiffuserStages> InhaltIRSynth::diffuserDelaysMs { {
+    1.201814f, 1.791383f, 2.607710f,
+} };
+
 // Same fixed 8x8 Hadamard matrix as AuraFDNEngine.h/ShieldsFDNEngine.h - Sylvester construction,
 // normalized by 1/sqrt(8) at the point of use (see processSample()).
 const std::array<std::array<float, InhaltIRSynth::numLines>, InhaltIRSynth::numLines> InhaltIRSynth::hadamard { {
@@ -114,6 +125,41 @@ float InhaltIRSynth::Tank::processSample(float input, float feedbackGain, float 
     return sum * tankNorm;
 }
 
+void InhaltIRSynth::Diffuser::prepare(const std::array<float, numDiffuserStages>& delayMs, double sampleRate)
+{
+    for (int i = 0; i < numDiffuserStages; ++i)
+    {
+        const auto maxDelaySamples = (int) std::ceil(delayMs[(size_t) i] * 0.001 * sampleRate) + 4;
+        stageBuffers[(size_t) i].setSize(maxDelaySamples);
+        stageDelaySamples[(size_t) i] = std::max(1, (int) std::round(delayMs[(size_t) i] * 0.001 * sampleRate));
+        stageBuffers[(size_t) i].reset();
+    }
+}
+
+void InhaltIRSynth::Diffuser::reset() noexcept
+{
+    for (auto& buffer : stageBuffers)
+        buffer.reset();
+}
+
+float InhaltIRSynth::Diffuser::processSample(float input, float gain) noexcept
+{
+    // Standard Schroeder allpass, chained in series: y = -g*(x + g*bufOut) + bufOut,
+    // buffer <- x + g*bufOut. Unity gain at every frequency (a diffuser, not a tone-shaping
+    // filter) - matches core.dsp_primitives.allpass_chain_transfer_function's per-stage transfer
+    // function A(z) = (-g + z^-D)/(1 - g*z^-D) exactly.
+    float x = input;
+    for (int i = 0; i < numDiffuserStages; ++i)
+    {
+        const auto bufOut = stageBuffers[(size_t) i].read(stageDelaySamples[(size_t) i] - 1);
+        const auto v = x + gain * bufOut;
+        const auto y = -gain * v + bufOut;
+        stageBuffers[(size_t) i].write(std::isfinite(v) ? v : 0.0f);
+        x = y;
+    }
+    return x;
+}
+
 namespace
 {
     // Numerically-stable softplus: log(1+exp(x)), computed to avoid overflow for large x (same
@@ -153,6 +199,10 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     leftTank.prepare(leftDelaysMs, sampleRate);
     rightTank.prepare(rightDelaysMs, sampleRate);
 
+    Diffuser diffuser;
+    diffuser.prepare(diffuserDelaysMs, sampleRate);
+    const auto diffuserGain = std::min(std::max(params.diffuserGain, 0.0f), 0.9f);
+
     const auto feedbackGain = std::min(std::max(params.feedbackGain, 0.0f), maxFeedbackGain);
     const auto dampingWeight = std::min(std::max(params.dampingWeight, 1e-6f), maxDampingWeight);
 
@@ -165,9 +215,10 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     for (int n = 0; n < numSamples; ++n)
     {
         const auto impulse = (n == 0) ? 1.0f : 0.0f;
+        const auto diffusedImpulse = diffuser.processSample(impulse, diffuserGain);
 
-        const auto tankL = leftTank.processSample(impulse, feedbackGain, dampingWeight);
-        const auto tankR = rightTank.processSample(impulse, feedbackGain, dampingWeight);
+        const auto tankL = leftTank.processSample(diffusedImpulse, feedbackGain, dampingWeight);
+        const auto tankR = rightTank.processSample(diffusedImpulse, feedbackGain, dampingWeight);
 
         // Input tilt - see the Params struct's own comment on why this is applied here, to the
         // closed-loop tank output, rather than recirculated inside the loop.

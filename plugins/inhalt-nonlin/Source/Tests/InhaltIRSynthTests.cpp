@@ -126,6 +126,69 @@ public:
                 "energy well past the knee (with a steep fall rate) should be crushed far below the pre-knee level");
         }
 
+        beginTest("Input diffuser measurably increases onset density vs. no diffuser");
+        {
+            // Guards the actual reason the diffuser chain exists: a real, ear-caught gap where
+            // this plugin's first render had a measurably thinner/sparser initial attack than the
+            // real hardware captures (see InhaltIRSynth.h's own comment and
+            // ml-toolkit/core.fit.onset_density_loss). Without a diffuser, a tank line's very
+            // first arrival is a single, isolated spike at exactly its own delay time; with the
+            // diffuser, that single spike is smeared into several arrivals scattered across the
+            // next few ms - this counts above-threshold samples in that window as a density proxy.
+            auto countActiveSamples = [](const std::vector<float>& buf, int start, int length, float thresholdFraction)
+            {
+                float peak = 0.0f;
+                for (int i = start; i < start + length && i < (int) buf.size(); ++i)
+                    peak = std::max(peak, std::abs(buf[(size_t) i]));
+                if (peak <= 0.0f)
+                    return 0;
+                int count = 0;
+                for (int i = start; i < start + length && i < (int) buf.size(); ++i)
+                    if (std::abs(buf[(size_t) i]) > peak * thresholdFraction)
+                        ++count;
+                return count;
+            };
+
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.85f;
+            params.dampingWeight = 0.4f;
+            params.kneeTimeMs = 300.0f;
+            params.fallRateDbPerSec = -50.0f; // slow fall - plenty of onset density to observe
+
+            params.diffuserGain = 0.0f;
+            std::vector<float> leftNoDiffuser, rightNoDiffuser;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.05 * sampleRate), leftNoDiffuser, rightNoDiffuser);
+
+            params.diffuserGain = 0.7f;
+            std::vector<float> leftWithDiffuser, rightWithDiffuser;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.05 * sampleRate), leftWithDiffuser, rightWithDiffuser);
+
+            // Left tank's earliest arrival is at its shortest delay line (~10.1ms @44.1kHz) - the
+            // window covers the 5ms right after that first arrival.
+            const auto windowStart = (int) (0.0101 * sampleRate);
+            const auto windowLength = (int) (0.005 * sampleRate);
+            const auto countNoDiffuser = countActiveSamples(leftNoDiffuser, windowStart, windowLength, 0.1f);
+            const auto countWithDiffuser = countActiveSamples(leftWithDiffuser, windowStart, windowLength, 0.1f);
+
+            expect(countWithDiffuser > countNoDiffuser,
+                "a diffused impulse should produce measurably MORE above-threshold samples in the "
+                "onset window than a bare impulse");
+        }
+
+        beginTest("Diffuser gain is clamped safely even if given out-of-range input");
+        {
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.8f;
+            params.dampingWeight = 0.4f;
+            params.diffuserGain = 5.0f; // well past the documented 0.9 ceiling
+
+            std::vector<float> left, right;
+            inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.2 * sampleRate), left, right);
+
+            expect(! hasNaNOrInf(left), "an out-of-range diffuser gain should still produce a finite, stable render");
+            expect(! hasNaNOrInf(right), "an out-of-range diffuser gain should still produce a finite, stable render");
+        }
+
         beginTest("No inter-sample discontinuity beyond a small tolerance, across the parameter range");
         {
             for (float feedbackGain : { 0.1f, 0.5f, inhalt::InhaltIRSynth::maxFeedbackGain })

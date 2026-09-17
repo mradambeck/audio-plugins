@@ -43,7 +43,14 @@ import numpy as np
 import torch
 
 from core.features import find_onset, gate_envelope_params
-from core.fit import decorrelation_regularizer, mid_side_stft_loss, stft_magnitude_loss, weighted_envelope_loss
+from core.fit import (
+    decorrelation_regularizer,
+    mid_side_stft_loss,
+    onset_density_loss,
+    spectral_flatness_loss,
+    stft_magnitude_loss,
+    weighted_envelope_loss,
+)
 from core.io import load_audio_channels, load_manifest
 from effects.nonlin.capture_schema import NONLIN_SCHEMA
 from effects.nonlin.model import (
@@ -77,6 +84,15 @@ SPECTRAL_WEIGHT = 1.0
 ENVELOPE_WEIGHT = 1.0
 MID_SIDE_WEIGHT = 1.0
 DECORRELATION_WEIGHT = 0.5
+
+# Added to catch the onset-density/"openness vs. grit" gap DURING fitting rather than after
+# building and listening to the plugin (the actual sequence that happened on the first pass here -
+# see core.fit.onset_density_loss/spectral_flatness_loss's own docstrings for the specific,
+# ear-caught symptom each term targets). Not yet swept against real data the way
+# TILT_REGULARIZATION_WEIGHT below eventually was - first values, re-sweep once a fit run with
+# these terms exists to compare against.
+ONSET_DENSITY_WEIGHT = 0.5
+FLATNESS_WEIGHT = 0.3
 
 # Added after the first real fit against findings.md's 9 captures: tilt_low_gain/tilt_high_gain
 # (unconstrained, not in the feedback loop) drifted up to 1.3-1.9 (neutral is 1.0) with no pull
@@ -187,6 +203,8 @@ def nonlin_loss(rendered: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     per_channel = (
         SPECTRAL_WEIGHT * stft_magnitude_loss(flat_rendered, flat_target)
         + ENVELOPE_WEIGHT * weighted_envelope_loss(flat_rendered, flat_target)
+        + ONSET_DENSITY_WEIGHT * onset_density_loss(flat_rendered, flat_target, FIT_SAMPLE_RATE)
+        + FLATNESS_WEIGHT * spectral_flatness_loss(flat_rendered, flat_target)
     )
     stereo = MID_SIDE_WEIGHT * mid_side_stft_loss(rendered, target)
     return per_channel + stereo
@@ -243,6 +261,7 @@ def main() -> None:
         fall_rate = model.fall_rate_db_per_s().squeeze(-1).tolist()
         tau_k_ms = (model.tau_k_s().squeeze(-1) * 1000.0).tolist()
         output_gain = model.output_gain.squeeze(-1).tolist()
+        diffuser_gain = model.diffuser_gain().squeeze(-1).tolist()
 
     records = []
     for i, m in enumerate(meta):
@@ -260,6 +279,7 @@ def main() -> None:
             "fall_rate_db_per_s": fall_rate[i],
             "tau_k_ms": tau_k_ms[i],
             "output_gain": output_gain[i],
+            "diffuser_gain": diffuser_gain[i],
         })
 
     with open(FITTED_RAW_PATH, "w") as fh:

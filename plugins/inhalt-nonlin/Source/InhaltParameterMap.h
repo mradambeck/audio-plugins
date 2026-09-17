@@ -48,6 +48,12 @@ struct TankParams
 {
     float feedbackGain = 0.78f;
     float dampingWeight = 0.5f;
+    // Input diffuser gain (see InhaltIRSynth.h's own comment on the allpass diffuser chain this
+    // feeds) - added to close a real, ear-caught onset-density gap ("denser quality... in the
+    // initial attack" / "more gritty" missing from the render vs. the real captures). Fitted
+    // jointly with feedback_gain/damping_weight_mean rather than hand-tuned, per
+    // core.fit.onset_density_loss - see that function's docstring.
+    float diffuserGain = 0.45f;
 };
 
 struct TiltParams

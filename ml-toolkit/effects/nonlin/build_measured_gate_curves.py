@@ -11,8 +11,8 @@ measurement instead" pattern this project's own AuraDecayGainData.h/AuraOnsetTil
 established as precedent - not a new kind of gap.
 
 KEPT from the fit (fitted_raw.json, via build_curves.py's own curves.json), NOT overwritten here:
-feedback_gain, damping_weight_mean, tilt_pivot_hz - none of these have as complete a direct-
-measurement replacement (the tank's internal density/damping isn't something core.features
+feedback_gain, damping_weight_mean, diffuser_gain, tilt_pivot_hz - none of these have as complete
+a direct-measurement replacement (the tank's internal density/damping isn't something core.features
 measures directly at all), and the fitted pivot values look physically plausible (clustering
 4200-4700Hz, consistent with this module's own earlier direct tilt_fit() estimate of ~4044Hz).
 
@@ -62,6 +62,17 @@ HERE = os.path.dirname(__file__)
 FEATURES_PATH = os.path.join(HERE, "features.json")
 CAPTURES_DIR = os.path.join(HERE, "captures")
 CURVES_PATH = os.path.join(HERE, "curves.json")
+FITTED_RAW_PATH = os.path.join(HERE, "fitted_raw.json")
+
+# The four params build_curves.py's own docstring says are "KEPT from the fit, not overwritten
+# here" - see this module's docstring. These are tank-density/topology-ish quantities (or, for
+# tau_k_ms, an unmeasured but still Time-varying one), not gate TIMING - build_curves.py's
+# H-timing-neutrality gate (checked against t_knee_ms specifically) shouldn't be the thing
+# deciding whether THESE curves get to pool the short-Time (0.1s/0.8s, High=-3-only) captures in.
+# Re-pooled here unconditionally, straight from fitted_raw.json, to restore low-Time coverage
+# whenever a fit run's own t_knee_ms happens to fail that unrelated neutrality check (see
+# _repool_fit_only_time_params's own docstring for the concrete bug this fixes).
+FIT_ONLY_TIME_PARAMS = ["feedback_gain", "damping_weight_mean", "diffuser_gain", "tau_k_ms"]
 
 # 1 - exp(-t/tau) = 10^(-3/20) at t = build_up_ms (gate_envelope_params()'s own "reached -3dB
 # below plateau" threshold) => tau = build_up_ms / -ln(1 - 10^(-3/20)).
@@ -175,9 +186,52 @@ def _build_knee_time_high_offset(features: dict) -> dict:
     }
 
 
+def _repool_fit_only_time_params(fitted_raw: dict) -> dict:
+    """Rebuilds FIT_ONLY_TIME_PARAMS' Time curves by pooling ALL 9 fitted captures (not just
+    High=0), regardless of build_curves.py's own H-timing-neutrality check outcome.
+
+    The concrete bug this fixes: build_curves.py groups every TIME_ONLY_PARAMS curve under ONE
+    shared "is H-timing-neutral" gate, checked against t_knee_ms's own spread across High at a
+    fixed Time. When that check passes, every TIME_ONLY_PARAMS curve (including these four) pools
+    all 9 captures, giving Time coverage down to 0.1s/0.8s (only available at High=-3). When it
+    fails - which happened on the fit run that added the onset-density/flatness loss terms
+    (core.fit.onset_density_loss/spectral_flatness_loss), shifting t_knee_ms's per-High
+    convergence enough to push the check's spread over its 10ms tolerance at Time=7.0/9.8 - EVERY
+    TIME_ONLY_PARAMS curve loses the 0.1s/0.8s points, including these four, which have nothing to
+    do with t_knee_ms's own neutrality. tau_a_ms/fall_rate_db_per_s/plateau_droop_db_per_s don't
+    feel this because they get overwritten by direct measurement above (which always pools
+    unconditionally); these four don't have that safety net, so a Time=0.1-9.8 knob position
+    querying feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms via
+    InhaltParameterMap::mapTimeKnobToTankParams's curve LINEARLY EXTRAPOLATES below the curve's
+    now-2.2s-only floor - and did, concretely: InhaltParameterMapTests caught tau_k_ms going
+    negative (kneeSoftnessMs must be finite and positive) and feedback_gain exceeding its own 0.95
+    ceiling at short Time knob values, both from extrapolating a steep 2.2s-4.8s slope backward.
+    InhaltIRSynth::render() clamps both defensively, so this was never audible, but an
+    out-of-documented-range value flowing quietly through an "extrapolated"-flagged path is
+    exactly the kind of gap this project's tests are meant to catch before it reaches a user."""
+    by_time: dict[float, dict[str, list[float]]] = {}
+    for c in fitted_raw["captures"]:
+        t = c["params"]["time"]
+        bucket = by_time.setdefault(t, {p: [] for p in FIT_ONLY_TIME_PARAMS})
+        for p in FIT_ONLY_TIME_PARAMS:
+            bucket[p].append(c[p])
+
+    result = {}
+    print("\nRe-pooled fit-only Time curves (all 9 captures, not gated on t_knee_ms's own "
+          "H-timing-neutrality check - see _repool_fit_only_time_params's own docstring):")
+    for p in FIT_ONLY_TIME_PARAMS:
+        pairs = sorted((t, sum(vals[p]) / len(vals[p])) for t, vals in by_time.items())
+        curve = fit_curve(pairs)
+        result[f"time_to_{p}"] = {"points": curve.points()}
+        print(f"  {p}: {[round(v, 4) for _, v in curve.points()]}")
+    return result
+
+
 def main() -> None:
     features = json.load(open(FEATURES_PATH))
     curves = json.load(open(CURVES_PATH))
+    fitted_raw = json.load(open(FITTED_RAW_PATH))
+    curves.update(_repool_fit_only_time_params(fitted_raw))
 
     # Dict keys here are the MODEL's own parameter names (matching build_curves.py's
     # TIME_ONLY_PARAMS/H_DEPENDENT_TIMING_PARAMS and InhaltParameterMap's field names), not
@@ -223,8 +277,8 @@ def main() -> None:
         "pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain and "
         "tilt_high_gain are ALSO replaced (same reasoning, see module docstring - the fit's "
         "TILT_REGULARIZATION_WEIGHT suppressed their real magnitude by roughly 2-3x). Only "
-        "feedback_gain, damping_weight_mean, and tilt_pivot_hz are UNCHANGED from the fit - see "
-        "build_measured_gate_curves.py's own module docstring for why those three were kept. The "
+        "feedback_gain, damping_weight_mean, diffuser_gain, and tilt_pivot_hz are UNCHANGED from the fit - see "
+        "build_measured_gate_curves.py's own module docstring for why those four were kept. The "
         "two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the "
         "real capture set and are pooled into these Time-only curves alongside the High=0 points at "
         "longer Time - an honest compromise (documented, not hidden), since findings.md found the "
@@ -239,6 +293,15 @@ def main() -> None:
         "combination model already used for plateau_droop_db_per_s. Built from only one Time "
         "setting's sweep (2-3 points), same Time-independence caveat as every other High-offset "
         "curve here."
+    )
+    curves["_notes"]["fit_only_time_params_repooled"] = (
+        "feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms are re-pooled across all 9 "
+        "fitted captures HERE (see _repool_fit_only_time_params), independent of build_curves.py's "
+        "own H-timing-neutrality gate (which checks t_knee_ms specifically, an unrelated "
+        "parameter) - a fit run can fail that check for reasons that have nothing to do with these "
+        "four, and did once (see that function's own docstring for the concrete "
+        "InhaltParameterMapTests failure this caused before the fix: tau_k_ms going negative and "
+        "feedback_gain exceeding 0.95 from extrapolating a curve missing its 0.1s/0.8s points)."
     )
     curves["_notes"]["tau_k_ms_not_measured"] = (
         "tau_k_ms (the gate's knee softness/transition width) has no direct measurement - "

@@ -57,6 +57,7 @@ import torch
 import torch.nn.functional as F_torch
 
 from core.dsp_primitives import (
+    allpass_chain_transfer_function,
     delay_transfer_function,
     hadamard_matrix,
     one_pole_transfer_function,
@@ -99,6 +100,23 @@ RIGHT_DELAY_SAMPLES_AT_44K = torch.tensor(
 # from AmbienceFDN's 0.985.
 MAX_FEEDBACK_GAIN = 0.95
 MAX_DAMPING_WEIGHT = 0.99
+
+# Input diffuser (Schroeder allpass chain, ahead of the tank - see core.dsp_primitives.
+# allpass_chain_transfer_function's own docstring for why this exists: a bare impulse into an
+# 8-line FDN measured a real onset-density gap against the real captures, confirmed both by ear
+# ("denser quality... in the initial attack" / "more gritty") and by
+# core.features.normalized_echo_density (render climbing ~0.02->0.12 over the first ~20ms vs. the
+# real captures' own near-flat ~0.38-0.43 from the first analysis frame).
+#
+# Delays are FIXED/non-learnable, chosen the same way the tank's own delay lines are (short,
+# mutually non-simple-ratio, empirically swept against the real captures' onset NED trajectory in
+# a throwaway prototype before being adopted here - a 3-stage chain matched the target's shape
+# far better than 1, 2, or 4 stages at the gains tried). ONE gain is learnable (shared across all
+# stages, same "fewer learnables than physical parameters" convention as everywhere else in this
+# module) so the fit - not a hand-picked constant - is what decides how much diffusion the real
+# captures actually need; see fit_nonlin.py's onset_density_loss for the objective driving it.
+DIFFUSER_DELAY_SAMPLES_AT_44K = torch.tensor([53.0, 79.0, 115.0])
+MAX_DIFFUSER_GAIN = 0.9
 
 # Input tilt pivot bounds - unlike AmbienceFDN's fixed 1kHz pivot, this is LEARNABLE (bounded to
 # this range) so the fit recovers the measured ~1-2kHz pivot from the data rather than being told
@@ -158,6 +176,7 @@ class NonLinGatedFDN(torch.nn.Module):
         self.sample_rate = sample_rate
         self.left_delay_samples = LEFT_DELAY_SAMPLES_AT_44K * (sample_rate / 44100.0)
         self.right_delay_samples = RIGHT_DELAY_SAMPLES_AT_44K * (sample_rate / 44100.0)
+        self.diffuser_delay_samples = DIFFUSER_DELAY_SAMPLES_AT_44K * (sample_rate / 44100.0)
         self.mixing_matrix = hadamard_matrix(NUM_LINES)
 
         # Tank (in feedback loop - bounded/sigmoid-reparameterized, per AmbienceFDN's own hard-
@@ -170,6 +189,12 @@ class NonLinGatedFDN(torch.nn.Module):
         # loss could.
         self.feedback_gain_raw = torch.nn.Parameter(torch.full((batch, 1), 1.5))
         self.damping_weight_raw = torch.nn.Parameter(torch.zeros(batch, NUM_LINES))
+
+        # Input diffuser gain (see DIFFUSER_DELAY_SAMPLES_AT_44K's own comment) - initialized at
+        # raw=0 (sigmoid(0)=0.5, effective ~0.45) rather than 0 gain, so the fit starts with SOME
+        # diffusion rather than needing to discover from a no-op that the onset-density loss wants
+        # any at all.
+        self.diffuser_gain_raw = torch.nn.Parameter(torch.zeros(batch, 1))
 
         # Input-stage tilt (NOT in the feedback loop - findings.md establishes H doesn't move
         # envelope timing, which is direct evidence the tilt sits outside the loop; an in-loop
@@ -223,6 +248,9 @@ class NonLinGatedFDN(torch.nn.Module):
     def tau_k_s(self) -> torch.Tensor:
         return _bounded_range(self.tau_k_raw, TAU_K_MIN_MS, TAU_K_MAX_MS) / 1000.0
 
+    def diffuser_gain(self) -> torch.Tensor:
+        return _bounded(self.diffuser_gain_raw, MAX_DIFFUSER_GAIN)
+
     # -- rendering -----------------------------------------------------------------------------
     def _pivot_weight(self) -> torch.Tensor:
         pivot_hz = self.tilt_pivot_hz().squeeze(-1)  # [B]
@@ -241,6 +269,10 @@ class NonLinGatedFDN(torch.nn.Module):
         Delta = delay_transfer_function(delay_samples.to(device), omega)  # [n_freq, L]
         Delta_b = Delta[None, :, :].expand(batch, -1, -1)
 
+        diffuser_response = allpass_chain_transfer_function(
+            self.diffuser_delay_samples.to(device), self.diffuser_gain().squeeze(-1), omega
+        )  # [B, n_freq]
+
         damping_weight = self.effective_damping_weight()
         Damp = one_pole_transfer_function(damping_weight, omega).transpose(-1, -2)  # [B, n_freq, L]
 
@@ -255,6 +287,7 @@ class NonLinGatedFDN(torch.nn.Module):
 
         ones_vec = torch.ones(batch, NUM_LINES, device=device, dtype=torch.complex64)
         rhs = (Delta_b * ones_vec[:, None, :]).unsqueeze(-1)
+        rhs = rhs * diffuser_response[:, :, None, None]
 
         Y = torch.linalg.solve(A, rhs)
         DampY = Damp_diag @ Y

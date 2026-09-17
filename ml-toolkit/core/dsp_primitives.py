@@ -101,6 +101,42 @@ def shelf_transfer_function(low_gain: torch.Tensor, high_gain: torch.Tensor, piv
     return low_gain[..., None] * lp + high_gain[..., None] * (1.0 - lp)
 
 
+def allpass_chain_transfer_function(delay_samples: torch.Tensor, gain: torch.Tensor, omega: torch.Tensor) -> torch.Tensor:
+    """Frequency response of a chain of Schroeder allpass diffusers in series - the standard
+    reverb input-diffusion stage (a handful of short allpasses ahead of the tank, breaking a bare
+    impulse into a dense train before it ever reaches the FDN). effects/nonlin/model.py's first
+    version fed the tank a bare impulse directly and measured a real, audible density gap against
+    real hardware captures in the first ~10-20ms (normalized_echo_density climbing from ~0.02 to
+    only ~0.12 over that window vs. the real captures' own ~0.38-0.43, essentially flat, from the
+    very first analysis frame) - this is the fix, applied to the impulse ONCE before it is
+    injected into each tank (see render_fdn_impulse_response's `input_diffuser_response` param).
+
+    Each stage: A(z) = (-g + z^-D) / (1 - g*z^-D), the standard Schroeder allpass (unity gain at
+    every frequency - a diffuser, not a tone-shaping filter). Stages are applied in series
+    (multiplied) - matches InhaltIRSynth.cpp's time-domain chain exactly, verified equal by
+    InhaltIRSynthTests' Python/C++ cross-check.
+
+    delay_samples: [num_stages] (fixed, non-learnable - the specific delay values are a topology
+        choice like the tank's own delay lines, not something the fit needs to discover).
+    gain: [] (scalar) or [batch] - the one learnable diffuser parameter, shared across every stage
+        (same convention as the rest of this module: fewer learnables than physical parameters).
+    omega: [n_freq].
+    Returns: complex [n_freq] if gain is a scalar, else [batch, n_freq].
+    """
+    phase = omega[None, :].to(torch.complex64) * delay_samples[:, None].to(torch.complex64)  # [num_stages, n_freq]
+    z_pow_neg = torch.exp(-1j * phase)  # z^-D per stage
+
+    if gain.ndim == 0:
+        g = gain.to(torch.complex64)
+        stage_response = (-g + z_pow_neg) / (1.0 - g * z_pow_neg)  # [num_stages, n_freq]
+        return stage_response.prod(dim=0)  # [n_freq]
+
+    g = gain.to(torch.complex64)[:, None, None]  # [batch, 1, 1]
+    z_pow_b = z_pow_neg[None, :, :]  # [1, num_stages, n_freq]
+    stage_response = (-g + z_pow_b) / (1.0 - g * z_pow_b)  # [batch, num_stages, n_freq]
+    return stage_response.prod(dim=1)  # [batch, n_freq]
+
+
 def render_fdn_impulse_response(
     delay_samples: torch.Tensor,
     feedback_gain: torch.Tensor,
@@ -108,6 +144,7 @@ def render_fdn_impulse_response(
     mixing_matrix: torch.Tensor,
     num_samples: int,
     input_gain: torch.Tensor | None = None,
+    input_diffuser_response: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Renders a fixed-topology FDN's impulse response via the frequency-sampling method (see
     module docstring) - no per-sample Python loop.
@@ -122,6 +159,11 @@ def render_fdn_impulse_response(
     mixing_matrix: [num_lines, num_lines] (fixed, e.g. hadamard_matrix(num_lines)).
     input_gain: optional [batch, num_lines] or [num_lines] gain applied to the impulse fed into
         each line (default: 1.0 into every line, as in ShieldsFDNEngine/IntruderFDNEngine).
+    input_diffuser_response: optional complex [n_freq] or [batch, n_freq] frequency response
+        (e.g. from allpass_chain_transfer_function) applied to the impulse ONCE, identically,
+        before it reaches every line - models an input diffuser stage ahead of the tank. Default
+        None preserves this function's exact prior behaviour (a bare impulse), which every
+        existing caller (effects/ambience) still relies on.
 
     Returns: real [batch, num_samples] impulse response.
     """
@@ -157,6 +199,12 @@ def render_fdn_impulse_response(
             impulse_vec = impulse_vec[None, :].expand(batch, -1)
     # D(z) @ impulse == elementwise Delta * impulse (D(z) is diagonal).
     rhs = (Delta_b * impulse_vec[:, None, :]).unsqueeze(-1)  # [batch, n_freq, L, 1]
+
+    if input_diffuser_response is not None:
+        diffuser = input_diffuser_response.to(device=device, dtype=torch.complex64)
+        if diffuser.ndim == 1:
+            diffuser = diffuser[None, :]  # [1, n_freq]
+        rhs = rhs * diffuser[:, :, None, None]
 
     Y = torch.linalg.solve(A, rhs)  # [batch, n_freq, L, 1]
     DampY = Damp_diag @ Y  # [batch, n_freq, L, 1]

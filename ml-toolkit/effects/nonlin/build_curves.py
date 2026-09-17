@@ -38,7 +38,7 @@ CURVES_PATH = os.path.join(HERE, "curves.json")
 
 TIME_ONLY_PARAMS = [
     "t_knee_ms", "tau_a_ms", "fall_rate_db_per_s", "tau_k_ms",
-    "feedback_gain", "damping_weight_mean",
+    "feedback_gain", "damping_weight_mean", "diffuser_gain",
 ]
 TONAL_PARAMS = ["tilt_low_gain", "tilt_high_gain", "tilt_pivot_hz"]
 # See module docstring - moved out of TIME_ONLY_PARAMS after findings.md measured this specific

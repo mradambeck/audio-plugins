@@ -23,7 +23,34 @@ and the full `ml-toolkit` test suite pass. `analysis/validate.py` (a real render
 comparison, not a synthetic check) is committed with current numbers in
 `analysis/validation_report.md`.
 
-Two things are documented as genuine, open gaps rather than silently fixed or hidden:
+**Onset density / tonal texture** (added after direct listening against the real IR captures found
+the render's initial attack thinner/less gritty than the real hardware): `model.py` and
+`InhaltIRSynth.cpp` now share a 3-stage Schroeder allpass input diffuser ahead of both tanks, with
+its gain FITTED (not hand-tuned) via two new loss terms in `fit_nonlin.py`
+(`core.fit.onset_density_loss`/`spectral_flatness_loss`, a differentiable windowed-kurtosis proxy
+and log spectral flatness respectively) - see `core.features.onset_echo_density` for the matching
+analysis-side metric and `analysis/validate.py`'s "Flagged concerns" section for automatic
+interpretation thresholds on both. Real, measured effect, not just "should help in theory":
+
+| Metric (mean, all 9 captures) | Before diffuser | After |
+|---|---|---|
+| Onset NED signed error (0-20ms) | -0.153 (systematically too sparse) | +0.169 (mild overshoot, direction flipped) |
+| Log-spectral distance (dB) | ~5.06 | 3.45 |
+| Spectral flatness error (dB) | 4.78 | 4.29 |
+
+At the flagship Time=2.2/High=0 setting specifically (the one compared by ear), onset density
+error dropped from -0.262 to +0.103 - a real fix for the complaint that prompted this work. Per-
+capture data shows the improvement is NOT uniform: long-Time/High=0 captures improved ~60%, but
+short-Time (0.1s/0.8s, High=-3 only in this capture set) and very-negative-High captures now
+OVERSHOOT (worse absolute error than before at those specific settings) - the single fitted
+diffuser gain doesn't yet vary with High the way the real hardware's own onset density apparently
+does. **Not an exact match yet** - flatness/grit remains flagged as a concern (4.29dB mean error,
+worse at negative High) and is the next thing to investigate, likely via a High-dependent diffuser
+gain or gain-stage, which the current 9-capture set doesn't have enough negative-High points at
+non-9.8s Time settings to fit reliably (same capture-coverage gap the gate-timing High-offset
+below already ran into).
+
+Three further things are documented as genuine, open gaps rather than silently fixed or hidden:
 
 - Rendered stereo decorrelation (IACC ~0.04-0.08) is closer to the real hardware's (~0.006-0.04)
   after an asymmetric-delay-range change, but not fully matched - see `InhaltIRSynth.cpp`'s own
@@ -33,6 +60,16 @@ Two things are documented as genuine, open gaps rather than silently fixed or hi
   fix was tried and reverted after it badly regressed short-Time captures despite improving the
   aggregate mean (see `InhaltParameterMap.cpp`'s own comment). Needs a High sweep at a short Time
   setting the current 9-capture set doesn't have.
+- `effects/nonlin/build_measured_gate_curves.py`'s `_repool_fit_only_time_params` exists because a
+  fit run can fail `build_curves.py`'s own H-timing-neutrality check (gated on `t_knee_ms`
+  specifically) for reasons unrelated to `feedback_gain`/`damping_weight_mean`/`diffuser_gain`/
+  `tau_k_ms`, silently losing their Time=0.1s/0.8s coverage and causing `InhaltParameterMap` to
+  linearly extrapolate those four parameters below Time=2.2s - concretely caught by
+  `InhaltParameterMapTests` (`tau_k_ms` went negative; `feedback_gain` exceeded its own 0.95
+  ceiling) when the new onset-density/flatness loss terms shifted the fit's `t_knee_ms`
+  convergence enough to flip that check. `InhaltIRSynth::render()`'s own defensive clamps meant
+  this was never audible, but it's a real architectural coupling worth knowing about before adding
+  another loss term that could shift `t_knee_ms` again.
 
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.

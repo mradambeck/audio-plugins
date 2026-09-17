@@ -92,13 +92,15 @@ TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated) noexcept
 {
     static const auto timeToFeedbackGain = toCurve(wildjag::dsp::time_to_feedback_gainPoints);
     static const auto timeToDamping = toCurve(wildjag::dsp::time_to_damping_weight_meanPoints);
+    static const auto timeToDiffuserGain = toCurve(wildjag::dsp::time_to_diffuser_gainPoints);
 
-    bool gainExtrapolated = false, dampingExtrapolated = false;
+    bool gainExtrapolated = false, dampingExtrapolated = false, diffuserExtrapolated = false;
     TankParams params;
     params.feedbackGain = timeToFeedbackGain.evaluate(timeKnob, &gainExtrapolated);
     params.dampingWeight = timeToDamping.evaluate(timeKnob, &dampingExtrapolated);
+    params.diffuserGain = timeToDiffuserGain.evaluate(timeKnob, &diffuserExtrapolated);
     if (extrapolated != nullptr)
-        *extrapolated = gainExtrapolated || dampingExtrapolated;
+        *extrapolated = gainExtrapolated || dampingExtrapolated || diffuserExtrapolated;
     return params;
 }
 

@@ -8,41 +8,55 @@
 
 | Metric | All | High=0 | High!=0 |
 |---|---|---|---|
-| Knee time error (ms) | -16.372 | 8.413 | -36.199 |
-| Fall rate error (dB/s) | -135.768 | -100.91 | -163.654 |
-| Plateau droop error (dB/s) | -70.535 | -76.615 | -65.671 |
-| Build-up error (ms) | -20.806 | -15.782 | -24.825 |
-| Time-to-NED=0.9 error (ms) | -175.316 | -122.721 | -245.442 |
-| Mixing time error (ms) | -77.245 | -89.728 | -64.762 |
-| Mid/side ratio error (dB) | 0.012 | 0.01 | 0.014 |
-| Log-spectral distance (dB, unsigned) | 5.064 | 3.885 | 6.008 |
-| Crest factor error (dB) | 0.684 | -0.039 | 1.262 |
-| Spectral flatness error (dB) | 4.784 | 2.302 | 6.769 |
+| Knee time error (ms) | -14.265 | 10.409 | -34.004 |
+| Fall rate error (dB/s) | -99.141 | -75.785 | -117.826 |
+| Plateau droop error (dB/s) | -38.832 | -58.323 | -23.24 |
+| Build-up error (ms) | -20.362 | -15.782 | -24.027 |
+| Onset NED mean error (0-20ms) | 0.169 | 0.099 | 0.226 |
+| Onset NED first-window error | 0.067 | -0.005 | 0.126 |
+| Time-to-NED=0.9 error (ms) | -199.546 | -193.061 | -204.735 |
+| Mixing time error (ms) | -151.801 | -170.295 | -137.007 |
+| Mid/side ratio error (dB) | -0.006 | -0.005 | -0.006 |
+| Log-spectral distance (dB, unsigned) | 3.446 | 2.592 | 4.128 |
+| Crest factor error (dB) | 0.015 | -0.755 | 0.631 |
+| Spectral flatness error (dB) | 4.292 | 2.074 | 6.066 |
+
+## Flagged concerns
+
+The following aggregate values exceed a threshold picked from the magnitude of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - worth listening to, not just noting:
+
+- **Onset NED mean error (0-20ms) (all)**: 0.169 exceeds +/-0.15 - the render's initial-attack density measurably diverges from the real hardware's - the exact 'thin/sparse attack' gap found by ear on this plugin's first pass.
+- **Spectral flatness error (dB) (all)**: 4.292 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Spectral flatness error (dB) (High=0)**: 2.074 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Onset NED mean error (0-20ms) (High!=0)**: 0.226 exceeds +/-0.15 - the render's initial-attack density measurably diverges from the real hardware's - the exact 'thin/sparse attack' gap found by ear on this plugin's first pass.
+- **Spectral flatness error (dB) (High!=0)**: 6.066 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Log-spectral distance (dB, unsigned) (High!=0)**: 4.128 exceeds +/-4.0 - overall tonal balance is audibly off, not just a narrow band - see the per-band table for where.
+- **Knee time error (ms) (High!=0)**: -34.004 exceeds +/-30.0 - the gate's fall doesn't land where the real hardware's does - audible as the wrong overall gate length.
 
 ## Stereo (IACC, rendered vs. reference, per capture)
 
 | File | IACC rendered | IACC reference | Coherence floor (r/ref) |
 |---|---|---|---|
-| NonLin_0.1s_-3H.wav | 0.0752 | 0.0057 | 0.3466 / 0.3466 |
-| NonLin_0.8s_-3H.wav | 0.0706 | 0.0056 | 0.3797 / 0.3797 |
-| NonLin_2.2s_0H.wav | 0.0431 | 0.0212 | 0.3492 / 0.3492 |
-| NonLin_4.8s_0H.wav | 0.0442 | 0.0394 | 0.3255 / 0.3255 |
-| NonLin_7.0s_-7H.wav | 0.0407 | 0.0115 | 0.2543 / 0.2543 |
-| NonLin_7.0s_0H.wav | 0.0487 | 0.0367 | 0.2375 / 0.2375 |
-| NonLin_9.8s_-4H.wav | 0.043 | 0.0158 | 0.2182 / 0.2182 |
-| NonLin_9.8s_-9H.wav | 0.0389 | 0.0089 | 0.2375 / 0.2375 |
-| NonLin_9.8s_0H.wav | 0.0489 | 0.0356 | 0.2298 / 0.2298 |
+| NonLin_0.1s_-3H.wav | 0.0663 | 0.0057 | 0.3466 / 0.3466 |
+| NonLin_0.8s_-3H.wav | 0.0644 | 0.0056 | 0.3797 / 0.3797 |
+| NonLin_2.2s_0H.wav | 0.0419 | 0.0212 | 0.3492 / 0.3492 |
+| NonLin_4.8s_0H.wav | 0.0437 | 0.0394 | 0.3255 / 0.3255 |
+| NonLin_7.0s_-7H.wav | 0.0357 | 0.0115 | 0.2543 / 0.2543 |
+| NonLin_7.0s_0H.wav | 0.0438 | 0.0367 | 0.2375 / 0.2375 |
+| NonLin_9.8s_-4H.wav | 0.0376 | 0.0158 | 0.2182 / 0.2182 |
+| NonLin_9.8s_-9H.wav | 0.035 | 0.0089 | 0.2375 / 0.2375 |
+| NonLin_9.8s_0H.wav | 0.0438 | 0.0356 | 0.2298 / 0.2298 |
 
 ## Per-capture gate errors
 
 | File | Knee error (ms) | Fall rate error (dB/s) | Droop error (dB/s) | Build-up error (ms) | LSD (dB) |
 |---|---|---|---|---|---|
-| NonLin_0.1s_-3H.wav | -13.016 | -286.27 | -116.033 | -16.009 | 7.34 |
-| NonLin_0.8s_-3H.wav | -15.057 | -283.14 | -100.322 | -18.05 | 6.88 |
-| NonLin_2.2s_0H.wav | -30.022 | -135.66 | -90.017 | -17.052 | 4.57 |
-| NonLin_4.8s_0H.wav | -14.966 | -88.71 | -65.012 | -15.964 | 3.3 |
-| NonLin_7.0s_-7H.wav | -61.95 | -79.33 | -28.087 | -30.022 | 5.32 |
-| NonLin_7.0s_0H.wav | 35.828 | -85.9 | -76.203 | -16.054 | 3.78 |
-| NonLin_9.8s_-4H.wav | -44.988 | -89.37 | -42.505 | -30.022 | 4.73 |
-| NonLin_9.8s_-9H.wav | -45.986 | -80.16 | -41.408 | -30.022 | 5.77 |
-| NonLin_9.8s_0H.wav | 42.812 | -93.37 | -75.227 | -14.059 | 3.89 |
+| NonLin_0.1s_-3H.wav | -9.025 | -205.5 | -37.071 | -15.011 | 4.67 |
+| NonLin_0.8s_-3H.wav | -11.066 | -205.66 | -34.231 | -17.052 | 4.54 |
+| NonLin_2.2s_0H.wav | -23.038 | -85.57 | -35.222 | -16.054 | 2.5 |
+| NonLin_4.8s_0H.wav | -16.961 | -81.28 | -75.744 | -16.962 | 3.28 |
+| NonLin_7.0s_-7H.wav | -58.957 | -55.32 | -5.886 | -29.024 | 3.93 |
+| NonLin_7.0s_0H.wav | 38.821 | -64.9 | -61.841 | -16.054 | 2.28 |
+| NonLin_9.8s_-4H.wav | -45.986 | -65.81 | -21.913 | -30.022 | 3.2 |
+| NonLin_9.8s_-9H.wav | -44.988 | -56.84 | -17.099 | -29.024 | 4.3 |
+| NonLin_9.8s_0H.wav | 42.812 | -71.39 | -60.485 | -14.059 | 2.31 |

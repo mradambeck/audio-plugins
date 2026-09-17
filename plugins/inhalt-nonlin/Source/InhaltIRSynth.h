@@ -53,9 +53,16 @@ public:
         float kneeTimeMs = 150.0f;
         float fallRateDbPerSec = -250.0f;
         float kneeSoftnessMs = 4.0f;
+
+        // Input diffuser (ahead of both tanks, shared - see the Diffuser struct's own comment).
+        // Fitted jointly with feedbackGain/dampingWeight, not hand-tuned - see
+        // ml-toolkit/effects/nonlin/model.py's DIFFUSER_DELAY_SAMPLES_AT_44K/MAX_DIFFUSER_GAIN and
+        // core.fit.onset_density_loss for why this exists and how it's fit.
+        float diffuserGain = 0.45f;
     };
 
     static constexpr int numLines = 8;
+    static constexpr int numDiffuserStages = 3;
 
     // Matches ml-toolkit/effects/nonlin/model.py's MAX_FEEDBACK_GAIN exactly - see that module's
     // "Feedback gain ceiling" docstring section for the empirical derivation (0.985, inherited
@@ -92,9 +99,27 @@ private:
         void reset() noexcept;
     };
 
+    // A short chain of Schroeder allpass diffusers, applied ONCE to the impulse before it feeds
+    // BOTH tanks identically (matches model.py's allpass_chain_transfer_function, applied to the
+    // shared `impulse_vec` rhs term before either tank's own solve - see that function's
+    // docstring for the full "why this exists" story: a bare impulse into an 8-line FDN measured a
+    // real, ear-caught onset-density gap against the real hardware captures). Delays are FIXED
+    // (topology, like the tank's own delay lines - not fitted); diffuserGain is the one fitted
+    // parameter, shared across every stage.
+    struct Diffuser
+    {
+        std::array<wildjag::dsp::CircularDelayBuffer, numDiffuserStages> stageBuffers;
+        std::array<int, numDiffuserStages> stageDelaySamples {};
+
+        void prepare(const std::array<float, numDiffuserStages>& delayMs, double sampleRate);
+        float processSample(float input, float gain) noexcept;
+        void reset() noexcept;
+    };
+
     static const std::array<float, numLines> leftDelaysMs;
     static const std::array<float, numLines> rightDelaysMs;
     static const std::array<std::array<float, numLines>, numLines> hadamard;
+    static const std::array<float, numDiffuserStages> diffuserDelaysMs;
 };
 
 } // namespace inhalt
