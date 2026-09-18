@@ -344,6 +344,44 @@ correctly much steeper, not the configured knee moving. Not independently re-ver
 C++ diagnostic the way the fall-rate fix itself was - a reasonable next step if a future listening
 pass finds the gate length itself (not just the tail's decay character) audibly off.
 
+**Smear investigation - tried, reverted, not shipped**: the "gate length itself audibly off"
+prediction above turned out right - a real "the Time knob doesn't align with the convolution
+anymore, and there's more smear than the real IRs" complaint followed. The smear half was traced
+to a genuine, measured gap: `core.features.mixing_time_ms` showed this tank reaching full
+statistical diffusion 54-280ms SOONER than the real hardware (confirmed via the actual kurtosis
+trajectory, not just the aggregate error - the real captures stay "grainy"/non-Gaussian for much
+longer). A uniformly-scaled-x2.2 delay-line set closed roughly half that gap (validated, with a
+full re-fit and re-derived plateau_droop/fall_rate overrides against the new tank) without
+reopening the earlier notch/IACC work - but on listening, it made the plugin sound "pretty off"
+overall despite the smear improvement, and didn't even fix the original Time-knob/decay complaint.
+**Reverted in full** (delay-line set, both re-fits, all re-derived overrides) back to this
+section's own committed fall_rate_db_per_s fix - "sounded better overall" beat a partial, costly
+win on one metric. The smear gap itself remains real and undocumented-as-fixed; a future attempt
+should probably not reach for delay-line topology first.
+
+**`earlyExcessDb` - the Time-knob/decay-timing complaint itself, addressed with a smaller,
+additive fix instead**: comparing a real capture's envelope directly against a straight-line
+extrapolation of its own `fall_rate_db_per_s` (rather than assuming a single dB/s rate is the
+whole story) showed the real post-knee fall is CURVED - `core.features.post_knee_excess_db`
+quantifies this directly: 20ms after the knee, 7 of 9 real captures sit 1-3.6dB BELOW where the
+straight line predicts (steeper-than-average initial drop), while the two captures with the
+shallowest knee (Time=7.0/9.8 at High=0) show the OPPOSITE, 1.8-2.1dB ABOVE it - a real,
+heterogeneous property of the hardware, not noise. `fallRateDbPerSec` alone (a single asymptotic
+rate, correctly calibrated against the deep-tail average) structurally can't represent this, so a
+new, small, ADDITIVE gate term was added instead of touching the tank topology: `earlyExcessDb`
+saturates smoothly to a fixed dB offset over `earlyExcessTauMs` (8ms, fixed, not per-Time
+calibrated) starting at the knee, then gets out of the way, leaving the already-verified deep-tail
+`fallRateDbPerSec` calibration untouched. Directly measured and Phase-4-calibrated per Time/High
+(same H0-equivalent-baseline-plus-offset architecture as `fall_rate_db_per_s`/`t_knee_ms`) -
+**no re-fit needed**, avoiding the exact cost/risk that made the delay-line attempt not worth it.
+Real, measured effect: mean absolute `gate_length_ms_at_20db` error (the actual Time-knob-
+alignment metric) improved from 26.15ms to 18.94ms across all 9 real captures (~28% reduction), 7
+of 9 settings improved (some substantially - Time=4.8 by ~24ms, Time=9.8/High=0 by ~11ms), and
+`validate.py`'s own concern list dropped the knee-time-error flag entirely (only the pre-existing
+spectral-flatness gap remains flagged). Two settings (Time=2.2, Time=7.0/High=-7) got measurably
+worse on `post_knee_excess_db` specifically despite the aggregate improving - not chased further
+this round, flagged here as a real, open residual rather than hidden.
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

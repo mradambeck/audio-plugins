@@ -209,13 +209,19 @@ namespace
         const auto tauA = std::max(p.buildUpMs, 0.001f) * 0.001f;
         const auto tauK = std::max(p.kneeSoftnessMs, 0.001f) * 0.001f;
         const auto tKnee = p.kneeTimeMs * 0.001f;
+        const auto tauEarly = std::max(p.earlyExcessTauMs, 0.001f) * 0.001f;
 
         const auto attackLin = std::max(1.0f - std::exp(-tSeconds / tauA), 1e-6f);
         const auto attackDb = 20.0f * std::log10(attackLin);
         const auto plateauDb = p.plateauDroopDbPerSec * tSeconds;
         const auto kneeDb = p.fallRateDbPerSec * tauK * softplus((tSeconds - tKnee) / tauK);
+        // Zero for t < tKnee (the max(...,0) guard keeps the exponent from blowing up there),
+        // saturating smoothly to earlyExcessDb for t well past the knee - see this field's own
+        // comment in InhaltIRSynth.h.
+        const auto earlyExcessDb = p.earlyExcessDb
+            * (1.0f - std::exp(-std::max(tSeconds - tKnee, 0.0f) / tauEarly));
 
-        return attackDb + plateauDb + kneeDb;
+        return attackDb + plateauDb + kneeDb + earlyExcessDb;
     }
 } // namespace
 

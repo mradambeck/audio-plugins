@@ -80,10 +80,13 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto timeToKneeSoftness = toCurve(wildjag::dsp::time_to_tau_k_msPoints);
     static const auto timeToDroopBaseline = toCurve(wildjag::dsp::time_to_plateau_droop_db_per_sPoints);
     static const auto highToDroopOffset = toCurve(wildjag::dsp::high_to_plateau_droop_db_per_s_offsetPoints);
+    static const auto timeToEarlyExcess = toCurve(wildjag::dsp::time_to_early_excess_dbPoints);
+    static const auto highToEarlyExcessOffset = toCurve(wildjag::dsp::high_to_early_excess_db_offsetPoints);
 
     bool tauAExtrapolated = false, kneeTimeExtrapolated = false, kneeHighExtrapolated = false,
          fallExtrapolated = false, fallHighExtrapolated = false, softnessExtrapolated = false,
-         droopTimeExtrapolated = false, droopHighExtrapolated = false;
+         droopTimeExtrapolated = false, droopHighExtrapolated = false,
+         earlyExcessTimeExtrapolated = false, earlyExcessHighExtrapolated = false;
 
     GateParams params;
     params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
@@ -116,10 +119,19 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // neutral" finding).
     params.plateauDroopDbPerSec = timeToDroopBaseline.evaluate(timeKnob, &droopTimeExtrapolated)
         + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
+    // Fixes a real "the decay and timing doesn't match the convolution" complaint that
+    // fallRateDbPerSec alone can't close: real captures' post-knee fall is CURVED, not a single
+    // constant dB/s rate - see build_measured_gate_curves.py's own _build_early_excess_curves
+    // docstring for the direct per-capture measurement this is built from, and InhaltIRSynth.h's
+    // own earlyExcessDb comment for what it does to the render. Same H0-equivalent-baseline-plus-
+    // offset combination as fallRateDbPerSec/kneeTimeMs directly above.
+    params.earlyExcessDb = timeToEarlyExcess.evaluate(timeKnob, &earlyExcessTimeExtrapolated)
+        + highToEarlyExcessOffset.evaluate(highKnob, &earlyExcessHighExtrapolated);
 
     if (extrapolated != nullptr)
         *extrapolated = tauAExtrapolated || kneeTimeExtrapolated || kneeHighExtrapolated
             || fallExtrapolated || fallHighExtrapolated || softnessExtrapolated
+            || earlyExcessTimeExtrapolated || earlyExcessHighExtrapolated
             || droopTimeExtrapolated || droopHighExtrapolated;
     return params;
 }

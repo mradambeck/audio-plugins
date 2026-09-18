@@ -44,6 +44,7 @@ struct GateParams
     float kneeTimeMs = 150.0f;
     float fallRateDbPerSec = -250.0f;
     float kneeSoftnessMs = 4.0f;
+    float earlyExcessDb = 0.0f;
 };
 
 struct TankParams

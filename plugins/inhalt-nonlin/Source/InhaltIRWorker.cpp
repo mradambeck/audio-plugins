@@ -68,6 +68,7 @@ namespace
         params.kneeTimeMs = gate.kneeTimeMs;
         params.fallRateDbPerSec = gate.fallRateDbPerSec;
         params.kneeSoftnessMs = gate.kneeSoftnessMs;
+        params.earlyExcessDb = gate.earlyExcessDb;
 
         const auto numSamples = (int) (irDurationSeconds * sampleRate);
         std::vector<float> left, right;

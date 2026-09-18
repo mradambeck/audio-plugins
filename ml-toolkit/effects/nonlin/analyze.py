@@ -44,6 +44,7 @@ from core.features import (
     modal_overlap_crossover_hz,
     normalized_echo_density,
     octave_bands,
+    post_knee_excess_db,
     resonant_peaks,
     stereo_gate_alignment,
     time_to_ned_threshold,
@@ -98,6 +99,9 @@ def analyze_nonlin_capture(channels: np.ndarray, sr: int) -> dict:
     onset_s = onset / sr
 
     gate = gate_envelope_params(mono, sr, onset)
+    gate["post_knee_excess_db"] = post_knee_excess_db(
+        mono, sr, onset, gate["knee_time_ms"], gate["fall_rate_db_per_s"]
+    )
     bands = octave_bands(sr=sr)
     band_gate = {f"{lo:.0f}-{hi:.0f}Hz": v for (lo, hi), v in band_gate_params(mono, sr, onset, bands).items()}
 

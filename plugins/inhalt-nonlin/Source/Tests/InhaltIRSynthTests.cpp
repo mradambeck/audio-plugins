@@ -126,6 +126,66 @@ public:
                 "energy well past the knee (with a steep fall rate) should be crushed far below the pre-knee level");
         }
 
+        beginTest("earlyExcessDb only affects the render at/after the knee, and pulls the level down there");
+        {
+            // Fixes a real "let's go back to trying to get it to have the same decay and timing
+            // as the convolution" complaint - real captures' post-knee fall is CURVED, not the
+            // single constant dB/s rate fallRateDbPerSec alone can represent (see
+            // InhaltIRSynth.h's own earlyExcessDb comment). Guards the two properties that make
+            // this a safe, additive extension rather than a regression risk: (1) it must be a
+            // pure no-op before the knee (attack/plateau region untouched), and (2) a negative
+            // value must measurably lower the level shortly after the knee.
+            inhalt::InhaltIRSynth::Params paramsNeutral;
+            paramsNeutral.feedbackGain = 0.85f;
+            paramsNeutral.dampingWeight = 0.4f;
+            paramsNeutral.buildUpMs = 3.0f;
+            paramsNeutral.kneeTimeMs = 100.0f;
+            paramsNeutral.fallRateDbPerSec = -150.0f;
+            paramsNeutral.kneeSoftnessMs = 3.0f;
+            paramsNeutral.earlyExcessDb = 0.0f;
+
+            auto paramsExcess = paramsNeutral;
+            paramsExcess.earlyExcessDb = -10.0f;
+            paramsExcess.earlyExcessTauMs = 8.0f;
+
+            const auto numSamples = (int) (0.5 * sampleRate);
+            std::vector<float> leftNeutral, rightNeutral, leftExcess, rightExcess;
+            inhalt::InhaltIRSynth::render(paramsNeutral, sampleRate, numSamples, leftNeutral, rightNeutral);
+            inhalt::InhaltIRSynth::render(paramsExcess, sampleRate, numSamples, leftExcess, rightExcess);
+
+            const auto beforeKneeSamples = (int) (0.08 * sampleRate); // well before the 100ms knee
+            bool identicalBeforeKnee = true;
+            for (int i = 0; i < beforeKneeSamples; ++i)
+            {
+                if (std::abs(leftNeutral[(size_t) i] - leftExcess[(size_t) i]) > 1.0e-7f)
+                {
+                    identicalBeforeKnee = false;
+                    break;
+                }
+            }
+            expect(identicalBeforeKnee,
+                "earlyExcessDb must be a pure no-op before the knee - it should not touch the attack/plateau region");
+
+            auto peakInWindow = [&](const std::vector<float>& buf, double centerSeconds, double windowSeconds)
+            {
+                const auto center = (int) (centerSeconds * sampleRate);
+                const auto half = (int) (windowSeconds * 0.5 * sampleRate);
+                const auto lo = std::max(0, center - half);
+                const auto hi = std::min((int) buf.size(), center + half);
+                float peak = 0.0f;
+                for (int i = lo; i < hi; ++i)
+                    peak = std::max(peak, std::abs(buf[(size_t) i]));
+                return peak;
+            };
+            // Shortly after the knee (within a couple of earlyExcessTauMs), the -10dB excess
+            // render should be measurably quieter than the neutral one.
+            const auto neutralShortlyAfterKnee = peakInWindow(leftNeutral, 0.115, 0.01);
+            const auto excessShortlyAfterKnee = peakInWindow(leftExcess, 0.115, 0.01);
+            expect(neutralShortlyAfterKnee > 0.0f, "should have energy shortly after the knee");
+            expect(excessShortlyAfterKnee < neutralShortlyAfterKnee * 0.5f,
+                "a -10dB earlyExcessDb should measurably lower the level shortly after the knee");
+        }
+
         beginTest("Direct/early tap measurably raises energy in the first ~1ms vs. the tank alone");
         {
             // Guards the actual reason the direct tap exists: a real, ear-caught complaint that

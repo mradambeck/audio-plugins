@@ -6,10 +6,10 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         2ad9da182d5fc61f4a87906cb3397a70c89da7c6
+//   git commit:         43d2059b8319ba736ee5c81e997fe5273077b630
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
-//   fit date:           2026-09-17
+//   fit date:           2026-09-18
 //   ml-toolkit version: 0.1.0
 
 #include <array>
@@ -157,5 +157,26 @@ static constexpr std::array<FittedPoint, 3> high_to_fall_rate_db_per_s_offsetPoi
 } };
 static_assert(high_to_fall_rate_db_per_s_offsetPoints.front().x <= high_to_fall_rate_db_per_s_offsetPoints.back().x,
     "high_to_fall_rate_db_per_s_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_early_excess_db
+static constexpr std::array<FittedPoint, 6> time_to_early_excess_dbPoints { {
+    { 0.1f, -5.98375f },
+    { 0.8f, -6.62075f },
+    { 2.2f, -3.1350000000000002f },
+    { 4.8f, -3.8870000000000005f },
+    { 7.0f, 0.7110000000000001f },
+    { 9.8f, 0.8810000000000002f },
+} };
+static_assert(time_to_early_excess_dbPoints.front().x <= time_to_early_excess_dbPoints.back().x,
+    "time_to_early_excess_dbPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_early_excess_db_offset
+static constexpr std::array<FittedPoint, 3> high_to_early_excess_db_offsetPoints { {
+    { -9.0f, -3.077f },
+    { -4.0f, -4.027f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_early_excess_db_offsetPoints.front().x <= high_to_early_excess_db_offsetPoints.back().x,
+    "high_to_early_excess_db_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 } // namespace wildjag::dsp

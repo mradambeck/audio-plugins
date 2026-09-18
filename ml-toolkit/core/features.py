@@ -427,6 +427,44 @@ def gate_envelope_params(x: np.ndarray, sr: int, onset_idx: int, win_ms: float =
     }
 
 
+def post_knee_excess_db(x: np.ndarray, sr: int, onset_idx: int, knee_time_ms: float,
+                         fall_rate_db_per_s: float, probe_ms: float = 20.0,
+                         win_ms: float = 5, hop_ms: float = 1) -> float | None:
+    """How far the envelope's level `probe_ms` after the knee sits from where a straight-line
+    extrapolation of fall_rate_db_per_s (gate_envelope_params()'s own whole-segment-average post-
+    knee slope) would place it - a signed dB value, negative meaning the real fall is STEEPER
+    right at the knee than its own long-run average suggests (the real captures' own actual
+    shape), positive meaning shallower.
+
+    Exists because fall_rate_db_per_s, by construction, is a SINGLE average slope over the whole
+    post-knee segment (knee to the -70dB floor) - correct for matching the long-run/deep-tail
+    decay character (see InhaltParameterMap's own fallRateDbPerSec calibration), but real NonLin
+    captures' post-knee fall is measurably CURVED, not a single constant rate: checked directly on
+    all 9 real captures, 7 of 9 show a steeper-than-average initial drop (this function returns
+    -1 to -3.6dB at 20ms) while the two captures with the shallowest knee (closest to the peak,
+    Time=7.0/9.8 at High=0) show the OPPOSITE, a shallower-than-average start (+1.8 to +2.1dB) -
+    a real, heterogeneous property of the hardware, not noise, which is why this needs its own
+    directly-measured, per-Time/High-calibrated correction term (InhaltIRSynth's own
+    earlyExcessDb) rather than a single universal constant.
+
+    Returns None if knee_time_ms or fall_rate_db_per_s is None, or there isn't enough audio past
+    the probe point."""
+    if knee_time_ms is None or fall_rate_db_per_s is None:
+        return None
+    idxs, rms_db = rms_envelope_db(x, sr, win_ms=win_ms, hop_ms=hop_ms)
+    if len(rms_db) == 0:
+        return None
+    t_ms = (idxs / sr - onset_idx / sr) * 1000.0
+    env = rms_db - np.max(rms_db)
+    if t_ms[-1] < knee_time_ms + probe_ms:
+        return None
+    level_at_knee = float(np.interp(knee_time_ms, t_ms, env))
+    probe_time_ms = knee_time_ms + probe_ms
+    level_at_probe = float(np.interp(probe_time_ms, t_ms, env))
+    asymptotic_level_at_probe = level_at_knee + fall_rate_db_per_s * (probe_ms / 1000.0)
+    return round(level_at_probe - asymptotic_level_at_probe, 3)
+
+
 # Octave bands, centre frequencies 63Hz-16kHz - the standard ISO set within this unit's
 # documented ~20Hz-18kHz bandwidth. Edges are centre * 2**(+-0.5) (one full octave wide).
 OCTAVE_BAND_CENTERS_HZ = (63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0)

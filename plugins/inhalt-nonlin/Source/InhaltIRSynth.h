@@ -54,6 +54,21 @@ public:
         float fallRateDbPerSec = -250.0f;
         float kneeSoftnessMs = 4.0f;
 
+        // Early-release excess (dB) - a SECOND, additive gate-shape term fixing a real gap
+        // fallRateDbPerSec/kneeSoftnessMs alone can't close: real captures' post-knee fall is
+        // CURVED, not a single constant dB/s rate - measured directly on the real captures (see
+        // build_measured_gate_curves.py's own _build_early_excess_curves docstring), the level
+        // 20ms after the knee sits earlyExcessDb dB BELOW (or, at two settings, above) where a
+        // pure straight-line extrapolation of fallRateDbPerSec's own asymptotic rate would put
+        // it - i.e. the real hardware's fall accelerates briefly right at the knee before
+        // settling into the slower, longer-term rate fallRateDbPerSec is calibrated against.
+        // Saturates smoothly to this fixed dB offset over earlyExcessTauMs (not an ongoing rate -
+        // it adds a one-time "kick" near the knee, then gets out of the way), so it doesn't
+        // disturb the already-verified deep-tail fallRateDbPerSec calibration. Zero by default -
+        // a neutral no-op matching this file's own convention for every other field here.
+        float earlyExcessDb = 0.0f;
+        float earlyExcessTauMs = 8.0f;
+
         // Input diffuser (ahead of both tanks - see the Diffuser struct's own comment; TWO
         // independent instances, one per channel, since the direct tap below reads their raw
         // output). Fitted jointly with feedbackGain/dampingWeight, not hand-tuned - see

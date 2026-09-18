@@ -745,6 +745,105 @@ def _build_fall_rate_curves(features: dict, curves: dict) -> dict:
     }
 
 
+# Hand-verified: InhaltIRSynth's OWN existing knee transition (kneeSoftnessMs/softplus, with
+# earlyExcessDb at its neutral default 0.0) already produces a small amount of curvature near the
+# knee on its own, before any new correction is added - this is that render's own "natural" post-
+# knee excess (core.features.post_knee_excess_db, measured directly via InhaltRenderIR at
+# earlyExcessDb=0.0f) at each of the 9 real capture settings, needed to correctly compute the
+# additive correction the same way _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE/
+# _FALL_RATE_CPP_VERIFIED_OVERRIDE do. Unlike those two, this isn't from an ongoing tank/gate
+# process (feedbackGain<1 or plateauDb(t) never turning off) - it's just kneeSoftnessMs's own
+# residual curvature - so it varies more with Time (0.22-6.07dB) than a "there's always some
+# amount of this" constant would suggest, tracking kneeSoftnessMs's own per-Time swings (Time=4.8
+# has an outlier 29.7ms tau_k_ms, for instance). Keyed by (time, high) rather than time alone,
+# since (unlike plateau_droop's own natural droop) this was measured at every one of the 9 real
+# capture settings directly, not needing per-Time interpolation.
+_EARLY_EXCESS_NATURAL_CPP_MEASURED = {
+    (0.1, -3): 5.58, (0.8, -3): 6.07, (2.2, 0): 0.22, (4.8, 0): 0.78,
+    (7.0, -7): 0.34, (7.0, 0): 0.60, (9.8, -4): 1.19, (9.8, -9): 1.21, (9.8, 0): 1.21,
+}
+
+
+def _build_early_excess_curves(features: dict) -> dict:
+    """earlyExcessDb's own Time baseline AND High offset - a NEW gate-shape term (see
+    InhaltIRSynth.h's own comment on the field), not a replacement for an existing bug, added
+    after a real "let's go back to trying to get it to have the same decay and timing as the
+    convolution" complaint (the Time-knob/gate-length alignment issue first found, then
+    deliberately deferred in favor of investigating a separate smear complaint - see README.md's
+    own history).
+
+    Root cause (found by comparing a real capture's envelope directly against what a straight-
+    line extrapolation of its own fall_rate_db_per_s would predict, not assumed): real NonLin
+    captures' post-knee fall is CURVED, not a single constant dB/s rate.
+    core.features.post_knee_excess_db quantifies this directly: 20ms after the knee, 7 of 9 real
+    captures sit -1 to -3.6dB BELOW what fall_rate_db_per_s's own straight-line average predicts
+    (a steeper-than-average initial drop) - but the two captures with the shallowest knee (closest
+    to the peak: Time=7.0/9.8 at High=0) show the OPPOSITE, +1.8 to +2.1dB ABOVE the line. A real,
+    heterogeneous property of the hardware (not noise - both same-Time/different-High pairs at
+    Time=7.0 and Time=9.8 show the same High=0-is-different pattern), which is exactly why this
+    needs a directly-measured, per-Time/High-calibrated correction rather than one constant.
+
+    Same additive-vs-total shape as plateau_droop_db_per_s/fall_rate_db_per_s: InhaltIRSynth's own
+    kneeSoftnessMs/softplus transition already contributes SOME curvature on its own (measured
+    directly per setting - see _EARLY_EXCESS_NATURAL_CPP_MEASURED's own comment), so what's
+    written must be target_excess minus that Time/High's own natural excess, not the raw target.
+
+    Same H0-equivalent-baseline-plus-offset architecture as _build_fall_rate_curves/
+    _build_t_knee_ms_curves (offset built from Time=9.8's own richest sweep; every capture
+    converted to an H0-equivalent WRITTEN value before averaging per Time) - see those functions'
+    own docstrings for why naive pooling across High would be wrong here too. No isotonic
+    regression applied (unlike t_knee_ms/fall_rate_db_per_s): this parameter has no physical
+    reason to be monotonic in Time, and the measured baseline (-6.6 to +0.9dB) isn't close to
+    monotonic, matching tau_a_ms's own simpler (no-monotonicity-assumed) convention instead."""
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+
+    written_by_time_high: dict[tuple[float, float], float] = {}
+    for c in features["captures"]:
+        t, h = c["params"]["time"], c["params"]["high"]
+        target = c["gate"]["post_knee_excess_db"]
+        natural = _EARLY_EXCESS_NATURAL_CPP_MEASURED.get((t, h))
+        if target is None or natural is None:
+            print(f"  Time={t} High={h}: no post_knee_excess_db target or natural override - skipping")
+            continue
+        written_by_time_high[(t, h)] = target - natural
+
+    sweep = sorted((h, v) for (t, h), v in written_by_time_high.items() if t == richest_time)
+    print(f"\nearly_excess_db High offset (written, target minus natural) at Time={richest_time}s: {sweep}")
+    if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
+        print("  no High=0 anchor or too few points - skipping early_excess_db entirely")
+        return {}
+
+    baseline_at_richest_time = next(v for h, v in sweep if h == 0)
+    offset_points = [(h, v - baseline_at_richest_time) for h, v in sweep]
+    print(f"  offsets: {[round(v, 3) for _, v in offset_points]} (baseline {baseline_at_richest_time:.3f}dB)")
+    offset_curve = Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points])
+
+    print("early_excess_db Time baseline (every capture converted to an H0-equivalent written value first):")
+    by_time: dict[float, list[float]] = {}
+    for (t, h), written in written_by_time_high.items():
+        offset, extrapolated = offset_curve.evaluate(h)
+        corrected = written - offset
+        flag = " (offset extrapolated)" if extrapolated else ""
+        print(f"  Time={t} High={h}: written={written:.3f}  offset(High)={offset:.3f}  "
+              f"-> H0_equivalent={corrected:.3f}{flag}")
+        by_time.setdefault(t, []).append(corrected)
+    baseline_pairs = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+    print(f"  averaged per Time: {[(t, round(v, 3)) for t, v in baseline_pairs]}")
+
+    return {
+        "time_to_early_excess_db": {
+            "points": fit_curve(baseline_pairs).points(),
+            "source": "direct_measurement_h0_equivalent_additive_corrected",
+        },
+        "high_to_early_excess_db_offset": {
+            "points": Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points]).points(),
+        },
+    }
+
+
 def _repool_fit_only_time_params(fitted_raw: dict) -> dict:
     """Rebuilds FIT_ONLY_TIME_PARAMS' Time curves by pooling ALL 9 fitted captures (not just
     High=0), regardless of build_curves.py's own H-timing-neutrality check outcome.
@@ -828,6 +927,7 @@ def main() -> None:
     curves.update(_build_t_knee_ms_curves(features))
     curves.update(_build_plateau_droop_curves(features, curves))
     curves.update(_build_fall_rate_curves(features, curves))
+    curves.update(_build_early_excess_curves(features))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "
@@ -888,6 +988,22 @@ def main() -> None:
         "see _build_fall_rate_curves' and _FALL_RATE_CPP_VERIFIED_OVERRIDE's own docstrings for the "
         "direct-measurement verification and the one known-unstable case (Time=2.2, kept at its "
         "analytical estimate rather than chased further)."
+    )
+    curves["_notes"]["early_excess_db_new_gate_term"] = (
+        "time_to_early_excess_db / high_to_early_excess_db_offset are a NEW gate-shape term (see "
+        "InhaltIRSynth.h's own earlyExcessDb comment), not a bug fix - added after a real 'let's "
+        "go back to trying to get it to have the same decay and timing as the convolution' "
+        "complaint. Root cause: real captures' post-knee fall is CURVED (core.features."
+        "post_knee_excess_db measures this directly), not the single constant dB/s rate "
+        "fall_rate_db_per_s alone can represent - 7 of 9 real captures fall measurably STEEPER "
+        "right at the knee than their own long-run average, but the two captures with the "
+        "shallowest knee (Time=7.0/9.8 at High=0) show the OPPOSITE. Built with the same "
+        "H0-equivalent-baseline-plus-offset architecture as fall_rate_db_per_s/t_knee_ms and the "
+        "same additive-vs-total correction (InhaltIRSynth's own kneeSoftnessMs transition already "
+        "contributes some curvature on its own - see _EARLY_EXCESS_NATURAL_CPP_MEASURED's own "
+        "comment for the direct C++ measurement this is corrected against). No isotonic "
+        "regression - unlike t_knee_ms/fall_rate_db_per_s, this parameter has no physical reason "
+        "to be monotonic in Time."
     )
     curves["_notes"]["fit_only_time_params_repooled"] = (
         "feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms are re-pooled across all 9 "
