@@ -75,18 +75,39 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto timeToTauA = toCurve(wildjag::dsp::time_to_tau_a_msPoints);
     static const auto timeToKnee = toCurve(wildjag::dsp::time_to_t_knee_msPoints);
     static const auto highToKneeOffset = toCurve(wildjag::dsp::high_to_t_knee_ms_offsetPoints);
-    static const auto timeToFallRate = toCurve(wildjag::dsp::time_to_fall_rate_db_per_sPoints);
-    static const auto highToFallRateOffset = toCurve(wildjag::dsp::high_to_fall_rate_db_per_s_offsetPoints);
     static const auto timeToKneeSoftness = toCurve(wildjag::dsp::time_to_tau_k_msPoints);
-    static const auto timeToDroopBaseline = toCurve(wildjag::dsp::time_to_plateau_droop_db_per_sPoints);
-    static const auto highToDroopOffset = toCurve(wildjag::dsp::high_to_plateau_droop_db_per_s_offsetPoints);
     static const auto timeToEarlyExcess = toCurve(wildjag::dsp::time_to_early_excess_dbPoints);
     static const auto highToEarlyExcessOffset = toCurve(wildjag::dsp::high_to_early_excess_db_offsetPoints);
 
+    // Per-band decay curves - REPLACED a single broadband time_to_plateau_droop_db_per_s/
+    // time_to_fall_rate_db_per_s pair (see InhaltIRSynth.h's own comment on
+    // Params::plateauDroopLowDbPerSec and build_measured_gate_curves.py's own
+    // _build_per_band_gate_curves docstring for the full story - one broadband rate structurally
+    // cannot represent real hardware's own per-band decay variation, and no tank dampingWeight
+    // value can reproduce it either). Same H0-equivalent-baseline-plus-offset combination as
+    // every other gate parameter here, just three times over.
+    static const auto timeToDroopLow = toCurve(wildjag::dsp::time_to_plateau_droop_low_db_per_sPoints);
+    static const auto highToDroopLowOffset = toCurve(wildjag::dsp::high_to_plateau_droop_low_db_per_s_offsetPoints);
+    static const auto timeToDroopMid = toCurve(wildjag::dsp::time_to_plateau_droop_mid_db_per_sPoints);
+    static const auto highToDroopMidOffset = toCurve(wildjag::dsp::high_to_plateau_droop_mid_db_per_s_offsetPoints);
+    static const auto timeToDroopHigh = toCurve(wildjag::dsp::time_to_plateau_droop_high_db_per_sPoints);
+    static const auto highToDroopHighOffset = toCurve(wildjag::dsp::high_to_plateau_droop_high_db_per_s_offsetPoints);
+    static const auto timeToFallLow = toCurve(wildjag::dsp::time_to_fall_rate_low_db_per_sPoints);
+    static const auto highToFallLowOffset = toCurve(wildjag::dsp::high_to_fall_rate_low_db_per_s_offsetPoints);
+    static const auto timeToFallMid = toCurve(wildjag::dsp::time_to_fall_rate_mid_db_per_sPoints);
+    static const auto highToFallMidOffset = toCurve(wildjag::dsp::high_to_fall_rate_mid_db_per_s_offsetPoints);
+    static const auto timeToFallHigh = toCurve(wildjag::dsp::time_to_fall_rate_high_db_per_sPoints);
+    static const auto highToFallHighOffset = toCurve(wildjag::dsp::high_to_fall_rate_high_db_per_s_offsetPoints);
+
     bool tauAExtrapolated = false, kneeTimeExtrapolated = false, kneeHighExtrapolated = false,
-         fallExtrapolated = false, fallHighExtrapolated = false, softnessExtrapolated = false,
-         droopTimeExtrapolated = false, droopHighExtrapolated = false,
-         earlyExcessTimeExtrapolated = false, earlyExcessHighExtrapolated = false;
+         softnessExtrapolated = false,
+         earlyExcessTimeExtrapolated = false, earlyExcessHighExtrapolated = false,
+         droopLowTimeExtrapolated = false, droopLowHighExtrapolated = false,
+         droopMidTimeExtrapolated = false, droopMidHighExtrapolated = false,
+         droopHighTimeExtrapolated = false, droopHighHighExtrapolated = false,
+         fallLowTimeExtrapolated = false, fallLowHighExtrapolated = false,
+         fallMidTimeExtrapolated = false, fallMidHighExtrapolated = false,
+         fallHighTimeExtrapolated = false, fallHighHighExtrapolated = false;
 
     GateParams params;
     params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
@@ -103,33 +124,23 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // building the Time baseline, so the two are self-consistent and can be safely combined here.
     params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeTimeExtrapolated)
         + highToKneeOffset.evaluate(highKnob, &kneeHighExtrapolated);
-    // NOW combined with high_to_fall_rate_db_per_s_offsetPoints, mirroring t_knee_ms's own
-    // architecture directly above: build_measured_gate_curves.py's _build_fall_rate_curves builds
-    // the Time-only baseline from every capture already converted to an H0-equivalent TARGET
-    // (subtracting this same offset curve first), so the two are self-consistent and can be
-    // safely combined here - see that function's own docstring for the two real bugs this fixes
-    // (naive High-pooling, and fallRateDbPerSec double-counting plateauDroopDbPerSec's own
-    // ongoing contribution past the knee).
-    // TEMPORARY: the same broadband value is assigned to all three decay bands below, as a
-    // deliberate placeholder pass-through until _build_per_band_gate_curves (or equivalent) exists
-    // and InhaltReferenceData.h carries real per-band Time/High curves - see InhaltIRSynth.h's own
-    // comment on why the single broadband rate was replaced with three in the render engine. This
-    // keeps the render mathematically IDENTICAL to the pre-multiband-gate commit whenever all
-    // three bands share one value (the crossover split-then-sum is exact for identically-gated
-    // bands - see InhaltIRSynth.cpp's own comment), so this is a safe, verifiable intermediate
-    // state, not a silent regression.
-    const auto fallRateBroadband = timeToFallRate.evaluate(timeKnob, &fallExtrapolated)
-        + highToFallRateOffset.evaluate(highKnob, &fallHighExtrapolated);
-    params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = fallRateBroadband;
     params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
-    // plateauDroopDbPerSec = time_to_plateau_droop_db_per_s(Time) [High=0 baseline, already
-    // absolute - see time_to_plateau_droop_db_per_sPoints' own values] + high offset (zero-
-    // anchored at High=0, per findings.md's "High: timing-NEUTRAL overall, but NOT damping-
-    // neutral" finding).
-    const auto plateauDroopBroadband = timeToDroopBaseline.evaluate(timeKnob, &droopTimeExtrapolated)
-        + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
-    params.plateauDroopLowDbPerSec = params.plateauDroopMidDbPerSec = params.plateauDroopHighDbPerSec
-        = plateauDroopBroadband;
+    // Per-band droop/fall - each pair follows the SAME H0-equivalent-baseline-plus-offset
+    // combination as t_knee_ms/fall_rate_db_per_s above (High offset added on top of a Time
+    // baseline that was itself built by converting every capture to an H0-equivalent value first
+    // - see _build_per_band_gate_curves' own docstring), just once per band.
+    params.plateauDroopLowDbPerSec = timeToDroopLow.evaluate(timeKnob, &droopLowTimeExtrapolated)
+        + highToDroopLowOffset.evaluate(highKnob, &droopLowHighExtrapolated);
+    params.plateauDroopMidDbPerSec = timeToDroopMid.evaluate(timeKnob, &droopMidTimeExtrapolated)
+        + highToDroopMidOffset.evaluate(highKnob, &droopMidHighExtrapolated);
+    params.plateauDroopHighDbPerSec = timeToDroopHigh.evaluate(timeKnob, &droopHighTimeExtrapolated)
+        + highToDroopHighOffset.evaluate(highKnob, &droopHighHighExtrapolated);
+    params.fallRateLowDbPerSec = timeToFallLow.evaluate(timeKnob, &fallLowTimeExtrapolated)
+        + highToFallLowOffset.evaluate(highKnob, &fallLowHighExtrapolated);
+    params.fallRateMidDbPerSec = timeToFallMid.evaluate(timeKnob, &fallMidTimeExtrapolated)
+        + highToFallMidOffset.evaluate(highKnob, &fallMidHighExtrapolated);
+    params.fallRateHighDbPerSec = timeToFallHigh.evaluate(timeKnob, &fallHighTimeExtrapolated)
+        + highToFallHighOffset.evaluate(highKnob, &fallHighHighExtrapolated);
     // Fixes a real "the decay and timing doesn't match the convolution" complaint that
     // fallRateDbPerSec alone can't close: real captures' post-knee fall is CURVED, not a single
     // constant dB/s rate - see build_measured_gate_curves.py's own _build_early_excess_curves
@@ -141,9 +152,13 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
 
     if (extrapolated != nullptr)
         *extrapolated = tauAExtrapolated || kneeTimeExtrapolated || kneeHighExtrapolated
-            || fallExtrapolated || fallHighExtrapolated || softnessExtrapolated
-            || earlyExcessTimeExtrapolated || earlyExcessHighExtrapolated
-            || droopTimeExtrapolated || droopHighExtrapolated;
+            || softnessExtrapolated || earlyExcessTimeExtrapolated || earlyExcessHighExtrapolated
+            || droopLowTimeExtrapolated || droopLowHighExtrapolated
+            || droopMidTimeExtrapolated || droopMidHighExtrapolated
+            || droopHighTimeExtrapolated || droopHighHighExtrapolated
+            || fallLowTimeExtrapolated || fallLowHighExtrapolated
+            || fallMidTimeExtrapolated || fallMidHighExtrapolated
+            || fallHighTimeExtrapolated || fallHighHighExtrapolated;
     return params;
 }
 

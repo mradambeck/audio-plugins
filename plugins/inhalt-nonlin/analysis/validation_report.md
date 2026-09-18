@@ -8,89 +8,87 @@
 
 | Metric | All | High=0 | High!=0 |
 |---|---|---|---|
-| Knee time error (ms) | -13.29 | -25.351 | -3.642 |
-| Fall rate error (dB/s) | -14.43 | -12.838 | -15.704 |
-| Plateau droop error (dB/s) | 37.667 | 50.506 | 27.397 |
-| Build-up error (ms) | -11.96 | -5.895 | -16.812 |
-| Onset NED mean error (0-20ms) | -0.048 | -0.014 | -0.075 |
-| Onset NED first-window error | -0.168 | -0.143 | -0.187 |
-| Time-to-NED=0.9 error (ms) | -204.868 | -200.544 | -208.327 |
-| Mixing time error (ms) | -166.19 | -174.195 | -159.787 |
-| Mid/side ratio error (dB) | -0.203 | -0.147 | -0.248 |
-| Log-spectral distance (dB, unsigned) | 2.449 | 2.217 | 2.634 |
-| Crest factor error (dB) | -0.61 | -0.976 | -0.317 |
-| Spectral flatness error (dB) | 3.215 | 1.752 | 4.386 |
+| Knee time error (ms) | 2.719 | 6.326 | -0.168 |
+| Fall rate error (dB/s) | -44.481 | -29.9 | -56.146 |
+| Plateau droop error (dB/s) | 53.755 | 13.215 | 86.187 |
+| Build-up error (ms) | -7.148 | -2.902 | -10.544 |
+| Onset NED mean error (0-20ms) | -0.047 | -0.013 | -0.074 |
+| Onset NED first-window error | -0.164 | -0.134 | -0.189 |
+| Time-to-NED=0.9 error (ms) | -197.551 | -187.075 | -205.932 |
+| Mixing time error (ms) | -147.279 | -143.016 | -150.689 |
+| Mid/side ratio error (dB) | -0.226 | -0.087 | -0.337 |
+| Log-spectral distance (dB, unsigned) | 3.997 | 4.34 | 3.722 |
+| Crest factor error (dB) | -0.229 | -0.549 | 0.027 |
+| Spectral flatness error (dB) | 4.164 | 2.484 | 5.508 |
 
 ## Flagged concerns
 
 The following aggregate values exceed a threshold picked from the magnitude of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - worth listening to, not just noting:
 
-- **Spectral flatness error (dB) (all)**: 3.215 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
-- **Spectral flatness error (dB) (High=0)**: 1.752 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
-- **Spectral flatness error (dB) (High!=0)**: 4.386 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
-- **Per-band plateau droop error (dB/s, mean |error|) (all)**: 106.101 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
-- **Per-band fall rate error (dB/s, mean |error|) (all)**: 163.133 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
-- **Per-band plateau droop error (dB/s, mean |error|) (High=0)**: 73.949 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
-- **Per-band fall rate error (dB/s, mean |error|) (High=0)**: 166.218 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
-- **Per-band plateau droop error (dB/s, mean |error|) (High!=0)**: 131.822 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
-- **Per-band fall rate error (dB/s, mean |error|) (High!=0)**: 160.665 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
-- Per-band sign mismatches (all): 26 band/capture/metric combination(s) where the render decays in the OPPOSITE direction from the real hardware - a more severe failure than a magnitude-only miss. See validation_report.md's own 'Per-band sign mismatches' section for the full list.
+- **Spectral flatness error (dB) (all)**: 4.164 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Spectral flatness error (dB) (High=0)**: 2.484 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Log-spectral distance (dB, unsigned) (High=0)**: 4.34 exceeds +/-4.0 - overall tonal balance is audibly off, not just a narrow band - see the per-band table for where.
+- **Spectral flatness error (dB) (High!=0)**: 5.508 exceeds +/-1.5 - the render's plateau reads noticeably smoother/more 'open' (or grittier/more resonant) than the real hardware - the qualitative 'openness vs. grit' complaint.
+- **Per-band plateau droop error (dB/s, mean |error|) (all)**: 90.256 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
+- **Per-band fall rate error (dB/s, mean |error|) (all)**: 107.211 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
+- **Per-band plateau droop error (dB/s, mean |error|) (High=0)**: 45.431 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
+- **Per-band fall rate error (dB/s, mean |error|) (High=0)**: 114.287 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
+- **Per-band plateau droop error (dB/s, mean |error|) (High!=0)**: 126.117 exceeds 25.0 - at least one octave band's mid-plateau decay is measurably off from the real hardware's own - check the per-band table for which band(s), and whether any show a SIGN mismatch below (a far more severe failure than a magnitude-only miss).
+- **Per-band fall rate error (dB/s, mean |error|) (High!=0)**: 101.55 exceeds 25.0 - at least one octave band's post-knee fall rate is measurably off from the real hardware's own - check the per-band table for which band(s).
+- Per-band sign mismatches (all): 23 band/capture/metric combination(s) where the render decays in the OPPOSITE direction from the real hardware - a more severe failure than a magnitude-only miss. See validation_report.md's own 'Per-band sign mismatches' section for the full list.
 
 ## Per-band sign mismatches
 
 Every octave band/capture/metric where the render decays in the OPPOSITE direction from the real hardware (see `_band_sign_mismatches`' own docstring) - a more severe failure than the magnitude-only per-band check above, since a sign flip can hide entirely inside a broadband average that still looks reasonable.
 
-- Time=0.1 High=-3 44-89Hz plateau droop: render=6.98dB/s vs. real=-163.22dB/s - opposite direction
-- Time=0.1 High=-3 1414-2828Hz plateau droop: render=-90.68dB/s vs. real=186.39dB/s - opposite direction
-- Time=0.1 High=-3 2828-5657Hz plateau droop: render=-129.98dB/s vs. real=196.76dB/s - opposite direction
-- Time=0.1 High=-3 5657-11314Hz plateau droop: render=-180.35dB/s vs. real=107.26dB/s - opposite direction
-- Time=0.1 High=-3 11314-22049Hz fall rate: render=288.04dB/s vs. real=-405.28dB/s - opposite direction
-- Time=0.8 High=-3 44-89Hz plateau droop: render=33.78dB/s vs. real=-163.67dB/s - opposite direction
-- Time=0.8 High=-3 354-707Hz plateau droop: render=255.78dB/s vs. real=-803.23dB/s - opposite direction
-- Time=0.8 High=-3 1414-2828Hz plateau droop: render=-65.20dB/s vs. real=186.37dB/s - opposite direction
-- Time=0.8 High=-3 2828-5657Hz plateau droop: render=-108.59dB/s vs. real=196.77dB/s - opposite direction
-- Time=0.8 High=-3 5657-11314Hz plateau droop: render=-164.34dB/s vs. real=107.25dB/s - opposite direction
-- Time=0.8 High=-3 11314-22049Hz fall rate: render=435.86dB/s vs. real=-91.93dB/s - opposite direction
-- Time=2.2 High=0 1414-2828Hz plateau droop: render=129.01dB/s vs. real=-33.73dB/s - opposite direction
-- Time=2.2 High=0 11314-22049Hz fall rate: render=342.34dB/s vs. real=-111.72dB/s - opposite direction
-- Time=4.8 High=0 177-354Hz plateau droop: render=3.18dB/s vs. real=-35.95dB/s - opposite direction
-- Time=4.8 High=0 11314-22049Hz plateau droop: render=-148.75dB/s vs. real=48.59dB/s - opposite direction
-- Time=4.8 High=0 11314-22049Hz fall rate: render=166.96dB/s vs. real=-129.29dB/s - opposite direction
-- Time=7.0 High=0 88-177Hz plateau droop: render=18.31dB/s vs. real=-61.34dB/s - opposite direction
-- Time=7.0 High=0 177-354Hz plateau droop: render=0.26dB/s vs. real=-40.86dB/s - opposite direction
-- Time=7.0 High=0 354-707Hz plateau droop: render=9.21dB/s vs. real=-41.34dB/s - opposite direction
-- Time=7.0 High=0 707-1414Hz plateau droop: render=10.63dB/s vs. real=-24.97dB/s - opposite direction
-- Time=7.0 High=0 1414-2828Hz plateau droop: render=18.73dB/s vs. real=-34.38dB/s - opposite direction
-- Time=7.0 High=0 2828-5657Hz plateau droop: render=5.88dB/s vs. real=-36.35dB/s - opposite direction
-- Time=9.8 High=0 354-707Hz plateau droop: render=4.27dB/s vs. real=-39.71dB/s - opposite direction
-- Time=9.8 High=0 707-1414Hz plateau droop: render=3.49dB/s vs. real=-37.50dB/s - opposite direction
-- Time=9.8 High=0 1414-2828Hz plateau droop: render=12.17dB/s vs. real=-33.92dB/s - opposite direction
-- Time=9.8 High=0 2828-5657Hz plateau droop: render=0.87dB/s vs. real=-34.16dB/s - opposite direction
+- Time=0.1 High=-3 88-177Hz plateau droop: render=102.63dB/s vs. real=-323.89dB/s - opposite direction
+- Time=0.1 High=-3 177-354Hz plateau droop: render=65.08dB/s vs. real=-527.17dB/s - opposite direction
+- Time=0.1 High=-3 2828-5657Hz plateau droop: render=-26.28dB/s vs. real=196.76dB/s - opposite direction
+- Time=0.1 High=-3 5657-11314Hz plateau droop: render=-16.24dB/s vs. real=107.26dB/s - opposite direction
+- Time=0.8 High=-3 88-177Hz plateau droop: render=67.86dB/s vs. real=-323.91dB/s - opposite direction
+- Time=0.8 High=-3 177-354Hz plateau droop: render=40.04dB/s vs. real=-527.18dB/s - opposite direction
+- Time=0.8 High=-3 1414-2828Hz plateau droop: render=-17.24dB/s vs. real=186.37dB/s - opposite direction
+- Time=0.8 High=-3 2828-5657Hz plateau droop: render=-37.73dB/s vs. real=196.77dB/s - opposite direction
+- Time=0.8 High=-3 5657-11314Hz plateau droop: render=-62.85dB/s vs. real=107.25dB/s - opposite direction
+- Time=2.2 High=0 177-354Hz plateau droop: render=3.95dB/s vs. real=-166.86dB/s - opposite direction
+- Time=2.2 High=0 707-1414Hz plateau droop: render=-29.42dB/s vs. real=25.29dB/s - opposite direction
+- Time=2.2 High=0 11314-22049Hz fall rate: render=284.01dB/s vs. real=-111.72dB/s - opposite direction
+- Time=4.8 High=0 1414-2828Hz plateau droop: render=7.09dB/s vs. real=-23.77dB/s - opposite direction
+- Time=4.8 High=0 2828-5657Hz plateau droop: render=27.83dB/s vs. real=-33.44dB/s - opposite direction
+- Time=4.8 High=0 5657-11314Hz plateau droop: render=24.23dB/s vs. real=-28.64dB/s - opposite direction
+- Time=4.8 High=0 11314-22049Hz plateau droop: render=-11.12dB/s vs. real=48.59dB/s - opposite direction
+- Time=7.0 High=-7 2828-5657Hz plateau droop: render=8.30dB/s vs. real=-36.03dB/s - opposite direction
+- Time=7.0 High=-7 5657-11314Hz plateau droop: render=9.04dB/s vs. real=-29.02dB/s - opposite direction
+- Time=7.0 High=0 2828-5657Hz plateau droop: render=1.83dB/s vs. real=-36.35dB/s - opposite direction
+- Time=9.8 High=-4 2828-5657Hz plateau droop: render=4.88dB/s vs. real=-33.83dB/s - opposite direction
+- Time=9.8 High=-4 5657-11314Hz plateau droop: render=4.47dB/s vs. real=-32.05dB/s - opposite direction
+- Time=9.8 High=-9 2828-5657Hz plateau droop: render=5.87dB/s vs. real=-33.78dB/s - opposite direction
+- Time=9.8 High=-9 5657-11314Hz plateau droop: render=4.25dB/s vs. real=-31.62dB/s - opposite direction
 
 ## Stereo (IACC, rendered vs. reference, per capture)
 
 | File | IACC rendered | IACC reference | Coherence floor (r/ref) |
 |---|---|---|---|
-| NonLin_0.1s_-3H.wav | 0.0543 | 0.0057 | 0.3466 / 0.3466 |
-| NonLin_0.8s_-3H.wav | 0.0547 | 0.0056 | 0.3797 / 0.3797 |
-| NonLin_2.2s_0H.wav | 0.0383 | 0.0212 | 0.3492 / 0.3492 |
-| NonLin_4.8s_0H.wav | 0.0284 | 0.0394 | 0.3255 / 0.3255 |
-| NonLin_7.0s_-7H.wav | 0.0583 | 0.0115 | 0.2543 / 0.2543 |
-| NonLin_7.0s_0H.wav | 0.0396 | 0.0367 | 0.2375 / 0.2375 |
-| NonLin_9.8s_-4H.wav | 0.0496 | 0.0158 | 0.2182 / 0.2182 |
-| NonLin_9.8s_-9H.wav | 0.0611 | 0.0089 | 0.2375 / 0.2375 |
-| NonLin_9.8s_0H.wav | 0.0405 | 0.0356 | 0.2298 / 0.2298 |
+| NonLin_0.1s_-3H.wav | 0.0887 | 0.0057 | 0.3466 / 0.3466 |
+| NonLin_0.8s_-3H.wav | 0.0682 | 0.0056 | 0.3797 / 0.3797 |
+| NonLin_2.2s_0H.wav | 0.0302 | 0.0212 | 0.3492 / 0.3492 |
+| NonLin_4.8s_0H.wav | 0.0334 | 0.0394 | 0.3255 / 0.3255 |
+| NonLin_7.0s_-7H.wav | 0.0364 | 0.0115 | 0.2543 / 0.2543 |
+| NonLin_7.0s_0H.wav | 0.026 | 0.0367 | 0.2375 / 0.2375 |
+| NonLin_9.8s_-4H.wav | 0.0314 | 0.0158 | 0.2182 / 0.2182 |
+| NonLin_9.8s_-9H.wav | 0.0404 | 0.0089 | 0.2375 / 0.2375 |
+| NonLin_9.8s_0H.wav | 0.0264 | 0.0356 | 0.2298 / 0.2298 |
 
 ## Per-capture gate errors
 
 | File | Knee error (ms) | Fall rate error (dB/s) | Droop error (dB/s) | Build-up error (ms) | LSD (dB) |
 |---|---|---|---|---|---|
-| NonLin_0.1s_-3H.wav | 2.109 | -32.22 | 34.811 | -15.85 | 4.11 |
-| NonLin_0.8s_-3H.wav | 1.066 | -47.78 | 56.155 | -16.893 | 3.69 |
-| NonLin_2.2s_0H.wav | -89.728 | -47.04 | 201.238 | -16.893 | 3.36 |
-| NonLin_4.8s_0H.wav | -5.827 | -1.62 | -1.049 | -4.83 | 2.11 |
-| NonLin_7.0s_-7H.wav | -15.715 | -2.66 | 25.765 | -16.712 | 1.73 |
-| NonLin_7.0s_0H.wav | -2.925 | -1.56 | 0.162 | -1.927 | 1.67 |
-| NonLin_9.8s_-4H.wav | 2.064 | 1.91 | 7.191 | -17.891 | 1.94 |
-| NonLin_9.8s_-9H.wav | -7.732 | 2.23 | 13.061 | -16.712 | 1.7 |
-| NonLin_9.8s_0H.wav | -2.925 | -1.13 | 1.673 | 0.068 | 1.73 |
+| NonLin_0.1s_-3H.wav | 2.109 | -210.68 | 165.989 | 2.109 | 4.43 |
+| NonLin_0.8s_-3H.wav | 5.465 | -53.06 | 144.558 | -2.517 | 4.0 |
+| NonLin_2.2s_0H.wav | 5.057 | -45.69 | 14.741 | -3.923 | 2.85 |
+| NonLin_4.8s_0H.wav | -4.83 | -26.1 | 49.552 | -0.839 | 7.07 |
+| NonLin_7.0s_-7H.wav | 5.238 | -6.61 | 48.469 | -16.712 | 3.31 |
+| NonLin_7.0s_0H.wav | 14.036 | -25.86 | -6.333 | -3.923 | 3.68 |
+| NonLin_9.8s_-4H.wav | 4.059 | -8.83 | 39.398 | -17.891 | 3.57 |
+| NonLin_9.8s_-9H.wav | -17.709 | -1.55 | 32.521 | -17.709 | 3.3 |
+| NonLin_9.8s_0H.wav | 11.043 | -21.95 | -5.102 | -2.925 | 3.76 |

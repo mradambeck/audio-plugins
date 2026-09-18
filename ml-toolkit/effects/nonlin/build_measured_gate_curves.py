@@ -844,6 +844,218 @@ def _build_early_excess_curves(features: dict) -> dict:
     }
 
 
+_PER_BAND_GROUPS = {
+    "low": ["44-89Hz", "88-177Hz"],
+    "mid": ["177-354Hz", "354-707Hz", "707-1414Hz", "1414-2828Hz", "2828-5657Hz", "5657-11314Hz"],
+    "high": ["11314-22049Hz"],
+}
+
+# Hand-verified via direct C++ measurement (same procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE):
+# temporarily force all three plateauDroop{Low,Mid,High}DbPerSec fields to 0.0f in
+# InhaltIRWorker.cpp, build InhaltRenderIR, render at High=0, measure core.features.
+# band_gate_params() per analysis band, aggregate into low/mid/high via _PER_BAND_GROUPS, revert.
+# Specific to InhaltIRSynth.cpp's own single-one-pole-stage crossover split (a steeper,
+# 4-cascaded-pole version was tried and reverted - see that file's own comment on
+# splitLow/splitHigh for why; these values would need re-measuring if the crossover ever changes).
+#
+# Time=2.2's own LOW band needed a DIFFERENT measurement than the other 11 entries here - real
+# mode-beating, not a fit bug: at such a low absolute frequency (44-89Hz) there are very few full
+# cycles within Time=2.2's own short plateau, and the tank's own widely-spaced low-frequency modes
+# beat against each other, producing a genuinely oscillating (not monotonic) envelope -
+# gate_envelope_params()'s swept-breakpoint fit found an essentially arbitrary two-segment split of
+# that oscillation (-542.7dB/s, not physically meaningful). A direct linear regression over
+# [20ms, 130ms] of the raw bandpassed envelope (skipping the earliest build-up, ending before the
+# real knee) gives a far more sensible -0.106dB/s - confirmed this isn't a render-only artifact by
+# checking the REAL capture's own target at this exact band/Time the same way (see
+# _TARGET_DROOP_ROBUST_OVERRIDE below): it breaks identically (-207.0dB/s via swept-breakpoint vs.
+# -1.966dB/s via the same robust regression), so both sides of this one correction use the robust
+# method for internal consistency, while every other band/Time keeps gate_envelope_params' own
+# standard method (all show sensible, non-oscillating values).
+_NATURAL_DROOP_PER_BAND_CPP_MEASURED = {
+    (2.2, "low"): -0.106, (2.2, "mid"): -34.380, (2.2, "high"): -143.033,
+    (4.8, "low"): -47.836, (4.8, "mid"): -35.930, (4.8, "high"): -101.545,
+    (7.0, "low"): -20.928, (7.0, "mid"): -21.534, (7.0, "high"): -107.770,
+    (9.8, "low"): -21.830, (9.8, "mid"): -20.045, (9.8, "high"): -106.714,
+}
+
+# Time=2.2's own low-band TARGET (the real capture's own measured value, not this engine's) needed
+# the same robust-regression treatment - see _NATURAL_DROOP_PER_BAND_CPP_MEASURED's own comment
+# for the full story and the direct verification that this is real mode-beating, not a fit bug.
+_TARGET_DROOP_ROBUST_OVERRIDE = {
+    (2.2, "low"): -1.966,
+}
+
+
+def _build_per_band_gate_curves(features: dict) -> dict:
+    """Builds Time baseline + High offset curves for the SIX parameters that replaced the single
+    broadband plateau_droop_db_per_s/fall_rate_db_per_s after a real "huffy, low-mid resonance...
+    rings out longer than the IR's" complaint (see InhaltIRSynth.h's own comment on
+    Params::plateauDroopLowDbPerSec for the full architectural story - real hardware's decay rate
+    varies dramatically by octave band in a way one broadband rate structurally cannot represent,
+    and no single tank dampingWeight value can reproduce it either).
+
+    Same architecture as _build_fall_rate_curves/_build_plateau_droop_curves, generalized across
+    three bands (_PER_BAND_GROUPS: low = 44-177Hz, mid = 177Hz-11.3kHz, high = 11.3-22kHz -
+    matching InhaltIRSynth.h's own lowMidCrossoverHz/midHighCrossoverHz exactly) instead of
+    duplicated three times:
+
+    - droop: H0-equivalent Time baseline (High=0 captures only - Time=0.1/0.8 have no H=0 capture
+      at all and are left to the curve's own extrapolation, same honest gap as the broadband
+      version), corrected for this engine's own natural per-band droop (the SAME additive-vs-total
+      shape plateau_droop_db_per_s's own fix had - InhaltIRSynth's plateauDb(t) terms are layered
+      on top of whatever the tank naturally does, not a replacement for it), using
+      _NATURAL_DROOP_PER_BAND_CPP_MEASURED as the direct-measurement override.
+    - fall_rate: covers all 9 captures (unlike droop), using the SAME analytical relationship
+      _build_fall_rate_curves established: since plateauDb(t) never turns off at the knee, what's
+      written must be target_fall_total minus this Time's own TARGET droop total (not the natural
+      droop, and not the corrected/written droop - the real target, since the written droop
+      combined with the tank's own natural contribution is what reproduces that real target on the
+      actual render).
+    - High offset for both: built from Time=9.8's own richest sweep, found to be small (<2dB/s
+      across High=-9/-4/0 in every band) - MUCH smaller than the single broadband droop's own
+      offset (-33 to -35dB/s) was, a real finding worth noting: the broadband number's large
+      High-dependence looks like it was substantially an artifact of the tilt filter shifting
+      which frequency band dominates a single whole-signal measurement, not a genuine change in
+      any one band's own decay character - further evidence the per-band model is the more
+      physically correct one."""
+    def band_droop_target(capture, band_key):
+        override = _TARGET_DROOP_ROBUST_OVERRIDE.get((capture["params"]["time"], band_key))
+        if override is not None and capture["params"]["high"] == 0:
+            return override
+        keys = _PER_BAND_GROUPS[band_key]
+        bg = capture["band_gate"]
+        vals = [bg[k]["plateau_droop_db_per_s"] for k in keys if k in bg and bg[k]["plateau_droop_db_per_s"] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    def band_fall_target(capture, band_key):
+        keys = _PER_BAND_GROUPS[band_key]
+        bg = capture["band_gate"]
+        vals = [bg[k]["fall_rate_db_per_s"] for k in keys if k in bg and bg[k]["fall_rate_db_per_s"] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+
+    result = {}
+    for band_key in ("low", "mid", "high"):
+        print(f"\n--- per-band gate curves: {band_key} ({_PER_BAND_GROUPS[band_key]}) ---")
+
+        # ---------------- droop (High=0 captures only, natural-corrected) ----------------
+        droop_h0 = [
+            (c["params"]["time"], band_droop_target(c, band_key))
+            for c in features["captures"] if c["params"]["high"] == 0
+        ]
+        droop_written_pairs = []
+        for t, target in sorted(droop_h0):
+            natural = _NATURAL_DROOP_PER_BAND_CPP_MEASURED.get((t, band_key))
+            if natural is None or target is None:
+                print(f"  droop Time={t}: no natural-droop override or target - skipping")
+                continue
+            written = target - natural
+            print(f"  droop Time={t}: target={target:.3f}  natural={natural:.3f}  -> written={written:.3f}")
+            droop_written_pairs.append((t, written))
+
+        droop_sweep = sorted(
+            (c["params"]["high"], band_droop_target(c, band_key))
+            for c in features["captures"] if c["params"]["time"] == richest_time
+        )
+        droop_offset_points = []
+        if any(h == 0 for h, _ in droop_sweep) and len(droop_sweep) >= 2:
+            baseline = next(v for h, v in droop_sweep if h == 0)
+            droop_offset_points = [(h, v - baseline) for h, v in droop_sweep]
+            print(f"  droop offsets (Time={richest_time}): {[round(v, 3) for _, v in droop_offset_points]}")
+
+        if len(droop_written_pairs) >= 2:
+            result[f"time_to_plateau_droop_{band_key}_db_per_s"] = {
+                "points": fit_curve(droop_written_pairs).points(),
+                "source": "direct_measurement_h0_only_natural_droop_corrected",
+            }
+        if len(droop_offset_points) >= 2:
+            result[f"high_to_plateau_droop_{band_key}_db_per_s_offset"] = {
+                "points": Curve1D([p[0] for p in droop_offset_points], [p[1] for p in droop_offset_points]).points(),
+            }
+
+        # ---------------- fall rate (all captures, analytical correction) ----------------
+        fall_sweep = sorted(
+            (c["params"]["high"], band_fall_target(c, band_key))
+            for c in features["captures"] if c["params"]["time"] == richest_time
+        )
+        fall_offset_points = []
+        fall_offset_curve = None
+        if any(h == 0 for h, _ in fall_sweep) and len(fall_sweep) >= 2:
+            baseline = next(v for h, v in fall_sweep if h == 0)
+            fall_offset_points = [(h, v - baseline) for h, v in fall_sweep]
+            fall_offset_curve = Curve1D([p[0] for p in fall_offset_points], [p[1] for p in fall_offset_points])
+            print(f"  fall_rate offsets (Time={richest_time}): {[round(v, 3) for _, v in fall_offset_points]}")
+
+        by_time: dict[float, list[float]] = {}
+        for c in features["captures"]:
+            t, h = c["params"]["time"], c["params"]["high"]
+            fall_target = band_fall_target(c, band_key)
+            if fall_target is None or fall_offset_curve is None:
+                continue
+            offset, _ = fall_offset_curve.evaluate(h)
+            fall_target_h0 = fall_target - offset
+            by_time.setdefault(t, []).append(fall_target_h0)
+        fall_target_baseline = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+
+        droop_target_by_time = dict(droop_h0)  # H0-only droop targets, keyed by Time (real totals)
+        droop_written_curve = (
+            Curve1D([p[0] for p in droop_written_pairs], [p[1] for p in droop_written_pairs])
+            if len(droop_written_pairs) >= 2 else None
+        )
+        fall_written_pairs = []
+        for t, fall_target_h0 in fall_target_baseline:
+            # Which formula applies depends on the WRITTEN droop's own sign, not the target's -
+            # InhaltIRSynth.cpp's plateauDb(t) only keeps contributing past the knee (making the
+            # target_fall - target_droop subtraction correct) when the value actually WRITTEN into
+            # plateauDroopDbPerSec is negative; a positive written value is clamped at the knee
+            # instead (see that file's own gateEnvelopeDb comment - a real bug found and fixed:
+            # this engine's own per-band tank damping is sometimes so far from real hardware's own
+            # that the correction needed is positive, and letting plateauDb(t) grow without bound
+            # for the whole render was silently swamping fallRateDbPerSec's own decay). When
+            # clamped, the post-knee slope is fallRateDbPerSec alone - target_fall_h0 directly, no
+            # subtraction.
+            droop_written_h0 = droop_written_curve.evaluate(t)[0] if droop_written_curve is not None else None
+            if droop_written_h0 is not None and droop_written_h0 >= 0.0:
+                written = fall_target_h0
+                print(f"  fall_rate Time={t}: fall_target_h0={fall_target_h0:.3f}  "
+                      f"droop_written_h0={droop_written_h0:.3f} (clamped/positive, no subtraction)  "
+                      f"-> written={written:.3f}")
+                fall_written_pairs.append((t, written))
+                continue
+
+            droop_target_h0 = droop_target_by_time.get(t)
+            if droop_target_h0 is None:
+                # Time=0.1/0.8 have no H=0 droop capture at all - extrapolate the droop curve
+                # we're about to write, the same way InhaltParameterMap.cpp itself will at runtime.
+                if droop_written_curve is not None:
+                    # This extrapolates the WRITTEN (corrected) droop curve, not the target - close
+                    # enough for this analytical relationship at Time settings this far outside the
+                    # measured range, and consistent with how the real render will behave (it reads
+                    # the written curve directly, not a separately-tracked target curve).
+                    droop_target_h0, _ = droop_written_curve.evaluate(t)
+                else:
+                    continue
+            written = fall_target_h0 - droop_target_h0
+            print(f"  fall_rate Time={t}: fall_target_h0={fall_target_h0:.3f}  droop_target_h0={droop_target_h0:.3f}  -> written={written:.3f}")
+            fall_written_pairs.append((t, written))
+
+        if len(fall_written_pairs) >= 2:
+            result[f"time_to_fall_rate_{band_key}_db_per_s"] = {
+                "points": fit_curve(fall_written_pairs).points(),
+                "source": "direct_measurement_h0_equivalent_additive_corrected",
+            }
+        if len(fall_offset_points) >= 2:
+            result[f"high_to_fall_rate_{band_key}_db_per_s_offset"] = {
+                "points": Curve1D([p[0] for p in fall_offset_points], [p[1] for p in fall_offset_points]).points(),
+            }
+
+    return result
+
+
 def _repool_fit_only_time_params(fitted_raw: dict) -> dict:
     """Rebuilds FIT_ONLY_TIME_PARAMS' Time curves by pooling ALL 9 fitted captures (not just
     High=0), regardless of build_curves.py's own H-timing-neutrality check outcome.
@@ -928,6 +1140,7 @@ def main() -> None:
     curves.update(_build_plateau_droop_curves(features, curves))
     curves.update(_build_fall_rate_curves(features, curves))
     curves.update(_build_early_excess_curves(features))
+    curves.update(_build_per_band_gate_curves(features))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "
@@ -1004,6 +1217,23 @@ def main() -> None:
         "comment for the direct C++ measurement this is corrected against). No isotonic "
         "regression - unlike t_knee_ms/fall_rate_db_per_s, this parameter has no physical reason "
         "to be monotonic in Time."
+    )
+    curves["_notes"]["per_band_gate_replaces_broadband"] = (
+        "time_to_{plateau_droop,fall_rate}_{low,mid,high}_db_per_s / high_to_..._offset REPLACE "
+        "the single broadband time_to_plateau_droop_db_per_s/time_to_fall_rate_db_per_s (kept in "
+        "curves.json for reference/comparison, but InhaltParameterMap.cpp no longer reads them) - "
+        "see _build_per_band_gate_curves' own docstring and InhaltIRSynth.h's own comment on "
+        "Params::plateauDroopLowDbPerSec for the full story. Added after a real 'huffy, low-mid "
+        "resonance... rings out longer than the IR's' complaint traced to a genuine architectural "
+        "gap (one broadband decay rate structurally cannot represent real hardware's own dramatic "
+        "per-band decay variation) confirmed NOT fixable by reshaping the tank's single "
+        "dampingWeight (tested directly: fixing the under-decaying low-mids over-damps the highs "
+        "by 3-6x, a structural ceiling of the one-pole-per-line filter). A real finding worth "
+        "flagging: each band's own High offset is small (<2dB/s across the full High=-9..0 sweep, "
+        "every band) - MUCH smaller than the broadband droop's own -33 to -35dB/s offset was, "
+        "suggesting that large broadband number was substantially an artifact of the tilt filter "
+        "shifting which band dominates a single whole-signal measurement, not a genuine per-band "
+        "effect - further evidence the per-band model is the physically correct one."
     )
     curves["_notes"]["fit_only_time_params_repooled"] = (
         "feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms are re-pooled across all 9 "

@@ -219,7 +219,20 @@ namespace
 
         const auto attackLin = std::max(1.0f - std::exp(-tSeconds / tauA), 1e-6f);
         const auto attackDb = 20.0f * std::log10(attackLin);
-        const auto plateauDb = plateauDroopDbPerSec * tSeconds;
+        // plateauDroopDbPerSec*t is deliberately UNBOUNDED past the knee for the (always-negative
+        // in practice) broadband/single-rate case - the fall_rate_db_per_s calibration is built on
+        // exactly that (see build_measured_gate_curves.py's own _build_fall_rate_curves docstring:
+        // what's written subtracts this Time's own target plateau droop specifically because this
+        // term keeps contributing after the knee). A per-band POSITIVE plateauDroopDbPerSec (real,
+        // needed when this engine's own tank over-damps a band far more than real hardware does -
+        // see InhaltIRSynth.h's own comment on plateauDroopHighDbPerSec) breaks that assumption in
+        // a way the broadband case never could: an ever-GROWING positive term swamps
+        // fallRateDbPerSec's own decay for the entire remaining render, not just the plateau.
+        // Clamped to stop growing past the knee ONLY when positive, leaving the established
+        // negative-droop relationship (and its own calibration) completely unchanged.
+        const auto plateauDb = plateauDroopDbPerSec >= 0.0f
+            ? plateauDroopDbPerSec * std::min(tSeconds, tKnee)
+            : plateauDroopDbPerSec * tSeconds;
         const auto kneeDb = fallRateDbPerSec * tauK * softplus((tSeconds - tKnee) / tauK);
         // Zero for t < tKnee (the max(...,0) guard keeps the exponent from blowing up there),
         // saturating smoothly to earlyExcessDb for t well past the knee - see this field's own
@@ -264,6 +277,17 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     // then peels the mid band away from what's left, leaving low+mid+high == input exactly
     // whenever all three bands are gated identically - see InhaltIRSynth.h's own comment on why
     // the decay rate (not the crossover topology) is what's actually band-calibrated.
+    //
+    // A steeper, CASCADED (4-stage) version of this split was tried and reverted: the
+    // complementary reconstruction (high = input - low) stays exact regardless of how steep the
+    // "low" estimate is, so the idea was sound, but cascading N one-pole stages at the SAME
+    // nominal cutoff shifts the cascade's own effective -3dB point well below that cutoff (a
+    // known property of cascaded first-order sections, not accounted for) - measured directly:
+    // the resulting bands no longer aligned with the analysis bands this engine is calibrated
+    // against, and per-band accuracy measurably WORSENED (sign mismatches, fall_rate errors both
+    // increased) rather than improved. Revisiting this needs the cutoff-correction factor for a
+    // cascaded one-pole's actual -3dB point (fc * sqrt(2^(1/N) - 1)) or a proper multi-pole
+    // (Butterworth/Linkwitz-Riley) design, not just more stages at the same nominal frequency.
     wildjag::dsp::OnePoleFilter splitLowL, splitLowR, splitHighL, splitHighR;
     splitLowL.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
     splitLowR.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
