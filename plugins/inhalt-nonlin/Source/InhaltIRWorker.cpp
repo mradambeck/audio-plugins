@@ -49,6 +49,20 @@ namespace
     // reasoning (long enough to cover every capture, not tied to any one Time setting).
     constexpr double irDurationSeconds = 1.0;
 
+    // Empirical makeup gain applied after unit-energy normalization, to compensate for a real
+    // A/B loudness gap against the real INHALT-RMX-NONLIN captures: convolving unit-energy-
+    // normalized versions of both with a shared white-noise input matches to within ~0.3dB
+    // (confirms normalization itself is correct), but with a percussive transient input - the
+    // realistic case for auditioning a reverb tail by ear - the real capture's full convolved
+    // output (hit + tail) measured 0.7 to +6.0dB louder than Inhalt's own render across all 9
+    // reference settings (mean +2.3dB, median +2.1dB). That gap isn't flat across settings - it
+    // tracks the still-open per-band decay-rate mismatch (see InhaltIRSynth.cpp's multi-band gate
+    // comments), largest at the longer Time settings where the fit is furthest from the real
+    // per-band fall rates. This constant is a deliberate stopgap sized to the median measured gap
+    // so A/B comparison is workable now; it should be revisited (and likely removed) once that
+    // per-band fit closes the gap at its source instead of papering over it with output gain.
+    constexpr float outputMakeupGainDb = 2.2f;
+
     juce::AudioBuffer<float> synthesizeAndNormalize(float timeKnob, float highKnob, double sampleRate)
     {
         const auto gate = InhaltParameterMap::mapTimeAndHighToGateParams(timeKnob, highKnob);
@@ -87,6 +101,13 @@ namespace
         // decoded capture there, a synthesized one here - reaches it at a comparable level and one
         // Wet knob stays meaningful across every Time/High setting.
         normaliseToUnitEnergy(buffer);
+
+        // See outputMakeupGainDb's own comment - a measured, deliberate stopgap, not part of the
+        // normalization contract itself.
+        const auto makeupGain = std::pow(10.0f, outputMakeupGainDb / 20.0f);
+        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+            juce::FloatVectorOperations::multiply(buffer.getWritePointer(channel), makeupGain, buffer.getNumSamples());
+
         return buffer;
     }
 } // namespace
