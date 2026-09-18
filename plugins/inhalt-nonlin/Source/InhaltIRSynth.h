@@ -48,22 +48,49 @@ public:
         // Gate envelope (Time's timing effect) - explicit, dB-domain, applied after the tank/tilt
         // stage. Every field here has a directly-measured twin in
         // core.features.gate_envelope_params() - see effects/nonlin/findings.md.
+        //
+        // buildUpMs/kneeTimeMs/kneeSoftnessMs are SHARED across all three decay bands below (not
+        // per-band) - these reflect the gate CIRCUIT's own timing (when it opens, when it starts
+        // to close), which core.features.band_gate_params shows is consistent across frequency
+        // (the knee lands at essentially the same time in every octave band); only the DECAY
+        // RATE itself (plateauDroop/fallRate) genuinely varies by band.
         float buildUpMs = 3.0f;
-        float plateauDroopDbPerSec = 0.0f;
         float kneeTimeMs = 150.0f;
-        float fallRateDbPerSec = -250.0f;
         float kneeSoftnessMs = 4.0f;
 
-        // Early-release excess (dB) - a SECOND, additive gate-shape term fixing a real gap
-        // fallRateDbPerSec/kneeSoftnessMs alone can't close: real captures' post-knee fall is
+        // Per-band plateau droop / fall rate - REPLACES a single broadband
+        // plateauDroopDbPerSec/fallRateDbPerSec (see git history for that version) after a real
+        // "huffy, low-mid resonance... rings out longer than the IR's" complaint traced to a
+        // genuine architectural gap: core.features.band_gate_params shows real hardware's decay
+        // rate varies dramatically by octave band (e.g. roughly -35 to -48dB/s across 44Hz-5.6kHz
+        // at Time=9.8/High=0, but only -13dB/s in the top octave), while a single broadband dB
+        // multiplier can only ever apply ONE rate to the whole signal. Direct measurement also
+        // showed no single tank dampingWeight value can reproduce this shape (fixing the
+        // under-decaying low-mids requires over-damping the highs by 3-6x - a structural ceiling
+        // of the one-pole-per-line damping filter, not a calibration miss) - seeInhaltIRSynth.cpp's
+        // own crossover-split comment for the fix instead: split the signal into three bands
+        // (below lowMidCrossoverHz, between the two crossovers, above midHighCrossoverHz) and gate
+        // each independently with its own directly-measured decay rate, then sum back together.
+        float plateauDroopLowDbPerSec = 0.0f;
+        float plateauDroopMidDbPerSec = 0.0f;
+        float plateauDroopHighDbPerSec = 0.0f;
+        float fallRateLowDbPerSec = -250.0f;
+        float fallRateMidDbPerSec = -250.0f;
+        float fallRateHighDbPerSec = -250.0f;
+
+        // Early-release excess (dB) - a SECOND, additive gate-shape term added BEFORE the
+        // per-band split above (when this engine still had one broadband fallRateDbPerSec),
+        // fixing a real gap that rate alone couldn't close: real captures' post-knee fall is
         // CURVED, not a single constant dB/s rate - measured directly on the real captures (see
         // build_measured_gate_curves.py's own _build_early_excess_curves docstring), the level
         // 20ms after the knee sits earlyExcessDb dB BELOW (or, at two settings, above) where a
-        // pure straight-line extrapolation of fallRateDbPerSec's own asymptotic rate would put
-        // it - i.e. the real hardware's fall accelerates briefly right at the knee before
-        // settling into the slower, longer-term rate fallRateDbPerSec is calibrated against.
-        // Saturates smoothly to this fixed dB offset over earlyExcessTauMs (not an ongoing rate -
-        // it adds a one-time "kick" near the knee, then gets out of the way), so it doesn't
+        // pure straight-line extrapolation of the broadband fall rate would put it. Kept as a
+        // single SHARED value applied identically inside each band's own gate formula (not yet
+        // re-measured per band) now that the per-band split above exists - plausibly redundant
+        // with it (per-band rates summed back together may already reproduce the curved broadband
+        // shape as an emergent property, without needing this at all), not yet verified either
+        // way. Saturates smoothly to this fixed dB offset over earlyExcessTauMs (not an ongoing
+        // rate - it adds a one-time "kick" near the knee, then gets out of the way), so it doesn't
         // disturb the already-verified deep-tail fallRateDbPerSec calibration. Zero by default -
         // a neutral no-op matching this file's own convention for every other field here.
         float earlyExcessDb = 0.0f;
@@ -107,6 +134,20 @@ public:
     // "successfully" with different-sounding results.
     static constexpr float maxFeedbackGain = 0.95f;
     static constexpr float maxDampingWeight = 0.99f;
+
+    // Per-band gate crossovers - fixed architecture constants, not fitted/calibrated (unlike the
+    // per-band decay rates themselves). Chosen directly from where core.features.band_gate_params'
+    // own 9 analysis bands (octave_bands()) show the real per-band decay pattern actually breaks:
+    // Time=9.8's own H=0/-4/-9 sweep (the cleanest, least noisy real data - longest gate, most
+    // samples) shows a fairly flat mid-region (~-32 to -40dB/s plateau droop from 177Hz-5.6kHz)
+    // bracketed by a distinctly steeper low end (44-177Hz, ~-47 to -48dB/s) and a distinctly
+    // shallower top octave (11.3-22kHz, ~-13dB/s) - both fall_rate_db_per_s and
+    // plateau_droop_db_per_s agree on the top-octave break specifically, across every Time/High
+    // setting checked, not just this one. Matches the analysis bands' own boundaries exactly
+    // (88.4-176.8Hz and 5657-11314Hz) so the synthesis bands stay directly interpretable against
+    // the measurement bands that motivated them.
+    static constexpr float lowMidCrossoverHz = 176.8f;
+    static constexpr float midHighCrossoverHz = 11313.7f;
 
     // Renders `numSamples` of a stereo gated IR at `sampleRate` into left/right (resized to
     // numSamples, overwritten). Allocates (line buffer sizing) - never call this on the audio

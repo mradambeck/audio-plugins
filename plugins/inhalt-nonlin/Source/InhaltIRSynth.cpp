@@ -204,7 +204,13 @@ namespace
         return std::log1p(std::exp(x));
     }
 
-    float gateEnvelopeDb(float tSeconds, const InhaltIRSynth::Params& p) noexcept
+    // Takes plateauDroopDbPerSec/fallRateDbPerSec explicitly rather than reading them off `p`
+    // directly - called once per decay band (low/mid/high, see InhaltIRSynth.h's own comment on
+    // why the decay rate is the one thing that genuinely varies by band), sharing every other
+    // field (buildUpMs/kneeTimeMs/kneeSoftnessMs/earlyExcessDb) from `p` unchanged across all
+    // three calls.
+    float gateEnvelopeDb(float tSeconds, const InhaltIRSynth::Params& p,
+                         float plateauDroopDbPerSec, float fallRateDbPerSec) noexcept
     {
         const auto tauA = std::max(p.buildUpMs, 0.001f) * 0.001f;
         const auto tauK = std::max(p.kneeSoftnessMs, 0.001f) * 0.001f;
@@ -213,8 +219,8 @@ namespace
 
         const auto attackLin = std::max(1.0f - std::exp(-tSeconds / tauA), 1e-6f);
         const auto attackDb = 20.0f * std::log10(attackLin);
-        const auto plateauDb = p.plateauDroopDbPerSec * tSeconds;
-        const auto kneeDb = p.fallRateDbPerSec * tauK * softplus((tSeconds - tKnee) / tauK);
+        const auto plateauDb = plateauDroopDbPerSec * tSeconds;
+        const auto kneeDb = fallRateDbPerSec * tauK * softplus((tSeconds - tKnee) / tauK);
         // Zero for t < tKnee (the max(...,0) guard keeps the exponent from blowing up there),
         // saturating smoothly to earlyExcessDb for t well past the knee - see this field's own
         // comment in InhaltIRSynth.h.
@@ -252,6 +258,18 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     tiltL.setPivotHz(params.tiltPivotHz, sampleRate);
     tiltR.setPivotHz(params.tiltPivotHz, sampleRate);
 
+    // Per-band gate split - two cascaded one-pole complementary splits per channel (same
+    // low+high=input-exactly technique as wildjag::dsp::BandShelf above, just applied twice to
+    // carve out a middle band): splitLow peels off everything below lowMidCrossoverHz; splitHigh
+    // then peels the mid band away from what's left, leaving low+mid+high == input exactly
+    // whenever all three bands are gated identically - see InhaltIRSynth.h's own comment on why
+    // the decay rate (not the crossover topology) is what's actually band-calibrated.
+    wildjag::dsp::OnePoleFilter splitLowL, splitLowR, splitHighL, splitHighR;
+    splitLowL.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
+    splitLowR.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
+    splitHighL.setCutoffHz(InhaltIRSynth::midHighCrossoverHz, sampleRate);
+    splitHighR.setCutoffHz(InhaltIRSynth::midHighCrossoverHz, sampleRate);
+
     for (int n = 0; n < numSamples; ++n)
     {
         const auto impulse = (n == 0) ? 1.0f : 0.0f;
@@ -274,11 +292,26 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         const auto tiltedL = tiltL.processSample(combinedL);
         const auto tiltedR = tiltR.processSample(combinedR);
 
-        const auto tSeconds = (float) n / (float) sampleRate;
-        const auto gateLin = std::pow(10.0f, gateEnvelopeDb(tSeconds, params) / 20.0f);
+        const auto lowL = splitLowL.processSample(tiltedL);
+        const auto restL = tiltedL - lowL;
+        const auto midL = splitHighL.processSample(restL);
+        const auto highL = restL - midL;
 
-        left[(size_t) n] = tiltedL * gateLin;
-        right[(size_t) n] = tiltedR * gateLin;
+        const auto lowR = splitLowR.processSample(tiltedR);
+        const auto restR = tiltedR - lowR;
+        const auto midR = splitHighR.processSample(restR);
+        const auto highR = restR - midR;
+
+        const auto tSeconds = (float) n / (float) sampleRate;
+        const auto gateLowLin = std::pow(10.0f, gateEnvelopeDb(
+            tSeconds, params, params.plateauDroopLowDbPerSec, params.fallRateLowDbPerSec) / 20.0f);
+        const auto gateMidLin = std::pow(10.0f, gateEnvelopeDb(
+            tSeconds, params, params.plateauDroopMidDbPerSec, params.fallRateMidDbPerSec) / 20.0f);
+        const auto gateHighLin = std::pow(10.0f, gateEnvelopeDb(
+            tSeconds, params, params.plateauDroopHighDbPerSec, params.fallRateHighDbPerSec) / 20.0f);
+
+        left[(size_t) n] = lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
+        right[(size_t) n] = lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;
     }
 }
 

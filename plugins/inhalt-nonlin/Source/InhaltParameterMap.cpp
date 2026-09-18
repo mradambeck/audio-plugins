@@ -110,15 +110,26 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // safely combined here - see that function's own docstring for the two real bugs this fixes
     // (naive High-pooling, and fallRateDbPerSec double-counting plateauDroopDbPerSec's own
     // ongoing contribution past the knee).
-    params.fallRateDbPerSec = timeToFallRate.evaluate(timeKnob, &fallExtrapolated)
+    // TEMPORARY: the same broadband value is assigned to all three decay bands below, as a
+    // deliberate placeholder pass-through until _build_per_band_gate_curves (or equivalent) exists
+    // and InhaltReferenceData.h carries real per-band Time/High curves - see InhaltIRSynth.h's own
+    // comment on why the single broadband rate was replaced with three in the render engine. This
+    // keeps the render mathematically IDENTICAL to the pre-multiband-gate commit whenever all
+    // three bands share one value (the crossover split-then-sum is exact for identically-gated
+    // bands - see InhaltIRSynth.cpp's own comment), so this is a safe, verifiable intermediate
+    // state, not a silent regression.
+    const auto fallRateBroadband = timeToFallRate.evaluate(timeKnob, &fallExtrapolated)
         + highToFallRateOffset.evaluate(highKnob, &fallHighExtrapolated);
+    params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = fallRateBroadband;
     params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
     // plateauDroopDbPerSec = time_to_plateau_droop_db_per_s(Time) [High=0 baseline, already
     // absolute - see time_to_plateau_droop_db_per_sPoints' own values] + high offset (zero-
     // anchored at High=0, per findings.md's "High: timing-NEUTRAL overall, but NOT damping-
     // neutral" finding).
-    params.plateauDroopDbPerSec = timeToDroopBaseline.evaluate(timeKnob, &droopTimeExtrapolated)
+    const auto plateauDroopBroadband = timeToDroopBaseline.evaluate(timeKnob, &droopTimeExtrapolated)
         + highToDroopOffset.evaluate(highKnob, &droopHighExtrapolated);
+    params.plateauDroopLowDbPerSec = params.plateauDroopMidDbPerSec = params.plateauDroopHighDbPerSec
+        = plateauDroopBroadband;
     // Fixes a real "the decay and timing doesn't match the convolution" complaint that
     // fallRateDbPerSec alone can't close: real captures' post-knee fall is CURVED, not a single
     // constant dB/s rate - see build_measured_gate_curves.py's own _build_early_excess_curves

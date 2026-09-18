@@ -50,7 +50,7 @@ public:
             params.feedbackGain = 0.8f;
             params.dampingWeight = 0.4f;
             params.kneeTimeMs = 150.0f;
-            params.fallRateDbPerSec = -250.0f;
+            params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -250.0f;
 
             std::vector<float> left, right;
             inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.5 * sampleRate), left, right);
@@ -84,7 +84,8 @@ public:
             params.feedbackGain = 0.85f;
             params.dampingWeight = 0.4f;
             params.kneeTimeMs = 300.0f;
-            params.fallRateDbPerSec = -100.0f; // slow fall, so there's plenty of dense signal to correlate
+            // slow fall, so there's plenty of dense signal to correlate
+            params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -100.0f;
 
             std::vector<float> left, right;
             inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.5 * sampleRate), left, right);
@@ -100,7 +101,7 @@ public:
             params.dampingWeight = 0.4f;
             params.buildUpMs = 3.0f;
             params.kneeTimeMs = 100.0f;
-            params.fallRateDbPerSec = -400.0f;
+            params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -400.0f;
             params.kneeSoftnessMs = 3.0f;
 
             std::vector<float> left, right;
@@ -140,7 +141,8 @@ public:
             paramsNeutral.dampingWeight = 0.4f;
             paramsNeutral.buildUpMs = 3.0f;
             paramsNeutral.kneeTimeMs = 100.0f;
-            paramsNeutral.fallRateDbPerSec = -150.0f;
+            paramsNeutral.fallRateLowDbPerSec = paramsNeutral.fallRateMidDbPerSec
+                = paramsNeutral.fallRateHighDbPerSec = -150.0f;
             paramsNeutral.kneeSoftnessMs = 3.0f;
             paramsNeutral.earlyExcessDb = 0.0f;
 
@@ -263,7 +265,8 @@ public:
             params.feedbackGain = 0.85f;
             params.dampingWeight = 0.4f;
             params.kneeTimeMs = 300.0f;
-            params.fallRateDbPerSec = -50.0f; // slow fall - plenty of onset density to observe
+            // slow fall - plenty of onset density to observe
+            params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -50.0f;
 
             params.diffuserGain = 0.0f;
             std::vector<float> leftNoDiffuser, rightNoDiffuser;
@@ -308,7 +311,7 @@ public:
                     inhalt::InhaltIRSynth::Params params;
                     params.feedbackGain = feedbackGain;
                     params.dampingWeight = 0.4f;
-                    params.fallRateDbPerSec = fallRate;
+                    params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = fallRate;
                     params.kneeTimeMs = 100.0f;
 
                     std::vector<float> left, right;
