@@ -382,6 +382,23 @@ spectral-flatness gap remains flagged). Two settings (Time=2.2, Time=7.0/High=-7
 worse on `post_knee_excess_db` specifically despite the aggregate improving - not chased further
 this round, flagged here as a real, open residual rather than hidden.
 
+**Per-band decay: a real, architectural gap found by ear** ("huffy, low-mid resonance... rings
+out longer than the IR's"), confirmed via `core.features.band_gate_params`: real hardware's
+plateau-droop/fall-rate decay varies dramatically by octave band (e.g. roughly -35 to -48dB/s
+across 44Hz-5.6kHz at Time=9.8/High=0), while this engine applies ONE broadband decay rate to
+everything - the explicit dB-domain gate is a scalar multiplier on the time-domain signal, so the
+only thing that can vary decay by frequency at all is the tank's single per-line `dampingWeight`.
+Tested directly (not assumed): no single `dampingWeight` value can fix the under-decaying low-mid
+bands without badly over-damping the highs (tried 0.5/0.7/the current 0.886 - fixing 707Hz-2.8kHz
+required over-damping 5.6-22kHz by 3-6x). This is a structural ceiling, not a calibration gap - the
+same class of limitation the delay-line/smear attempt ran into. **Not fixed this session** -
+closing it properly needs either a differently-shaped damping filter or genuine per-band explicit
+gating, both bigger than an additive parameter fix. `analysis/validate.py` now has a permanent
+regression guard for this class of bug specifically (see its own `_band_sign_mismatches`/
+`BAND_CONCERN_THRESHOLDS` - added after this exact defect was invisible in every broadband/
+aggregate check that existed at the time, despite `band_errors` having carried the raw per-band
+data in `validation_results.json` all along).
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

@@ -16,39 +16,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 170.208,
-        "fall_rate_error": 70.45
+        "fall_rate_error": 70.45,
+        "droop_rendered": 6.983,
+        "droop_reference": -163.225,
+        "fall_rate_rendered": -230.2,
+        "fall_rate_reference": -300.65
       },
       "88-177Hz": {
         "droop_error": 218.775,
-        "fall_rate_error": 138.16
+        "fall_rate_error": 138.16,
+        "droop_rendered": -105.118,
+        "droop_reference": -323.893,
+        "fall_rate_rendered": -178.83,
+        "fall_rate_reference": -316.99
       },
       "177-354Hz": {
         "droop_error": 385.873,
-        "fall_rate_error": 132.52
+        "fall_rate_error": 132.52,
+        "droop_rendered": -141.3,
+        "droop_reference": -527.173,
+        "fall_rate_rendered": -183.4,
+        "fall_rate_reference": -315.92
       },
       "354-707Hz": {
         "droop_error": 680.904,
-        "fall_rate_error": 138.38
+        "fall_rate_error": 138.38,
+        "droop_rendered": -122.323,
+        "droop_reference": -803.227,
+        "fall_rate_rendered": -175.73,
+        "fall_rate_reference": -314.11
       },
       "707-1414Hz": {
         "droop_error": 7.089,
-        "fall_rate_error": 130.87
+        "fall_rate_error": 130.87,
+        "droop_rendered": -114.411,
+        "droop_reference": -121.5,
+        "fall_rate_rendered": -179.07,
+        "fall_rate_reference": -309.94
       },
       "1414-2828Hz": {
         "droop_error": -277.068,
-        "fall_rate_error": 142.36
+        "fall_rate_error": 142.36,
+        "droop_rendered": -90.68,
+        "droop_reference": 186.388,
+        "fall_rate_rendered": -188.14,
+        "fall_rate_reference": -330.5
       },
       "2828-5657Hz": {
         "droop_error": -326.744,
-        "fall_rate_error": 181.84
+        "fall_rate_error": 181.84,
+        "droop_rendered": -129.982,
+        "droop_reference": 196.762,
+        "fall_rate_rendered": -185.14,
+        "fall_rate_reference": -366.98
       },
       "5657-11314Hz": {
         "droop_error": -287.605,
-        "fall_rate_error": 221.36
+        "fall_rate_error": 221.36,
+        "droop_rendered": -180.347,
+        "droop_reference": 107.258,
+        "fall_rate_rendered": -186.86,
+        "fall_rate_reference": -408.22
       },
       "11314-22049Hz": {
         "droop_error": -66.489,
-        "fall_rate_error": 693.32
+        "fall_rate_error": 693.32,
+        "droop_rendered": -200.965,
+        "droop_reference": -134.476,
+        "fall_rate_rendered": 288.04,
+        "fall_rate_reference": -405.28
       }
     },
     "onset_ned_mean_rendered": 0.3474854070155534,
@@ -83,39 +119,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 197.451,
-        "fall_rate_error": 56.15
+        "fall_rate_error": 56.15,
+        "droop_rendered": 33.781,
+        "droop_reference": -163.67,
+        "fall_rate_rendered": -244.06,
+        "fall_rate_reference": -300.21
       },
       "88-177Hz": {
         "droop_error": 211.783,
-        "fall_rate_error": 138.6
+        "fall_rate_error": 138.6,
+        "droop_rendered": -112.123,
+        "droop_reference": -323.906,
+        "fall_rate_rendered": -178.24,
+        "fall_rate_reference": -316.84
       },
       "177-354Hz": {
         "droop_error": 408.793,
-        "fall_rate_error": 129.7
+        "fall_rate_error": 129.7,
+        "droop_rendered": -118.387,
+        "droop_reference": -527.18,
+        "fall_rate_rendered": -186.12,
+        "fall_rate_reference": -315.82
       },
       "354-707Hz": {
         "droop_error": 1059.014,
-        "fall_rate_error": 97.66
+        "fall_rate_error": 97.66,
+        "droop_rendered": 255.781,
+        "droop_reference": -803.233,
+        "fall_rate_rendered": -216.53,
+        "fall_rate_reference": -314.19
       },
       "707-1414Hz": {
         "droop_error": 27.508,
-        "fall_rate_error": 124.25
+        "fall_rate_error": 124.25,
+        "droop_rendered": -93.958,
+        "droop_reference": -121.466,
+        "fall_rate_rendered": -185.56,
+        "fall_rate_reference": -309.81
       },
       "1414-2828Hz": {
         "droop_error": -251.575,
-        "fall_rate_error": 139.11
+        "fall_rate_error": 139.11,
+        "droop_rendered": -65.204,
+        "droop_reference": 186.371,
+        "fall_rate_rendered": -191.6,
+        "fall_rate_reference": -330.71
       },
       "2828-5657Hz": {
         "droop_error": -305.364,
-        "fall_rate_error": 171.3
+        "fall_rate_error": 171.3,
+        "droop_rendered": -108.592,
+        "droop_reference": 196.772,
+        "fall_rate_rendered": -194.96,
+        "fall_rate_reference": -366.26
       },
       "5657-11314Hz": {
         "droop_error": -271.589,
-        "fall_rate_error": 205.49
+        "fall_rate_error": 205.49,
+        "droop_rendered": -164.34,
+        "droop_reference": 107.249,
+        "fall_rate_rendered": -202.82,
+        "fall_rate_reference": -408.31
       },
       "11314-22049Hz": {
         "droop_error": -148.842,
-        "fall_rate_error": 527.79
+        "fall_rate_error": 527.79,
+        "droop_rendered": -235.736,
+        "droop_reference": -86.894,
+        "fall_rate_rendered": 435.86,
+        "fall_rate_reference": -91.93
       }
     },
     "onset_ned_mean_rendered": 0.3510585217406491,
@@ -150,39 +222,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 203.717,
-        "fall_rate_error": 81.05
+        "fall_rate_error": 81.05,
+        "droop_rendered": -3.262,
+        "droop_reference": -206.979,
+        "fall_rate_rendered": -197.73,
+        "fall_rate_reference": -278.78
       },
       "88-177Hz": {
         "droop_error": 125.992,
-        "fall_rate_error": 132.37
+        "fall_rate_error": 132.37,
+        "droop_rendered": -47.354,
+        "droop_reference": -173.346,
+        "fall_rate_rendered": -182.87,
+        "fall_rate_reference": -315.24
       },
       "177-354Hz": {
         "droop_error": 111.402,
-        "fall_rate_error": 139.46
+        "fall_rate_error": 139.46,
+        "droop_rendered": -55.455,
+        "droop_reference": -166.857,
+        "fall_rate_rendered": -177.91,
+        "fall_rate_reference": -317.37
       },
       "354-707Hz": {
         "droop_error": -90.585,
-        "fall_rate_error": 120.27
+        "fall_rate_error": 120.27,
+        "droop_rendered": -82.239,
+        "droop_reference": 8.346,
+        "fall_rate_rendered": -171.14,
+        "fall_rate_reference": -291.41
       },
       "707-1414Hz": {
         "droop_error": 69.771,
-        "fall_rate_error": 128.13
+        "fall_rate_error": 128.13,
+        "droop_rendered": 95.056,
+        "droop_reference": 25.285,
+        "fall_rate_rendered": -175.41,
+        "fall_rate_reference": -303.54
       },
       "1414-2828Hz": {
         "droop_error": 162.745,
-        "fall_rate_error": 146.0
+        "fall_rate_error": 146.0,
+        "droop_rendered": 129.013,
+        "droop_reference": -33.732,
+        "fall_rate_rendered": -182.5,
+        "fall_rate_reference": -328.5
       },
       "2828-5657Hz": {
         "droop_error": -21.764,
-        "fall_rate_error": 173.77
+        "fall_rate_error": 173.77,
+        "droop_rendered": -86.049,
+        "droop_reference": -64.285,
+        "fall_rate_rendered": -188.6,
+        "fall_rate_reference": -362.37
       },
       "5657-11314Hz": {
         "droop_error": 169.826,
-        "fall_rate_error": 199.25
+        "fall_rate_error": 199.25,
+        "droop_rendered": 173.142,
+        "droop_reference": 3.316,
+        "fall_rate_rendered": -207.99,
+        "fall_rate_reference": -407.24
       },
       "11314-22049Hz": {
         "droop_error": -159.107,
-        "fall_rate_error": 454.06
+        "fall_rate_error": 454.06,
+        "droop_rendered": -200.484,
+        "droop_reference": -41.377,
+        "fall_rate_rendered": 342.34,
+        "fall_rate_reference": -111.72
       }
     },
     "onset_ned_mean_rendered": 0.4779040944815452,
@@ -217,39 +325,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 100.631,
-        "fall_rate_error": 145.95
+        "fall_rate_error": 145.95,
+        "droop_rendered": -49.867,
+        "droop_reference": -150.498,
+        "fall_rate_rendered": -159.9,
+        "fall_rate_reference": -305.85
       },
       "88-177Hz": {
         "droop_error": 136.505,
-        "fall_rate_error": 142.79
+        "fall_rate_error": 142.79,
+        "droop_rendered": -12.992,
+        "droop_reference": -149.497,
+        "fall_rate_rendered": -161.98,
+        "fall_rate_reference": -304.77
       },
       "177-354Hz": {
         "droop_error": 39.121,
-        "fall_rate_error": 166.57
+        "fall_rate_error": 166.57,
+        "droop_rendered": 3.176,
+        "droop_reference": -35.945,
+        "fall_rate_rendered": -146.75,
+        "fall_rate_reference": -313.32
       },
       "354-707Hz": {
         "droop_error": 31.661,
-        "fall_rate_error": 169.25
+        "fall_rate_error": 169.25,
+        "droop_rendered": -23.202,
+        "droop_reference": -54.863,
+        "fall_rate_rendered": -140.82,
+        "fall_rate_reference": -310.07
       },
       "707-1414Hz": {
         "droop_error": 18.368,
-        "fall_rate_error": 169.41
+        "fall_rate_error": 169.41,
+        "droop_rendered": -14.216,
+        "droop_reference": -32.584,
+        "fall_rate_rendered": -141.56,
+        "fall_rate_reference": -310.97
       },
       "1414-2828Hz": {
         "droop_error": 10.619,
-        "fall_rate_error": 180.41
+        "fall_rate_error": 180.41,
+        "droop_rendered": -13.151,
+        "droop_reference": -23.77,
+        "fall_rate_rendered": -143.49,
+        "fall_rate_reference": -323.9
       },
       "2828-5657Hz": {
         "droop_error": 7.773,
-        "fall_rate_error": 219.0
+        "fall_rate_error": 219.0,
+        "droop_rendered": -25.662,
+        "droop_reference": -33.435,
+        "fall_rate_rendered": -152.7,
+        "fall_rate_reference": -371.7
       },
       "5657-11314Hz": {
         "droop_error": -11.928,
-        "fall_rate_error": 224.26
+        "fall_rate_error": 224.26,
+        "droop_rendered": -40.571,
+        "droop_reference": -28.643,
+        "fall_rate_rendered": -173.5,
+        "fall_rate_reference": -397.76
       },
       "11314-22049Hz": {
         "droop_error": -197.337,
-        "fall_rate_error": 296.25
+        "fall_rate_error": 296.25,
+        "droop_rendered": -148.748,
+        "droop_reference": 48.589,
+        "fall_rate_rendered": 166.96,
+        "fall_rate_reference": -129.29
       }
     },
     "onset_ned_mean_rendered": 0.48415704525046255,
@@ -284,39 +428,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": -22.806,
-        "fall_rate_error": 123.65
+        "fall_rate_error": 123.65,
+        "droop_rendered": -40.718,
+        "droop_reference": -17.912,
+        "fall_rate_rendered": -173.03,
+        "fall_rate_reference": -296.68
       },
       "88-177Hz": {
         "droop_error": 39.944,
-        "fall_rate_error": 113.08
+        "fall_rate_error": 113.08,
+        "droop_rendered": -21.443,
+        "droop_reference": -61.387,
+        "fall_rate_rendered": -181.27,
+        "fall_rate_reference": -294.35
       },
       "177-354Hz": {
         "droop_error": 23.516,
-        "fall_rate_error": 135.6
+        "fall_rate_error": 135.6,
+        "droop_rendered": -17.442,
+        "droop_reference": -40.958,
+        "fall_rate_rendered": -174.91,
+        "fall_rate_reference": -310.51
       },
       "354-707Hz": {
         "droop_error": 11.123,
-        "fall_rate_error": 116.4
+        "fall_rate_error": 116.4,
+        "droop_rendered": -30.071,
+        "droop_reference": -41.194,
+        "fall_rate_rendered": -184.34,
+        "fall_rate_reference": -300.74
       },
       "707-1414Hz": {
         "droop_error": -1.516,
-        "fall_rate_error": 111.7
+        "fall_rate_error": 111.7,
+        "droop_rendered": -26.157,
+        "droop_reference": -24.641,
+        "fall_rate_rendered": -184.73,
+        "fall_rate_reference": -296.43
       },
       "1414-2828Hz": {
         "droop_error": 11.632,
-        "fall_rate_error": 135.69
+        "fall_rate_error": 135.69,
+        "droop_rendered": -23.092,
+        "droop_reference": -34.724,
+        "fall_rate_rendered": -185.58,
+        "fall_rate_reference": -321.27
       },
       "2828-5657Hz": {
         "droop_error": 5.359,
-        "fall_rate_error": 194.43
+        "fall_rate_error": 194.43,
+        "droop_rendered": -30.67,
+        "droop_reference": -36.029,
+        "fall_rate_rendered": -181.05,
+        "fall_rate_reference": -375.48
       },
       "5657-11314Hz": {
         "droop_error": -26.619,
-        "fall_rate_error": 214.07
+        "fall_rate_error": 214.07,
+        "droop_rendered": -55.635,
+        "droop_reference": -29.016,
+        "fall_rate_rendered": -165.5,
+        "fall_rate_reference": -379.57
       },
       "11314-22049Hz": {
         "droop_error": -106.625,
-        "fall_rate_error": 110.13
+        "fall_rate_error": 110.13,
+        "droop_rendered": -114.936,
+        "droop_reference": -8.311,
+        "fall_rate_rendered": -44.36,
+        "fall_rate_reference": -154.49
       }
     },
     "onset_ned_mean_rendered": 0.41626786547364497,
@@ -351,39 +531,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": -167.136,
-        "fall_rate_error": 137.32
+        "fall_rate_error": 137.32,
+        "droop_rendered": -185.072,
+        "droop_reference": -17.936,
+        "fall_rate_rendered": -159.31,
+        "fall_rate_reference": -296.63
       },
       "88-177Hz": {
         "droop_error": 79.646,
-        "fall_rate_error": 124.62
+        "fall_rate_error": 124.62,
+        "droop_rendered": 18.309,
+        "droop_reference": -61.337,
+        "fall_rate_rendered": -169.84,
+        "fall_rate_reference": -294.46
       },
       "177-354Hz": {
         "droop_error": 41.118,
-        "fall_rate_error": 140.06
+        "fall_rate_error": 140.06,
+        "droop_rendered": 0.256,
+        "droop_reference": -40.862,
+        "fall_rate_rendered": -172.21,
+        "fall_rate_reference": -312.27
       },
       "354-707Hz": {
         "droop_error": 50.558,
-        "fall_rate_error": 133.91
+        "fall_rate_error": 133.91,
+        "droop_rendered": 9.214,
+        "droop_reference": -41.344,
+        "fall_rate_rendered": -166.93,
+        "fall_rate_reference": -300.84
       },
       "707-1414Hz": {
         "droop_error": 35.601,
-        "fall_rate_error": 128.32
+        "fall_rate_error": 128.32,
+        "droop_rendered": 10.631,
+        "droop_reference": -24.97,
+        "fall_rate_rendered": -167.57,
+        "fall_rate_reference": -295.89
       },
       "1414-2828Hz": {
         "droop_error": 53.107,
-        "fall_rate_error": 147.04
+        "fall_rate_error": 147.04,
+        "droop_rendered": 18.727,
+        "droop_reference": -34.38,
+        "fall_rate_rendered": -173.5,
+        "fall_rate_reference": -320.54
       },
       "2828-5657Hz": {
         "droop_error": 42.225,
-        "fall_rate_error": 202.16
+        "fall_rate_error": 202.16,
+        "droop_rendered": 5.875,
+        "droop_reference": -36.35,
+        "fall_rate_rendered": -178.19,
+        "fall_rate_reference": -380.35
       },
       "5657-11314Hz": {
         "droop_error": 14.587,
-        "fall_rate_error": 203.77
+        "fall_rate_error": 203.77,
+        "droop_rendered": -15.768,
+        "droop_reference": -30.355,
+        "fall_rate_rendered": -181.05,
+        "fall_rate_reference": -384.82
       },
       "11314-22049Hz": {
         "droop_error": -133.649,
-        "fall_rate_error": 132.04
+        "fall_rate_error": 132.04,
+        "droop_rendered": -140.89,
+        "droop_reference": -7.241,
+        "fall_rate_rendered": -18.15,
+        "fall_rate_reference": -150.19
       }
     },
     "onset_ned_mean_rendered": 0.4752242584377235,
@@ -418,39 +634,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 2.535,
-        "fall_rate_error": 99.75
+        "fall_rate_error": 99.75,
+        "droop_rendered": -45.558,
+        "droop_reference": -48.093,
+        "fall_rate_rendered": -164.69,
+        "fall_rate_reference": -264.44
       },
       "88-177Hz": {
         "droop_error": 23.418,
-        "fall_rate_error": 111.3
+        "fall_rate_error": 111.3,
+        "droop_rendered": -23.936,
+        "droop_reference": -47.354,
+        "fall_rate_rendered": -176.94,
+        "fall_rate_reference": -288.24
       },
       "177-354Hz": {
         "droop_error": 7.382,
-        "fall_rate_error": 144.25
+        "fall_rate_error": 144.25,
+        "droop_rendered": -30.949,
+        "droop_reference": -38.331,
+        "fall_rate_rendered": -168.29,
+        "fall_rate_reference": -312.54
       },
       "354-707Hz": {
         "droop_error": 6.207,
-        "fall_rate_error": 140.0
+        "fall_rate_error": 140.0,
+        "droop_rendered": -33.466,
+        "droop_reference": -39.673,
+        "fall_rate_rendered": -177.67,
+        "fall_rate_reference": -317.67
       },
       "707-1414Hz": {
         "droop_error": 7.981,
-        "fall_rate_error": 126.77
+        "fall_rate_error": 126.77,
+        "droop_rendered": -29.507,
+        "droop_reference": -37.488,
+        "fall_rate_rendered": -179.29,
+        "fall_rate_reference": -306.06
       },
       "1414-2828Hz": {
         "droop_error": 1.647,
-        "fall_rate_error": 144.52
+        "fall_rate_error": 144.52,
+        "droop_rendered": -32.054,
+        "droop_reference": -33.701,
+        "fall_rate_rendered": -179.62,
+        "fall_rate_reference": -324.14
       },
       "2828-5657Hz": {
         "droop_error": -1.532,
-        "fall_rate_error": 173.48
+        "fall_rate_error": 173.48,
+        "droop_rendered": -35.366,
+        "droop_reference": -33.834,
+        "fall_rate_rendered": -179.15,
+        "fall_rate_reference": -352.63
       },
       "5657-11314Hz": {
         "droop_error": -27.092,
-        "fall_rate_error": 216.64
+        "fall_rate_error": 216.64,
+        "droop_rendered": -59.147,
+        "droop_reference": -32.055,
+        "fall_rate_rendered": -167.09,
+        "fall_rate_reference": -383.73
       },
       "11314-22049Hz": {
         "droop_error": -115.051,
-        "fall_rate_error": 135.64
+        "fall_rate_error": 135.64,
+        "droop_rendered": -127.456,
+        "droop_reference": -12.405,
+        "fall_rate_rendered": -13.97,
+        "fall_rate_reference": -149.61
       }
     },
     "onset_ned_mean_rendered": 0.426987209648932,
@@ -485,39 +737,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 3.913,
-        "fall_rate_error": 96.09
+        "fall_rate_error": 96.09,
+        "droop_rendered": -44.122,
+        "droop_reference": -48.035,
+        "fall_rate_rendered": -167.95,
+        "fall_rate_reference": -264.04
       },
       "88-177Hz": {
         "droop_error": 24.96,
-        "fall_rate_error": 103.74
+        "fall_rate_error": 103.74,
+        "droop_rendered": -22.437,
+        "droop_reference": -47.397,
+        "fall_rate_rendered": -184.26,
+        "fall_rate_reference": -288.0
       },
       "177-354Hz": {
         "droop_error": 9.162,
-        "fall_rate_error": 140.37
+        "fall_rate_error": 140.37,
+        "droop_rendered": -29.189,
+        "droop_reference": -38.351,
+        "fall_rate_rendered": -172.01,
+        "fall_rate_reference": -312.38
       },
       "354-707Hz": {
         "droop_error": 7.668,
-        "fall_rate_error": 132.39
+        "fall_rate_error": 132.39,
+        "droop_rendered": -31.824,
+        "droop_reference": -39.492,
+        "fall_rate_rendered": -185.23,
+        "fall_rate_reference": -317.62
       },
       "707-1414Hz": {
         "droop_error": 9.299,
-        "fall_rate_error": 118.66
+        "fall_rate_error": 118.66,
+        "droop_rendered": -28.024,
+        "droop_reference": -37.323,
+        "fall_rate_rendered": -187.93,
+        "fall_rate_reference": -306.59
       },
       "1414-2828Hz": {
         "droop_error": 2.777,
-        "fall_rate_error": 137.51
+        "fall_rate_error": 137.51,
+        "droop_rendered": -30.563,
+        "droop_reference": -33.34,
+        "fall_rate_rendered": -186.34,
+        "fall_rate_reference": -323.85
       },
       "2828-5657Hz": {
         "droop_error": 0.206,
-        "fall_rate_error": 170.64
+        "fall_rate_error": 170.64,
+        "droop_rendered": -33.573,
+        "droop_reference": -33.779,
+        "fall_rate_rendered": -181.49,
+        "fall_rate_reference": -352.13
       },
       "5657-11314Hz": {
         "droop_error": -24.854,
-        "fall_rate_error": 221.04
+        "fall_rate_error": 221.04,
+        "droop_rendered": -56.476,
+        "droop_reference": -31.622,
+        "fall_rate_rendered": -157.81,
+        "fall_rate_reference": -378.85
       },
       "11314-22049Hz": {
         "droop_error": -104.484,
-        "fall_rate_error": 123.08
+        "fall_rate_error": 123.08,
+        "droop_rendered": -118.242,
+        "droop_reference": -13.758,
+        "fall_rate_rendered": -29.45,
+        "fall_rate_reference": -152.53
       }
     },
     "onset_ned_mean_rendered": 0.4001888492107145,
@@ -552,39 +840,75 @@
     "band_errors": {
       "44-89Hz": {
         "droop_error": 29.705,
-        "fall_rate_error": 113.16
+        "fall_rate_error": 113.16,
+        "droop_rendered": -18.371,
+        "droop_reference": -48.076,
+        "fall_rate_rendered": -151.16,
+        "fall_rate_reference": -264.32
       },
       "88-177Hz": {
         "droop_error": 29.458,
-        "fall_rate_error": 114.14
+        "fall_rate_error": 114.14,
+        "droop_rendered": -17.775,
+        "droop_reference": -47.233,
+        "fall_rate_rendered": -174.17,
+        "fall_rate_reference": -288.31
       },
       "177-354Hz": {
         "droop_error": 17.38,
-        "fall_rate_error": 151.21
+        "fall_rate_error": 151.21,
+        "droop_rendered": -20.938,
+        "droop_reference": -38.318,
+        "fall_rate_rendered": -160.88,
+        "fall_rate_reference": -312.09
       },
       "354-707Hz": {
         "droop_error": 43.986,
-        "fall_rate_error": 157.64
+        "fall_rate_error": 157.64,
+        "droop_rendered": 4.274,
+        "droop_reference": -39.712,
+        "fall_rate_rendered": -160.22,
+        "fall_rate_reference": -317.86
       },
       "707-1414Hz": {
         "droop_error": 40.988,
-        "fall_rate_error": 139.63
+        "fall_rate_error": 139.63,
+        "droop_rendered": 3.489,
+        "droop_reference": -37.499,
+        "fall_rate_rendered": -166.01,
+        "fall_rate_reference": -305.64
       },
       "1414-2828Hz": {
         "droop_error": 46.087,
-        "fall_rate_error": 153.76
+        "fall_rate_error": 153.76,
+        "droop_rendered": 12.166,
+        "droop_reference": -33.921,
+        "fall_rate_rendered": -170.37,
+        "fall_rate_reference": -324.13
       },
       "2828-5657Hz": {
         "droop_error": 35.031,
-        "fall_rate_error": 177.67
+        "fall_rate_error": 177.67,
+        "droop_rendered": 0.872,
+        "droop_reference": -34.159,
+        "fall_rate_rendered": -176.78,
+        "fall_rate_reference": -354.45
       },
       "5657-11314Hz": {
         "droop_error": 10.327,
-        "fall_rate_error": 207.05
+        "fall_rate_error": 207.05,
+        "droop_rendered": -21.974,
+        "droop_reference": -32.301,
+        "fall_rate_rendered": -179.28,
+        "fall_rate_reference": -386.33
       },
       "11314-22049Hz": {
         "droop_error": -122.738,
-        "fall_rate_error": 132.08
+        "fall_rate_error": 132.08,
+        "droop_rendered": -136.056,
+        "droop_reference": -13.318,
+        "fall_rate_rendered": -16.63,
+        "fall_rate_reference": -148.71
       }
     },
     "onset_ned_mean_rendered": 0.47433097975644956,

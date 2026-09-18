@@ -138,9 +138,20 @@ def compare_one(capture: dict, render_path: str) -> dict:
     band_ref = band_gate_params(ref_mono, sr_ref, onset_ref, bands)
     band_errors = {}
     for key in band_r:
-        droop_err = signed_error(band_r[key]["plateau_droop_db_per_s"], band_ref.get(key, {}).get("plateau_droop_db_per_s"))
-        fall_err = signed_error(band_r[key]["fall_rate_db_per_s"], band_ref.get(key, {}).get("fall_rate_db_per_s"))
-        band_errors[f"{key[0]:.0f}-{key[1]:.0f}Hz"] = {"droop_error": droop_err, "fall_rate_error": fall_err}
+        droop_r = band_r[key]["plateau_droop_db_per_s"]
+        droop_ref = band_ref.get(key, {}).get("plateau_droop_db_per_s")
+        fall_r = band_r[key]["fall_rate_db_per_s"]
+        fall_ref = band_ref.get(key, {}).get("fall_rate_db_per_s")
+        band_errors[f"{key[0]:.0f}-{key[1]:.0f}Hz"] = {
+            "droop_error": signed_error(droop_r, droop_ref),
+            "fall_rate_error": signed_error(fall_r, fall_ref),
+            # Raw values, not just the signed error - a sign MISMATCH (render rising when real
+            # decays, or vice versa) is a qualitatively different, more severe failure than "same
+            # direction, wrong magnitude", and the error alone can't distinguish the two (see
+            # _band_sign_mismatches' own docstring for the real bug this exists to catch).
+            "droop_rendered": droop_r, "droop_reference": droop_ref,
+            "fall_rate_rendered": fall_r, "fall_rate_reference": fall_ref,
+        }
 
     # Onset-specific density (fine window/hop, first 20ms only) - distinct from the coarser
     # normalized_echo_density comparison below, which measures TIME-TO-full-diffuseness, not
@@ -248,6 +259,89 @@ CONCERN_THRESHOLDS: list[tuple[str, list[str], float, str]] = [
      "the gate's post-knee fall is audibly too fast or too slow relative to the real hardware."),
 ]
 
+# Per-band magnitude thresholds - a SEPARATE check from CONCERN_THRESHOLDS above (which only
+# looks at broadband/aggregate numbers), added after a real, ear-caught "huffy, low-mid resonance"
+# complaint that the broadband checks completely missed: the render's per-band plateau droop was
+# POSITIVE (rising, not decaying) in several bands while the broadband average still looked
+# reasonable, because positive and negative per-band errors cancel out in a single mean. band_errors
+# has carried this data in validation_results.json since the metric was added (see Phase 6 of the
+# original project plan: "Report per-octave-band plateau droop and fall rate"), but nothing ever
+# actually checked it - the exact "the numbers were all there, just not called out" pattern
+# CONCERN_THRESHOLDS' own docstring above describes, one level deeper. Threshold picked from the
+# real gap this complaint traced to (median per-band droop error ~41dB/s, mean ~106dB/s across all
+# 81 band/capture combinations at the time this was added) - meant to catch a comparably-sized
+# regression, not to certify perfection.
+BAND_CONCERN_THRESHOLDS: list[tuple[str, str, float, str]] = [
+    ("Per-band plateau droop error (dB/s, mean |error|)", "droop_error", 25.0,
+     "at least one octave band's mid-plateau decay is measurably off from the real hardware's own "
+     "- check the per-band table for which band(s), and whether any show a SIGN mismatch below "
+     "(a far more severe failure than a magnitude-only miss)."),
+    ("Per-band fall rate error (dB/s, mean |error|)", "fall_rate_error", 25.0,
+     "at least one octave band's post-knee fall rate is measurably off from the real hardware's "
+     "own - check the per-band table for which band(s)."),
+]
+
+
+def _flag_band_magnitude_concerns(results: list[dict], group_label: str) -> list[str]:
+    """Mirrors _flag_concerns, but for BAND_CONCERN_THRESHOLDS - aggregates the mean absolute
+    error across every octave band in every capture in `results` (not per-band, since with only
+    9 captures there isn't enough data to trust a per-band-alone aggregate; this is a coarse
+    tripwire, not a diagnosis - the per-band table is where the actual diagnosis happens)."""
+    flags = []
+    for label, key, threshold, interpretation in BAND_CONCERN_THRESHOLDS:
+        errors = [
+            vals[key] for r in results for vals in r.get("band_errors", {}).values()
+            if vals.get(key) is not None
+        ]
+        if not errors:
+            continue
+        mean_abs = round(float(np.mean(np.abs(errors))), 3)
+        if mean_abs > threshold:
+            flags.append(f"**{label} ({group_label})**: {mean_abs} exceeds {threshold} - {interpretation}")
+    return flags
+
+
+def _band_sign_mismatches(results: list[dict], real_floor_db_per_s: float = 10.0) -> list[str]:
+    """Every (capture, band, metric) where the render and the real capture DISAGREE ON DIRECTION -
+    the render rising (or flat) where the real hardware clearly decays, or vice versa. Qualitatively
+    different from, and more severe than, "right direction, wrong magnitude" (what the mean-|error|
+    check above catches) - a sign flip means the render's per-band character is not just imprecise
+    but backwards, which a magnitude-only aggregate can hide entirely if positive and negative
+    per-band errors happen to cancel out.
+
+    `real_floor_db_per_s` guards against flagging a real value that's already near zero (where
+    "which sign" is dominated by measurement noise, not a real hardware property) - only a real
+    decay/rise steeper than this floor counts. No threshold on the render's own magnitude: a
+    render sitting at +0.01dB/s while real decays at -50dB/s is still a real, audible sign flip
+    (essentially not decaying at all where it clearly should be), not a rounding difference.
+
+    Added after a real "huffy, low-mid resonance... rings out longer than the IR's" complaint
+    traced to exactly this - core.features.band_gate_params showed several bands (varying by Time
+    setting, e.g. 354-1414Hz at Time=9.8/High=0, 88-707Hz at Time=7.0/High=0) with a positive
+    (rising) render droop against a clearly-decaying real target, invisible in every existing
+    broadband/aggregate check. Found to affect 26 of 162 band/capture/metric combinations (9
+    bands x 9 captures x 2 metrics) at the time this was added - not a rare edge case, and not
+    one-directional either (some bands/captures show the opposite mismatch - real hardware rising
+    where the render decays)."""
+    lines = []
+    for r in results:
+        for band, vals in r.get("band_errors", {}).items():
+            for metric, rendered_key, reference_key in (
+                ("plateau droop", "droop_rendered", "droop_reference"),
+                ("fall rate", "fall_rate_rendered", "fall_rate_reference"),
+            ):
+                rendered, reference = vals.get(rendered_key), vals.get(reference_key)
+                if rendered is None or reference is None:
+                    continue
+                if abs(reference) < real_floor_db_per_s:
+                    continue
+                if (rendered > 0) != (reference > 0):
+                    lines.append(
+                        f"Time={r['time']} High={r['high']} {band} {metric}: render={rendered:.2f}dB/s "
+                        f"vs. real={reference:.2f}dB/s - opposite direction"
+                    )
+    return lines
+
 
 def _flag_concerns(results: list[dict], group_label: str) -> list[str]:
     """Returns human-readable flag lines for every CONCERN_THRESHOLDS metric whose aggregate
@@ -271,6 +365,34 @@ def _aggregate(results: list[dict], field_path: list[str]) -> float | None:
         if v is not None:
             values.append(v)
     return round(float(np.mean(values)), 3) if values else None
+
+
+def _compute_all_flags(results: list[dict]) -> tuple[list[str], list[str]]:
+    """Single source of truth for every flagged concern - CONCERN_THRESHOLDS, BAND_CONCERN_
+    THRESHOLDS, and the per-band sign-mismatch summary line - shared between write_report() and
+    main()'s own console summary. Previously duplicated inline in both places, which is exactly
+    how the sign-mismatch/magnitude checks could have silently existed in one but not the other -
+    the same class of drift this whole addition exists to catch, one level up. Returns
+    (flags, sign_mismatch_detail_lines) - the caller decides how to render each."""
+    h0_results = [r for r in results if r["high"] == 0]
+    hneg_results = [r for r in results if r["high"] != 0]
+    flags = (
+        _flag_concerns(results, "all")
+        + _flag_concerns(h0_results, "High=0")
+        + _flag_concerns(hneg_results, "High!=0")
+        + _flag_band_magnitude_concerns(results, "all")
+        + _flag_band_magnitude_concerns(h0_results, "High=0")
+        + _flag_band_magnitude_concerns(hneg_results, "High!=0")
+    )
+    sign_mismatches = _band_sign_mismatches(results)
+    if sign_mismatches:
+        flags.append(
+            f"Per-band sign mismatches (all): {len(sign_mismatches)} band/capture/metric "
+            f"combination(s) where the render decays in the OPPOSITE direction from the real "
+            f"hardware - a more severe failure than a magnitude-only miss. See validation_report."
+            f"md's own 'Per-band sign mismatches' section for the full list."
+        )
+    return flags, sign_mismatches
 
 
 def write_report(results: list[dict]) -> None:
@@ -315,11 +437,7 @@ def write_report(results: list[dict]) -> None:
 
     lines.append("## Flagged concerns")
     lines.append("")
-    all_flags = (
-        _flag_concerns(all_results, "all")
-        + _flag_concerns(h0_results, "High=0")
-        + _flag_concerns(hneg_results, "High!=0")
-    )
+    all_flags, sign_mismatches = _compute_all_flags(all_results)
     if all_flags:
         lines.append("The following aggregate values exceed a threshold picked from the magnitude "
                       "of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - "
@@ -329,6 +447,20 @@ def write_report(results: list[dict]) -> None:
             lines.append(f"- {flag}")
     else:
         lines.append("None of the tracked metrics exceed their interpretation threshold.")
+    lines.append("")
+
+    lines.append("## Per-band sign mismatches")
+    lines.append("")
+    lines.append("Every octave band/capture/metric where the render decays in the OPPOSITE "
+                  "direction from the real hardware (see `_band_sign_mismatches`' own docstring) - "
+                  "a more severe failure than the magnitude-only per-band check above, since a sign "
+                  "flip can hide entirely inside a broadband average that still looks reasonable.")
+    lines.append("")
+    if sign_mismatches:
+        for line in sign_mismatches:
+            lines.append(f"- {line}")
+    else:
+        lines.append("None.")
     lines.append("")
 
     lines.append("## Stereo (IACC, rendered vs. reference, per capture)")
@@ -377,13 +509,7 @@ def main() -> None:
     print(f"\nWrote {RESULTS_PATH}")
     print(f"Wrote {REPORT_PATH}")
 
-    h0_results = [r for r in results if r["high"] == 0]
-    hneg_results = [r for r in results if r["high"] != 0]
-    all_flags = (
-        _flag_concerns(results, "all")
-        + _flag_concerns(h0_results, "High=0")
-        + _flag_concerns(hneg_results, "High!=0")
-    )
+    all_flags, _ = _compute_all_flags(results)
     if all_flags:
         print(f"\n{len(all_flags)} concern(s) flagged (see validation_report.md's own section):")
         for flag in all_flags:
