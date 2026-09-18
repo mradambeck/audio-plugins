@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         8781044cccf66023f50dd0b2c994b1342cfd506f
+//   git commit:         bf721fbe91f88a8e3d34cce2450f3b8bbc1ace03
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-18
@@ -181,10 +181,10 @@ static_assert(high_to_early_excess_db_offsetPoints.front().x <= high_to_early_ex
 
 // time_to_plateau_droop_low_db_per_s
 static constexpr std::array<FittedPoint, 4> time_to_plateau_droop_low_db_per_sPoints { {
-    { 2.2f, -1.8599999999999999f },
-    { 4.8f, -102.1615f },
-    { 7.0f, -18.708499999999997f },
-    { 9.8f, -25.8245f },
+    { 2.2f, 60.842f },
+    { 4.8f, -96.51650000000001f },
+    { 7.0f, -11.003499999999999f },
+    { 9.8f, -31.6605f },
 } };
 static_assert(time_to_plateau_droop_low_db_per_sPoints.front().x <= time_to_plateau_droop_low_db_per_sPoints.back().x,
     "time_to_plateau_droop_low_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
@@ -202,7 +202,7 @@ static_assert(high_to_plateau_droop_low_db_per_s_offsetPoints.front().x <= high_
 static constexpr std::array<FittedPoint, 6> time_to_fall_rate_low_db_per_sPoints { {
     { 0.1f, -308.80125f },
     { 0.8f, -308.50624999999997f },
-    { 2.2f, -295.044f },
+    { 2.2f, -297.01f },
     { 4.8f, -155.3125f },
     { 7.0f, -255.97699999999992f },
     { 9.8f, -228.6605f },
@@ -221,10 +221,10 @@ static_assert(high_to_fall_rate_low_db_per_s_offsetPoints.front().x <= high_to_f
 
 // time_to_plateau_droop_mid_db_per_s
 static constexpr std::array<FittedPoint, 4> time_to_plateau_droop_mid_db_per_sPoints { {
-    { 2.2f, -3.607833333333332f },
-    { 4.8f, 1.0566666666666649f },
-    { 7.0f, -13.176166666666667f },
-    { 9.8f, -15.93999999999999f },
+    { 2.2f, -9.311833333333336f },
+    { 4.8f, 11.795666666666662f },
+    { 7.0f, -11.257166666666667f },
+    { 9.8f, -14.752999999999993f },
 } };
 static_assert(time_to_plateau_droop_mid_db_per_sPoints.front().x <= time_to_plateau_droop_mid_db_per_sPoints.back().x,
     "time_to_plateau_droop_mid_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
@@ -240,8 +240,8 @@ static_assert(high_to_plateau_droop_mid_db_per_s_offsetPoints.front().x <= high_
 
 // time_to_fall_rate_mid_db_per_s
 static constexpr std::array<FittedPoint, 6> time_to_fall_rate_mid_db_per_sPoints { {
-    { 0.1f, -334.0359358974359f },
-    { 0.8f, -335.1967628205128f },
+    { 0.1f, -315.0510512820513f },
+    { 0.8f, -320.6388397435897f },
     { 2.2f, -297.0838333333333f },
     { 4.8f, -337.9533333333333f },
     { 7.0f, -297.4273333333333f },
@@ -261,10 +261,10 @@ static_assert(high_to_fall_rate_mid_db_per_s_offsetPoints.front().x <= high_to_f
 
 // time_to_plateau_droop_high_db_per_s
 static constexpr std::array<FittedPoint, 4> time_to_plateau_droop_high_db_per_sPoints { {
-    { 2.2f, 101.65599999999998f },
-    { 4.8f, 150.13400000000001f },
-    { 7.0f, 100.529f },
-    { 9.8f, 93.396f },
+    { 2.2f, 79.499f },
+    { 4.8f, 159.204f },
+    { 7.0f, 96.263f },
+    { 9.8f, 89.608f },
 } };
 static_assert(time_to_plateau_droop_high_db_per_sPoints.front().x <= time_to_plateau_droop_high_db_per_sPoints.back().x,
     "time_to_plateau_droop_high_db_per_sPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");

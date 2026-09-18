@@ -271,28 +271,36 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     tiltL.setPivotHz(params.tiltPivotHz, sampleRate);
     tiltR.setPivotHz(params.tiltPivotHz, sampleRate);
 
-    // Per-band gate split - two cascaded one-pole complementary splits per channel (same
-    // low+high=input-exactly technique as wildjag::dsp::BandShelf above, just applied twice to
-    // carve out a middle band): splitLow peels off everything below lowMidCrossoverHz; splitHigh
-    // then peels the mid band away from what's left, leaving low+mid+high == input exactly
-    // whenever all three bands are gated identically - see InhaltIRSynth.h's own comment on why
-    // the decay rate (not the crossover topology) is what's actually band-calibrated.
-    //
-    // A steeper, CASCADED (4-stage) version of this split was tried and reverted: the
-    // complementary reconstruction (high = input - low) stays exact regardless of how steep the
-    // "low" estimate is, so the idea was sound, but cascading N one-pole stages at the SAME
-    // nominal cutoff shifts the cascade's own effective -3dB point well below that cutoff (a
-    // known property of cascaded first-order sections, not accounted for) - measured directly:
-    // the resulting bands no longer aligned with the analysis bands this engine is calibrated
-    // against, and per-band accuracy measurably WORSENED (sign mismatches, fall_rate errors both
-    // increased) rather than improved. Revisiting this needs the cutoff-correction factor for a
-    // cascaded one-pole's actual -3dB point (fc * sqrt(2^(1/N) - 1)) or a proper multi-pole
-    // (Butterworth/Linkwitz-Riley) design, not just more stages at the same nominal frequency.
-    wildjag::dsp::OnePoleFilter splitLowL, splitLowR, splitHighL, splitHighR;
-    splitLowL.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
-    splitLowR.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz, sampleRate);
-    splitHighL.setCutoffHz(InhaltIRSynth::midHighCrossoverHz, sampleRate);
-    splitHighR.setCutoffHz(InhaltIRSynth::midHighCrossoverHz, sampleRate);
+    // Per-band gate split - cascaded one-pole complementary splits per channel (same
+    // low+high=input-exactly technique as wildjag::dsp::BandShelf above, just STEEPER and applied
+    // twice to carve out a middle band). The complementary reconstruction (high = input - low)
+    // stays EXACT regardless of how the "low" estimate is computed, so cascading N one-pole stages
+    // for a steeper (~6*N dB/octave) roll-off is safe on its own - a first attempt at this used
+    // splitPoleStages one-pole stages at the crossover frequency ITSELF as each stage's own
+    // cutoff, and measurably WORSENED per-band accuracy: cascading N identical one-pole stages
+    // shifts the CASCADE's own effective -3dB point to fc*sqrt(2^(1/N)-1), well below the nominal
+    // fc each stage was individually set to (verified: at splitPoleStages=4 the bands shifted far
+    // enough to misalign with the analysis bands this engine calibrates against entirely). Fixed
+    // by compensating each stage's own cutoff so the CASCADE's own -3dB point lands exactly on
+    // lowMidCrossoverHz/midHighCrossoverHz - splitPoleCompensation is 1/sqrt(2^(1/N)-1) for that N.
+    // N=2 (not 4) specifically to keep the compensated high crossover safely under Nyquist at
+    // ordinary session rates (4 stages' own compensation factor would push midHighCrossoverHz's
+    // compensated cutoff above 22kHz Nyquist at 44.1kHz - not just steeper, actively invalid).
+    static constexpr int splitPoleStages = 2;
+    const auto splitPoleCompensation = 1.0f / std::sqrt(std::pow(2.0f, 1.0f / (float) splitPoleStages) - 1.0f);
+    std::array<wildjag::dsp::OnePoleFilter, splitPoleStages> splitLowL, splitLowR, splitHighL, splitHighR;
+    for (auto& f : splitLowL) f.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz * splitPoleCompensation, sampleRate);
+    for (auto& f : splitLowR) f.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz * splitPoleCompensation, sampleRate);
+    for (auto& f : splitHighL) f.setCutoffHz(InhaltIRSynth::midHighCrossoverHz * splitPoleCompensation, sampleRate);
+    for (auto& f : splitHighR) f.setCutoffHz(InhaltIRSynth::midHighCrossoverHz * splitPoleCompensation, sampleRate);
+
+    auto cascadedLowpass = [](std::array<wildjag::dsp::OnePoleFilter, splitPoleStages>& stages, float x) noexcept
+    {
+        auto y = x;
+        for (auto& stage : stages)
+            y = stage.processSample(y);
+        return y;
+    };
 
     for (int n = 0; n < numSamples; ++n)
     {
@@ -316,14 +324,14 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         const auto tiltedL = tiltL.processSample(combinedL);
         const auto tiltedR = tiltR.processSample(combinedR);
 
-        const auto lowL = splitLowL.processSample(tiltedL);
+        const auto lowL = cascadedLowpass(splitLowL, tiltedL);
         const auto restL = tiltedL - lowL;
-        const auto midL = splitHighL.processSample(restL);
+        const auto midL = cascadedLowpass(splitHighL, restL);
         const auto highL = restL - midL;
 
-        const auto lowR = splitLowR.processSample(tiltedR);
+        const auto lowR = cascadedLowpass(splitLowR, tiltedR);
         const auto restR = tiltedR - lowR;
-        const auto midR = splitHighR.processSample(restR);
+        const auto midR = cascadedLowpass(splitHighR, restR);
         const auto highR = restR - midR;
 
         const auto tSeconds = (float) n / (float) sampleRate;

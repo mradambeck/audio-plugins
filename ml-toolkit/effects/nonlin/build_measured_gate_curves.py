@@ -854,28 +854,25 @@ _PER_BAND_GROUPS = {
 # temporarily force all three plateauDroop{Low,Mid,High}DbPerSec fields to 0.0f in
 # InhaltIRWorker.cpp, build InhaltRenderIR, render at High=0, measure core.features.
 # band_gate_params() per analysis band, aggregate into low/mid/high via _PER_BAND_GROUPS, revert.
-# Specific to InhaltIRSynth.cpp's own single-one-pole-stage crossover split (a steeper,
-# 4-cascaded-pole version was tried and reverted - see that file's own comment on
-# splitLow/splitHigh for why; these values would need re-measuring if the crossover ever changes).
+# Specific to InhaltIRSynth.cpp's own splitPoleStages=2 cutoff-compensated cascaded crossover split
+# (see that file's own comment on splitLowL/splitHighL for the two earlier crossover designs this
+# superseded) - these values would need re-measuring if the crossover ever changes again.
 #
-# Time=2.2's own LOW band needed a DIFFERENT measurement than the other 11 entries here - real
-# mode-beating, not a fit bug: at such a low absolute frequency (44-89Hz) there are very few full
-# cycles within Time=2.2's own short plateau, and the tank's own widely-spaced low-frequency modes
-# beat against each other, producing a genuinely oscillating (not monotonic) envelope -
-# gate_envelope_params()'s swept-breakpoint fit found an essentially arbitrary two-segment split of
-# that oscillation (-542.7dB/s, not physically meaningful). A direct linear regression over
-# [20ms, 130ms] of the raw bandpassed envelope (skipping the earliest build-up, ending before the
-# real knee) gives a far more sensible -0.106dB/s - confirmed this isn't a render-only artifact by
-# checking the REAL capture's own target at this exact band/Time the same way (see
-# _TARGET_DROOP_ROBUST_OVERRIDE below): it breaks identically (-207.0dB/s via swept-breakpoint vs.
-# -1.966dB/s via the same robust regression), so both sides of this one correction use the robust
-# method for internal consistency, while every other band/Time keeps gate_envelope_params' own
-# standard method (all show sensible, non-oscillating values).
+# Time=2.2's own LOW band was a genuine outlier under the FIRST (single, uncompensated one-pole
+# stage) crossover - real mode-beating, not a fit bug: a gentle 6dB/octave split let in enough
+# adjacent-band energy that the tank's own widely-spaced low-frequency modes beat against each
+# other within Time=2.2's own short plateau, producing a genuinely oscillating envelope
+# gate_envelope_params()'s swept-breakpoint fit couldn't sensibly fit (-542.7dB/s). The current,
+# steeper crossover resolved this as a side effect, same as it did under the (since-reverted)
+# 4-stage attempt - measured cleanly with the standard method now, no special-casing needed for
+# this entry. The REAL capture's own target at this same band/Time still needs its own
+# robust-regression override (see _TARGET_DROOP_ROBUST_OVERRIDE below) - that side is unrelated to
+# this engine's own crossover and unaffected by any of these changes.
 _NATURAL_DROOP_PER_BAND_CPP_MEASURED = {
-    (2.2, "low"): -0.106, (2.2, "mid"): -34.380, (2.2, "high"): -143.033,
-    (4.8, "low"): -47.836, (4.8, "mid"): -35.930, (4.8, "high"): -101.545,
-    (7.0, "low"): -20.928, (7.0, "mid"): -21.534, (7.0, "high"): -107.770,
-    (9.8, "low"): -21.830, (9.8, "mid"): -20.045, (9.8, "high"): -106.714,
+    (2.2, "low"): -62.808, (2.2, "mid"): -28.676, (2.2, "high"): -120.876,
+    (4.8, "low"): -53.481, (4.8, "mid"): -46.669, (4.8, "high"): -110.615,
+    (7.0, "low"): -28.633, (7.0, "mid"): -23.453, (7.0, "high"): -103.504,
+    (9.8, "low"): -15.994, (9.8, "mid"): -21.232, (9.8, "high"): -102.926,
 }
 
 # Time=2.2's own low-band TARGET (the real capture's own measured value, not this engine's) needed
