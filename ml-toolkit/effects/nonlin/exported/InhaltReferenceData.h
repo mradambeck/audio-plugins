@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         bf721fbe91f88a8e3d34cce2450f3b8bbc1ace03
+//   git commit:         27fb0f050db53d7d5eb3bf61c5ab2b6aa030620e
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-18
@@ -181,7 +181,7 @@ static_assert(high_to_early_excess_db_offsetPoints.front().x <= high_to_early_ex
 
 // time_to_plateau_droop_low_db_per_s
 static constexpr std::array<FittedPoint, 4> time_to_plateau_droop_low_db_per_sPoints { {
-    { 2.2f, 60.842f },
+    { 2.2f, -127.35450000000003f },
     { 4.8f, -96.51650000000001f },
     { 7.0f, -11.003499999999999f },
     { 9.8f, -31.6605f },
@@ -200,9 +200,9 @@ static_assert(high_to_plateau_droop_low_db_per_s_offsetPoints.front().x <= high_
 
 // time_to_fall_rate_low_db_per_s
 static constexpr std::array<FittedPoint, 6> time_to_fall_rate_low_db_per_sPoints { {
-    { 0.1f, -308.80125f },
-    { 0.8f, -308.50624999999997f },
-    { 2.2f, -297.01f },
+    { 0.1f, -156.53913461538454f },
+    { 0.8f, -164.54667307692299f },
+    { 2.2f, -106.84749999999997f },
     { 4.8f, -155.3125f },
     { 7.0f, -255.97699999999992f },
     { 9.8f, -228.6605f },

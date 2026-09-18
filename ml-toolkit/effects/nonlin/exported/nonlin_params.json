@@ -1,6 +1,6 @@
 {
   "manifest": {
-    "git_commit": "bf721fbe91f88a8e3d34cce2450f3b8bbc1ace03",
+    "git_commit": "27fb0f050db53d7d5eb3bf61c5ab2b6aa030620e",
     "capture_set_hash": "3802e6e0ad0b96de",
     "fit_config_hash": "60a6e3a299ef08b5",
     "fit_date": "2026-09-18",
@@ -320,7 +320,7 @@
     "time_to_plateau_droop_low_db_per_s": [
       [
         2.2,
-        60.842
+        -127.35450000000003
       ],
       [
         4.8,
@@ -352,15 +352,15 @@
     "time_to_fall_rate_low_db_per_s": [
       [
         0.1,
-        -308.80125
+        -156.53913461538454
       ],
       [
         0.8,
-        -308.50624999999997
+        -164.54667307692299
       ],
       [
         2.2,
-        -297.01
+        -106.84749999999997
       ],
       [
         4.8,

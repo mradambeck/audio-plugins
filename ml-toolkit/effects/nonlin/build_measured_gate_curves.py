@@ -875,12 +875,28 @@ _NATURAL_DROOP_PER_BAND_CPP_MEASURED = {
     (9.8, "low"): -15.994, (9.8, "mid"): -21.232, (9.8, "high"): -102.926,
 }
 
-# Time=2.2's own low-band TARGET (the real capture's own measured value, not this engine's) needed
-# the same robust-regression treatment - see _NATURAL_DROOP_PER_BAND_CPP_MEASURED's own comment
-# for the full story and the direct verification that this is real mode-beating, not a fit bug.
-_TARGET_DROOP_ROBUST_OVERRIDE = {
-    (2.2, "low"): -1.966,
-}
+# REMOVED (was: {(2.2, "low"): -1.966}). This claimed the real capture's own low-band target at
+# Time=2.2 needed the same robust-regression treatment as _NATURAL_DROOP_PER_BAND_CPP_MEASURED's
+# (render-side) mode-beating fix above. Re-investigated after a real "way more low end than the
+# IR's" complaint traced back to this exact number: with -1.966 (near-flat) as the target,
+# written = target - natural = -1.966 - (-62.808) = +60.8dB/s - a POSITIVE (growing) plateau
+# droop for Time=2.2's low band, a stark outlier against the other three Time points' own written
+# values (4.8: -96.5, 7.0: -11.0, 9.8: -31.7dB/s), and - because InhaltIRSynth.cpp's gate clamps a
+# positive plateauDb(t) instead of letting it keep falling - it makes the low band barely decay
+# during the plateau at all, i.e. exactly "rings out longer than the IR's".
+#
+# Direct re-measurement (both a fresh core.features.band_gate_params() run on the current
+# features.json AND a by-hand envelope inspection of the raw capture in both bands) found NO
+# evidence of unfittable mode-beating: 44-89Hz fits with knee_r2=0.962 at plateau_droop_db_per_s=
+# -206.98, 88-177Hz fits with knee_r2=0.963 at -173.35 - both clean two-segment (plateau+knee)
+# shapes, not the "-542.7dB/s, genuinely oscillating" signature the override's own comment
+# describes. That signature was verified for the RENDER side (hence
+# _NATURAL_DROOP_PER_BAND_CPP_MEASURED's fix, which still stands), but the real-capture target
+# side was evidently never re-checked after the crossover redesign that fixed the render side -
+# this override outlived the problem it was written for. Removing it lets band_droop_target()
+# fall through to the plain per-band average (-190.16dB/s here), which - unlike -1.966 - fits the
+# monotonic-with-Time trend the other three points already show.
+_TARGET_DROOP_ROBUST_OVERRIDE: dict[tuple[float, str], float] = {}
 
 
 def _build_per_band_gate_curves(features: dict) -> dict:
