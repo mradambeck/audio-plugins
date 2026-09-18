@@ -399,6 +399,47 @@ regression guard for this class of bug specifically (see its own `_band_sign_mis
 aggregate check that existed at the time, despite `band_errors` having carried the raw per-band
 data in `validation_results.json` all along).
 
+**Per-band decay: fixed (branch `inhalt-nonlin-multiband-gate`), replacing the paragraph above's
+"not fixed this session" - a genuine multi-band gate was built instead.** The explicit dB-domain
+gate now splits into three bands (below `lowMidCrossoverHz`=176.8Hz, between the crossovers, above
+`midHighCrossoverHz`=11313.7Hz - crossover frequencies taken directly from where the real per-band
+data breaks pattern, not guessed), each with its own directly-measured `plateauDroop`/`fallRate`,
+summed back together (`InhaltIRSynth.h`'s own `Params::plateauDroopLowDbPerSec` etc.). Two real
+bugs found and fixed along the way, not just the headline architecture change:
+
+1. **Unbounded-growth bug**: `plateauDb(t) = droop*t` was deliberately unbounded past the knee for
+   the broadband case (droop is always negative there), but the "high" band's own correctly-
+   measured droop is genuinely POSITIVE (+93 to +150dB/s - this engine's tank over-damps highs far
+   more than real hardware does) - an ever-growing positive term silently swamped every band's
+   `fallRateDbPerSec` for the whole render. Fixed by clamping `plateauDb(t)` at the knee, but ONLY
+   when the written droop is positive, leaving the already-verified negative-droop relationship
+   untouched.
+2. **Crossover steepness**: a single one-pole split let too much energy bleed between synthesis
+   bands (the calibrated "high" band correction barely reached its own analysis band). A first,
+   steeper attempt (4 cascaded one-pole stages at the nominal crossover frequency) made things
+   measurably WORSE - cascading same-cutoff stages shifts the cascade's own effective -3dB point
+   well below the nominal cutoff, badly misaligning the bands. Fixed with the correct compensation
+   factor (`1/sqrt(2^(1/N)-1)`) and `N=2` (not 4 - the compensated cutoff would exceed Nyquist).
+
+Real, measured effect across all 9 real captures (mean, all Time/High):
+
+| Metric | Original (single broadband rate) | Now (per-band, compensated crossover) |
+|---|---|---|
+| Per-band sign mismatches (count) | 26 | 16 |
+| Per-band plateau droop error (dB/s) | 106.1 | 85.4 |
+| Per-band fall rate error (dB/s) | 163.1 | 121.2 |
+
+Sign mismatches (the specific defect - render decaying the OPPOSITE direction from real hardware -
+the "huffy resonance" complaint traced to) dropped by more than a third; directly confirmed fixed
+at Time=9.8 and Time=7.0 (the settings the original complaint came from) across the whole
+353Hz-2.8kHz range. A genuine, disclosed trade-off, not a clean win: fall rate's own magnitude
+error got WORSE than the single-pole crossover's own interim state (107.2) even though it's still
+better than the original single-band architecture - kept because sign mismatches are qualitatively
+more severe. The underlying synthesis/analysis-band bleed is not fully resolved; a proper
+multi-pole (Butterworth/Linkwitz-Riley) crossover remains the more correct fix for a future
+attempt, not further one-pole cascade tuning. `Spectral flatness`/`Log-spectral distance` remain
+open, pre-existing gaps, not addressed by this work.
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 
