@@ -6,6 +6,7 @@ import pytest
 
 from core.features import (
     band_interchannel_coherence,
+    correlation_at_lag,
     dominant_lag_correlation,
     iacc,
     interchannel_correlation,
@@ -111,3 +112,32 @@ def test_dominant_lag_correlation_direction_matches_which_channel_leads():
     lag_ms, corr = dominant_lag_correlation(l, r, SR, max_lag_ms=10.0)
     assert corr > 0.99
     assert lag_ms == pytest.approx(2.5, abs=0.05)
+
+
+def test_correlation_at_lag_matches_dominant_lag_correlations_own_convention():
+    """correlation_at_lag exists specifically to be evaluated at a lag chosen by ONE signal (the
+    reference) and applied to BOTH - so its sign/magnitude convention at a given lag must agree
+    exactly with what dominant_lag_correlation itself reports there, not just be plausible on its
+    own."""
+    rng = np.random.default_rng(9)
+    l = rng.standard_normal(SR)
+    delay_samples = int(SR * 0.0025)
+    r = np.zeros_like(l)
+    r[delay_samples:] = l[:-delay_samples]  # r lags l
+
+    lag_ms, dominant_corr = dominant_lag_correlation(l, r, SR, max_lag_ms=10.0)
+    at_lag_corr = correlation_at_lag(l, r, SR, lag_ms)
+    assert at_lag_corr == pytest.approx(dominant_corr, abs=0.02)
+
+
+def test_correlation_at_lag_is_near_zero_at_an_unrelated_lag():
+    """The whole point of fixing the lag rather than searching: evaluated at the WRONG lag, a
+    genuinely delayed-but-otherwise-independent pair should read as uncorrelated."""
+    rng = np.random.default_rng(10)
+    l = rng.standard_normal(SR)
+    delay_samples = int(SR * 0.0025)
+    r = np.zeros_like(l)
+    r[delay_samples:] = l[:-delay_samples]  # r lags l by 2.5ms -> true lag is -2.5ms (verified above)
+
+    wrong_lag_corr = correlation_at_lag(l, r, SR, 2.5)  # the wrong sign for THIS setup
+    assert abs(wrong_lag_corr) < 0.1

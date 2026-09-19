@@ -56,19 +56,27 @@ Every octave band/capture/metric where the render decays in the OPPOSITE directi
 - Time=4.8 High=0 11314-22049Hz fall rate: render=290.75dB/s vs. real=-129.29dB/s - opposite direction
 - Time=7.0 High=-7 44-89Hz plateau droop: render=0.33dB/s vs. real=-17.91dB/s - opposite direction
 
-## Stereo (IACC, rendered vs. reference, per capture)
+## Stereo sign mismatches
 
-| File | IACC rendered | IACC reference | Coherence floor (r/ref) |
-|---|---|---|---|
-| NonLin_0.1s_-3H.wav | 0.1786 | 0.0057 | 0.3466 / 0.3466 |
-| NonLin_0.8s_-3H.wav | 0.174 | 0.0056 | 0.3797 / 0.3797 |
-| NonLin_2.2s_0H.wav | 0.2588 | 0.0212 | 0.3492 / 0.3492 |
-| NonLin_4.8s_0H.wav | 0.1816 | 0.0394 | 0.3255 / 0.3255 |
-| NonLin_7.0s_-7H.wav | 0.1861 | 0.0115 | 0.2543 / 0.2543 |
-| NonLin_7.0s_0H.wav | 0.1592 | 0.0367 | 0.2375 / 0.2375 |
-| NonLin_9.8s_-4H.wav | 0.1607 | 0.0158 | 0.2182 / 0.2182 |
-| NonLin_9.8s_-9H.wav | 0.1741 | 0.0089 | 0.2375 / 0.2375 |
-| NonLin_9.8s_0H.wav | 0.1495 | 0.0356 | 0.2298 / 0.2298 |
+Every capture where the render's stereo correlation at the reference's own dominant lag is the OPPOSITE SIGN from the real hardware's (see `_stereo_sign_mismatches`' own docstring) - narrow vs. wide, not just off in magnitude.
+
+None.
+
+## Stereo (IACC and lag-correlation, rendered vs. reference, per capture)
+
+`Lag corr.` is evaluated at the reference's own dominant lag (`Lag (ms)`) on both signals - see `core.features.dominant_lag_correlation`'s own docstring for why this catches a real correlation well outside IACC's own +-1ms window.
+
+| File | IACC rendered | IACC reference | Coherence floor (r/ref) | Lag (ms) | Lag corr. rendered | Lag corr. reference |
+|---|---|---|---|---|---|---|
+| NonLin_0.1s_-3H.wav | 0.1786 | 0.0057 | 0.3466 / 0.3466 | 2.49 | 0.9752 | 0.9781 |
+| NonLin_0.8s_-3H.wav | 0.174 | 0.0056 | 0.3797 / 0.3797 | 2.49 | 0.9757 | 0.9784 |
+| NonLin_2.2s_0H.wav | 0.2588 | 0.0212 | 0.3492 / 0.3492 | 2.49 | -0.4651 | -0.4614 |
+| NonLin_4.8s_0H.wav | 0.1816 | 0.0394 | 0.3255 / 0.3255 | 2.49 | -0.2502 | -0.238 |
+| NonLin_7.0s_-7H.wav | 0.1861 | 0.0115 | 0.2543 / 0.2543 | 2.49 | -0.1464 | -0.1914 |
+| NonLin_7.0s_0H.wav | 0.1592 | 0.0367 | 0.2375 / 0.2375 | 2.49 | -0.1933 | -0.1855 |
+| NonLin_9.8s_-4H.wav | 0.1607 | 0.0158 | 0.2182 / 0.2182 | 2.49 | -0.1812 | -0.1837 |
+| NonLin_9.8s_-9H.wav | 0.1741 | 0.0089 | 0.2375 / 0.2375 | 2.49 | -0.1643 | -0.1807 |
+| NonLin_9.8s_0H.wav | 0.1495 | 0.0356 | 0.2298 / 0.2298 | 2.49 | -0.1942 | -0.1778 |
 
 ## Per-capture gate errors
 

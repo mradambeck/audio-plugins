@@ -50,6 +50,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "common", "tools"))
 from core.features import (  # noqa: E402
     band_interchannel_coherence,
     band_gate_params,
+    correlation_at_lag,
+    dominant_lag_correlation,
     find_onset,
     gate_envelope_params,
     iacc,
@@ -186,6 +188,19 @@ def compare_one(capture: dict, render_path: str) -> dict:
     ms_ratio_r = mid_side_ratio_db(render_l, render_r)
     ms_ratio_ref = mid_side_ratio_db(ref_l, ref_r)
 
+    # Wider net than iacc()'s own +-1ms window - added after a real "the IR's and the algorithm
+    # plugin seem to have very different stereo widths" complaint that iacc() alone couldn't have
+    # caught (see core.features.dominant_lag_correlation's own docstring: the real captures'
+    # channels are 97-98% correlated at a fixed ~2.5ms lag, well outside iacc()'s default window).
+    # Evaluated at the REFERENCE's own dominant lag on BOTH signals (not each side's own
+    # independently-found dominant lag) - dominant_lag_correlation's argmax search can lock onto an
+    # unrelated, coincidentally-stronger peak elsewhere in the render at extreme settings (confirmed
+    # on two real captures at heavy negative-High), which would make a render-vs-reference
+    # comparison meaningless; fixing the lag from the reference and using correlation_at_lag for
+    # both sides avoids that entirely (see that function's own docstring for the full story).
+    ref_lag_ms, ref_lag_corr = dominant_lag_correlation(ref_l, ref_r, sr_ref)
+    render_lag_corr = correlation_at_lag(render_l, render_r, sr_r, ref_lag_ms)
+
     # compare_wavs.py's LSD/crest/flatness, mono, with its own trim-and-level-match convention -
     # reused directly rather than re-implemented (see module docstring).
     render_mono64 = render_mono.astype(np.float64)
@@ -224,6 +239,10 @@ def compare_one(capture: dict, render_path: str) -> dict:
         "iacc_reference": round(iacc_ref, 4),
         "coherence_noise_floor_rendered": coherence_r.get("_noise_floor"),
         "coherence_noise_floor_reference": coherence_ref.get("_noise_floor"),
+        "stereo_lag_ms": round(ref_lag_ms, 2),
+        "stereo_lag_correlation_rendered": round(render_lag_corr, 4),
+        "stereo_lag_correlation_reference": round(ref_lag_corr, 4),
+        "stereo_lag_correlation_error": signed_error(render_lag_corr, ref_lag_corr),
         "mid_side_ratio_error_db": signed_error(ms_ratio_r, ms_ratio_ref),
         "log_spectral_distance_db": round(lsd, 2) if lsd is not None else None,
         "crest_factor_error_db": crest_error,
@@ -257,6 +276,12 @@ CONCERN_THRESHOLDS: list[tuple[str, list[str], float, str]] = [
      "gate length."),
     ("Fall rate error (dB/s)", ["gate_errors", "fall_rate_db_per_s"], 300.0,
      "the gate's post-knee fall is audibly too fast or too slow relative to the real hardware."),
+    ("Stereo lag correlation error (unsigned)", ["stereo_lag_correlation_error"], 0.15,
+     "the render's own stereo width doesn't match the real hardware's - see "
+     "core.features.dominant_lag_correlation's own docstring: real hardware's two channels can be "
+     "highly correlated at a fixed lag well outside iacc()'s own +-1ms window (near-mono with a "
+     "small delay at short Time, in this plugin's own case), which a fixed-topology always-"
+     "independent stereo design can't reproduce on its own without an explicit correction."),
 ]
 
 # Per-band magnitude thresholds - a SEPARATE check from CONCERN_THRESHOLDS above (which only
@@ -343,6 +368,29 @@ def _band_sign_mismatches(results: list[dict], real_floor_db_per_s: float = 10.0
     return lines
 
 
+def _stereo_sign_mismatches(results: list[dict], real_floor: float = 0.05) -> list[str]:
+    """Same idea as _band_sign_mismatches, one level up: a capture where the render's stereo
+    correlation at the reference's own dominant lag is the OPPOSITE SIGN from the real hardware's -
+    e.g. render genuinely wide where real hardware is nearly mono, or vice versa - not just off in
+    magnitude. Added alongside the stereo_lag_correlation_error concern check itself, for the same
+    reason BAND_CONCERN_THRESHOLDS got its own sign-mismatch check: a magnitude-only aggregate can
+    hide a sign flip entirely if it's not the dominant error in the mean. `real_floor` guards
+    against flagging near-zero-vs-near-zero noise, mirroring the per-band check's own convention."""
+    lines = []
+    for r in results:
+        rendered, reference = r.get("stereo_lag_correlation_rendered"), r.get("stereo_lag_correlation_reference")
+        if rendered is None or reference is None:
+            continue
+        if abs(reference) < real_floor:
+            continue
+        if (rendered > 0) != (reference > 0):
+            lines.append(
+                f"Time={r['time']} High={r['high']} stereo lag correlation (at {r['stereo_lag_ms']}ms): "
+                f"render={rendered:.3f} vs. real={reference:.3f} - opposite direction"
+            )
+    return lines
+
+
 def _flag_concerns(results: list[dict], group_label: str) -> list[str]:
     """Returns human-readable flag lines for every CONCERN_THRESHOLDS metric whose aggregate
     |value| exceeds its threshold on this group of results - empty list if nothing is flagged."""
@@ -367,13 +415,14 @@ def _aggregate(results: list[dict], field_path: list[str]) -> float | None:
     return round(float(np.mean(values)), 3) if values else None
 
 
-def _compute_all_flags(results: list[dict]) -> tuple[list[str], list[str]]:
+def _compute_all_flags(results: list[dict]) -> tuple[list[str], list[str], list[str]]:
     """Single source of truth for every flagged concern - CONCERN_THRESHOLDS, BAND_CONCERN_
-    THRESHOLDS, and the per-band sign-mismatch summary line - shared between write_report() and
-    main()'s own console summary. Previously duplicated inline in both places, which is exactly
+    THRESHOLDS, and the per-band/stereo sign-mismatch summary lines - shared between write_report()
+    and main()'s own console summary. Previously duplicated inline in both places, which is exactly
     how the sign-mismatch/magnitude checks could have silently existed in one but not the other -
     the same class of drift this whole addition exists to catch, one level up. Returns
-    (flags, sign_mismatch_detail_lines) - the caller decides how to render each."""
+    (flags, band_sign_mismatch_detail_lines, stereo_sign_mismatch_detail_lines) - the caller
+    decides how to render each."""
     h0_results = [r for r in results if r["high"] == 0]
     hneg_results = [r for r in results if r["high"] != 0]
     flags = (
@@ -392,7 +441,15 @@ def _compute_all_flags(results: list[dict]) -> tuple[list[str], list[str]]:
             f"hardware - a more severe failure than a magnitude-only miss. See validation_report."
             f"md's own 'Per-band sign mismatches' section for the full list."
         )
-    return flags, sign_mismatches
+    stereo_sign_mismatches = _stereo_sign_mismatches(results)
+    if stereo_sign_mismatches:
+        flags.append(
+            f"Stereo sign mismatches (all): {len(stereo_sign_mismatches)} capture(s) where the "
+            f"render's stereo correlation is the OPPOSITE direction from the real hardware's own "
+            f"(narrow vs. wide, not just off in magnitude). See validation_report.md's own 'Stereo "
+            f"sign mismatches' section for the full list."
+        )
+    return flags, sign_mismatches, stereo_sign_mismatches
 
 
 def write_report(results: list[dict]) -> None:
@@ -437,7 +494,7 @@ def write_report(results: list[dict]) -> None:
 
     lines.append("## Flagged concerns")
     lines.append("")
-    all_flags, sign_mismatches = _compute_all_flags(all_results)
+    all_flags, sign_mismatches, stereo_sign_mismatches = _compute_all_flags(all_results)
     if all_flags:
         lines.append("The following aggregate values exceed a threshold picked from the magnitude "
                       "of a real, previously-found gap (see CONCERN_THRESHOLDS in this script) - "
@@ -463,13 +520,34 @@ def write_report(results: list[dict]) -> None:
         lines.append("None.")
     lines.append("")
 
-    lines.append("## Stereo (IACC, rendered vs. reference, per capture)")
+    lines.append("## Stereo sign mismatches")
     lines.append("")
-    lines.append("| File | IACC rendered | IACC reference | Coherence floor (r/ref) |")
-    lines.append("|---|---|---|---|")
+    lines.append("Every capture where the render's stereo correlation at the reference's own "
+                  "dominant lag is the OPPOSITE SIGN from the real hardware's (see "
+                  "`_stereo_sign_mismatches`' own docstring) - narrow vs. wide, not just off in "
+                  "magnitude.")
+    lines.append("")
+    if stereo_sign_mismatches:
+        for line in stereo_sign_mismatches:
+            lines.append(f"- {line}")
+    else:
+        lines.append("None.")
+    lines.append("")
+
+    lines.append("## Stereo (IACC and lag-correlation, rendered vs. reference, per capture)")
+    lines.append("")
+    lines.append("`Lag corr.` is evaluated at the reference's own dominant lag (`Lag (ms)`) on both "
+                  "signals - see `core.features.dominant_lag_correlation`'s own docstring for why "
+                  "this catches a real correlation well outside IACC's own +-1ms window.")
+    lines.append("")
+    lines.append("| File | IACC rendered | IACC reference | Coherence floor (r/ref) | Lag (ms) | "
+                  "Lag corr. rendered | Lag corr. reference |")
+    lines.append("|---|---|---|---|---|---|---|")
     for r in results:
         lines.append(f"| {r['filename']} | {r['iacc_rendered']} | {r['iacc_reference']} | "
-                      f"{r['coherence_noise_floor_rendered']} / {r['coherence_noise_floor_reference']} |")
+                      f"{r['coherence_noise_floor_rendered']} / {r['coherence_noise_floor_reference']} | "
+                      f"{r['stereo_lag_ms']} | {r['stereo_lag_correlation_rendered']} | "
+                      f"{r['stereo_lag_correlation_reference']} |")
     lines.append("")
 
     lines.append("## Per-capture gate errors")
@@ -509,7 +587,7 @@ def main() -> None:
     print(f"\nWrote {RESULTS_PATH}")
     print(f"Wrote {REPORT_PATH}")
 
-    all_flags, _ = _compute_all_flags(results)
+    all_flags, _, _ = _compute_all_flags(results)
     if all_flags:
         print(f"\n{len(all_flags)} concern(s) flagged (see validation_report.md's own section):")
         for flag in all_flags:

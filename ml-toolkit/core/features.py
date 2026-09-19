@@ -628,6 +628,39 @@ def dominant_lag_correlation(l: np.ndarray, r: np.ndarray, sr: int, max_lag_ms: 
     return float(lag_ms), float(normed[peak_idx])
 
 
+def correlation_at_lag(l: np.ndarray, r: np.ndarray, sr: int, lag_ms: float) -> float:
+    """Signed normalized cross-correlation at ONE specific lag (not a search over a window like
+    dominant_lag_correlation/iacc) - same sign convention as dominant_lag_correlation (positive
+    lag_ms means l lags r).
+
+    Exists for comparing a render against a reference on a KNOWN, expected lag rather than each
+    signal's own independently-found dominant peak: dominant_lag_correlation's own argmax search
+    can lock onto an unrelated, coincidentally-stronger peak elsewhere in a wide search window
+    (confirmed on two real NonLin renders at extreme negative-High settings, where the intended
+    ~2.5ms-lag narrowing effect was correctly applied - and measurably close to target when
+    checked AT that lag directly - but a stronger unrelated low-frequency periodicity elsewhere in
+    +-50ms made dominant_lag_correlation report the wrong lag/sign for the summary metric). The
+    fix for a comparison is to fix the lag from the REFERENCE's own measurement and evaluate both
+    signals there, not let the render's own search wander."""
+    lag_samples = int(round(lag_ms * sr / 1000.0))
+    l = l - l.mean()
+    r = r - r.mean()
+    if lag_samples >= 0:
+        a = l[lag_samples:]
+        b = r[:len(r) - lag_samples] if lag_samples > 0 else r
+    else:
+        a = l[:len(l) + lag_samples]
+        b = r[-lag_samples:]
+    n = min(len(a), len(b))
+    if n <= 0:
+        return 0.0
+    a, b = a[:n], b[:n]
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    if denom <= 0:
+        return 0.0
+    return float(np.dot(a, b) / denom)
+
+
 def band_interchannel_coherence(l: np.ndarray, r: np.ndarray, sr: int, bands=None):
     """Per-band scipy.signal.coherence, WITH the coherence noise floor for this capture's own
     length included as "_noise_floor" - two genuinely independent signals give approximately that
