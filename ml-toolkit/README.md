@@ -69,6 +69,83 @@ correlation sitting outside their own search window - which is exactly what NonL
   both sides there avoids that failure mode entirely. See `plugins/inhalt-nonlin/analysis/
   validate.py`'s own `compare_one()` for the pattern.
 
+## After any synthesis architecture change, re-run the FULL `validate.py` - not just the metric you were targeting
+
+Parameters that look independent are coupled through the shared measurement pipeline: every
+per-band/per-capture number in `validate.py` comes from fitting the SAME swept-breakpoint model to
+the SAME rendered envelope, so a change anywhere in that envelope's shape can move the fit's read
+on something that had nothing to do with the change.
+
+Two concrete NonLin cases, both real and each found only by running the full suite rather than
+spot-checking the target metric:
+
+- **Promoting `buildUpMs` to per-band was implemented in isolation, passed its own diagnostic
+  (confirmed real, non-artifact per-band signal), and still measurably broke things**: per-band
+  plateau droop error went 66->87dB/s and sign mismatches 13->16, spread across bands that were
+  previously fine. Changing the attack shape shifted where the swept-breakpoint fit located each
+  band's own "plateau," invalidating droop/knee curves that were calibrated assuming the OLD shared
+  attack shape - a coupling effect an isolated before/after check on `buildUpMs` itself could never
+  surface. Reverted; see `plugins/inhalt-nonlin/README.md`'s own writeup for the full story.
+- **Adding the stereo-narrowing fix measurably worsened per-band decay metrics specifically at the
+  Time settings where narrowing was strongest** (mean |droop error| 240 vs. 39 at other settings) -
+  not a decay regression at all, but comb filtering: `validate.py`'s per-band gate metrics are
+  computed from a MONO downmix (`(L+R)/2`), and correlating two channels with a fixed delay
+  introduces real, expected frequency-dependent nulls/peaks in that sum (first null at roughly
+  `1/(2*lag)` - ~200Hz for NonLin's own 2.49ms). Confirmed as expected comb filtering rather than a
+  broken fit by checking `knee_r2` stayed clean (~0.99) at the affected settings, not just noting
+  the metric moved.
+
+The practice this argues for: after ANY synthesis architecture change - a new per-band split, a
+promoted parameter, a new correlation/width stage, a crossover redesign - run the complete
+`validate.py` suite and read every section, not just the one the change targeted. A metric getting
+worse doesn't necessarily mean the change was wrong (see `write_report()`'s own "this aggregate
+table is not the final word on anything" standing rule), but it does mean something needs to be
+understood and disclosed, not silently accepted or silently ignored as "unrelated."
+
+## Hand-measured overrides and constants go stale silently - tag what they depend on
+
+Several curve-building functions (`_NATURAL_DROOP_PER_BAND_CPP_MEASURED`,
+`_KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET`, `_STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED`, and others)
+hardcode a table measured once via a direct C++ render sweep, because the relationship they
+capture isn't closed-form (a narrow analysis filter's own smearing, a mixing formula whose
+equal-power assumption doesn't quite hold in practice, etc.). That pattern is sound and worth
+reusing - the failure mode found this session was a hand-verified override that stayed in the code
+UNCHANGED after the architecture it was measured against changed underneath it.
+
+Specifically: `_TARGET_DROOP_ROBUST_OVERRIDE`'s `(2.2, "low")` entry was a real, carefully-verified
+fix for genuine mode-beating - under the FIRST, uncompensated crossover. Once the crossover was
+redesigned (fixing the render-side mode-beating as a side effect), the override's own justification
+no longer held, but nothing re-checked it - it silently kept overriding a now-perfectly-fittable
+real measurement with a stale, wrong number, and directly caused a real "way more low end than the
+IR's" complaint months of work later. `knee_r2` on the un-overridden data was 0.96+ the whole time;
+the override was never revisited to check whether it was still needed.
+
+The fix, worth applying to every such table going forward: comment each hand-measured override
+with what it's contingent on (which crossover design, which gate formula, which architecture
+version) as precisely as `_KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET`'s own comment already does -
+and when ANY of those dependencies change, explicitly re-check every override that names it as a
+reason to exist, not just the one the current change is obviously about. A quick `knee_r2` (or
+equivalent fit-quality) check on the un-overridden data is a fast way to tell whether an old
+override's own justification still holds.
+
+## Level/loudness matching: verify with both steady-state AND transient material
+
+Unit-energy normalization (`normaliseToUnitEnergy` / `IRLibrary::normaliseToUnitEnergy`) guarantees
+that two IRs produce the same output RMS for STEADY-STATE input (continuous noise) - that's what
+"equal energy" means. It does NOT guarantee equal PERCEIVED loudness for percussive/transient
+input if the two IRs' envelope shapes differ (a front-loaded, fast-decaying envelope needs a
+higher peak to reach the same total energy as a more evenly-spread one, so a transient hit sounds
+different even when both convolve a stationary noise floor identically).
+
+Checked directly for NonLin after a real "convolution sounds much louder" complaint: white-noise
+input matched to within ~0.3dB (confirming normalization itself was correct), but a percussive
+test transient measured the real capture's output 0.7-6.0dB louder across all 9 settings (mean
++2.3dB) - the gap tracked the still-open per-band decay-rate mismatch, not a normalization bug.
+When comparing a synthesized IR's level against a reference (a new module's own Phase 6/`validate.py`
+work, or an ad hoc "does this sound right" check), test with BOTH a stationary/noise signal and a
+short percussive transient - they can and did disagree meaningfully here, and only the transient
+case matched what was actually being heard.
+
 ## Every module's own `validate.py` needs a permanent regression guard, not a one-time check
 
 Twice now, a real defect sat fully visible in `validate.py`'s own per-capture output for a while
