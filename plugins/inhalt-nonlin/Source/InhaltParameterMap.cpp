@@ -73,9 +73,21 @@ namespace
 GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated) noexcept
 {
     static const auto timeToTauA = toCurve(wildjag::dsp::time_to_tau_a_msPoints);
-    static const auto timeToKnee = toCurve(wildjag::dsp::time_to_t_knee_msPoints);
-    static const auto highToKneeOffset = toCurve(wildjag::dsp::high_to_t_knee_ms_offsetPoints);
     static const auto timeToKneeSoftness = toCurve(wildjag::dsp::time_to_tau_k_msPoints);
+    // Per-band knee time - REPLACED a single shared time_to_t_knee_ms/high_to_t_knee_ms_offset
+    // pair (see InhaltIRSynth.h's own comment on Params::kneeTimeSubLowMs and
+    // build_measured_gate_curves.py's own _build_per_band_knee_time_curves docstring for the full
+    // story - the "knee lands at the same time in every band" assumption this shared pair was
+    // originally built on turned out to be false when actually checked). Same
+    // H0-equivalent-baseline-plus-offset combination as every other gate parameter here.
+    static const auto timeToKneeSubLow = toCurve(wildjag::dsp::time_to_knee_time_subLow_msPoints);
+    static const auto highToKneeSubLowOffset = toCurve(wildjag::dsp::high_to_knee_time_subLow_ms_offsetPoints);
+    static const auto timeToKneeLow = toCurve(wildjag::dsp::time_to_knee_time_low_msPoints);
+    static const auto highToKneeLowOffset = toCurve(wildjag::dsp::high_to_knee_time_low_ms_offsetPoints);
+    static const auto timeToKneeMid = toCurve(wildjag::dsp::time_to_knee_time_mid_msPoints);
+    static const auto highToKneeMidOffset = toCurve(wildjag::dsp::high_to_knee_time_mid_ms_offsetPoints);
+    static const auto timeToKneeHigh = toCurve(wildjag::dsp::time_to_knee_time_high_msPoints);
+    static const auto highToKneeHighOffset = toCurve(wildjag::dsp::high_to_knee_time_high_ms_offsetPoints);
     static const auto timeToEarlyExcess = toCurve(wildjag::dsp::time_to_early_excess_dbPoints);
     static const auto highToEarlyExcessOffset = toCurve(wildjag::dsp::high_to_early_excess_db_offsetPoints);
 
@@ -103,7 +115,7 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto timeToFallHigh = toCurve(wildjag::dsp::time_to_fall_rate_high_db_per_sPoints);
     static const auto highToFallHighOffset = toCurve(wildjag::dsp::high_to_fall_rate_high_db_per_s_offsetPoints);
 
-    bool tauAExtrapolated = false, kneeTimeExtrapolated = false, kneeHighExtrapolated = false,
+    bool tauAExtrapolated = false,
          softnessExtrapolated = false,
          earlyExcessTimeExtrapolated = false, earlyExcessHighExtrapolated = false,
          droopSubLowTimeExtrapolated = false, droopSubLowHighExtrapolated = false,
@@ -113,24 +125,29 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
          fallSubLowTimeExtrapolated = false, fallSubLowHighExtrapolated = false,
          fallLowTimeExtrapolated = false, fallLowHighExtrapolated = false,
          fallMidTimeExtrapolated = false, fallMidHighExtrapolated = false,
-         fallHighTimeExtrapolated = false, fallHighHighExtrapolated = false;
+         fallHighTimeExtrapolated = false, fallHighHighExtrapolated = false,
+         kneeSubLowTimeExtrapolated = false, kneeSubLowHighExtrapolated = false,
+         kneeLowTimeExtrapolated = false, kneeLowHighExtrapolated = false,
+         kneeMidTimeExtrapolated = false, kneeMidHighExtrapolated = false,
+         kneeHighTimeExtrapolated = false, kneeHighHighExtrapolated = false;
 
     GateParams params;
     params.buildUpMs = timeToTauA.evaluate(timeKnob, &tauAExtrapolated);
-    // NOW combined with high_to_t_knee_ms_offsetPoints - a first attempt at this (Time-only
-    // baseline + offset, both taken at face value from their own separate measurements) was tried
-    // and REVERTED after it made the two short-Time captures dramatically WORSE (knee error
-    // ~2-4ms -> ~91-93ms): a real, ear-caught "reverb rings out too long at High=0" complaint led
-    // to tracing that regression to its actual root cause - the Time-only baseline was never a
-    // clean High=0 reference to begin with (Time=0.1s/0.8s only exist at High=-3 in the real
-    // capture set, so their raw H=-3 knee_time_ms was being pooled straight into the "Time-only"
-    // curve), so adding a further High-dependent offset on top double-counted that capture's own
-    // High=-3 effect. build_measured_gate_curves.py's own _build_t_knee_ms_curves now converts
-    // EVERY capture to an H=0-equivalent value (subtracting this same offset curve) before
-    // building the Time baseline, so the two are self-consistent and can be safely combined here.
-    params.kneeTimeMs = timeToKnee.evaluate(timeKnob, &kneeTimeExtrapolated)
-        + highToKneeOffset.evaluate(highKnob, &kneeHighExtrapolated);
     params.kneeSoftnessMs = timeToKneeSoftness.evaluate(timeKnob, &softnessExtrapolated);
+    // Per-band knee time - REPLACES a single shared kneeTimeMs (see InhaltIRSynth.h's own comment
+    // on Params::kneeTimeSubLowMs for the "knee lands at the same time in every band" assumption
+    // this was built on turning out false). Baseline+offset combine safely here for the SAME
+    // reason the old shared version's own comment explained: build_measured_gate_curves.py's own
+    // _build_per_band_knee_time_curves converts EVERY capture to an H=0-equivalent value first,
+    // so the two are self-consistent by construction, just once per band now.
+    params.kneeTimeSubLowMs = timeToKneeSubLow.evaluate(timeKnob, &kneeSubLowTimeExtrapolated)
+        + highToKneeSubLowOffset.evaluate(highKnob, &kneeSubLowHighExtrapolated);
+    params.kneeTimeLowMs = timeToKneeLow.evaluate(timeKnob, &kneeLowTimeExtrapolated)
+        + highToKneeLowOffset.evaluate(highKnob, &kneeLowHighExtrapolated);
+    params.kneeTimeMidMs = timeToKneeMid.evaluate(timeKnob, &kneeMidTimeExtrapolated)
+        + highToKneeMidOffset.evaluate(highKnob, &kneeMidHighExtrapolated);
+    params.kneeTimeHighMs = timeToKneeHigh.evaluate(timeKnob, &kneeHighTimeExtrapolated)
+        + highToKneeHighOffset.evaluate(highKnob, &kneeHighHighExtrapolated);
     // Per-band droop/fall - each pair follows the SAME H0-equivalent-baseline-plus-offset
     // combination as t_knee_ms/fall_rate_db_per_s above (High offset added on top of a Time
     // baseline that was itself built by converting every capture to an H0-equivalent value first
@@ -156,12 +173,12 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // constant dB/s rate - see build_measured_gate_curves.py's own _build_early_excess_curves
     // docstring for the direct per-capture measurement this is built from, and InhaltIRSynth.h's
     // own earlyExcessDb comment for what it does to the render. Same H0-equivalent-baseline-plus-
-    // offset combination as fallRateDbPerSec/kneeTimeMs directly above.
+    // offset combination as fallRateDbPerSec/kneeTimeSubLowMs etc. above.
     params.earlyExcessDb = timeToEarlyExcess.evaluate(timeKnob, &earlyExcessTimeExtrapolated)
         + highToEarlyExcessOffset.evaluate(highKnob, &earlyExcessHighExtrapolated);
 
     if (extrapolated != nullptr)
-        *extrapolated = tauAExtrapolated || kneeTimeExtrapolated || kneeHighExtrapolated
+        *extrapolated = tauAExtrapolated
             || softnessExtrapolated || earlyExcessTimeExtrapolated || earlyExcessHighExtrapolated
             || droopSubLowTimeExtrapolated || droopSubLowHighExtrapolated
             || droopLowTimeExtrapolated || droopLowHighExtrapolated
@@ -170,7 +187,11 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
             || fallSubLowTimeExtrapolated || fallSubLowHighExtrapolated
             || fallLowTimeExtrapolated || fallLowHighExtrapolated
             || fallMidTimeExtrapolated || fallMidHighExtrapolated
-            || fallHighTimeExtrapolated || fallHighHighExtrapolated;
+            || fallHighTimeExtrapolated || fallHighHighExtrapolated
+            || kneeSubLowTimeExtrapolated || kneeSubLowHighExtrapolated
+            || kneeLowTimeExtrapolated || kneeLowHighExtrapolated
+            || kneeMidTimeExtrapolated || kneeMidHighExtrapolated
+            || kneeHighTimeExtrapolated || kneeHighHighExtrapolated;
     return params;
 }
 

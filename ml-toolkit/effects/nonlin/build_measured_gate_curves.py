@@ -605,6 +605,117 @@ def _build_t_knee_ms_curves(features: dict) -> dict:
     }
 
 
+# Hand-measured via direct render comparison (same "compare against the real capture" spirit as
+# _NATURAL_DROOP_PER_BAND_CPP_MEASURED, but a different derivation - see
+# _build_per_band_knee_time_curves' own docstring for why a straight natural-render measurement
+# doesn't apply here). For each of the 9 real captures: target = written_shared_kneeTimeMs -
+# (render_measured_band_knee - real_measured_band_knee), where written_shared_kneeTimeMs is
+# InhaltParameterMap's own CURRENT (shared, pre-this-fix) t_knee_ms+High-offset evaluated at that
+# exact Time/High, and both "measured" values come from core.features.band_gate_params() applied
+# to plugins/inhalt-nonlin/analysis/validation_renders/*.wav and the matching real capture. Unlike
+# the droop/fall_rate "natural" tables, this isn't a fixed per-Time constant measured once at
+# droop=0 - the render's own per-band knee measurement is smeared by BOTH the analysis filter's own
+# group delay AND this Time's own kneeSoftnessMs (tauK, which varies 0.45-29.7ms across Time - a
+# sharper or softer knee transition smears differently through each band's own narrow filter), so
+# it must be measured per-capture, at the Time/High the render already uses, not read off a
+# separate isolated measurement. Re-measure (rerun the script printed by this file's own
+# `python3 -c` one-liner in that comment, kept informally rather than automated - see AGENTS.md's
+# precedent for other one-time hand measurements in this catalog) if the crossover, kneeSoftnessMs
+# curve, or the octave analysis bands themselves ever change.
+_KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET = {
+    (0.1, -3, "subLow"): 138.957, (0.1, -3, "low"): 71.111, (0.1, -3, "mid"): 47.165, (0.1, -3, "high"): 288.616,
+    (0.8, -3, "subLow"): 143.038, (0.8, -3, "low"): 75.193, (0.8, -3, "mid"): 41.769, (0.8, -3, "high"): 81.18,
+    (2.2, 0, "subLow"): 234.83, (2.2, 0, "low"): 100.136, (2.2, 0, "mid"): 98.806, (2.2, 0, "high"): 88.163,
+    (4.8, 0, "subLow"): 191.791, (4.8, 0, "low"): 173.832, (4.8, 0, "mid"): 185.472, (4.8, 0, "high"): 74.059,
+    (7.0, -7, "subLow"): 304.444, (7.0, -7, "low"): 288.48, (7.0, -7, "mid"): 251.564, (7.0, -7, "high"): 177.732,
+    (7.0, 0, "subLow"): 187.891, (7.0, 0, "low"): 292.653, (7.0, 0, "mid"): 241.104, (7.0, 0, "high"): 151.973,
+    (9.8, -4, "subLow"): 396.462, (9.8, -4, "low"): 287.709, (9.8, -4, "mid"): 282.887, (9.8, -4, "high"): 196.916,
+    (9.8, -9, "subLow"): 397.279, (9.8, -9, "low"): 288.525, (9.8, -9, "mid"): 280.212, (9.8, -9, "high"): 185.759,
+    (9.8, 0, "subLow"): 272.744, (9.8, 0, "low"): 284.716, (9.8, 0, "mid"): 272.578, (9.8, 0, "high"): 161.995,
+}
+
+
+def _build_per_band_knee_time_curves(features: dict) -> dict:
+    """Promotes t_knee_ms to four per-band knee times (subLow/low/mid/high, matching the
+    plateau_droop/fall_rate per-band split), fixing a real, ear-caught "still trails the real
+    capture's own level in the deep tail" gap left after that split: `validate.py`'s own per-band
+    droop/fall-rate errors improved, but a direct envelope comparison at Time=2.2 still showed the
+    render's low bands sitting 15-25dB above the real capture from ~280ms on - traced to the real
+    hardware's own per-band knee time genuinely differing a lot by band (163ms at 44-89Hz vs. 76ms
+    at 88-177Hz for that same capture - core.features.band_gate_params), which one SHARED
+    kneeTimeMs structurally cannot represent, the exact class of gap the low/mid/high split was
+    built to fix one level up.
+
+    Same H0-equivalent-baseline-plus-offset-plus-isotonic-regression architecture as
+    _build_t_knee_ms_curves (this function's own direct ancestor - see that docstring for the full
+    "why H0-equivalent conversion first" story), generalized across the four bands, using
+    _KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET as the per-capture, per-band "real knee time" input in
+    place of that function's own `c["gate"]["knee_time_ms"]` - necessary because a raw per-band
+    knee_time_ms measured directly off either signal is smeared by the analysis filter's own group
+    delay (confirmed: even the CURRENT render, with one shared true kneeTimeMs, measures a real
+    40-100ms per-band SPREAD that isn't a synthesis defect at all - it's the filter). Subtracting
+    the render's own per-band measurement from the reference's cancels that shared filter artifact
+    algebraically (see _KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET's own comment for the derivation),
+    leaving the genuine per-band hardware target - the same purpose the "natural" subtraction serves
+    for droop/fall_rate, just via measured subtraction instead of an analytical formula, since knee
+    timing isn't an additive dB-domain term the way droop is."""
+    by_time_high_count: dict[float, set] = {}
+    for c in features["captures"]:
+        by_time_high_count.setdefault(c["params"]["time"], set()).add(c["params"]["high"])
+    richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
+
+    result = {}
+    for band_key in ("subLow", "low", "mid", "high"):
+        print(f"\n--- per-band knee time curves: {band_key} ---")
+
+        def target(t: float, h: int, band_key: str = band_key) -> float | None:
+            return _KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET.get((t, h, band_key))
+
+        sweep = sorted(
+            (h, target(richest_time, h)) for h in by_time_high_count[richest_time]
+            if target(richest_time, h) is not None
+        )
+        if not any(h == 0 for h, _ in sweep) or len(sweep) < 2:
+            print(f"  no High=0 anchor or too few points at Time={richest_time} - skipping {band_key}")
+            continue
+
+        baseline_at_richest_time = next(v for h, v in sweep if h == 0)
+        offset_points = [(h, v - baseline_at_richest_time) for h, v in sweep]
+        print(f"  offsets: {[round(v, 2) for _, v in offset_points]} (baseline {baseline_at_richest_time:.2f}ms)")
+        offset_curve = Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points])
+
+        by_time: dict[float, list[float]] = {}
+        for c in features["captures"]:
+            t, h = c["params"]["time"], c["params"]["high"]
+            raw = target(t, h)
+            if raw is None:
+                continue
+            offset, _ = offset_curve.evaluate(h)
+            corrected = raw - offset
+            by_time.setdefault(t, []).append(corrected)
+            print(f"  Time={t} High={h}: target={raw:.3f}  offset(High)={offset:.3f}  -> corrected={corrected:.3f}")
+
+        if len(by_time) < 2:
+            print(f"  too few Time points with data - skipping {band_key}")
+            continue
+
+        baseline_pairs = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+        monotonic_pairs = _isotonic_nondecreasing(baseline_pairs)
+        if monotonic_pairs != baseline_pairs:
+            print(f"  NOTE: not monotonic in Time - applied isotonic regression: "
+                  f"{[(t, round(v, 3)) for t, v in monotonic_pairs]}")
+
+        result[f"time_to_knee_time_{band_key}_ms"] = {
+            "points": fit_curve(monotonic_pairs).points(),
+            "source": "direct_measurement_h0_equivalent_corrected_isotonic_per_band",
+        }
+        result[f"high_to_knee_time_{band_key}_ms_offset"] = {
+            "points": Curve1D([p[0] for p in offset_points], [p[1] for p in offset_points]).points(),
+        }
+
+    return result
+
+
 def _build_fall_rate_curves(features: dict, curves: dict) -> dict:
     """fall_rate_db_per_s's own Time baseline AND High offset - REPLACES its entry in main()'s
     naive pooling loop, which had BOTH bugs already found and fixed for plateau_droop_db_per_s and
@@ -1167,6 +1278,7 @@ def main() -> None:
     curves.update(_build_fall_rate_curves(features, curves))
     curves.update(_build_early_excess_curves(features))
     curves.update(_build_per_band_gate_curves(features))
+    curves.update(_build_per_band_knee_time_curves(features))
 
     curves["_notes"]["gate_timing_source_correction"] = (
         "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s "

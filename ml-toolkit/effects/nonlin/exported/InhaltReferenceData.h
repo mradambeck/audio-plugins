@@ -6,10 +6,10 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         99eb386e4835a560d8110d62e19c06d02206f1f9
+//   git commit:         f12937a69f70c0c98804ec0e6f30d14127fa108d
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
-//   fit date:           2026-09-18
+//   fit date:           2026-09-19
 //   ml-toolkit version: 0.1.0
 
 #include <array>
@@ -338,5 +338,89 @@ static constexpr std::array<FittedPoint, 3> high_to_fall_rate_subLow_db_per_s_of
 } };
 static_assert(high_to_fall_rate_subLow_db_per_s_offsetPoints.front().x <= high_to_fall_rate_subLow_db_per_s_offsetPoints.back().x,
     "high_to_fall_rate_subLow_db_per_s_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_knee_time_subLow_ms
+static constexpr std::array<FittedPoint, 6> time_to_knee_time_subLow_msPoints { {
+    { 0.1f, 46.16850000000002f },
+    { 0.8f, 50.24950000000004f },
+    { 2.2f, 203.56146666666666f },
+    { 4.8f, 203.56146666666666f },
+    { 7.0f, 203.56146666666666f },
+    { 9.8f, 272.744f },
+} };
+static_assert(time_to_knee_time_subLow_msPoints.front().x <= time_to_knee_time_subLow_msPoints.back().x,
+    "time_to_knee_time_subLow_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_knee_time_subLow_ms_offset
+static constexpr std::array<FittedPoint, 3> high_to_knee_time_subLow_ms_offsetPoints { {
+    { -9.0f, 124.53499999999997f },
+    { -4.0f, 123.71799999999996f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_knee_time_subLow_ms_offsetPoints.front().x <= high_to_knee_time_subLow_ms_offsetPoints.back().x,
+    "high_to_knee_time_subLow_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_knee_time_low_ms
+static constexpr std::array<FittedPoint, 6> time_to_knee_time_low_msPoints { {
+    { 0.1f, 68.86625000000001f },
+    { 0.8f, 72.94825f },
+    { 2.2f, 100.136f },
+    { 4.8f, 173.832f },
+    { 7.0f, 286.7706f },
+    { 9.8f, 286.7706f },
+} };
+static_assert(time_to_knee_time_low_msPoints.front().x <= time_to_knee_time_low_msPoints.back().x,
+    "time_to_knee_time_low_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_knee_time_low_ms_offset
+static constexpr std::array<FittedPoint, 3> high_to_knee_time_low_ms_offsetPoints { {
+    { -9.0f, 3.808999999999969f },
+    { -4.0f, 2.992999999999995f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_knee_time_low_ms_offsetPoints.front().x <= high_to_knee_time_low_ms_offsetPoints.back().x,
+    "high_to_knee_time_low_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_knee_time_mid_ms
+static constexpr std::array<FittedPoint, 6> time_to_knee_time_mid_msPoints { {
+    { 0.1f, 36.73524999999998f },
+    { 0.8f, 36.73524999999998f },
+    { 2.2f, 98.806f },
+    { 4.8f, 185.472f },
+    { 7.0f, 241.982f },
+    { 9.8f, 272.578f },
+} };
+static_assert(time_to_knee_time_mid_msPoints.front().x <= time_to_knee_time_mid_msPoints.back().x,
+    "time_to_knee_time_mid_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_knee_time_mid_ms_offset
+static constexpr std::array<FittedPoint, 3> high_to_knee_time_mid_ms_offsetPoints { {
+    { -9.0f, 7.6340000000000146f },
+    { -4.0f, 10.309000000000026f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_knee_time_mid_ms_offsetPoints.front().x <= high_to_knee_time_mid_ms_offsetPoints.back().x,
+    "high_to_knee_time_mid_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_knee_time_high_ms
+static constexpr std::array<FittedPoint, 6> time_to_knee_time_high_msPoints { {
+    { 0.1f, 119.90912500000002f },
+    { 0.8f, 119.90912500000002f },
+    { 2.2f, 119.90912500000002f },
+    { 4.8f, 119.90912500000002f },
+    { 7.0f, 150.7391f },
+    { 9.8f, 161.995f },
+} };
+static_assert(time_to_knee_time_high_msPoints.front().x <= time_to_knee_time_high_msPoints.back().x,
+    "time_to_knee_time_high_msPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// high_to_knee_time_high_ms_offset
+static constexpr std::array<FittedPoint, 3> high_to_knee_time_high_ms_offsetPoints { {
+    { -9.0f, 23.76399999999998f },
+    { -4.0f, 34.92099999999999f },
+    { 0.0f, 0.0f },
+} };
+static_assert(high_to_knee_time_high_ms_offsetPoints.front().x <= high_to_knee_time_high_ms_offsetPoints.back().x,
+    "high_to_knee_time_high_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 } // namespace wildjag::dsp

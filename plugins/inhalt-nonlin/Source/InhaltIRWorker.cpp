@@ -78,7 +78,6 @@ namespace
         params.tiltHighGain = tilt.highGain;
         params.tiltPivotHz = tilt.pivotHz;
         params.buildUpMs = gate.buildUpMs;
-        params.kneeTimeMs = gate.kneeTimeMs;
         params.kneeSoftnessMs = gate.kneeSoftnessMs;
         params.plateauDroopSubLowDbPerSec = gate.plateauDroopSubLowDbPerSec;
         params.plateauDroopLowDbPerSec = gate.plateauDroopLowDbPerSec;
@@ -88,6 +87,10 @@ namespace
         params.fallRateLowDbPerSec = gate.fallRateLowDbPerSec;
         params.fallRateMidDbPerSec = gate.fallRateMidDbPerSec;
         params.fallRateHighDbPerSec = gate.fallRateHighDbPerSec;
+        params.kneeTimeSubLowMs = gate.kneeTimeSubLowMs;
+        params.kneeTimeLowMs = gate.kneeTimeLowMs;
+        params.kneeTimeMidMs = gate.kneeTimeMidMs;
+        params.kneeTimeHighMs = gate.kneeTimeHighMs;
         params.earlyExcessDb = gate.earlyExcessDb;
 
         const auto numSamples = (int) (irDurationSeconds * sampleRate);

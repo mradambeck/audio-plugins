@@ -204,17 +204,16 @@ namespace
         return std::log1p(std::exp(x));
     }
 
-    // Takes plateauDroopDbPerSec/fallRateDbPerSec explicitly rather than reading them off `p`
-    // directly - called once per decay band (low/mid/high, see InhaltIRSynth.h's own comment on
-    // why the decay rate is the one thing that genuinely varies by band), sharing every other
-    // field (buildUpMs/kneeTimeMs/kneeSoftnessMs/earlyExcessDb) from `p` unchanged across all
-    // three calls.
+    // Takes plateauDroopDbPerSec/fallRateDbPerSec/kneeTimeMs explicitly rather than reading them
+    // off `p` directly - called once per decay band (subLow/low/mid/high, see InhaltIRSynth.h's
+    // own comment on why these are the things that genuinely vary by band), sharing every other
+    // field (buildUpMs/kneeSoftnessMs/earlyExcessDb) from `p` unchanged across all four calls.
     float gateEnvelopeDb(float tSeconds, const InhaltIRSynth::Params& p,
-                         float plateauDroopDbPerSec, float fallRateDbPerSec) noexcept
+                         float plateauDroopDbPerSec, float fallRateDbPerSec, float kneeTimeMs) noexcept
     {
         const auto tauA = std::max(p.buildUpMs, 0.001f) * 0.001f;
         const auto tauK = std::max(p.kneeSoftnessMs, 0.001f) * 0.001f;
-        const auto tKnee = p.kneeTimeMs * 0.001f;
+        const auto tKnee = kneeTimeMs * 0.001f;
         const auto tauEarly = std::max(p.earlyExcessTauMs, 0.001f) * 0.001f;
 
         const auto attackLin = std::max(1.0f - std::exp(-tSeconds / tauA), 1e-6f);
@@ -343,13 +342,13 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
 
         const auto tSeconds = (float) n / (float) sampleRate;
         const auto gateSubLowLin = std::pow(10.0f, gateEnvelopeDb(
-            tSeconds, params, params.plateauDroopSubLowDbPerSec, params.fallRateSubLowDbPerSec) / 20.0f);
+            tSeconds, params, params.plateauDroopSubLowDbPerSec, params.fallRateSubLowDbPerSec, params.kneeTimeSubLowMs) / 20.0f);
         const auto gateLowLin = std::pow(10.0f, gateEnvelopeDb(
-            tSeconds, params, params.plateauDroopLowDbPerSec, params.fallRateLowDbPerSec) / 20.0f);
+            tSeconds, params, params.plateauDroopLowDbPerSec, params.fallRateLowDbPerSec, params.kneeTimeLowMs) / 20.0f);
         const auto gateMidLin = std::pow(10.0f, gateEnvelopeDb(
-            tSeconds, params, params.plateauDroopMidDbPerSec, params.fallRateMidDbPerSec) / 20.0f);
+            tSeconds, params, params.plateauDroopMidDbPerSec, params.fallRateMidDbPerSec, params.kneeTimeMidMs) / 20.0f);
         const auto gateHighLin = std::pow(10.0f, gateEnvelopeDb(
-            tSeconds, params, params.plateauDroopHighDbPerSec, params.fallRateHighDbPerSec) / 20.0f);
+            tSeconds, params, params.plateauDroopHighDbPerSec, params.fallRateHighDbPerSec, params.kneeTimeHighMs) / 20.0f);
 
         left[(size_t) n] = subLowL * gateSubLowLin + lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
         right[(size_t) n] = subLowR * gateSubLowLin + lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;

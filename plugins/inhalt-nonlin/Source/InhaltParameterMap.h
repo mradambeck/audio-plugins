@@ -40,7 +40,6 @@ namespace InhaltParameterMap
 struct GateParams
 {
     float buildUpMs = 3.0f;
-    float kneeTimeMs = 150.0f;
     float kneeSoftnessMs = 4.0f;
     // Per-band decay rates - see InhaltIRSynth.h's own comment on Params::plateauDroopSubLowDbPerSec
     // etc. for why a single broadband rate was replaced with four.
@@ -52,6 +51,12 @@ struct GateParams
     float fallRateLowDbPerSec = -250.0f;
     float fallRateMidDbPerSec = -250.0f;
     float fallRateHighDbPerSec = -250.0f;
+    // Per-band knee time - see InhaltIRSynth.h's own comment on Params::kneeTimeSubLowMs for why a
+    // single shared knee time was replaced with four.
+    float kneeTimeSubLowMs = 150.0f;
+    float kneeTimeLowMs = 150.0f;
+    float kneeTimeMidMs = 150.0f;
+    float kneeTimeHighMs = 150.0f;
     float earlyExcessDb = 0.0f;
 };
 
@@ -82,11 +87,12 @@ struct TiltParams
 // PluginProcessor.h's timeKnobParamID comment) -> the gate envelope shape. Also depends on High
 // for plateauDroopDbPerSec (findings.md found High redistributes energy loss between the plateau
 // and the post-knee fall while conserving the overall gate length - see that file's "High:
-// TIMING-neutral overall, but NOT damping-neutral" section) and for kneeTimeMs (a real, ear-caught
-// "reverb rings out too long at High=0" complaint traced to a genuine High-dependence at
-// Time=7.0/9.8 - see InhaltParameterMap.cpp's own comment on kneeTimeMs for the earlier, reverted
-// attempt at this and the double-counting bug that caused the regression, now fixed at the source
-// in build_measured_gate_curves.py's own _build_t_knee_ms_curves).
+// TIMING-neutral overall, but NOT damping-neutral" section) and for kneeTimeSubLowMs etc. (a real,
+// ear-caught "reverb rings out too long at High=0" complaint traced to a genuine High-dependence
+// at Time=7.0/9.8 - see InhaltParameterMap.cpp's own comment on kneeTimeSubLowMs for the earlier,
+// reverted attempt at this and the double-counting bug that caused the regression, fixed at the
+// source in build_measured_gate_curves.py's own _build_t_knee_ms_curves, later promoted to
+// per-band by that same file's _build_per_band_knee_time_curves).
 // extrapolated, if non-null, is
 // set when either knob falls outside its own curves' measured range.
 GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extrapolated = nullptr) noexcept;

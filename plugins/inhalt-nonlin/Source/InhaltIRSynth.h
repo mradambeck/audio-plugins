@@ -49,13 +49,23 @@ public:
         // stage. Every field here has a directly-measured twin in
         // core.features.gate_envelope_params() - see effects/nonlin/findings.md.
         //
-        // buildUpMs/kneeTimeMs/kneeSoftnessMs are SHARED across all three decay bands below (not
-        // per-band) - these reflect the gate CIRCUIT's own timing (when it opens, when it starts
-        // to close), which core.features.band_gate_params shows is consistent across frequency
-        // (the knee lands at essentially the same time in every octave band); only the DECAY
-        // RATE itself (plateauDroop/fallRate) genuinely varies by band.
+        // buildUpMs/kneeSoftnessMs are SHARED across all four decay bands below (not per-band).
+        // kneeTimeMs was ALSO believed shared - "the knee lands at essentially the same time in
+        // every octave band" - until a real "still trails the real capture's own level in the
+        // deep tail" complaint led to actually checking that claim directly: it does not hold.
+        // core.features.band_gate_params shows real hardware's own knee time varies by tens to
+        // over a hundred ms by octave band (e.g. 163ms at 44-89Hz vs. 76ms at 88-177Hz for the
+        // same Time=2.2 capture) - promoted to per-band below, see kneeTimeSubLowMs's own comment.
+        // buildUpMs shows an even larger, cleaner per-band pattern in the same data (roughly
+        // 45-80ms in the low bands vs. 2-18ms in the top two octaves, consistent across almost
+        // every Time setting) - NOT yet promoted, flagged here rather than silently assumed fine:
+        // unlike kneeTimeMs's own cross-check (see kneeTimeSubLowMs's comment on canceling the
+        // analysis filter's own smearing algebraically), build-up's per-band spread has not been
+        // separated from the octave analysis filter's own inherent rise-time artifact (a narrower
+        // bandpass filter settles more slowly for a purely mathematical reason, independent of
+        // whatever it's measuring) - a real per-band synthesis effect may or may not be hiding
+        // underneath that artifact, not yet checked.
         float buildUpMs = 3.0f;
-        float kneeTimeMs = 150.0f;
         float kneeSoftnessMs = 4.0f;
 
         // Per-band plateau droop / fall rate - REPLACES a single broadband
@@ -87,6 +97,25 @@ public:
         float fallRateLowDbPerSec = -250.0f;
         float fallRateMidDbPerSec = -250.0f;
         float fallRateHighDbPerSec = -250.0f;
+
+        // Per-band knee time - REPLACES a single shared kneeTimeMs (see this struct's own comment
+        // above on buildUpMs/kneeSoftnessMs for why). Calibrating a per-band TARGET here is less
+        // direct than plateauDroop/fallRate's own additive dB-domain correction: a per-band
+        // knee_time_ms measured directly off either the render or the real capture is smeared by
+        // the analysis filter's own group delay, confirmed by measuring the render itself - even
+        // with a single TRUE shared kneeTimeMs, core.features.band_gate_params measures a real
+        // 40-100ms per-band SPREAD that isn't a synthesis defect at all, just the filter. Since
+        // that smearing is the SAME shared filter applied to both signals, it cancels out of
+        // (real_measured_band - render_measured_band) algebraically, leaving the genuine per-band
+        // hardware target once added back to whatever kneeTimeMs the render was already using -
+        // see build_measured_gate_curves.py's own _KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET comment
+        // for the exact derivation and why it must be measured per-capture rather than at one
+        // isolated setting (kneeSoftnessMs varies 0.45-29.7ms across Time, and a sharper or softer
+        // knee transition smears differently through each band's own narrow analysis filter).
+        float kneeTimeSubLowMs = 150.0f;
+        float kneeTimeLowMs = 150.0f;
+        float kneeTimeMidMs = 150.0f;
+        float kneeTimeHighMs = 150.0f;
 
         // Early-release excess (dB) - a SECOND, additive gate-shape term added BEFORE the
         // per-band split above (when this engine still had one broadband fallRateDbPerSec),

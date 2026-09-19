@@ -108,7 +108,10 @@ public:
             {
                 const auto gate = InhaltParameterMap::mapTimeAndHighToGateParams(t, 0.0f);
                 expect(std::isfinite(gate.buildUpMs) && gate.buildUpMs > 0.0f, "buildUpMs must be finite and positive");
-                expect(std::isfinite(gate.kneeTimeMs) && gate.kneeTimeMs > 0.0f, "kneeTimeMs must be finite and positive");
+                expect(std::isfinite(gate.kneeTimeSubLowMs) && gate.kneeTimeSubLowMs > 0.0f, "kneeTimeSubLowMs must be finite and positive");
+                expect(std::isfinite(gate.kneeTimeLowMs) && gate.kneeTimeLowMs > 0.0f, "kneeTimeLowMs must be finite and positive");
+                expect(std::isfinite(gate.kneeTimeMidMs) && gate.kneeTimeMidMs > 0.0f, "kneeTimeMidMs must be finite and positive");
+                expect(std::isfinite(gate.kneeTimeHighMs) && gate.kneeTimeHighMs > 0.0f, "kneeTimeHighMs must be finite and positive");
                 expect(std::isfinite(gate.fallRateSubLowDbPerSec) && gate.fallRateSubLowDbPerSec < 0.0f, "fallRateSubLowDbPerSec must be finite and negative");
                 expect(std::isfinite(gate.fallRateLowDbPerSec) && gate.fallRateLowDbPerSec < 0.0f, "fallRateLowDbPerSec must be finite and negative");
                 expect(std::isfinite(gate.fallRateMidDbPerSec) && gate.fallRateMidDbPerSec < 0.0f, "fallRateMidDbPerSec must be finite and negative");
@@ -117,20 +120,30 @@ public:
             }
         }
 
-        beginTest("kneeTimeMs is monotonically non-decreasing with Time (regression guard)");
+        beginTest("Per-band knee time is monotonically non-decreasing with Time (regression guard)");
         {
             // The Python fit's own t_knee_ms was found systematically wrong here (non-monotonic -
             // e.g. its Time=0.1 value was LONGER than its Time=9.8 value) and was replaced with a
             // curve built directly from measurement (see InhaltParameterMap.h's own comment and
             // ml-toolkit/effects/nonlin/build_measured_gate_curves.py). This holds that correction
-            // in place: a future regeneration of InhaltReferenceData.h from a bad fit, without
-            // re-running the correction script, would fail this test.
-            float previous = -1.0f;
+            // in place for all four per-band knee times (promoted from one shared value after a
+            // real "still trails the real capture's own level in the deep tail" complaint - see
+            // build_measured_gate_curves.py's own _build_per_band_knee_time_curves docstring,
+            // which applies the same isotonic-regression fallback per band): a future
+            // regeneration of InhaltReferenceData.h from a bad fit, without re-running the
+            // correction script, would fail this test.
+            float previousSubLow = -1.0f, previousLow = -1.0f, previousMid = -1.0f, previousHigh = -1.0f;
             for (float t = 0.1f; t <= 9.8f; t += 0.1f)
             {
                 const auto gate = InhaltParameterMap::mapTimeAndHighToGateParams(t, 0.0f);
-                expect(gate.kneeTimeMs >= previous - 0.01f, "kneeTimeMs should not decrease as Time increases");
-                previous = gate.kneeTimeMs;
+                expect(gate.kneeTimeSubLowMs >= previousSubLow - 0.01f, "kneeTimeSubLowMs should not decrease as Time increases");
+                expect(gate.kneeTimeLowMs >= previousLow - 0.01f, "kneeTimeLowMs should not decrease as Time increases");
+                expect(gate.kneeTimeMidMs >= previousMid - 0.01f, "kneeTimeMidMs should not decrease as Time increases");
+                expect(gate.kneeTimeHighMs >= previousHigh - 0.01f, "kneeTimeHighMs should not decrease as Time increases");
+                previousSubLow = gate.kneeTimeSubLowMs;
+                previousLow = gate.kneeTimeLowMs;
+                previousMid = gate.kneeTimeMidMs;
+                previousHigh = gate.kneeTimeHighMs;
             }
         }
 

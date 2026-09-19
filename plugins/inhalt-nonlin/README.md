@@ -477,8 +477,36 @@ shows the render's low bands trailing 15-25dB above the real capture's own level
 (280ms+) at Time=2.2, now most plausibly explained by the SHARED (not per-band) `kneeTimeMs`: the
 real hardware's own per-band knee time genuinely differs a lot by band (163ms at 44-89Hz vs. 76ms
 at 88-177Hz for this same capture), which one shared knee-time parameter cannot represent - a
-different structural gap than the decay-RATE one this and the earlier per-band work closed, not
-yet attempted.
+different structural gap than the decay-RATE one this and the earlier per-band work closed.
+
+**Knee time promoted to per-band** (`kneeTimeSubLowMs`/`kneeTimeLowMs`/`kneeTimeMidMs`/
+`kneeTimeHighMs`, replacing a single shared `kneeTimeMs`), closing the gap flagged above. Unlike
+plateau droop/fall rate's own additive dB-domain correction, a per-band knee_time_ms measured
+directly off either signal is smeared by the analysis filter's own group delay - confirmed
+directly: even the CURRENT render, with one true shared `kneeTimeMs`, measures a real 40-100ms
+per-band SPREAD via `core.features.band_gate_params` that isn't a synthesis defect at all, just
+the filter. Since that smearing is the same shared filter applied to both signals, it cancels out
+of (real capture's own measured per-band knee minus the render's) algebraically, leaving the
+genuine per-band hardware target once added back to the knee time the render was already using -
+see `build_measured_gate_curves.py`'s own `_KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET` comment for
+the exact derivation, measured per-capture (not at one isolated setting) because `kneeSoftnessMs`
+also varies 0.45-29.7ms across Time, and a sharper or softer knee transition smears differently
+through each band's own narrow analysis filter.
+
+Real, measured effect across all 9 captures: per-band plateau droop error improved 22%
+(85.1->66.3dB/s), fall rate error improved further (103.6->97.4dB/s), the `LSD (all)` concern
+cleared entirely. A genuine, disclosed trade-off, not a clean win: one new sign mismatch appeared
+(44-89Hz plateau droop at Time=2.2, render now +70dB/s vs. real -207dB/s) and the same setting's
+own deep-tail envelope lag got slightly WORSE (was +25dB gap at 320ms, now +28.8dB) even as the
+aggregate improved - both traced to the same already-documented 44-89Hz/Time=2.2 measurement
+fragility this project has hit twice before (mode-beating in the lowest, narrowest analysis band
+at a short plateau), not evidence the per-band knee-time approach itself is unsound elsewhere.
+`buildUpMs` shows an even larger, cleaner-looking per-band pattern in the same data (roughly
+45-80ms in the low bands vs. 2-18ms in the top two octaves) - NOT yet promoted, since unlike
+`kneeTimeMs` it hasn't been checked whether that pattern is a real per-band hardware effect or
+just the octave analysis filter's own inherent rise-time artifact (a narrower bandpass settles
+more slowly for a purely mathematical reason, independent of what it's measuring) - see
+`InhaltIRSynth.h`'s own comment on `Params::buildUpMs` for the open question.
 
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
