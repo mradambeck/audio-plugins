@@ -6,7 +6,7 @@
 // re-fit, update the captures/fit config and regenerate, not this file directly.
 //
 // Provenance:
-//   git commit:         f12937a69f70c0c98804ec0e6f30d14127fa108d
+//   git commit:         4c9e91ec39f3b227dde16ee0ae8b9966aa058aa6
 //   capture set hash:   3802e6e0ad0b96de
 //   fit config hash:    60a6e3a299ef08b5
 //   fit date:           2026-09-19
@@ -422,5 +422,17 @@ static constexpr std::array<FittedPoint, 3> high_to_knee_time_high_ms_offsetPoin
 } };
 static_assert(high_to_knee_time_high_ms_offsetPoints.front().x <= high_to_knee_time_high_ms_offsetPoints.back().x,
     "high_to_knee_time_high_ms_offsetPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
+
+// time_to_stereo_narrow_correlation
+static constexpr std::array<FittedPoint, 6> time_to_stereo_narrow_correlationPoints { {
+    { 0.1f, 0.9698571428571429f },
+    { 0.8f, 0.9702816901408452f },
+    { 2.2f, -0.2905930470347648f },
+    { 4.8f, -0.09582781456953643f },
+    { 7.0f, -0.06520192307692309f },
+    { 9.8f, -0.06075f },
+} };
+static_assert(time_to_stereo_narrow_correlationPoints.front().x <= time_to_stereo_narrow_correlationPoints.back().x,
+    "time_to_stereo_narrow_correlationPoints must be sorted ascending by x - FittedCurve1D assumes this ordering");
 
 } // namespace wildjag::dsp

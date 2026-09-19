@@ -205,15 +205,22 @@ TankParams mapTimeKnobToTankParams(float timeKnob, bool* extrapolated) noexcept
     static const auto timeToFeedbackGain = toCurve(wildjag::dsp::time_to_feedback_gainPoints);
     static const auto timeToDamping = toCurve(wildjag::dsp::time_to_damping_weight_meanPoints);
     static const auto timeToDiffuserGain = toCurve(wildjag::dsp::time_to_diffuser_gainPoints);
+    // Stereo narrowing correlation (see InhaltIRSynth.h's own Params::stereoNarrowCorrelation and
+    // build_measured_gate_curves.py's own _build_stereo_narrow_curve for the full story) - Time-
+    // only, like every other field in this function, since Time=9.8's own richest sweep showed no
+    // meaningful per-band... per-High dependence to correct for.
+    static const auto timeToStereoNarrow = toCurve(wildjag::dsp::time_to_stereo_narrow_correlationPoints);
 
-    bool gainExtrapolated = false, dampingExtrapolated = false, diffuserExtrapolated = false;
+    bool gainExtrapolated = false, dampingExtrapolated = false, diffuserExtrapolated = false,
+         stereoNarrowExtrapolated = false;
     TankParams params;
     params.feedbackGain = timeToFeedbackGain.evaluate(timeKnob, &gainExtrapolated);
     params.dampingWeight = timeToDamping.evaluate(timeKnob, &dampingExtrapolated);
     params.diffuserGain = timeToDiffuserGain.evaluate(timeKnob, &diffuserExtrapolated);
     params.directGain = directGainConstant;
+    params.stereoNarrowCorrelation = timeToStereoNarrow.evaluate(timeKnob, &stereoNarrowExtrapolated);
     if (extrapolated != nullptr)
-        *extrapolated = gainExtrapolated || dampingExtrapolated || diffuserExtrapolated;
+        *extrapolated = gainExtrapolated || dampingExtrapolated || diffuserExtrapolated || stereoNarrowExtrapolated;
     return params;
 }
 

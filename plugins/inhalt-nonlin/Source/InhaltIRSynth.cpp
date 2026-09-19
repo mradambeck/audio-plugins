@@ -353,6 +353,49 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         left[(size_t) n] = subLowL * gateSubLowLin + lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
         right[(size_t) n] = subLowR * gateSubLowLin + lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;
     }
+
+    // Stereo narrowing - see Params::stereoNarrowCorrelation's own comment for why this exists.
+    // Post-processes the completed left/right buffers (rather than working per-sample inline
+    // above) because the fixed inter-channel delay needs to look backward into already-rendered
+    // samples, and this is an offline synth call, not a real-time block - the extra full-buffer
+    // pass costs nothing that matters here.
+    //
+    // Model: treat the CURRENT left/right (already independent by construction, verified directly
+    // - see Params::stereoNarrowCorrelation's own comment) as two independent components, and mix
+    // in a shared "mono" reference derived from their own average, delayed on the left side by
+    // stereoNarrowFixedDelayMs (core.features.dominant_lag_correlation's own sign convention: a
+    // positive lag means left lags right, i.e. right leads). Mixing weights
+    // sqrt(1-|r|)/sqrt(|r|) reproduce the target correlation r exactly for two equal-power
+    // independent signals (r = shared-power fraction) - see build_measured_gate_curves.py's own
+    // _build_stereo_narrow_curve docstring for the full derivation, including why the sign is kept
+    // rather than just the magnitude. mono is rescaled by sqrt(2) first: averaging two independent
+    // equal-power signals halves the variance, so without this the shared reference would carry
+    // less power than left/right's own independent components and under-shoot the target r.
+    {
+        const auto rSigned = params.stereoNarrowCorrelation;
+        const auto rAbs = std::min(std::abs(rSigned), 1.0f);
+        if (rAbs > 0.0f)
+        {
+            const auto rSign = rSigned >= 0.0f ? 1.0f : -1.0f;
+            const auto independentGain = std::sqrt(std::max(1.0f - rAbs, 0.0f));
+            const auto sharedGain = std::sqrt(rAbs);
+            const auto delaySamples = (int) std::round(InhaltIRSynth::stereoNarrowFixedDelayMs * 0.001 * sampleRate);
+
+            std::vector<float> monoScaled((size_t) numSamples);
+            for (int n = 0; n < numSamples; ++n)
+                monoScaled[(size_t) n] = (left[(size_t) n] + right[(size_t) n]) * 0.70710678f; // *sqrt(2)/2
+
+            std::vector<float> newLeft((size_t) numSamples), newRight((size_t) numSamples);
+            for (int n = 0; n < numSamples; ++n)
+            {
+                const auto monoDelayed = (n >= delaySamples) ? monoScaled[(size_t) (n - delaySamples)] : 0.0f;
+                newLeft[(size_t) n] = independentGain * left[(size_t) n] + rSign * sharedGain * monoDelayed;
+                newRight[(size_t) n] = independentGain * right[(size_t) n] + sharedGain * monoScaled[(size_t) n];
+            }
+            left = std::move(newLeft);
+            right = std::move(newRight);
+        }
+    }
 }
 
 } // namespace inhalt

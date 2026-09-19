@@ -149,7 +149,9 @@
             "gate_length_ms_at_20db": 105.15
           },
           "knee_time_diff_ms": 87.347
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": 0.9781
       },
       "ltas_third_octave": [
         [
@@ -484,7 +486,9 @@
             "gate_length_ms_at_20db": 107.19
           },
           "knee_time_diff_ms": 26.44
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": 0.9784
       },
       "ltas_third_octave": [
         [
@@ -819,7 +823,9 @@
             "gate_length_ms_at_20db": 164.06
           },
           "knee_time_diff_ms": -11.474
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.4614
       },
       "ltas_third_octave": [
         [
@@ -1154,7 +1160,9 @@
             "gate_length_ms_at_20db": 222.83
           },
           "knee_time_diff_ms": 85.306
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.238
       },
       "ltas_third_octave": [
         [
@@ -1484,7 +1492,9 @@
             "gate_length_ms_at_20db": 275.8
           },
           "knee_time_diff_ms": 9.478
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1914
       },
       "ltas_third_octave": [
         [
@@ -1809,7 +1819,9 @@
             "gate_length_ms_at_20db": 276.8
           },
           "knee_time_diff_ms": 84.308
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1855
       },
       "ltas_third_octave": [
         [
@@ -2139,7 +2151,9 @@
             "gate_length_ms_at_20db": 302.74
           },
           "knee_time_diff_ms": -4.489
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1837
       },
       "ltas_third_octave": [
         [
@@ -2469,7 +2483,9 @@
             "gate_length_ms_at_20db": 300.75
           },
           "knee_time_diff_ms": -10.476
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1807
       },
       "ltas_third_octave": [
         [
@@ -2799,7 +2815,9 @@
             "gate_length_ms_at_20db": 301.75
           },
           "knee_time_diff_ms": 104.263
-        }
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1778
       },
       "ltas_third_octave": [
         [

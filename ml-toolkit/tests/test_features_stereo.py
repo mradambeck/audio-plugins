@@ -2,9 +2,11 @@
 delayed-identical-channel case is the one that actually justifies iacc() existing alongside
 interchannel_correlation() - see the docstrings."""
 import numpy as np
+import pytest
 
 from core.features import (
     band_interchannel_coherence,
+    dominant_lag_correlation,
     iacc,
     interchannel_correlation,
     mid_side_ratio_db,
@@ -76,3 +78,36 @@ def test_mid_side_ratio_near_zero_for_independent_channels():
     l = rng.standard_normal(SR)
     r = rng.standard_normal(SR)
     assert abs(mid_side_ratio_db(l, r)) < 2.0
+
+
+def test_dominant_lag_correlation_finds_a_delay_outside_iaccs_own_window():
+    """The whole reason this function exists over iacc(): a real NonLin capture pair read as
+    near-zero at zero lag AND near-zero within iacc()'s own +-1ms window, yet were 97-98%
+    correlated at a fixed ~2.5ms lag - well outside what iacc() searches. This is that exact case,
+    synthesized: a delay bigger than iacc()'s default window."""
+    rng = np.random.default_rng(7)
+    l = rng.standard_normal(SR)
+    delay_samples = int(SR * 0.0025)  # 2.5ms, outside iacc()'s default 1ms window
+    r = np.zeros_like(l)
+    r[delay_samples:] = l[:-delay_samples]  # r[n] = l[n - delay_samples]: r lags l
+
+    assert abs(interchannel_correlation(l, r)) < 0.1
+    assert abs(iacc(l, r, SR, max_lag_ms=1.0)) < 0.1
+
+    lag_ms, corr = dominant_lag_correlation(l, r, SR, max_lag_ms=10.0)
+    assert corr > 0.99
+    assert lag_ms == pytest.approx(-2.5, abs=0.05)  # negative: r lags l, see the function's own docstring
+
+
+def test_dominant_lag_correlation_direction_matches_which_channel_leads():
+    """Confirms the sign convention isn't just asserted but actually verified both ways - swapping
+    which channel leads should flip the sign of the reported lag."""
+    rng = np.random.default_rng(8)
+    l = rng.standard_normal(SR)
+    delay_samples = int(SR * 0.0025)
+    r = np.zeros_like(l)
+    r[:-delay_samples] = l[delay_samples:]  # r[n] = l[n + delay_samples]: r leads l (l lags r)
+
+    lag_ms, corr = dominant_lag_correlation(l, r, SR, max_lag_ms=10.0)
+    assert corr > 0.99
+    assert lag_ms == pytest.approx(2.5, abs=0.05)

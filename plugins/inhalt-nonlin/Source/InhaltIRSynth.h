@@ -158,6 +158,25 @@ public:
         // sampling) - see InhaltParameterMap.cpp's own directGainConstant comment for the
         // calibration and its known residual gap at very negative High.
         float directGain = 0.96f;
+
+        // Stereo narrowing correlation - a real, ear-caught "the IR's and the algorithm plugin
+        // seem to have very different stereo widths" complaint, traced to a genuine hardware
+        // behaviour this engine's own two-tank architecture cannot reproduce on its own: the two
+        // independent tanks (and their own independent diffusers/direct taps) decorrelate from
+        // sample zero, at every Time setting, by construction - checked directly, not assumed
+        // (no significant correlation at any lag at either Time=0.1 or Time=9.8, peak <=0.10).
+        // Real hardware's own two channels are NOT like that: core.features.
+        // dominant_lag_correlation found them 97-98% correlated at a fixed lag of +2.49ms at
+        // Time=0.1/0.8 - essentially a mono signal with a small hardware inter-channel delay -
+        // decaying (through a sign flip) to a modest -0.18 to -0.24 residual by Time=4.8-9.8.
+        // Applied in render() as a post-process blend toward a shared, delayed mono reference
+        // derived from this engine's own already-independent left/right (see that function's own
+        // comment for the exact formula) - not baked into the tank/diffuser topology, since the
+        // topology's independence is still correct and wanted for the underlying tail, just
+        // needs blending down at short Time. 0 = neutral no-op (today's fully-independent
+        // behaviour), matching this struct's own convention; the sign is kept (not just
+        // magnitude) to reproduce the measured short-vs-long-Time flip directly.
+        float stereoNarrowCorrelation = 0.0f;
     };
 
     static constexpr int numLines = 8;
@@ -192,6 +211,12 @@ public:
     static constexpr float subLowLowCrossoverHz = 88.4f;
     static constexpr float lowMidCrossoverHz = 176.8f;
     static constexpr float midHighCrossoverHz = 11313.7f;
+
+    // Fixed inter-channel delay for the stereo-narrowing blend (see Params::stereoNarrowCorrelation's
+    // own comment) - core.features.dominant_lag_correlation measured this at EXACTLY +2.49ms in
+    // every one of the 9 real captures, independent of Time or High, so it's a fixed architecture
+    // constant here too, not a curve.
+    static constexpr float stereoNarrowFixedDelayMs = 2.49f;
 
     // Renders `numSamples` of a stereo gated IR at `sampleRate` into left/right (resized to
     // numSamples, overwritten). Allocates (line buffer sizing) - never call this on the audio

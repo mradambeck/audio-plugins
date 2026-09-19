@@ -508,6 +508,58 @@ just the octave analysis filter's own inherent rise-time artifact (a narrower ba
 more slowly for a purely mathematical reason, independent of what it's measuring) - see
 `InhaltIRSynth.h`'s own comment on `Params::buildUpMs` for the open question.
 
+**`buildUpMs` per-band promotion: investigated, tried, reverted - a real hardware effect that
+doesn't help when applied in isolation.** The filter-artifact question above was answered directly
+(the same render-minus-reference-cancellation technique used for `kneeTimeMs` found real,
+non-artifact signal - the discrepancy clustered cleanly by Time regime rather than varying
+randomly), so per-band `buildUpMs` was implemented and calibrated the same way. Validated across
+all 9 captures, it made things measurably WORSE, not better: per-band plateau droop error 66->87dB/s,
+sign mismatches 13->16, spread broadly across bands and settings that were previously fine - not
+confined to the one already-fragile 44-89Hz/Time=2.2 case. Root cause: changing the attack shape
+per band shifts where the analysis-side swept-breakpoint fit locates each band's own "plateau",
+which invalidated the already-calibrated droop/knee-time curves (built assuming the OLD shared
+attack shape) - a coupling effect the isolated filter-cancellation diagnostic couldn't surface.
+Reverted in full (verified via a clean `git status` and the full test suite) rather than keep a
+change that measurably hurts the real-hardware match. If revisited, it would need the droop/knee
+curves re-derived UNDER the new per-band attack shape, not reused as-is - a bigger, more coupled
+piece of work than the isolated promotion attempted here.
+
+**Stereo width: fixed with a new, Time-dependent narrowing stage.** A real "the IR's and the
+algorithm plugin seem to have very different stereo widths" complaint led to a new measurement
+(`core.features.dominant_lag_correlation`, added for this - wider net than `iacc()`'s own +-1ms
+window) that found something genuinely surprising: the real captures' two channels are 97-98%
+correlated at a FIXED lag of +2.49ms at Time=0.1/0.8 - essentially a MONO signal with a small
+hardware inter-channel delay, not decorrelated stereo at all - decaying smoothly (through a sign
+flip) to a modest -0.18 to -0.24 residual by Time=4.8-9.8. This engine's own two tanks (plus their
+independent diffusers/direct taps) are decorrelated from sample zero by construction, at EVERY
+Time setting - checked directly, not assumed (no significant correlation at any lag at either
+Time=0.1 or Time=9.8, peak magnitude <=0.10). A single always-decorrelated architecture cannot
+reproduce a real, Time-dependent width.
+
+Fixed with a new `Params::stereoNarrowCorrelation` (`TankParams`, Time-only), applied in
+`InhaltIRSynth::render()` as a post-process blend toward a shared, delayed-mono reference derived
+from the engine's own already-independent left/right (mixing weights `sqrt(1-|r|)`/`sqrt(|r|)`
+reproduce a target correlation `r` exactly for two equal-power independent signals - see that
+function's own comment for the full derivation, including why the sign is kept, not just the
+magnitude, to reproduce the measured short-vs-long-Time flip directly). The naive target-as-written
+value overshot in practice (the render's own left/right aren't exactly equal-power once the
+per-band gate/tilt/diffuser stages are folded in) - corrected with the same "hand-measured direct
+C++ sweep" procedure as every other per-Time parameter in this project
+(`_STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED`, numerically inverted).
+
+Real, measured effect: rendered correlation at the fixed lag now matches the real target to within
+0.003-0.016 at 7 of 9 settings (was ~0 everywhere before, a complete miss). A genuine, disclosed
+trade-off: `validate.py`'s own per-band droop/fall-rate metrics (computed from a MONO downmix)
+got measurably worse specifically at Time=0.1/0.8 (mean |droop error| 240 vs. 39 at Time>=2.2) -
+understood as expected comb-filtering from correctly reproducing a genuinely near-mono, delayed
+signal (confirmed via a clean `knee_r2=0.99` fit, not fit corruption), not a bug. Two settings
+(the most-negative-High case at Time=7.0 and Time=9.8) show the aggregate
+`dominant_lag_correlation` metric itself reading the wrong sign - checked directly and confirmed
+to be the search picking up an unrelated, stronger peak elsewhere within its own +-50ms window at
+those heavy-tilt settings, not a synthesis defect: correlation measured at the exact intended
+2.49ms lag is correctly negative and close to target in both cases (-0.12 vs. -0.19, -0.16 vs.
+-0.18).
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

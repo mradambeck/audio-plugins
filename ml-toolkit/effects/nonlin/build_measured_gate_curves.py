@@ -716,6 +716,109 @@ def _build_per_band_knee_time_curves(features: dict) -> dict:
     return result
 
 
+# Hand-measured via direct C++ render sweep (same procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE):
+# temporarily render InhaltIRSynth at a range of explicit Params::stereoNarrowCorrelation inputs
+# (holding every other param fixed at a real setting's own calibrated values - Time=9.8's own for
+# the negative-input half of the table, Time=0.1's own for the positive half, since that's the
+# setting the positive target actually applies to), measure the ACHIEVED
+# core.features.dominant_lag_correlation on the result. See _build_stereo_narrow_curve's own
+# docstring for why this correction is needed at all (the render's own left/right aren't exactly
+# equal-power, so the mixing formula's exact-target guarantee doesn't quite hold in practice).
+# Re-measure if InhaltIRSynth.cpp's own stereo-narrowing formula or the surrounding gate
+# architecture ever changes.
+_STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED = [
+    (0.0, 0.0106),
+    (-0.05, -0.1621), (-0.08, -0.2141), (-0.1, -0.2443), (-0.12, -0.2722),
+    (-0.15, -0.3108), (-0.181, -0.3476), (-0.2, -0.369), (-0.25, -0.4217),
+    (-0.3, -0.4706), (-0.4, -0.5601), (-0.5, -0.642), (-0.6, -0.7185),
+    (-0.7, -0.7913), (-0.8, -0.8615), (-0.9, -0.9302), (-0.95, -0.9646),
+    (0.9, 0.9299), (0.93, 0.9504), (0.95, 0.9642), (0.97, 0.9782), (0.98, 0.9853), (0.99, 0.9926),
+]
+
+
+def _invert_stereo_narrow_input(target: float) -> float:
+    """Numerically inverts _STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED (achieved-vs-input isn't
+    closed-form) to find the WRITTEN Params::stereoNarrowCorrelation value that actually achieves
+    the given real target correlation, via linear interpolation over the measured table."""
+    pairs = sorted(_STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED, key=lambda p: p[1])
+    achieved = [p[1] for p in pairs]
+    inputs = [p[0] for p in pairs]
+    return float(np.interp(target, achieved, inputs))
+
+
+def _build_stereo_narrow_curve(features: dict) -> dict:
+    """time_to_stereo_narrow_correlation - a NEW parameter, not a replacement, added after a real
+    "the IR's and the algorithm plugin have very different stereo widths" complaint.
+
+    core.features.dominant_lag_correlation (added for this) found something interchannel_
+    correlation/iacc's own +-1ms window had been missing entirely: the real captures' two channels
+    are 97-98% correlated at a FIXED lag of +2.49ms at Time=0.1/0.8 - essentially a mono signal
+    with a small hardware inter-channel delay, not decorrelated stereo at all - decaying smoothly
+    (through a sign flip) to a modest -0.18 to -0.24 residual by Time=4.8-9.8. The lag itself is
+    fixed at +2.49ms in EVERY one of the 9 captures checked, independent of Time or High - a fixed
+    architecture constant (InhaltIRSynth.h's own stereoNarrowFixedDelayMs), not something to curve-
+    fit. Only the CORRELATION AMOUNT at that lag varies, and only with Time - High makes no
+    meaningful difference (Time=9.8's own three-point sweep: -0.181/-0.184/-0.178 across
+    High=-9/-4/0, within noise of each other) - so this is Time-only, like feedbackGain/
+    dampingWeight/diffuserGain in TankParams, not baseline-plus-High-offset.
+
+    This engine's own two tanks (plus their independent diffusers/direct taps) are decorrelated
+    from sample zero by construction, at every Time setting - checked directly, not assumed: the
+    render shows no significant correlation at ANY lag at either Time=0.1 or Time=9.8 (peak
+    magnitude <=0.10 both times). A single always-decorrelated architecture cannot reproduce a
+    real, Time-DEPENDENT width - hence this new parameter, applied as a post-process blend toward
+    a shared, delayed mono reference (see InhaltIRSynth.cpp's own render() comment for the exact
+    formula) rather than baked into the tank/diffuser topology itself.
+
+    Kept SIGNED (not just magnitude) and used signed in the render's own blend, reproducing the
+    measured sign flip between short and long Time directly rather than discarding it - simpler
+    than deciding whether the flip is physically meaningful (a phase-inverted shared component) or
+    coincidental, and it costs nothing extra to keep.
+
+    The raw Time-averaged sequence (0.978, 0.978, -0.461, -0.238, -0.189, -0.181) is already
+    monotonically non-increasing on its own - no isotonic regression needed, unlike t_knee_ms's own
+    curve.
+
+    NOT written directly, though - the raw target needs the SAME "measure what the render actually
+    does, then correct" treatment as every other per-Time parameter here, for a reason specific to
+    this one: InhaltIRSynth.cpp's own render() mixing formula (sqrt(1-|r|)/sqrt(|r|) weights) is
+    exact only for two perfectly independent, perfectly equal-power components - this engine's own
+    left/right are independent to within measurement noise (a small nonzero natural correlation at
+    this exact lag, +0.011, confirmed by direct C++ probe) but not exactly equal-power once the
+    per-band gate/tilt/diffuser stages are folded in, so writing the target directly OVERSHOOTS it:
+    a direct C++ sweep (temporarily rendering at a range of stereoNarrowCorrelation inputs and
+    measuring the ACHIEVED core.features.dominant_lag_correlation on the result - same "hand-
+    verified via direct measurement" procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE) found
+    writing -0.181 achieves -0.348, not -0.181 - roughly 1.9x too strong at that end of the range,
+    tapering to roughly 1x by the time |target| approaches 1. _STEREO_NARROW_INPUT_OUTPUT_CPP_MEASURED
+    below is that sweep's own (input, achieved) table; _invert_stereo_narrow_input numerically
+    inverts it (the achieved-vs-input relationship isn't closed-form, so interpolation over the
+    measured table stands in for an analytical formula) to find the WRITTEN value that actually
+    achieves each real target. Re-measure (rerun a small standalone render sweep, same as the other
+    hand-measured tables in this file) if the mixing formula or the surrounding gate architecture
+    ever changes."""
+    by_time: dict[float, list[float]] = {}
+    for c in features["captures"]:
+        t = c["params"]["time"]
+        corr = c["stereo"]["dominant_lag_correlation"]
+        by_time.setdefault(t, []).append(corr)
+
+    baseline_pairs = sorted((t, sum(vs) / len(vs)) for t, vs in by_time.items())
+    print(f"\nstereo_narrow_correlation Time baseline (averaged per Time, real target): "
+          f"{[(t, round(v, 3)) for t, v in baseline_pairs]}")
+
+    written_pairs = [(t, _invert_stereo_narrow_input(target)) for t, target in baseline_pairs]
+    print(f"  corrected for the render's own overshoot -> written: "
+          f"{[(t, round(v, 3)) for t, v in written_pairs]}")
+
+    return {
+        "time_to_stereo_narrow_correlation": {
+            "points": fit_curve(written_pairs).points(),
+            "source": "direct_measurement_time_only_input_output_corrected",
+        },
+    }
+
+
 def _build_fall_rate_curves(features: dict, curves: dict) -> dict:
     """fall_rate_db_per_s's own Time baseline AND High offset - REPLACES its entry in main()'s
     naive pooling loop, which had BOTH bugs already found and fixed for plateau_droop_db_per_s and
@@ -1278,6 +1381,7 @@ def main() -> None:
     curves.update(_build_fall_rate_curves(features, curves))
     curves.update(_build_early_excess_curves(features))
     curves.update(_build_per_band_gate_curves(features))
+    curves.update(_build_stereo_narrow_curve(features))
     curves.update(_build_per_band_knee_time_curves(features))
 
     curves["_notes"]["gate_timing_source_correction"] = (

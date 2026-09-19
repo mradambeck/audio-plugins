@@ -74,6 +74,12 @@ struct TankParams
     // hand-measured CONSTANT (Time/High-independent within the real capture set's own sampling),
     // not fit-derived, matching InhaltParameterMap.cpp's tiltPivotHz convention.
     float directGain = 0.35f;
+    // Stereo narrowing correlation (see InhaltIRSynth.h's own Params::stereoNarrowCorrelation
+    // comment) - a real, ear-caught "very different stereo widths" complaint traced to a genuine
+    // Time-dependent hardware behaviour this engine's own always-independent two-tank design
+    // can't reproduce on its own. Direct measurement (core.features.dominant_lag_correlation),
+    // Time-only like every other field here.
+    float stereoNarrowCorrelation = 0.0f;
 };
 
 struct TiltParams

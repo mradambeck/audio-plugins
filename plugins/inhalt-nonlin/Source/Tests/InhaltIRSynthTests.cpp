@@ -33,6 +33,25 @@ namespace
         const auto denom = std::sqrt(denomA * denomB);
         return denom > 0.0 ? num / denom : 0.0;
     }
+
+    // correlation(a, b) at a fixed lag: a[n] compared against b[n - lagSamples] - positive lag
+    // means a LAGS b (a's content arrives lagSamples samples AFTER the matching content in b),
+    // matching core.features.dominant_lag_correlation's own sign convention exactly (verified
+    // there against a synthetic delayed-noise pair, not just reasoned).
+    double correlationAtLag(const std::vector<float>& a, const std::vector<float>& b, int lagSamples)
+    {
+        std::vector<float> ashift, bshift;
+        for (size_t i = 0; i < a.size() && i < b.size(); ++i)
+        {
+            const auto bi = (int) i - lagSamples;
+            if (bi >= 0 && bi < (int) b.size())
+            {
+                ashift.push_back(a[i]);
+                bshift.push_back(b[(size_t) bi]);
+            }
+        }
+        return correlation(ashift, bshift);
+    }
 }
 
 class InhaltIRSynthTests : public juce::UnitTest
@@ -92,6 +111,44 @@ public:
 
             const auto corr = std::abs(correlation(left, right));
             expect(corr < 0.3, "L/R correlation should be well below what a shared/split tank would produce");
+        }
+
+        beginTest("stereoNarrowCorrelation reproduces the target correlation at its fixed lag, sign included");
+        {
+            // Guards the actual reason this parameter exists: a real "the IR's and the algorithm
+            // plugin seem to have very different stereo widths" complaint (see
+            // Params::stereoNarrowCorrelation's own comment) - real hardware is far more
+            // correlated at a fixed +2.49ms lag than this engine's own always-independent tanks
+            // produce on their own. At 0 (default) this must stay a pure no-op; at a real,
+            // nonzero value it must measurably shift left/right's own correlation AT THAT LAG
+            // toward the requested value, sign included (not just magnitude).
+            inhalt::InhaltIRSynth::Params params;
+            params.feedbackGain = 0.85f;
+            params.dampingWeight = 0.4f;
+            params.kneeTimeSubLowMs = params.kneeTimeLowMs = params.kneeTimeMidMs = params.kneeTimeHighMs = 300.0f;
+            params.fallRateSubLowDbPerSec = params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -100.0f;
+
+            const auto numSamples = (int) (0.3 * sampleRate);
+            const auto delaySamples = (int) std::round(inhalt::InhaltIRSynth::stereoNarrowFixedDelayMs * 0.001 * sampleRate);
+
+            params.stereoNarrowCorrelation = 0.0f;
+            std::vector<float> leftNeutral, rightNeutral;
+            inhalt::InhaltIRSynth::render(params, sampleRate, numSamples, leftNeutral, rightNeutral);
+            const auto corrNeutral = correlationAtLag(leftNeutral, rightNeutral, delaySamples);
+            expect(std::abs(corrNeutral) < 0.3,
+                "stereoNarrowCorrelation=0 should leave left/right close to the base architecture's own decorrelation");
+
+            params.stereoNarrowCorrelation = 0.9f;
+            std::vector<float> leftPositive, rightPositive;
+            inhalt::InhaltIRSynth::render(params, sampleRate, numSamples, leftPositive, rightPositive);
+            const auto corrPositive = correlationAtLag(leftPositive, rightPositive, delaySamples);
+            expect(corrPositive > 0.7, "stereoNarrowCorrelation=+0.9 should measurably raise correlation at its own fixed lag");
+
+            params.stereoNarrowCorrelation = -0.9f;
+            std::vector<float> leftNegative, rightNegative;
+            inhalt::InhaltIRSynth::render(params, sampleRate, numSamples, leftNegative, rightNegative);
+            const auto corrNegative = correlationAtLag(leftNegative, rightNegative, delaySamples);
+            expect(corrNegative < -0.7, "stereoNarrowCorrelation=-0.9 should reproduce the NEGATIVE sign too, not just the magnitude");
         }
 
         beginTest("The gate crushes energy toward the tail past the knee");

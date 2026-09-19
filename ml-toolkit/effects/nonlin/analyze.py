@@ -33,6 +33,7 @@ import numpy as np
 from core.features import (
     band_gate_params,
     band_interchannel_coherence,
+    dominant_lag_correlation,
     find_onset,
     gate_envelope_params,
     hilbert_envelope_db,
@@ -136,6 +137,13 @@ def analyze_nonlin_capture(channels: np.ndarray, sr: int) -> dict:
     coherence = _coherence_json_safe(band_interchannel_coherence(l, r, sr, bands))
     ms_ratio_db = mid_side_ratio_db(l, r)
     stereo_align = stereo_gate_alignment(l, r, sr)
+    # Wider net than iacc()'s own +-1ms - a real, unexpected finding on the short-Time captures
+    # (see dominant_lag_correlation's own docstring): near-zero at zero lag AND within iacc()'s
+    # own window, yet 97-98% correlated at a fixed ~2.5ms lag. Real hardware's own stereo image
+    # turns out to be Time-dependent in a way this engine's own two-always-independent-tank
+    # architecture doesn't reproduce - see effects/nonlin/build_measured_gate_curves.py's own
+    # _build_stereo_narrow_curve docstring for the fix built from this measurement.
+    dominant_lag_ms, dominant_lag_corr = dominant_lag_correlation(l, r, sr)
 
     ltas_f, ltas_db = long_term_average_spectrum(mono, sr)
     peaks = resonant_peaks(mono, sr)
@@ -156,6 +164,8 @@ def analyze_nonlin_capture(channels: np.ndarray, sr: int) -> dict:
             "coherence": coherence,
             "mid_side_ratio_db": round(ms_ratio_db, 2),
             "gate_alignment": stereo_align,
+            "dominant_lag_ms": round(dominant_lag_ms, 3),
+            "dominant_lag_correlation": round(dominant_lag_corr, 4),
         },
         "ltas_third_octave": [[round(float(f), 1), round(float(d), 2)] for f, d in zip(ltas_f, ltas_db)],
         "resonant_peaks": peaks,

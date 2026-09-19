@@ -601,6 +601,33 @@ def iacc(l: np.ndarray, r: np.ndarray, sr: int, max_lag_ms: float = 1.0):
     return float(np.max(np.abs(window)) / denom)
 
 
+def dominant_lag_correlation(l: np.ndarray, r: np.ndarray, sr: int, max_lag_ms: float = 50.0):
+    """Like iacc() but returns the (lag_ms, signed correlation) pair at whichever lag has the
+    largest |correlation| within +-max_lag_ms, instead of just the magnitude at a fixed +-1ms
+    window. Built for a wider net than iacc()'s own ear-inspired +-1ms: a real, unexpected finding
+    on NonLin's own short-Time captures (see effects/nonlin/findings.md) needed this - their two
+    channels read as near-zero at zero lag (interchannel_correlation) AND near-zero within iacc()'s
+    own +-1ms window, yet are 97-98% correlated at a fixed ~2.5ms lag, well outside that window.
+    Positive lag_ms means l's content arrives that many ms AFTER the matching content in r (l
+    lags r, i.e. r leads); negative means the reverse (r lags l) - verified against a synthetic
+    delayed-noise pair, not just reasoned from np.correlate()'s own convention."""
+    l = l - l.mean()
+    r = r - r.mean()
+    max_lag = max(1, int(sr * max_lag_ms / 1000))
+    full = np.correlate(l, r, mode="full")
+    mid = len(l) - 1
+    lo = max(0, mid - max_lag)
+    hi = min(len(full), mid + max_lag + 1)
+    window = full[lo:hi]
+    denom = np.linalg.norm(l) * np.linalg.norm(r)
+    if denom <= 0 or len(window) == 0:
+        return 0.0, 0.0
+    normed = window / denom
+    peak_idx = int(np.argmax(np.abs(normed)))
+    lag_ms = (lo + peak_idx - mid) / sr * 1000.0
+    return float(lag_ms), float(normed[peak_idx])
+
+
 def band_interchannel_coherence(l: np.ndarray, r: np.ndarray, sr: int, bands=None):
     """Per-band scipy.signal.coherence, WITH the coherence noise floor for this capture's own
     length included as "_noise_floor" - two genuinely independent signals give approximately that
