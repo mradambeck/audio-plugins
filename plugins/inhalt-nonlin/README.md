@@ -440,6 +440,46 @@ multi-pole (Butterworth/Linkwitz-Riley) crossover remains the more correct fix f
 attempt, not further one-pole cascade tuning. `Spectral flatness`/`Log-spectral distance` remain
 open, pre-existing gaps, not addressed by this work.
 
+**A/B loudness gap vs. the real captures: fixed with an empirical output makeup gain.**
+Convolving unit-energy-normalized versions of both this engine's render and the real capture with
+a shared white-noise input matches to within ~0.3dB - normalization itself was already correct.
+But with a percussive transient input (the realistic case for auditioning a reverb tail by ear),
+the real capture's full convolved output measured 0.7-6.0dB louder across all 9 reference settings
+(mean +2.3dB). Fixed with a documented +2.2dB output makeup gain in `InhaltIRWorker.cpp`
+(`outputMakeupGainDb`) - a deliberate stopgap sized to the median measured gap, not a fix to the
+underlying per-band decay-shape mismatch that actually causes it (see that constant's own comment).
+Re-measured after: mean gap dropped to +0.4dB, median to +0.1dB.
+
+**Low end excess traced to a stale calibration override, not a level bug.** A follow-up "way more
+low end than the IR's" complaint turned out NOT to be about loudness at all: `validate.py`'s own
+per-band data showed the synthesized low band barely decaying during the plateau at Time=2.2
+(-0.1dB/s rendered vs. a real -173 to -207dB/s target). Traced to
+`_TARGET_DROOP_ROBUST_OVERRIDE`'s `(2.2, "low")` entry (`build_measured_gate_curves.py`) - a
+near-flat -1.966dB/s value hand-set earlier in the same session for a mode-beating problem that
+turned out to be render-side only (fixed by the crossover redesign above); the real capture's own
+target was never re-checked afterward. Direct re-measurement showed no mode-beating evidence (both
+sub-bands fit cleanly, knee_r2 ~0.96, at steep real rates) - removing the stale override let the
+real per-band average flow through, fixing the specific defect (LSD concerns cleared entirely,
+sign mismatches 16->12, aggregate fall-rate error 121.2->105.4dB/s).
+
+**Low band split in two** (`subLow` 44-89Hz / `low` 88-177Hz, `subLowLowCrossoverHz`=88.4Hz),
+closing the rest of the gap the fix above couldn't: those two analysis octaves have real,
+meaningfully different decay rates of their own (e.g. -207 vs. -173dB/s at Time=2.2) that one
+shared "low" parameter structurally could not track independently, mirroring exactly the
+low/mid/high split's own original rationale one octave further down. Same nested-complementary-
+crossover technique, same natural-droop-measurement procedure (including a second real
+mode-beating case at Time=2.2's own subLow sub-band, fixed the same way with a robust linear
+regression override - see `_NATURAL_DROOP_PER_BAND_CPP_MEASURED`'s own comment). Real, measured
+effect: 44-89Hz's own post-knee fall rate error dropped from -91.4dB/s to -0.6dB/s at Time=2.2; no
+new sign mismatches introduced in either sub-band anywhere in the capture set; aggregate fall-rate
+error improved slightly further (105.4->103.6dB/s). Not a complete fix - envelope inspection still
+shows the render's low bands trailing 15-25dB above the real capture's own level in the deep tail
+(280ms+) at Time=2.2, now most plausibly explained by the SHARED (not per-band) `kneeTimeMs`: the
+real hardware's own per-band knee time genuinely differs a lot by band (163ms at 44-89Hz vs. 76ms
+at 88-177Hz for this same capture), which one shared knee-time parameter cannot represent - a
+different structural gap than the decay-RATE one this and the earlier per-band work closed, not
+yet attempted.
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

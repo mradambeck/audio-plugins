@@ -86,12 +86,16 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // cannot represent real hardware's own per-band decay variation, and no tank dampingWeight
     // value can reproduce it either). Same H0-equivalent-baseline-plus-offset combination as
     // every other gate parameter here, just three times over.
+    static const auto timeToDroopSubLow = toCurve(wildjag::dsp::time_to_plateau_droop_subLow_db_per_sPoints);
+    static const auto highToDroopSubLowOffset = toCurve(wildjag::dsp::high_to_plateau_droop_subLow_db_per_s_offsetPoints);
     static const auto timeToDroopLow = toCurve(wildjag::dsp::time_to_plateau_droop_low_db_per_sPoints);
     static const auto highToDroopLowOffset = toCurve(wildjag::dsp::high_to_plateau_droop_low_db_per_s_offsetPoints);
     static const auto timeToDroopMid = toCurve(wildjag::dsp::time_to_plateau_droop_mid_db_per_sPoints);
     static const auto highToDroopMidOffset = toCurve(wildjag::dsp::high_to_plateau_droop_mid_db_per_s_offsetPoints);
     static const auto timeToDroopHigh = toCurve(wildjag::dsp::time_to_plateau_droop_high_db_per_sPoints);
     static const auto highToDroopHighOffset = toCurve(wildjag::dsp::high_to_plateau_droop_high_db_per_s_offsetPoints);
+    static const auto timeToFallSubLow = toCurve(wildjag::dsp::time_to_fall_rate_subLow_db_per_sPoints);
+    static const auto highToFallSubLowOffset = toCurve(wildjag::dsp::high_to_fall_rate_subLow_db_per_s_offsetPoints);
     static const auto timeToFallLow = toCurve(wildjag::dsp::time_to_fall_rate_low_db_per_sPoints);
     static const auto highToFallLowOffset = toCurve(wildjag::dsp::high_to_fall_rate_low_db_per_s_offsetPoints);
     static const auto timeToFallMid = toCurve(wildjag::dsp::time_to_fall_rate_mid_db_per_sPoints);
@@ -102,9 +106,11 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     bool tauAExtrapolated = false, kneeTimeExtrapolated = false, kneeHighExtrapolated = false,
          softnessExtrapolated = false,
          earlyExcessTimeExtrapolated = false, earlyExcessHighExtrapolated = false,
+         droopSubLowTimeExtrapolated = false, droopSubLowHighExtrapolated = false,
          droopLowTimeExtrapolated = false, droopLowHighExtrapolated = false,
          droopMidTimeExtrapolated = false, droopMidHighExtrapolated = false,
          droopHighTimeExtrapolated = false, droopHighHighExtrapolated = false,
+         fallSubLowTimeExtrapolated = false, fallSubLowHighExtrapolated = false,
          fallLowTimeExtrapolated = false, fallLowHighExtrapolated = false,
          fallMidTimeExtrapolated = false, fallMidHighExtrapolated = false,
          fallHighTimeExtrapolated = false, fallHighHighExtrapolated = false;
@@ -129,12 +135,16 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     // combination as t_knee_ms/fall_rate_db_per_s above (High offset added on top of a Time
     // baseline that was itself built by converting every capture to an H0-equivalent value first
     // - see _build_per_band_gate_curves' own docstring), just once per band.
+    params.plateauDroopSubLowDbPerSec = timeToDroopSubLow.evaluate(timeKnob, &droopSubLowTimeExtrapolated)
+        + highToDroopSubLowOffset.evaluate(highKnob, &droopSubLowHighExtrapolated);
     params.plateauDroopLowDbPerSec = timeToDroopLow.evaluate(timeKnob, &droopLowTimeExtrapolated)
         + highToDroopLowOffset.evaluate(highKnob, &droopLowHighExtrapolated);
     params.plateauDroopMidDbPerSec = timeToDroopMid.evaluate(timeKnob, &droopMidTimeExtrapolated)
         + highToDroopMidOffset.evaluate(highKnob, &droopMidHighExtrapolated);
     params.plateauDroopHighDbPerSec = timeToDroopHigh.evaluate(timeKnob, &droopHighTimeExtrapolated)
         + highToDroopHighOffset.evaluate(highKnob, &droopHighHighExtrapolated);
+    params.fallRateSubLowDbPerSec = timeToFallSubLow.evaluate(timeKnob, &fallSubLowTimeExtrapolated)
+        + highToFallSubLowOffset.evaluate(highKnob, &fallSubLowHighExtrapolated);
     params.fallRateLowDbPerSec = timeToFallLow.evaluate(timeKnob, &fallLowTimeExtrapolated)
         + highToFallLowOffset.evaluate(highKnob, &fallLowHighExtrapolated);
     params.fallRateMidDbPerSec = timeToFallMid.evaluate(timeKnob, &fallMidTimeExtrapolated)
@@ -153,9 +163,11 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     if (extrapolated != nullptr)
         *extrapolated = tauAExtrapolated || kneeTimeExtrapolated || kneeHighExtrapolated
             || softnessExtrapolated || earlyExcessTimeExtrapolated || earlyExcessHighExtrapolated
+            || droopSubLowTimeExtrapolated || droopSubLowHighExtrapolated
             || droopLowTimeExtrapolated || droopLowHighExtrapolated
             || droopMidTimeExtrapolated || droopMidHighExtrapolated
             || droopHighTimeExtrapolated || droopHighHighExtrapolated
+            || fallSubLowTimeExtrapolated || fallSubLowHighExtrapolated
             || fallLowTimeExtrapolated || fallLowHighExtrapolated
             || fallMidTimeExtrapolated || fallMidHighExtrapolated
             || fallHighTimeExtrapolated || fallHighHighExtrapolated;

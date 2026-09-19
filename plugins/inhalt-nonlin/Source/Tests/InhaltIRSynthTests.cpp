@@ -247,16 +247,25 @@ public:
             // first arrival is a single, isolated spike at exactly its own delay time; with the
             // diffuser, that single spike is smeared into several arrivals scattered across the
             // next few ms - this counts above-threshold samples in that window as a density proxy.
-            auto countActiveSamples = [](const std::vector<float>& buf, int start, int length, float thresholdFraction)
+            //
+            // Uses an ABSOLUTE threshold, not each case's own local peak (an earlier version did,
+            // and a later crossover change - splitting the low band's own gate into subLow/low -
+            // flipped it from passing to failing by coincidence): even at diffuserGain=0 the
+            // diffuser is a pure 3-stage serial delay chain (~5.6ms total, see
+            // leftDiffuserDelaysMs's own sum), so the tank's true first arrival lands at
+            // ~5.6ms + its shortest line (~10.9ms) = ~16.5ms, well AFTER this window ends - the
+            // no-diffuser case is genuine floating-point-noise-level silence here (~1e-10), not a
+            // real signal, so a peak-relative threshold on it is measuring noise shape, not signal.
+            // An absolute threshold well above float noise and well below a real diffuser arrival
+            // (~1e-2 to 1e-1, see the with-diffuser case) makes the comparison architecture-
+            // independent: no-diffuser must count exactly zero real samples here, with-diffuser
+            // must count many, from the diffuser's OWN allpass feedback recirculating almost
+            // immediately (unlike the diffuserGain=0 case's simple one-shot delay).
+            auto countActiveSamples = [](const std::vector<float>& buf, int start, int length, float absoluteThreshold)
             {
-                float peak = 0.0f;
-                for (int i = start; i < start + length && i < (int) buf.size(); ++i)
-                    peak = std::max(peak, std::abs(buf[(size_t) i]));
-                if (peak <= 0.0f)
-                    return 0;
                 int count = 0;
                 for (int i = start; i < start + length && i < (int) buf.size(); ++i)
-                    if (std::abs(buf[(size_t) i]) > peak * thresholdFraction)
+                    if (std::abs(buf[(size_t) i]) > absoluteThreshold)
                         ++count;
                 return count;
             };
@@ -266,7 +275,7 @@ public:
             params.dampingWeight = 0.4f;
             params.kneeTimeMs = 300.0f;
             // slow fall - plenty of onset density to observe
-            params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -50.0f;
+            params.fallRateSubLowDbPerSec = params.fallRateLowDbPerSec = params.fallRateMidDbPerSec = params.fallRateHighDbPerSec = -50.0f;
 
             params.diffuserGain = 0.0f;
             std::vector<float> leftNoDiffuser, rightNoDiffuser;
@@ -276,12 +285,12 @@ public:
             std::vector<float> leftWithDiffuser, rightWithDiffuser;
             inhalt::InhaltIRSynth::render(params, sampleRate, (int) (0.05 * sampleRate), leftWithDiffuser, rightWithDiffuser);
 
-            // Left tank's earliest arrival is at its shortest delay line (~10.1ms @44.1kHz) - the
-            // window covers the 5ms right after that first arrival.
+            // Window chosen to sit BEFORE the no-diffuser case's true first arrival (~16.5ms, see
+            // above) - the window covers 10.1-15.1ms, genuine silence with no diffuser.
             const auto windowStart = (int) (0.0101 * sampleRate);
             const auto windowLength = (int) (0.005 * sampleRate);
-            const auto countNoDiffuser = countActiveSamples(leftNoDiffuser, windowStart, windowLength, 0.1f);
-            const auto countWithDiffuser = countActiveSamples(leftWithDiffuser, windowStart, windowLength, 0.1f);
+            const auto countNoDiffuser = countActiveSamples(leftNoDiffuser, windowStart, windowLength, 1e-4f);
+            const auto countWithDiffuser = countActiveSamples(leftWithDiffuser, windowStart, windowLength, 1e-4f);
 
             expect(countWithDiffuser > countNoDiffuser,
                 "a diffused impulse should produce measurably MORE above-threshold samples in the "

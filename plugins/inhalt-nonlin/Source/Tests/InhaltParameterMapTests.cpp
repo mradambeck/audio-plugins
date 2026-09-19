@@ -109,6 +109,7 @@ public:
                 const auto gate = InhaltParameterMap::mapTimeAndHighToGateParams(t, 0.0f);
                 expect(std::isfinite(gate.buildUpMs) && gate.buildUpMs > 0.0f, "buildUpMs must be finite and positive");
                 expect(std::isfinite(gate.kneeTimeMs) && gate.kneeTimeMs > 0.0f, "kneeTimeMs must be finite and positive");
+                expect(std::isfinite(gate.fallRateSubLowDbPerSec) && gate.fallRateSubLowDbPerSec < 0.0f, "fallRateSubLowDbPerSec must be finite and negative");
                 expect(std::isfinite(gate.fallRateLowDbPerSec) && gate.fallRateLowDbPerSec < 0.0f, "fallRateLowDbPerSec must be finite and negative");
                 expect(std::isfinite(gate.fallRateMidDbPerSec) && gate.fallRateMidDbPerSec < 0.0f, "fallRateMidDbPerSec must be finite and negative");
                 expect(std::isfinite(gate.fallRateHighDbPerSec) && gate.fallRateHighDbPerSec < 0.0f, "fallRateHighDbPerSec must be finite and negative");

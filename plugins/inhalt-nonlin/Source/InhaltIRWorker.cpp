@@ -80,9 +80,11 @@ namespace
         params.buildUpMs = gate.buildUpMs;
         params.kneeTimeMs = gate.kneeTimeMs;
         params.kneeSoftnessMs = gate.kneeSoftnessMs;
+        params.plateauDroopSubLowDbPerSec = gate.plateauDroopSubLowDbPerSec;
         params.plateauDroopLowDbPerSec = gate.plateauDroopLowDbPerSec;
         params.plateauDroopMidDbPerSec = gate.plateauDroopMidDbPerSec;
         params.plateauDroopHighDbPerSec = gate.plateauDroopHighDbPerSec;
+        params.fallRateSubLowDbPerSec = gate.fallRateSubLowDbPerSec;
         params.fallRateLowDbPerSec = gate.fallRateLowDbPerSec;
         params.fallRateMidDbPerSec = gate.fallRateMidDbPerSec;
         params.fallRateHighDbPerSec = gate.fallRateHighDbPerSec;

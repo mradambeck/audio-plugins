@@ -42,11 +42,13 @@ struct GateParams
     float buildUpMs = 3.0f;
     float kneeTimeMs = 150.0f;
     float kneeSoftnessMs = 4.0f;
-    // Per-band decay rates - see InhaltIRSynth.h's own comment on Params::plateauDroopLowDbPerSec
-    // etc. for why a single broadband rate was replaced with three.
+    // Per-band decay rates - see InhaltIRSynth.h's own comment on Params::plateauDroopSubLowDbPerSec
+    // etc. for why a single broadband rate was replaced with four.
+    float plateauDroopSubLowDbPerSec = 0.0f;
     float plateauDroopLowDbPerSec = 0.0f;
     float plateauDroopMidDbPerSec = 0.0f;
     float plateauDroopHighDbPerSec = 0.0f;
+    float fallRateSubLowDbPerSec = -250.0f;
     float fallRateLowDbPerSec = -250.0f;
     float fallRateMidDbPerSec = -250.0f;
     float fallRateHighDbPerSec = -250.0f;

@@ -68,12 +68,22 @@ public:
         // showed no single tank dampingWeight value can reproduce this shape (fixing the
         // under-decaying low-mids requires over-damping the highs by 3-6x - a structural ceiling
         // of the one-pole-per-line damping filter, not a calibration miss) - seeInhaltIRSynth.cpp's
-        // own crossover-split comment for the fix instead: split the signal into three bands
-        // (below lowMidCrossoverHz, between the two crossovers, above midHighCrossoverHz) and gate
-        // each independently with its own directly-measured decay rate, then sum back together.
+        // own crossover-split comment for the fix instead: split the signal into four bands
+        // (below subLowLowCrossoverHz, between it and lowMidCrossoverHz, between lowMidCrossoverHz
+        // and midHighCrossoverHz, above midHighCrossoverHz) and gate each independently with its
+        // own directly-measured decay rate, then sum back together.
+        //
+        // The low band was originally ONE band (below lowMidCrossoverHz, covering both the
+        // 44-89Hz and 88-177Hz analysis octaves), split into subLow/low after a real "way more low
+        // end than the IR's" complaint: those two analysis octaves have real, meaningfully
+        // different decay rates of their own (-207 vs -173dB/s at Time=2.2, for instance) that one
+        // shared parameter structurally cannot track independently - see
+        // build_measured_gate_curves.py's own _PER_BAND_GROUPS comment for the measurement.
+        float plateauDroopSubLowDbPerSec = 0.0f;
         float plateauDroopLowDbPerSec = 0.0f;
         float plateauDroopMidDbPerSec = 0.0f;
         float plateauDroopHighDbPerSec = 0.0f;
+        float fallRateSubLowDbPerSec = -250.0f;
         float fallRateLowDbPerSec = -250.0f;
         float fallRateMidDbPerSec = -250.0f;
         float fallRateHighDbPerSec = -250.0f;
@@ -146,6 +156,11 @@ public:
     // setting checked, not just this one. Matches the analysis bands' own boundaries exactly
     // (88.4-176.8Hz and 5657-11314Hz) so the synthesis bands stay directly interpretable against
     // the measurement bands that motivated them.
+    //
+    // subLowLowCrossoverHz added later, splitting the original low band in two (see
+    // Params::plateauDroopSubLowDbPerSec's own comment) - same convention, the shared edge between
+    // the 44-89Hz and 88-177Hz analysis octaves (125Hz center / sqrt(2) = 88.39Hz).
+    static constexpr float subLowLowCrossoverHz = 88.4f;
     static constexpr float lowMidCrossoverHz = 176.8f;
     static constexpr float midHighCrossoverHz = 11313.7f;
 

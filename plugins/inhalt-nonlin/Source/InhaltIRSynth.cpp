@@ -273,7 +273,8 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
 
     // Per-band gate split - cascaded one-pole complementary splits per channel (same
     // low+high=input-exactly technique as wildjag::dsp::BandShelf above, just STEEPER and applied
-    // twice to carve out a middle band). The complementary reconstruction (high = input - low)
+    // three times: once to carve subLow+low off the bottom, once to carve mid off what's left,
+    // and the remainder is high). The complementary reconstruction (high = input - low)
     // stays EXACT regardless of how the "low" estimate is computed, so cascading N one-pole stages
     // for a steeper (~6*N dB/octave) roll-off is safe on its own - a first attempt at this used
     // splitPoleStages one-pole stages at the crossover frequency ITSELF as each stage's own
@@ -288,7 +289,9 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
     // compensated cutoff above 22kHz Nyquist at 44.1kHz - not just steeper, actively invalid).
     static constexpr int splitPoleStages = 2;
     const auto splitPoleCompensation = 1.0f / std::sqrt(std::pow(2.0f, 1.0f / (float) splitPoleStages) - 1.0f);
-    std::array<wildjag::dsp::OnePoleFilter, splitPoleStages> splitLowL, splitLowR, splitHighL, splitHighR;
+    std::array<wildjag::dsp::OnePoleFilter, splitPoleStages> splitSubLowL, splitSubLowR, splitLowL, splitLowR, splitHighL, splitHighR;
+    for (auto& f : splitSubLowL) f.setCutoffHz(InhaltIRSynth::subLowLowCrossoverHz * splitPoleCompensation, sampleRate);
+    for (auto& f : splitSubLowR) f.setCutoffHz(InhaltIRSynth::subLowLowCrossoverHz * splitPoleCompensation, sampleRate);
     for (auto& f : splitLowL) f.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz * splitPoleCompensation, sampleRate);
     for (auto& f : splitLowR) f.setCutoffHz(InhaltIRSynth::lowMidCrossoverHz * splitPoleCompensation, sampleRate);
     for (auto& f : splitHighL) f.setCutoffHz(InhaltIRSynth::midHighCrossoverHz * splitPoleCompensation, sampleRate);
@@ -324,17 +327,23 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         const auto tiltedL = tiltL.processSample(combinedL);
         const auto tiltedR = tiltR.processSample(combinedR);
 
-        const auto lowL = cascadedLowpass(splitLowL, tiltedL);
-        const auto restL = tiltedL - lowL;
+        const auto lowAllL = cascadedLowpass(splitLowL, tiltedL);
+        const auto restL = tiltedL - lowAllL;
+        const auto subLowL = cascadedLowpass(splitSubLowL, lowAllL);
+        const auto lowL = lowAllL - subLowL;
         const auto midL = cascadedLowpass(splitHighL, restL);
         const auto highL = restL - midL;
 
-        const auto lowR = cascadedLowpass(splitLowR, tiltedR);
-        const auto restR = tiltedR - lowR;
+        const auto lowAllR = cascadedLowpass(splitLowR, tiltedR);
+        const auto restR = tiltedR - lowAllR;
+        const auto subLowR = cascadedLowpass(splitSubLowR, lowAllR);
+        const auto lowR = lowAllR - subLowR;
         const auto midR = cascadedLowpass(splitHighR, restR);
         const auto highR = restR - midR;
 
         const auto tSeconds = (float) n / (float) sampleRate;
+        const auto gateSubLowLin = std::pow(10.0f, gateEnvelopeDb(
+            tSeconds, params, params.plateauDroopSubLowDbPerSec, params.fallRateSubLowDbPerSec) / 20.0f);
         const auto gateLowLin = std::pow(10.0f, gateEnvelopeDb(
             tSeconds, params, params.plateauDroopLowDbPerSec, params.fallRateLowDbPerSec) / 20.0f);
         const auto gateMidLin = std::pow(10.0f, gateEnvelopeDb(
@@ -342,8 +351,8 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         const auto gateHighLin = std::pow(10.0f, gateEnvelopeDb(
             tSeconds, params, params.plateauDroopHighDbPerSec, params.fallRateHighDbPerSec) / 20.0f);
 
-        left[(size_t) n] = lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
-        right[(size_t) n] = lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;
+        left[(size_t) n] = subLowL * gateSubLowLin + lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
+        right[(size_t) n] = subLowR * gateSubLowLin + lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;
     }
 }
 

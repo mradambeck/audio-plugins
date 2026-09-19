@@ -845,34 +845,46 @@ def _build_early_excess_curves(features: dict) -> dict:
 
 
 _PER_BAND_GROUPS = {
-    "low": ["44-89Hz", "88-177Hz"],
+    "subLow": ["44-89Hz"],
+    "low": ["88-177Hz"],
     "mid": ["177-354Hz", "354-707Hz", "707-1414Hz", "1414-2828Hz", "2828-5657Hz", "5657-11314Hz"],
     "high": ["11314-22049Hz"],
 }
 
 # Hand-verified via direct C++ measurement (same procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE):
-# temporarily force all three plateauDroop{Low,Mid,High}DbPerSec fields to 0.0f in
+# temporarily force all four plateauDroop{SubLow,Low,Mid,High}DbPerSec fields to 0.0f in
 # InhaltIRWorker.cpp, build InhaltRenderIR, render at High=0, measure core.features.
-# band_gate_params() per analysis band, aggregate into low/mid/high via _PER_BAND_GROUPS, revert.
-# Specific to InhaltIRSynth.cpp's own splitPoleStages=2 cutoff-compensated cascaded crossover split
-# (see that file's own comment on splitLowL/splitHighL for the two earlier crossover designs this
-# superseded) - these values would need re-measuring if the crossover ever changes again.
+# band_gate_params() per analysis band, aggregate into subLow/low/mid/high via _PER_BAND_GROUPS,
+# revert. Specific to InhaltIRSynth.cpp's own splitPoleStages=2 cutoff-compensated cascaded
+# crossover split (see that file's own comment on splitSubLowL/splitLowL/splitHighL for the
+# earlier crossover designs this superseded) - these values would need re-measuring if the
+# crossover ever changes again.
 #
-# Time=2.2's own LOW band was a genuine outlier under the FIRST (single, uncompensated one-pole
-# stage) crossover - real mode-beating, not a fit bug: a gentle 6dB/octave split let in enough
-# adjacent-band energy that the tank's own widely-spaced low-frequency modes beat against each
-# other within Time=2.2's own short plateau, producing a genuinely oscillating envelope
-# gate_envelope_params()'s swept-breakpoint fit couldn't sensibly fit (-542.7dB/s). The current,
-# steeper crossover resolved this as a side effect, same as it did under the (since-reverted)
-# 4-stage attempt - measured cleanly with the standard method now, no special-casing needed for
-# this entry. The REAL capture's own target at this same band/Time still needs its own
-# robust-regression override (see _TARGET_DROOP_ROBUST_OVERRIDE below) - that side is unrelated to
-# this engine's own crossover and unaffected by any of these changes.
+# subLow (44-89Hz) was originally part of a single combined "low" group (44-177Hz) - split out
+# after a real "way more low end than the IR's" complaint traced to that single shared band being
+# structurally unable to track the 44-89Hz and 88-177Hz analysis octaves' own different real decay
+# rates (see plugins/inhalt-nonlin/Source/InhaltIRSynth.h's own Params::plateauDroopSubLowDbPerSec
+# comment). Old combined "low" entries (pre-split): (2.2, "low"): -62.808, (4.8, "low"): -53.481,
+# (7.0, "low"): -28.633, (9.8, "low"): -15.994 - kept here for reference since they were an average
+# of what are now two rows each.
+#
+# Time=2.2's own subLow (44-89Hz) natural measurement is a genuine mode-beating outlier, same
+# signature as the earlier combined-low-band case this file used to document (a gentle-enough
+# crossover, or here just a very low/narrow analysis band, lets the tank's own widely-spaced
+# low-frequency modes beat against each other within Time=2.2's own short ~137ms plateau): the
+# swept-breakpoint fit gave -1099.9dB/s despite a deceptively fine knee_r2=0.903 - direct envelope
+# inspection (5ms windows) shows real, large (10-20dB) bounces between adjacent samples, not a
+# clean decay. Fixed the same way as every other confirmed mode-beating case in this file: a
+# robust (ordinary least-squares, not swept-breakpoint) linear fit over the plateau window
+# [0, knee_time_ms=137ms], giving -104.0dB/s - consistent with the other three Time points' own
+# subLow trend (-69.5, -51.1, -31.3, decreasing with Time) where the combined value (-62.8) was
+# not obviously so. The other three subLow measurements and all four low (88-177Hz) measurements
+# fit cleanly (r2 0.90-0.96) with no such override needed.
 _NATURAL_DROOP_PER_BAND_CPP_MEASURED = {
-    (2.2, "low"): -62.808, (2.2, "mid"): -28.676, (2.2, "high"): -120.876,
-    (4.8, "low"): -53.481, (4.8, "mid"): -46.669, (4.8, "high"): -110.615,
-    (7.0, "low"): -28.633, (7.0, "mid"): -23.453, (7.0, "high"): -103.504,
-    (9.8, "low"): -15.994, (9.8, "mid"): -21.232, (9.8, "high"): -102.926,
+    (2.2, "subLow"): -104.0, (2.2, "low"): -33.577, (2.2, "mid"): -28.676, (2.2, "high"): -120.876,
+    (4.8, "subLow"): -69.518, (4.8, "low"): -37.383, (4.8, "mid"): -46.669, (4.8, "high"): -110.615,
+    (7.0, "subLow"): -51.129, (7.0, "low"): -6.167, (7.0, "mid"): -23.453, (7.0, "high"): -103.504,
+    (9.8, "subLow"): -31.280, (9.8, "low"): -0.707, (9.8, "mid"): -21.232, (9.8, "high"): -102.926,
 }
 
 # REMOVED (was: {(2.2, "low"): -1.966}). This claimed the real capture's own low-band target at
@@ -908,8 +920,9 @@ def _build_per_band_gate_curves(features: dict) -> dict:
     and no single tank dampingWeight value can reproduce it either).
 
     Same architecture as _build_fall_rate_curves/_build_plateau_droop_curves, generalized across
-    three bands (_PER_BAND_GROUPS: low = 44-177Hz, mid = 177Hz-11.3kHz, high = 11.3-22kHz -
-    matching InhaltIRSynth.h's own lowMidCrossoverHz/midHighCrossoverHz exactly) instead of
+    four bands (_PER_BAND_GROUPS: subLow = 44-89Hz, low = 88-177Hz, mid = 177Hz-11.3kHz,
+    high = 11.3-22kHz - matching InhaltIRSynth.h's own subLowLowCrossoverHz/lowMidCrossoverHz/
+    midHighCrossoverHz exactly) instead of
     duplicated three times:
 
     - droop: H0-equivalent Time baseline (High=0 captures only - Time=0.1/0.8 have no H=0 capture
@@ -952,7 +965,7 @@ def _build_per_band_gate_curves(features: dict) -> dict:
     richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
 
     result = {}
-    for band_key in ("low", "mid", "high"):
+    for band_key in ("subLow", "low", "mid", "high"):
         print(f"\n--- per-band gate curves: {band_key} ({_PER_BAND_GROUPS[band_key]}) ---")
 
         # ---------------- droop (High=0 captures only, natural-corrected) ----------------
