@@ -1062,7 +1062,8 @@ _PER_BAND_GROUPS = {
     "subLow": ["44-89Hz"],
     "low": ["88-177Hz"],
     "mid": ["177-354Hz", "354-707Hz", "707-1414Hz", "1414-2828Hz", "2828-5657Hz", "5657-11314Hz"],
-    "high": ["11314-22049Hz"],
+    "high": ["11314-16000Hz"],
+    "veryHigh": ["16000-22049Hz"],
 }
 
 # Hand-verified via direct C++ measurement (same procedure as _NATURAL_DROOP_CPP_VERIFIED_OVERRIDE):
@@ -1095,10 +1096,10 @@ _PER_BAND_GROUPS = {
 # not obviously so. The other three subLow measurements and all four low (88-177Hz) measurements
 # fit cleanly (r2 0.90-0.96) with no such override needed.
 _NATURAL_DROOP_PER_BAND_CPP_MEASURED = {
-    (2.2, "subLow"): -104.0, (2.2, "low"): -33.577, (2.2, "mid"): -28.676, (2.2, "high"): -120.876,
-    (4.8, "subLow"): -69.518, (4.8, "low"): -37.383, (4.8, "mid"): -46.669, (4.8, "high"): -110.615,
-    (7.0, "subLow"): -51.129, (7.0, "low"): -6.167, (7.0, "mid"): -23.453, (7.0, "high"): -103.504,
-    (9.8, "subLow"): -31.280, (9.8, "low"): -0.707, (9.8, "mid"): -21.232, (9.8, "high"): -102.926,
+    (2.2, "subLow"): -104.0, (2.2, "low"): -33.577, (2.2, "mid"): -28.676, (2.2, "high"): -52.294, (2.2, "veryHigh"): -206.638,
+    (4.8, "subLow"): -69.518, (4.8, "low"): -37.383, (4.8, "mid"): -46.669, (4.8, "high"): -5.218, (4.8, "veryHigh"): -174.792,
+    (7.0, "subLow"): -51.129, (7.0, "low"): -6.167, (7.0, "mid"): -23.453, (7.0, "high"): -101.343, (7.0, "veryHigh"): -120.651,
+    (9.8, "subLow"): -31.280, (9.8, "low"): -0.707, (9.8, "mid"): -21.232, (9.8, "high"): -94.766, (9.8, "veryHigh"): -116.174,
 }
 
 # REMOVED (was: {(2.2, "low"): -1.966}). This claimed the real capture's own low-band target at
@@ -1134,10 +1135,16 @@ def _build_per_band_gate_curves(features: dict) -> dict:
     and no single tank dampingWeight value can reproduce it either).
 
     Same architecture as _build_fall_rate_curves/_build_plateau_droop_curves, generalized across
-    four bands (_PER_BAND_GROUPS: subLow = 44-89Hz, low = 88-177Hz, mid = 177Hz-11.3kHz,
-    high = 11.3-22kHz - matching InhaltIRSynth.h's own subLowLowCrossoverHz/lowMidCrossoverHz/
-    midHighCrossoverHz exactly) instead of
-    duplicated three times:
+    five bands (_PER_BAND_GROUPS: subLow = 44-89Hz, low = 88-177Hz, mid = 177Hz-11.3kHz,
+    high = 11.3-16kHz, veryHigh = 16-22kHz - matching InhaltIRSynth.h's own subLowLowCrossoverHz/
+    lowMidCrossoverHz/midHighCrossoverHz/highVeryHighCrossoverHz exactly) instead of
+    duplicated four times. high/veryHigh were split later, after a real "more loudness in the
+    4k-5k...overall EQ" complaint traced to those two sub-bands having real, meaningfully
+    different decay rates (11.3-16kHz: -395 to -440dB/s at most settings; 16-22kHz: -85 to
+    -241dB/s) the single old "high" (11.3-22kHz) parameter averaged away - the same
+    one-band-can't-track-two-rates gap subLow/low's own split fixed one octave down, discovered
+    only after ruling out the tilt shelf itself (measured as already cutting MORE than the real
+    hardware's own spec at negative High, not under-cutting).
 
     - droop: H0-equivalent Time baseline (High=0 captures only - Time=0.1/0.8 have no H=0 capture
       at all and are left to the curve's own extrapolation, same honest gap as the broadband
@@ -1179,7 +1186,7 @@ def _build_per_band_gate_curves(features: dict) -> dict:
     richest_time = max(by_time_high_count, key=lambda t: len(by_time_high_count[t]))
 
     result = {}
-    for band_key in ("subLow", "low", "mid", "high"):
+    for band_key in ("subLow", "low", "mid", "high", "veryHigh"):
         print(f"\n--- per-band gate curves: {band_key} ({_PER_BAND_GROUPS[band_key]}) ---")
 
         # ---------------- droop (High=0 captures only, natural-corrected) ----------------

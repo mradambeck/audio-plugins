@@ -89,14 +89,27 @@ public:
         // different decay rates of their own (-207 vs -173dB/s at Time=2.2, for instance) that one
         // shared parameter structurally cannot track independently - see
         // build_measured_gate_curves.py's own _PER_BAND_GROUPS comment for the measurement.
+        //
+        // The high band was ALSO originally one band (above midHighCrossoverHz, the whole
+        // 11314-22049Hz octave), split into high/veryHigh after a real "more loudness in the
+        // 4k-5k...overall EQ" complaint traced - after ruling out the tilt shelf itself, which
+        // measured as already cutting MORE than the real hardware's own spec (-16.6dB vs. the
+        // spec's own -9.1dB at High=-9) - to this exact same one-band-can't-track-two-rates
+        // problem one octave higher: 11.3-16kHz decays steeply (-395 to -440dB/s at most settings)
+        // while 16-22kHz decays much more slowly (-85 to -241dB/s), a real, consistent ~200-350dB/s
+        // gap the single old "high" parameter averaged away. Shares kneeTimeHighMs/buildUpMs with
+        // the (now lower) high band rather than getting its own - only the decay RATE was found to
+        // differ between these two sub-bands, not the timing.
         float plateauDroopSubLowDbPerSec = 0.0f;
         float plateauDroopLowDbPerSec = 0.0f;
         float plateauDroopMidDbPerSec = 0.0f;
         float plateauDroopHighDbPerSec = 0.0f;
+        float plateauDroopVeryHighDbPerSec = 0.0f;
         float fallRateSubLowDbPerSec = -250.0f;
         float fallRateLowDbPerSec = -250.0f;
         float fallRateMidDbPerSec = -250.0f;
         float fallRateHighDbPerSec = -250.0f;
+        float fallRateVeryHighDbPerSec = -250.0f;
 
         // Per-band knee time - REPLACES a single shared kneeTimeMs (see this struct's own comment
         // above on buildUpMs/kneeSoftnessMs for why). Calibrating a per-band TARGET here is less
@@ -211,6 +224,15 @@ public:
     static constexpr float subLowLowCrossoverHz = 88.4f;
     static constexpr float lowMidCrossoverHz = 176.8f;
     static constexpr float midHighCrossoverHz = 11313.7f;
+
+    // highVeryHighCrossoverHz added later, splitting the original high band in two (see
+    // Params::plateauDroopVeryHighDbPerSec's own comment) - unlike every other crossover here,
+    // there was no PRE-EXISTING analysis-band edge to reuse (octave_bands()' own 16kHz-center band
+    // runs 11313.7-22049Hz as ONE band, all the way to Nyquist) - 16000Hz is that band's own
+    // center frequency, the natural halfway point for splitting it, chosen the same way the
+    // original band boundaries were (from where core.features.band_gate_params, run with a custom
+    // [(11314,16000),(16000,22049)] split, shows the real per-band decay pattern actually breaks).
+    static constexpr float highVeryHighCrossoverHz = 16000.0f;
 
     // Fixed inter-channel delay for the stereo-narrowing blend (see Params::stereoNarrowCorrelation's
     // own comment) - core.features.dominant_lag_correlation measured this at EXACTLY +2.49ms in

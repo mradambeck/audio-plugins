@@ -84,10 +84,12 @@ namespace
         params.plateauDroopLowDbPerSec = gate.plateauDroopLowDbPerSec;
         params.plateauDroopMidDbPerSec = gate.plateauDroopMidDbPerSec;
         params.plateauDroopHighDbPerSec = gate.plateauDroopHighDbPerSec;
+        params.plateauDroopVeryHighDbPerSec = gate.plateauDroopVeryHighDbPerSec;
         params.fallRateSubLowDbPerSec = gate.fallRateSubLowDbPerSec;
         params.fallRateLowDbPerSec = gate.fallRateLowDbPerSec;
         params.fallRateMidDbPerSec = gate.fallRateMidDbPerSec;
         params.fallRateHighDbPerSec = gate.fallRateHighDbPerSec;
+        params.fallRateVeryHighDbPerSec = gate.fallRateVeryHighDbPerSec;
         params.kneeTimeSubLowMs = gate.kneeTimeSubLowMs;
         params.kneeTimeLowMs = gate.kneeTimeLowMs;
         params.kneeTimeMidMs = gate.kneeTimeMidMs;

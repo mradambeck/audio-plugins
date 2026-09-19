@@ -103,7 +103,16 @@ def analyze_nonlin_capture(channels: np.ndarray, sr: int) -> dict:
     gate["post_knee_excess_db"] = post_knee_excess_db(
         mono, sr, onset, gate["knee_time_ms"], gate["fall_rate_db_per_s"]
     )
-    bands = octave_bands(sr=sr)
+    # Standard octave bands PLUS a finer split of the top octave (11314-22049Hz) into
+    # 11314-16000Hz/16000-22049Hz - added after a real "more loudness in the 4k-5k...overall EQ"
+    # complaint traced to those two sub-bands having real, meaningfully different decay rates
+    # (11.3-16kHz: -395 to -440dB/s at most settings; 16-22kHz: -85 to -241dB/s) that the single
+    # octave-wide "11314-22049Hz" entry averages away - the exact same one-band-can't-track-two-
+    # rates gap the low band's own subLow/low split fixed one octave down. 16000Hz (that octave's
+    # own center frequency) is the natural halfway point - see InhaltIRSynth.h's own
+    # highVeryHighCrossoverHz comment. Kept ALONGSIDE the standard octave_bands() list (not
+    # replacing the 11314-22049Hz entry) for continuity with anything still reading that key.
+    bands = list(octave_bands(sr=sr)) + [(11314.0, 16000.0), (16000.0, min(22049.0, sr / 2.0 - 1.0))]
     band_gate = {f"{lo:.0f}-{hi:.0f}Hz": v for (lo, hi), v in band_gate_params(mono, sr, onset, bands).items()}
 
     ned_times, ned = normalized_echo_density(mono, sr, onset)

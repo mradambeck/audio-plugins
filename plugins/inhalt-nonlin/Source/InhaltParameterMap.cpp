@@ -106,6 +106,8 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto highToDroopMidOffset = toCurve(wildjag::dsp::high_to_plateau_droop_mid_db_per_s_offsetPoints);
     static const auto timeToDroopHigh = toCurve(wildjag::dsp::time_to_plateau_droop_high_db_per_sPoints);
     static const auto highToDroopHighOffset = toCurve(wildjag::dsp::high_to_plateau_droop_high_db_per_s_offsetPoints);
+    static const auto timeToDroopVeryHigh = toCurve(wildjag::dsp::time_to_plateau_droop_veryHigh_db_per_sPoints);
+    static const auto highToDroopVeryHighOffset = toCurve(wildjag::dsp::high_to_plateau_droop_veryHigh_db_per_s_offsetPoints);
     static const auto timeToFallSubLow = toCurve(wildjag::dsp::time_to_fall_rate_subLow_db_per_sPoints);
     static const auto highToFallSubLowOffset = toCurve(wildjag::dsp::high_to_fall_rate_subLow_db_per_s_offsetPoints);
     static const auto timeToFallLow = toCurve(wildjag::dsp::time_to_fall_rate_low_db_per_sPoints);
@@ -114,6 +116,8 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
     static const auto highToFallMidOffset = toCurve(wildjag::dsp::high_to_fall_rate_mid_db_per_s_offsetPoints);
     static const auto timeToFallHigh = toCurve(wildjag::dsp::time_to_fall_rate_high_db_per_sPoints);
     static const auto highToFallHighOffset = toCurve(wildjag::dsp::high_to_fall_rate_high_db_per_s_offsetPoints);
+    static const auto timeToFallVeryHigh = toCurve(wildjag::dsp::time_to_fall_rate_veryHigh_db_per_sPoints);
+    static const auto highToFallVeryHighOffset = toCurve(wildjag::dsp::high_to_fall_rate_veryHigh_db_per_s_offsetPoints);
 
     bool tauAExtrapolated = false,
          softnessExtrapolated = false,
@@ -122,10 +126,12 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
          droopLowTimeExtrapolated = false, droopLowHighExtrapolated = false,
          droopMidTimeExtrapolated = false, droopMidHighExtrapolated = false,
          droopHighTimeExtrapolated = false, droopHighHighExtrapolated = false,
+         droopVeryHighTimeExtrapolated = false, droopVeryHighHighExtrapolated = false,
          fallSubLowTimeExtrapolated = false, fallSubLowHighExtrapolated = false,
          fallLowTimeExtrapolated = false, fallLowHighExtrapolated = false,
          fallMidTimeExtrapolated = false, fallMidHighExtrapolated = false,
          fallHighTimeExtrapolated = false, fallHighHighExtrapolated = false,
+         fallVeryHighTimeExtrapolated = false, fallVeryHighHighExtrapolated = false,
          kneeSubLowTimeExtrapolated = false, kneeSubLowHighExtrapolated = false,
          kneeLowTimeExtrapolated = false, kneeLowHighExtrapolated = false,
          kneeMidTimeExtrapolated = false, kneeMidHighExtrapolated = false,
@@ -160,6 +166,8 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
         + highToDroopMidOffset.evaluate(highKnob, &droopMidHighExtrapolated);
     params.plateauDroopHighDbPerSec = timeToDroopHigh.evaluate(timeKnob, &droopHighTimeExtrapolated)
         + highToDroopHighOffset.evaluate(highKnob, &droopHighHighExtrapolated);
+    params.plateauDroopVeryHighDbPerSec = timeToDroopVeryHigh.evaluate(timeKnob, &droopVeryHighTimeExtrapolated)
+        + highToDroopVeryHighOffset.evaluate(highKnob, &droopVeryHighHighExtrapolated);
     params.fallRateSubLowDbPerSec = timeToFallSubLow.evaluate(timeKnob, &fallSubLowTimeExtrapolated)
         + highToFallSubLowOffset.evaluate(highKnob, &fallSubLowHighExtrapolated);
     params.fallRateLowDbPerSec = timeToFallLow.evaluate(timeKnob, &fallLowTimeExtrapolated)
@@ -168,6 +176,8 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
         + highToFallMidOffset.evaluate(highKnob, &fallMidHighExtrapolated);
     params.fallRateHighDbPerSec = timeToFallHigh.evaluate(timeKnob, &fallHighTimeExtrapolated)
         + highToFallHighOffset.evaluate(highKnob, &fallHighHighExtrapolated);
+    params.fallRateVeryHighDbPerSec = timeToFallVeryHigh.evaluate(timeKnob, &fallVeryHighTimeExtrapolated)
+        + highToFallVeryHighOffset.evaluate(highKnob, &fallVeryHighHighExtrapolated);
     // Fixes a real "the decay and timing doesn't match the convolution" complaint that
     // fallRateDbPerSec alone can't close: real captures' post-knee fall is CURVED, not a single
     // constant dB/s rate - see build_measured_gate_curves.py's own _build_early_excess_curves
@@ -184,10 +194,12 @@ GateParams mapTimeAndHighToGateParams(float timeKnob, float highKnob, bool* extr
             || droopLowTimeExtrapolated || droopLowHighExtrapolated
             || droopMidTimeExtrapolated || droopMidHighExtrapolated
             || droopHighTimeExtrapolated || droopHighHighExtrapolated
+            || droopVeryHighTimeExtrapolated || droopVeryHighHighExtrapolated
             || fallSubLowTimeExtrapolated || fallSubLowHighExtrapolated
             || fallLowTimeExtrapolated || fallLowHighExtrapolated
             || fallMidTimeExtrapolated || fallMidHighExtrapolated
             || fallHighTimeExtrapolated || fallHighHighExtrapolated
+            || fallVeryHighTimeExtrapolated || fallVeryHighHighExtrapolated
             || kneeSubLowTimeExtrapolated || kneeSubLowHighExtrapolated
             || kneeLowTimeExtrapolated || kneeLowHighExtrapolated
             || kneeMidTimeExtrapolated || kneeMidHighExtrapolated

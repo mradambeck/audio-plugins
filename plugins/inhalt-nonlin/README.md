@@ -560,6 +560,55 @@ those heavy-tilt settings, not a synthesis defect: correlation measured at the e
 2.49ms lag is correctly negative and close to target in both cases (-0.12 vs. -0.19, -0.16 vs.
 -0.18).
 
+**Top-octave EQ: real, narrow spectral excess found and partly closed with a high/veryHigh split.**
+A real "more loudness in the 4k-5k...overall EQ" complaint (raised after the stereo-narrowing fix
+above, on an already-much-closer render) led to a careful reconciliation between two disagreeing
+measurements before touching anything: `validate.py`'s own per-band "high" (11314-22049Hz) fall
+rate showed sign-mismatches at negative High that looked like "doesn't decay" - but direct envelope
+inspection showed the render decaying normally, even reaching its own floor FASTER than the real
+capture in that band. That contradiction traced to a swept-breakpoint fit artifact (a chunk of the
+analysis window sitting at the render's own flat noise floor drags the fitted rate toward shallow),
+not a real defect - a genuine measurement-reliability gap, left as-is rather than "fixed" against
+data that couldn't be trusted (documented as an open reliability gap in
+`core.features.gate_envelope_params`'s own docstring, with no fix implemented yet).
+
+The tilt shelf was ALSO ruled out directly: its own calibrated cut at High=-9 (-16.6dB) is already
+STEEPER than the real hardware's own spec-sheet figure (-9.1dB) - not under-cutting.
+
+The real, narrow (not broadband) culprit, found by comparing render vs. reference at each
+individual 1/3-octave band rather than trusting an averaged "top octave" figure: a consistent
++2.6 to +5.0dB excess specifically at 13.9-17.5kHz, present ONLY at negative High (High=0: within
++/-0.8dB, essentially neutral) and scaling with how negative High is set. Traced to the OLD single
+"high" band's own gate envelope - `plateauDroopHighDbPerSec` is POSITIVE (growing, not decaying) at
+every calibrated Time, a real, deliberate correction for this engine's own tank structurally
+over-damping highs (see the "harmonics/saturation" section above) - accumulating to as much as
++16.6dB of gain baked into the WHOLE 11.3-22kHz band by the time of the knee, calibrated as ONE
+aggregate number for a band that, once measured with a custom [(11314,16000),(16000,22049)] split
+(`core.features.band_gate_params`' own `bands` argument, now a standard part of `analyze.py`'s own
+per-capture measurement), turned out to have real, consistently different decay rates: 11.3-16kHz
+decays steeply (-395 to -440dB/s at most settings) while 16-22kHz decays far more slowly (-85 to
+-241dB/s) - the same one-band-can't-track-two-rates gap the low band's own subLow/low split fixed
+one octave down, one octave up this time.
+
+Split into `high` (11.3-16kHz) and `veryHigh` (16-22kHz, `InhaltIRSynth.h`'s own
+`highVeryHighCrossoverHz`=16000Hz - that octave's own center, the natural halfway point, since
+unlike every other crossover here there was no pre-existing analysis-band edge to reuse). Uses a
+single UNCOMPENSATED one-pole stage for this specific crossover (not the usual compensated N=2
+cascade) - N=2's own compensation factor would push this crossover's effective cutoff to ~24.9kHz,
+above Nyquist at ordinary session rates, the same reasoning that already ruled out N=4 for
+`midHighCrossoverHz`. `veryHigh` shares `kneeTimeHighMs`/`buildUpMs` with `high` rather than
+getting its own - only the decay RATE was found to differ between the two sub-bands, not the
+timing, keeping this scoped to droop/fall-rate as asked rather than expanding further.
+
+Real, measured effect across all 9 captures: aggregate fall-rate error improved 97.3->83.1dB/s,
+sign mismatches 13->12, the `LSD (all)` concern cleared entirely. At the specific 13.9-17.5kHz
+excess that motivated this: roughly 1-2dB closed at every negative-High setting checked (e.g.
+Time=9.8/High=-9: +2.6/+3.5dB -> +0.9/+1.8dB), while High=0 stays neutral. Not a complete fix - a
+real, disclosed residual (+1 to +4dB) remains at the worst negative-High cases, consistent with
+Adam's own framing ("much closer now than ever before" but "still a little bit off") - closing it
+further would need either a steeper (compensated, multi-stage) crossover at a session rate where
+that stays valid, or accepting this as the practical ceiling of a two-pole-total top-end split.
+
 The UI is still a plain-JUCE placeholder (see "How it works" below) - not yet the real
 hardware-panel chassis.
 

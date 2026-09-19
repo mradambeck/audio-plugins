@@ -304,6 +304,17 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         return y;
     };
 
+    // Single, UNCOMPENSATED stage for the high/veryHigh split specifically - see
+    // highVeryHighCrossoverHz's own comment. N=2's own compensation factor (splitPoleCompensation
+    // above) would push this crossover's compensated cutoff to ~24.9kHz, above Nyquist at ordinary
+    // session rates - not just steeper, actively invalid, the same reasoning that already ruled
+    // out N=4 for midHighCrossoverHz. A single stage needs no compensation at all (one stage's own
+    // -3dB point IS its own configured cutoff, no cascade shift to correct for), at the cost of a
+    // gentler ~6dB/octave separation here than the ~12dB/octave the other three crossovers get.
+    wildjag::dsp::OnePoleFilter splitVeryHighL, splitVeryHighR;
+    splitVeryHighL.setCutoffHz(InhaltIRSynth::highVeryHighCrossoverHz, sampleRate);
+    splitVeryHighR.setCutoffHz(InhaltIRSynth::highVeryHighCrossoverHz, sampleRate);
+
     for (int n = 0; n < numSamples; ++n)
     {
         const auto impulse = (n == 0) ? 1.0f : 0.0f;
@@ -331,14 +342,18 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
         const auto subLowL = cascadedLowpass(splitSubLowL, lowAllL);
         const auto lowL = lowAllL - subLowL;
         const auto midL = cascadedLowpass(splitHighL, restL);
-        const auto highL = restL - midL;
+        const auto highAllL = restL - midL;
+        const auto veryHighL = highAllL - splitVeryHighL.processSample(highAllL);
+        const auto highL = highAllL - veryHighL;
 
         const auto lowAllR = cascadedLowpass(splitLowR, tiltedR);
         const auto restR = tiltedR - lowAllR;
         const auto subLowR = cascadedLowpass(splitSubLowR, lowAllR);
         const auto lowR = lowAllR - subLowR;
         const auto midR = cascadedLowpass(splitHighR, restR);
-        const auto highR = restR - midR;
+        const auto highAllR = restR - midR;
+        const auto veryHighR = highAllR - splitVeryHighR.processSample(highAllR);
+        const auto highR = highAllR - veryHighR;
 
         const auto tSeconds = (float) n / (float) sampleRate;
         const auto gateSubLowLin = std::pow(10.0f, gateEnvelopeDb(
@@ -349,9 +364,15 @@ void InhaltIRSynth::render(const Params& params, double sampleRate, int numSampl
             tSeconds, params, params.plateauDroopMidDbPerSec, params.fallRateMidDbPerSec, params.kneeTimeMidMs) / 20.0f);
         const auto gateHighLin = std::pow(10.0f, gateEnvelopeDb(
             tSeconds, params, params.plateauDroopHighDbPerSec, params.fallRateHighDbPerSec, params.kneeTimeHighMs) / 20.0f);
+        // veryHigh shares kneeTimeHighMs - only the decay RATE was found to differ between these
+        // two sub-bands, not the knee timing - see Params::plateauDroopVeryHighDbPerSec's own comment.
+        const auto gateVeryHighLin = std::pow(10.0f, gateEnvelopeDb(
+            tSeconds, params, params.plateauDroopVeryHighDbPerSec, params.fallRateVeryHighDbPerSec, params.kneeTimeHighMs) / 20.0f);
 
-        left[(size_t) n] = subLowL * gateSubLowLin + lowL * gateLowLin + midL * gateMidLin + highL * gateHighLin;
-        right[(size_t) n] = subLowR * gateSubLowLin + lowR * gateLowLin + midR * gateMidLin + highR * gateHighLin;
+        left[(size_t) n] = subLowL * gateSubLowLin + lowL * gateLowLin + midL * gateMidLin
+            + highL * gateHighLin + veryHighL * gateVeryHighLin;
+        right[(size_t) n] = subLowR * gateSubLowLin + lowR * gateLowLin + midR * gateMidLin
+            + highR * gateHighLin + veryHighR * gateVeryHighLin;
     }
 
     // Stereo narrowing - see Params::stereoNarrowCorrelation's own comment for why this exists.
