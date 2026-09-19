@@ -345,16 +345,16 @@ def gate_envelope_params(x: np.ndarray, sr: int, onset_idx: int, win_ms: float =
 
     OPEN RELIABILITY GAP, found on Inhalt (2026-09): segment B's fit window runs to the first
     floor_db crossing OR THE END OF THE CAPTURE if that crossing never happens. If the input's own
-    flat noise floor sits above floor_db relative to ITS OWN peak (e.g. a narrow high-frequency
-    band with low absolute energy, where -70dB-relative-to-peak is still a small absolute number
-    easily exceeded by residual bleed from an adjacent band), the floor crossing never fires and a
-    long stretch of pure noise floor - not real decay - gets folded into segment B's line fit,
-    dragging fall_rate_db_per_s toward an artificially shallow value. Caught by contradiction: a
-    band read as "barely decaying" by this fit, directly inspected via its own RMS envelope, was
-    decaying normally to a floor by ~500ms and flat after. No fix implemented yet (e.g. shrinking
-    floor_db adaptively per-input, or detecting a flat run and excluding it from segment B) - when
-    a fitted fall_rate_db_per_s looks implausibly shallow for a visibly-decaying band, cross-check
-    against a direct envelope plot before trusting the fit.
+    flat noise floor sits above floor_db relative to ITS OWN peak - plausible for a narrow,
+    low-energy band, where -70dB-relative-to-peak is a small absolute number and the exact cause
+    (crossover bleed, quantization, something else) wasn't identified - the floor crossing never
+    fires and a long stretch of pure noise floor - not real decay - gets folded into segment B's
+    line fit, dragging fall_rate_db_per_s toward an artificially shallow value. Caught by
+    contradiction: a band read as "barely decaying" by this fit, directly inspected via its own
+    RMS envelope, was decaying normally to a floor by ~500ms and flat after. No fix implemented
+    yet (e.g. shrinking floor_db adaptively per-input, or detecting a flat run and excluding it
+    from segment B) - when a fitted fall_rate_db_per_s looks implausibly shallow for a
+    visibly-decaying band, cross-check against a direct envelope plot before trusting the fit.
 
     Returns a dict; every field is None if there isn't enough data on either side of onset_idx."""
     empty = {
