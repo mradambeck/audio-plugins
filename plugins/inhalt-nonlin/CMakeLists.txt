@@ -13,8 +13,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 
 set(INHALT_CONVOLUTION_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../common/convolution/ConvolutionEngine.cpp)
+
+juce_add_binary_data(InhaltBinaryData
+    SOURCES
+        ../common/Assets/WildJagLogo.svg
+        ../common/Assets/Oxanium-Bold.ttf
+        ../common/Assets/Oswald-SemiBold.ttf
+)
 
 juce_add_plugin(Inhalt
     COMPANY_NAME "Wild Jag"
@@ -48,6 +56,7 @@ target_sources(Inhalt PRIVATE
     Source/InhaltParameterMap.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/InhaltLookAndFeel.cpp
     ${INHALT_CONVOLUTION_ENGINE_SOURCE}
 )
 
@@ -57,7 +66,8 @@ target_compile_definitions(Inhalt PUBLIC
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
 
 target_link_libraries(Inhalt
-    PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_gui_extra
+    PRIVATE InhaltBinaryData HardwarePanelLookAndFeel
+            juce::juce_audio_utils juce::juce_dsp juce::juce_gui_extra
     PUBLIC  juce::juce_recommended_config_flags juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)
 
@@ -104,6 +114,7 @@ target_sources(InhaltRenderIR PRIVATE
     Source/InhaltParameterMap.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/InhaltLookAndFeel.cpp
     Source/Tools/RenderIR.cpp
     ${INHALT_CONVOLUTION_ENGINE_SOURCE}
 )
@@ -117,6 +128,7 @@ target_compile_definitions(InhaltRenderIR PRIVATE
     JucePlugin_VersionString="${PROJECT_VERSION}")
 
 target_link_libraries(InhaltRenderIR
-    PRIVATE juce::juce_audio_utils juce::juce_audio_formats juce::juce_dsp juce::juce_gui_extra
+    PRIVATE InhaltBinaryData HardwarePanelLookAndFeel
+            juce::juce_audio_utils juce::juce_audio_formats juce::juce_dsp juce::juce_gui_extra
     PUBLIC  juce::juce_recommended_config_flags juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags)

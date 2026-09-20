@@ -20,11 +20,12 @@ namespace
     // this catalog (see ShieldsAudioProcessor::prepareToPlay's own comment).
     constexpr int blockSizeHeadroom = 2;
 
-    // Vintage/Modern converter - see PluginProcessor.h's converterBandwidthL/R comment. Both
-    // figures come from the AMS RMX16 spec sheet Adam supplied, not a capture measurement.
-    constexpr float vintageBandwidthHz = 18000.0f;   // 20Hz-18kHz -3/+0dB (original unit)
-    constexpr float modernBandwidthHz = 21000.0f;    // effectively flat to 18kHz (500-series reissue)
-    constexpr float vintageQuantizationLevels = 32768.0f; // ~16-bit-class, matching a ~90dB DR unit
+    // Converter - see PluginProcessor.h's converterBandwidthL/R comment. Fixed to the AMS RMX16's
+    // original ("Vintage") spec-sheet figures Adam supplied, not a capture measurement - there was
+    // briefly a user-selectable Vintage/Modern choice here, removed (2026-09-19) since the plugin
+    // never actually needed the Modern alternative exposed as a control.
+    constexpr float converterBandwidthHz = 18000.0f;   // 20Hz-18kHz -3/+0dB
+    constexpr float converterQuantizationLevels = 32768.0f; // ~16-bit-class, matching a ~90dB DR unit
 
     // Saturation - see PluginProcessor.h's converterSaturationDrive comment for the full story
     // (added after "brassiness"/"harmonic richness" was found, via direct measurement, to survive
@@ -38,10 +39,8 @@ namespace
     // tanh waveshaper (y = tanh(drive*x)/tanh(drive), unity-gain-preserving, no hard clipping) with
     // `drive` numerically solved (see ml-toolkit's own throwaway calibration script - a 1kHz sine
     // swept in level, FFT'd, harmonic energy measured) so a 0dBFS sine produces the spec's own
-    // worst-case THD at each position: 0.03% for Vintage, 0.002% for Modern - the same "Vintage is
-    // the more colored position" asymmetry the bandwidth/quantization figures above already use.
-    constexpr float vintageSaturationDrive = 0.060027f;
-    constexpr float modernSaturationDrive = 0.015492f;
+    // worst-case Vintage THD: 0.03%.
+    constexpr float converterSaturationDrive = 0.060027f;
 
     inline float saturate(float x, float drive) noexcept
     {
@@ -60,7 +59,6 @@ InhaltAudioProcessor::InhaltAudioProcessor()
     highParam = apvts.getRawParameterValue(highParamID);
     preDelayMsParam = apvts.getRawParameterValue(preDelayMsParamID);
     lowCutHzParam = apvts.getRawParameterValue(lowCutHzParamID);
-    converterParam = apvts.getRawParameterValue(converterParamID);
     widthParam = apvts.getRawParameterValue(widthParamID);
     dryParam = apvts.getRawParameterValue(dryParamID);
     wetParam = apvts.getRawParameterValue(wetParamID);
@@ -120,15 +118,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout InhaltAudioProcessor::create
         juce::AudioParameterFloatAttributes()
             .withLabel("Hz")
             .withStringFromValueFunction([](float v, int) { return v <= 0.0f ? juce::String("Off") : juce::String((int) v) + " Hz"; })));
-
-    // Bandwidth + noise-floor + a gentle spec-derived saturation stage - see PluginProcessor.h's
-    // converterBandwidthL/R comment. Both positions are documented spec-sheet numbers, not
-    // calibrated against a capture (no bypass/converter-isolating capture exists yet).
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{converterParamID, 1},
-        "Converter",
-        juce::StringArray { "Vintage", "Modern" },
-        0));
 
     // 100% = the hardware's own measured width (IACC ~0.006-0.037, side/mid ~0dB - see the
     // project plan) - a bit-identical no-op at the default, same explicit-bypass contract as
@@ -302,32 +291,26 @@ void InhaltAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         }
     }
 
-    // --- Converter: saturation + bandwidth + quantization (see this file's own comment above and
-    // PluginProcessor.h's converterBandwidthL/R comment). Vintage is index 0. Wet-only, same
-    // reasoning as Width above. Saturation runs FIRST (an early-circuit-stage nonlinearity, ahead
-    // of the output filter/quantization that follows it in a real signal path), though for a
-    // spec-derived effect this subtle the exact order is not itself a measured/load-bearing
-    // choice. ---
-    const auto isVintage = converterParam->load() < 0.5f;
-    const auto bandwidthHz = isVintage ? vintageBandwidthHz : modernBandwidthHz;
-    const auto saturationDrive = isVintage ? vintageSaturationDrive : modernSaturationDrive;
-    converterBandwidthL.setCutoffHz(bandwidthHz, currentSampleRate);
-    converterBandwidthR.setCutoffHz(bandwidthHz, currentSampleRate);
+    // --- Converter: fixed saturation + bandwidth + quantization (see this file's own comment
+    // above and PluginProcessor.h's converterBandwidthL/R comment) - the AMS RMX16's original
+    // ("Vintage") spec, no longer user-switchable. Wet-only, same reasoning as Width above.
+    // Saturation runs FIRST (an early-circuit-stage nonlinearity, ahead of the output
+    // filter/quantization that follows it in a real signal path), though for a spec-derived
+    // effect this subtle the exact order is not itself a measured/load-bearing choice. ---
+    converterBandwidthL.setCutoffHz(converterBandwidthHz, currentSampleRate);
+    converterBandwidthR.setCutoffHz(converterBandwidthHz, currentSampleRate);
 
     {
         auto* left = buffer.getWritePointer(0);
         auto* right = buffer.getWritePointer(1);
         for (int i = 0; i < numSamples; ++i)
         {
-            left[i] = saturate(left[i], saturationDrive);
-            right[i] = saturate(right[i], saturationDrive);
+            left[i] = saturate(left[i], converterSaturationDrive);
+            right[i] = saturate(right[i], converterSaturationDrive);
             left[i] = converterBandwidthL.processSample(left[i]);
             right[i] = converterBandwidthR.processSample(right[i]);
-            if (isVintage)
-            {
-                left[i] = std::round(left[i] * vintageQuantizationLevels) / vintageQuantizationLevels;
-                right[i] = std::round(right[i] * vintageQuantizationLevels) / vintageQuantizationLevels;
-            }
+            left[i] = std::round(left[i] * converterQuantizationLevels) / converterQuantizationLevels;
+            right[i] = std::round(right[i] * converterQuantizationLevels) / converterQuantizationLevels;
         }
     }
 

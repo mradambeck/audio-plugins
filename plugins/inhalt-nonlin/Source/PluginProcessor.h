@@ -61,7 +61,6 @@ public:
     static constexpr auto highParamID = "high";
     static constexpr auto preDelayMsParamID = "preDelayMs";
     static constexpr auto lowCutHzParamID = "lowCutHz";
-    static constexpr auto converterParamID = "converter";
     static constexpr auto widthParamID = "width";
     static constexpr auto dryParamID = "dry";
     static constexpr auto wetParamID = "wet";
@@ -83,7 +82,6 @@ private:
     std::atomic<float>* highParam = nullptr;
     std::atomic<float>* preDelayMsParam = nullptr;
     std::atomic<float>* lowCutHzParam = nullptr;
-    std::atomic<float>* converterParam = nullptr;
     std::atomic<float>* widthParam = nullptr;
     std::atomic<float>* dryParam = nullptr;
     std::atomic<float>* wetParam = nullptr;
@@ -96,19 +94,20 @@ private:
 
     double currentSampleRate = 44100.0;
 
-    // Converter (Vintage/Modern) - bandwidth + noise-floor + a gentle spec-derived saturation
-    // stage (harmonics were originally scoped OUT entirely - see the project plan - but a real
+    // Converter - fixed bandwidth + noise-floor + a gentle spec-derived saturation stage
+    // (harmonics were originally scoped OUT entirely - see the project plan - but a real
     // "brassiness"/"harmonic richness" complaint survived three separate linear-architecture
     // experiments, evidence it's the real hardware's own nonlinear character rather than a
     // reachable modal/EQ gap; see PluginProcessor.cpp's own converterSaturationDrive comment for
     // the full story). Applied post-engine, not inside ConvolutionEngine (which stays
-    // variant-agnostic). Vintage: 20Hz-18kHz -3/+0dB, ~90dB dynamic range (~16-bit-class
-    // quantization), ~0.03% THD at 0dBFS. Modern: near-flat to 18kHz, ~112dB (quantization
-    // effectively bypassed), ~0.002% THD at 0dBFS. All figures are from the AMS RMX16 spec sheet
-    // Adam supplied, not measured from a capture (no capture isolates the real unit's own
-    // saturation curve - see PluginProcessor.cpp's own comment on why) - see
-    // PluginProcessor.cpp's createParameterLayout() comment on this parameter for the exact
-    // bandwidth/quantization numbers.
+    // variant-agnostic). Fixed to the AMS RMX16's original ("Vintage") spec: 20Hz-18kHz -3/+0dB,
+    // ~90dB dynamic range (~16-bit-class quantization), ~0.03% THD at 0dBFS - there was briefly a
+    // user-selectable Modern alternative (near-flat to 18kHz, ~112dB, ~0.002% THD) exposed as a
+    // "Converter" parameter, removed 2026-09-19 since the plugin never actually needed it exposed
+    // as a control. All figures are from the AMS RMX16 spec sheet Adam supplied, not measured
+    // from a capture (no capture isolates the real unit's own saturation curve - see
+    // PluginProcessor.cpp's own comment on why) - see PluginProcessor.cpp's anonymous-namespace
+    // constants for the exact bandwidth/quantization numbers.
     wildjag::dsp::OnePoleFilter converterBandwidthL, converterBandwidthR;
 
     wildjag::FactoryPresetList factoryPresets;

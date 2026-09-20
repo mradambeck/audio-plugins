@@ -18,8 +18,8 @@
 //
 // Because Inhalt convolves a synthesized IR rather than running a live tank, feeding one impulse
 // through the real processor with Dry=0/Wet=100 reproduces that IR AS SHAPED by the plugin's own
-// other controls (Pre-Delay, Low Cut, Width, Converter) - exactly the end-to-end behaviour
-// validation needs, not a special case.
+// other controls (Pre-Delay, Low Cut, Width, and the always-on Converter stage) - exactly the
+// end-to-end behaviour validation needs, not a special case.
 //
 // MUST write stereo (never collapse to mono) - stereo decorrelation is a validated property of
 // this plugin, and a mono render would make half of the project plan's Phase 6 verification
@@ -28,7 +28,7 @@
 // Usage:
 //   InhaltRenderIR --out <path.wav> [--seconds 1.5] [--sampleRate 44100]
 //                   [--timeKnob 2.2] [--high 0] [--preDelayMs 0] [--lowCutHz 0]
-//                   [--converter 0] [--width 100] [--dry 0] [--wet 100] [--bypass 0]
+//                   [--width 100] [--dry 0] [--wet 100] [--bypass 0]
 //
 // Flags map 1:1 onto the plugin's own APVTS parameter IDs in the plugin's own native units - not
 // normalised 0-1. Dry/Wet default to 0/100 here (pure wet, isolated from the dry tap), unlike the
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
         std::fprintf(stderr,
             "Usage: InhaltRenderIR --out <path.wav> [--seconds 1.5] [--sampleRate 44100]\n"
             "                       [--timeKnob 2.2] [--high 0] [--preDelayMs 0] [--lowCutHz 0]\n"
-            "                       [--converter 0] [--width 100]\n"
+            "                       [--width 100]\n"
             "                       [--dry 0] [--wet 100] [--bypass 0]\n");
         return 1;
     }
@@ -91,7 +91,6 @@ int main(int argc, char* argv[])
     setParam(processor, InhaltAudioProcessor::highParamID, getFloatArg(args, "high", 0.0f));
     setParam(processor, InhaltAudioProcessor::preDelayMsParamID, getFloatArg(args, "preDelayMs", 0.0f));
     setParam(processor, InhaltAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowCutHz", 0.0f));
-    setParam(processor, InhaltAudioProcessor::converterParamID, getFloatArg(args, "converter", 0.0f));
     setParam(processor, InhaltAudioProcessor::widthParamID, getFloatArg(args, "width", 100.0f));
     setParam(processor, InhaltAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
     setParam(processor, InhaltAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));

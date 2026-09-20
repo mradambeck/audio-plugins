@@ -262,10 +262,10 @@ Reopened with Adam's explicit go-ahead, SPEC-DERIVED rather than measured (no ca
 isolates the real unit's own saturation curve - the 9 NonLin captures are single-impulse-response
 style, not the level-swept sine material a real THD curve needs): a simple, standard, unity-gain
 tanh waveshaper (`y = tanh(drive*x)/tanh(drive)`, no hard clipping) added to the existing Converter
-stage (Vintage/Modern), with `drive` numerically solved so a 0dBFS sine produces the spec sheet's
-own worst-case THD at each position - 0.03% for Vintage, 0.002% for Modern, the same "Vintage is
-the more colored position" asymmetry the bandwidth/quantization figures already use. Deliberately
-NOT calibrated against `resonant_peaks()`'s own count/Q numbers (that would just be curve-fitting a
+stage, with `drive` numerically solved so a 0dBFS sine produces the spec sheet's own worst-case
+Vintage THD of 0.03%. (The Converter briefly had a user-selectable Vintage/Modern choice; removed
+2026-09-19 - see "Controls" below - so this is now the plugin's only, fixed converter behaviour.)
+Deliberately NOT calibrated against `resonant_peaks()`'s own count/Q numbers (that would just be curve-fitting a
 linear-domain metric with a nonlinear knob, the same mismatch the three ruled-out experiments
 already demonstrated) - this is a first, honest, spec-grounded pass, not a verified match to the
 real hardware's own harmonic character. A future dedicated capture session (level-swept sine or
@@ -644,7 +644,8 @@ correction, not stylistic).
   comment for exactly what is a real hardware measurement vs. placeholder pending Phase 2.
 - `Source/PluginProcessor.h/.cpp` - owns `plugins/common/convolution/ConvolutionEngine` (pre-delay,
   low cut, dry/wet, a click-free ramped bypass - shared with the convolution-base/variant family)
-  plus two Inhalt-specific post-stages, Width and Converter, both applied to the **wet contribution
+  plus two Inhalt-specific post-stages, Width (user-controllable) and a fixed, always-on Converter
+  stage (no longer user-switchable - see "Controls" below), both applied to the **wet contribution
   only** (isolated via linear un-mixing after `engine.process()` - see `processBlock()`'s own
   comment for why this matters: an early version applied them to the combined dry+wet signal and
   audibly smeared what should have been a pristine Dry=100%/Wet=0% passthrough, caught by
@@ -661,10 +662,15 @@ correction, not stylistic).
 | High Frequency | -9-0 dB | Real hardware measurement (input tilt, both range endpoints) |
 | Pre-Delay | 0-200 ms | Catalog convention |
 | Low Cut | 0-300 Hz (0 = off) | Catalog convention |
-| Converter | Vintage / Modern | AMS RMX16 spec sheet (bandwidth + noise floor + a spec-derived saturation stage, ~0.03%/~0.002% THD - see "Status" below for why harmonics were reopened) |
 | Width | 0-150% (100% = measured hardware width) | Real hardware measurement (stereo decorrelation) |
 | Dry / Wet | 0-100% each | Catalog convention |
 | Bypass | - | Click-free, via `ConvolutionEngine`'s own ramped bypass |
+
+Not a user control: the Converter stage (AMS RMX16 spec sheet - bandwidth + noise floor + a
+spec-derived saturation stage, ~0.03% THD - see "Status" above for why harmonics were reopened) is
+always on, fixed to the hardware's original ("Vintage") spec. It briefly had a Vintage/Modern
+choice exposed as a parameter; removed 2026-09-19 since the plugin never actually needed it
+user-switchable.
 
 ## Building
 
