@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Aura VERSION 0.2.0)
+project(Aura VERSION 0.2.1)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning. Beta: the real
     # hardware-panel UI (juce-hardware-panel-ui skill, mockup-approved and screenshot-verified
     # against plugins/aura-reverb/mockups/aura-mockup-v1.html) is in place and Low Cut is wired, but no
