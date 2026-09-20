@@ -11,7 +11,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/aura-reverb:Aura" "plugins/concrete-sampler:Concrete" "plugins/convolution-base:ConvBase"; do
+for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/aura-reverb:Aura" "plugins/concrete-sampler:Concrete" "plugins/convolution-base:ConvBase" "plugins/inhalt-nonlin:Inhalt"; do
     repo="${entry%%:*}"
     name="${entry##*:}"
     echo "==> Configuring $name"

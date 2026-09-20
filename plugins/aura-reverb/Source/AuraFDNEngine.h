@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "../../common/dsp/BandShelf.h"
 #include "../../common/dsp/CircularDelayBuffer.h"
 #include "../../common/dsp/OnePoleFilter.h"
 #include "../../common/dsp/TiltFilter.h"
@@ -187,30 +188,13 @@ private:
     static constexpr float maxFeedbackGain = 0.985f;
     static constexpr float maxDampingWeight = 0.99f;
 
-    // Independent low/high-band gain shelf, one-pole split - same structure as
-    // common/dsp/TiltFilter.h, but with two independently-settable linear gains instead of one
-    // symmetric tiltDb (TiltFilter always moves the two bands by equal-and-opposite dB amounts,
-    // which doesn't fit here: model.py's fitted high_band_gain/low_band_gain are independent
-    // values, not a symmetric tilt around a center). Not added as a new TiltFilter capability -
-    // per AGENTS.md's LookAndFeel-extension convention applied the same way to common/dsp/, a
-    // new shared capability gets added to shared code once a second plugin needs it, not
-    // speculatively for the first one that does.
-    struct BandShelf
-    {
-        wildjag::dsp::OnePoleFilter lowpass;
-        float lowGain = 1.0f;
-        float highGain = 1.0f;
-
-        void reset() noexcept { lowpass.reset(); }
-        void setPivotHz(float hz, double sampleRate) noexcept { lowpass.setCutoffHz(hz, sampleRate); }
-
-        float processSample(float x) noexcept
-        {
-            const auto low = lowpass.processSample(x);
-            const auto high = x - low;
-            return low * lowGain + high * highGain;
-        }
-    };
+    // Independent low/high-band gain shelf, one-pole split - see common/dsp/BandShelf.h. Used to
+    // be a private struct here (same structure as common/dsp/TiltFilter.h, but with two
+    // independently-settable linear gains instead of one symmetric tiltDb, which doesn't fit here:
+    // model.py's fitted high_band_gain/low_band_gain are independent values, not a symmetric tilt
+    // around a center); promoted to shared code once Inhalt needed the identical shape for its own
+    // input-stage tilt - see that header's own comment.
+    using BandShelf = wildjag::dsp::BandShelf;
 
     double sampleRateHz = 44100.0;
     bool prepared = false;

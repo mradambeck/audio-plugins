@@ -3,10 +3,12 @@ import math
 import torch
 
 from core.dsp_primitives import (
+    allpass_chain_transfer_function,
     cutoff_hz_from_weight,
     hadamard_matrix,
     real_rate_damping_weight,
     render_fdn_impulse_response,
+    rfft_omega,
 )
 
 
@@ -14,6 +16,54 @@ def test_hadamard_matrix_is_orthogonal():
     H = hadamard_matrix(8)
     identity = H @ H.T
     assert torch.allclose(identity, torch.eye(8), atol=1e-5)
+
+
+def test_allpass_chain_transfer_function_has_unity_magnitude():
+    """A Schroeder allpass chain must pass every frequency at unity gain (it's a diffuser, not a
+    tone-shaping filter) - the property effects/nonlin/model.py's diffuser stage relies on to NOT
+    also change the tank's overall frequency response/tilt."""
+    omega = rfft_omega(2048)
+    delays = torch.tensor([53.0, 79.0, 115.0])
+    response = allpass_chain_transfer_function(delays, torch.tensor(0.7), omega)
+    magnitude = response.abs()
+    assert torch.allclose(magnitude, torch.ones_like(magnitude), atol=1e-4)
+
+
+def test_allpass_chain_transfer_function_batched_gain():
+    omega = rfft_omega(1024)
+    delays = torch.tensor([53.0, 79.0, 115.0])
+    gains = torch.tensor([0.0, 0.5, 0.9])
+    response = allpass_chain_transfer_function(delays, gains, omega)
+    assert response.shape == (3, omega.shape[0])
+    # gain=0 -> every stage is a pure delay (magnitude 1, but also must equal the unbatched
+    # scalar-gain result exactly, not just have the right magnitude).
+    scalar_response = allpass_chain_transfer_function(delays, torch.tensor(0.5), omega)
+    assert torch.allclose(response[1], scalar_response, atol=1e-5)
+
+
+def test_render_fdn_impulse_response_diffuser_changes_output_but_not_when_none():
+    """input_diffuser_response=None (the default) must reproduce this function's exact prior
+    behaviour - Ambience's own fit depends on that. Passing a real diffuser response must actually
+    change the render (guards a silently-ignored parameter)."""
+    torch.manual_seed(0)
+    delays = torch.tensor([37.0, 53.0, 71.0, 97.0])
+    H = hadamard_matrix(4)
+    feedback_gain = torch.tensor([[0.8]])
+    damping_weight = torch.full((1, 4), 0.3)
+    num_samples = 2048
+
+    baseline = render_fdn_impulse_response(delays, feedback_gain, damping_weight, H, num_samples)
+    explicit_none = render_fdn_impulse_response(
+        delays, feedback_gain, damping_weight, H, num_samples, input_diffuser_response=None
+    )
+    assert torch.equal(baseline, explicit_none)
+
+    omega = rfft_omega(num_samples)
+    diffuser = allpass_chain_transfer_function(torch.tensor([53.0, 79.0, 115.0]), torch.tensor(0.6), omega)
+    diffused = render_fdn_impulse_response(
+        delays, feedback_gain, damping_weight, H, num_samples, input_diffuser_response=diffuser
+    )
+    assert not torch.allclose(diffused, baseline, atol=1e-5)
 
 
 def test_render_fdn_impulse_response_matches_time_domain_reference():

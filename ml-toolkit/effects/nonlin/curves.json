@@ -1,0 +1,1064 @@
+{
+  "time_to_t_knee_ms": {
+    "points": [
+      [
+        0.1,
+        59.25200000000001
+      ],
+      [
+        0.8,
+        61.293000000000006
+      ],
+      [
+        2.2,
+        137.12
+      ],
+      [
+        4.8,
+        199.93200000000002
+      ],
+      [
+        7.0,
+        199.93200000000002
+      ],
+      [
+        9.8,
+        212.948
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_corrected_isotonic"
+  },
+  "time_to_tau_a_ms": {
+    "points": [
+      [
+        0.1,
+        13.283059642876045
+      ],
+      [
+        0.8,
+        14.941309366474432
+      ],
+      [
+        2.2,
+        14.941309366474432
+      ],
+      [
+        4.8,
+        16.489063273115747
+      ],
+      [
+        7.0,
+        23.047314997214798
+      ],
+      [
+        9.8,
+        24.398451347211918
+      ]
+    ],
+    "source": "direct_measurement"
+  },
+  "time_to_fall_rate_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -15.713128205128186
+      ],
+      [
+        0.8,
+        -36.85797435897433
+      ],
+      [
+        2.2,
+        -79.14766666666665
+      ],
+      [
+        4.8,
+        -135.814
+      ],
+      [
+        7.0,
+        -177.713
+      ],
+      [
+        9.8,
+        -170.18
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "time_to_tau_k_ms": {
+    "points": [
+      [
+        0.1,
+        0.7838802933692932
+      ],
+      [
+        0.8,
+        0.45271360874176025
+      ],
+      [
+        2.2,
+        3.9668707847595215
+      ],
+      [
+        4.8,
+        29.716176986694336
+      ],
+      [
+        7.0,
+        1.5522608160972595
+      ],
+      [
+        9.8,
+        1.774828314781189
+      ]
+    ]
+  },
+  "time_to_feedback_gain": {
+    "points": [
+      [
+        0.1,
+        0.9488055109977722
+      ],
+      [
+        0.8,
+        0.9488700032234192
+      ],
+      [
+        2.2,
+        0.9310675859451294
+      ],
+      [
+        4.8,
+        0.9439131617546082
+      ],
+      [
+        7.0,
+        0.9462866485118866
+      ],
+      [
+        9.8,
+        0.9459753433863322
+      ]
+    ]
+  },
+  "time_to_damping_weight_mean": {
+    "points": [
+      [
+        0.1,
+        0.8478138446807861
+      ],
+      [
+        0.8,
+        0.8211125135421753
+      ],
+      [
+        2.2,
+        0.8458993434906006
+      ],
+      [
+        4.8,
+        0.8736988306045532
+      ],
+      [
+        7.0,
+        0.8848611116409302
+      ],
+      [
+        9.8,
+        0.885959525903066
+      ]
+    ]
+  },
+  "time_to_diffuser_gain": {
+    "points": [
+      [
+        0.1,
+        0.23160885274410248
+      ],
+      [
+        0.8,
+        0.23505981266498566
+      ],
+      [
+        2.2,
+        0.30376893281936646
+      ],
+      [
+        4.8,
+        0.3088827431201935
+      ],
+      [
+        7.0,
+        0.30799177289009094
+      ],
+      [
+        9.8,
+        0.3084732989470164
+      ]
+    ]
+  },
+  "time_to_plateau_droop_db_per_s": {
+    "points": [
+      [
+        2.2,
+        -62.214
+      ],
+      [
+        4.8,
+        16.323999999999998
+      ],
+      [
+        7.0,
+        32.812999999999995
+      ],
+      [
+        9.8,
+        28.198
+      ]
+    ],
+    "source": "direct_measurement_high0_only_natural_droop_corrected"
+  },
+  "high_to_tilt_low_gain_offset": {
+    "points": [
+      [
+        -9.0,
+        1.481746372405031
+      ],
+      [
+        -4.0,
+        0.4292329094050229
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 1.0
+  },
+  "high_to_tilt_high_gain_offset": {
+    "points": [
+      [
+        -9.0,
+        -0.8532347375050937
+      ],
+      [
+        -4.0,
+        -0.5294992531650122
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "baseline_at_high0": 1.0
+  },
+  "high_to_plateau_droop_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -33.332
+      ],
+      [
+        -4.0,
+        -34.752
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "_notes": {
+    "h_time_interaction": "No High*Time interaction curve is built - the captured grid (see the project plan's capture design) is a cross, not a full grid, and can't support fitting one honestly. H-timing-neutrality was CHECKED against the actual fitted data (not assumed): NOT confirmed within 10.0ms (per-Time t_knee_ms spreads: {'7.0': 15.81, '9.8': 15.41}). Per-capture residuals against the resulting time_to_t_knee_ms curve are in 'h_time_interaction_residuals' below - a real interaction would show up as residuals that grow with |High|, rather than sitting near the fit's general noise level.",
+    "h_time_interaction_residuals": [
+      {
+        "filename": "NonLin_0.1s_-3H.wav",
+        "time": 0.1,
+        "high": -3,
+        "predicted_t_knee_ms": 469.29,
+        "actual_t_knee_ms": 367.67,
+        "residual_ms": -101.62,
+        "extrapolated": true
+      },
+      {
+        "filename": "NonLin_0.8s_-3H.wav",
+        "time": 0.8,
+        "high": -3,
+        "predicted_t_knee_ms": 433.99,
+        "actual_t_knee_ms": 308.97,
+        "residual_ms": -125.01,
+        "extrapolated": true
+      },
+      {
+        "filename": "NonLin_2.2s_0H.wav",
+        "time": 2.2,
+        "high": 0,
+        "predicted_t_knee_ms": 363.37,
+        "actual_t_knee_ms": 363.37,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_4.8s_0H.wav",
+        "time": 4.8,
+        "high": 0,
+        "predicted_t_knee_ms": 232.24,
+        "actual_t_knee_ms": 232.24,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_7.0s_-7H.wav",
+        "time": 7.0,
+        "high": -7,
+        "predicted_t_knee_ms": 218.24,
+        "actual_t_knee_ms": 234.05,
+        "residual_ms": 15.81,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_7.0s_0H.wav",
+        "time": 7.0,
+        "high": 0,
+        "predicted_t_knee_ms": 218.24,
+        "actual_t_knee_ms": 218.24,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_-4H.wav",
+        "time": 9.8,
+        "high": -4,
+        "predicted_t_knee_ms": 239.43,
+        "actual_t_knee_ms": 238.28,
+        "residual_ms": -1.16,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_-9H.wav",
+        "time": 9.8,
+        "high": -9,
+        "predicted_t_knee_ms": 239.43,
+        "actual_t_knee_ms": 253.69,
+        "residual_ms": 14.25,
+        "extrapolated": false
+      },
+      {
+        "filename": "NonLin_9.8s_0H.wav",
+        "time": 9.8,
+        "high": 0,
+        "predicted_t_knee_ms": 239.43,
+        "actual_t_knee_ms": 239.43,
+        "residual_ms": 0.0,
+        "extrapolated": false
+      }
+    ],
+    "tonal_time_independence": "tilt_low_gain/tilt_high_gain/tilt_pivot_hz are modeled as depending on High only, not Time - findings.md's onset 4-band breakdown found Time doesn't move tone at H=0 (T=7.0s and T=9.8s matched to within 0.1dB per band), so a single High offset curve (built from whichever Time setting had the richest H sweep, printed above) is used at every Time setting.",
+    "plateau_droop_combination_model": "plateau_droop_db_per_s = time_to_plateau_droop_db_per_s(Time) [H=0 baseline] + high_to_plateau_droop_db_per_s_offset(High) - moved out of the pooled Time-only curve after findings.md measured High has a real, large effect on this specific parameter (roughly 4-12x between High=0 and negative High at the same Time) even though the OVERALL gate length (t_knee_ms and friends) is exactly High-independent. The offset curve uses the same richest-High-sweep Time setting as the tonal params, which is a Time-independence assumption for the OFFSET's shape (not the baseline) - same caveat as Ambience's own High-offset curves, unconfirmed by a second Time setting's full sweep.",
+    "gate_timing_source_correction": "time_to_tau_a_ms / time_to_t_knee_ms / time_to_fall_rate_db_per_s / time_to_plateau_droop_db_per_s were REPLACED after this module's own build (see build_measured_gate_curves.py) - the fit's own values for these were compared per-capture against features.json's direct measurement and found systematically wrong (e.g. Time=0.1: measured knee_time_ms=125.1ms, fitted 366.2ms; fall_rate ranged -101 to -1614dB/s fitted vs a real -141 to -187dB/s measured range). Replaced with curves built directly from features.json instead - the exact 'fit numbers don't hold up, use direct measurement' pattern this catalog's AuraDecayGainData.h already established. tilt_low_gain, tilt_high_gain, and tilt_pivot_hz are ALSO replaced (see module docstring - the gains for the same TILT_REGULARIZATION_WEIGHT reason as before; the pivot after a real ear-caught complaint found the fit's ~4200-4700Hz value structurally caps the achievable HF cut well below the real captures' own measured spread, fixed by lowering it to 1500Hz and recalibrating gains against the whole-decay LTAS instead of the 20ms onset window). Only feedback_gain, damping_weight_mean, and diffuser_gain are UNCHANGED from the fit - see build_measured_gate_curves.py's own module docstring for why those three were kept. The two shortest Time settings (0.1s, 0.8s) exist only at High=-3 in the real capture set - tau_a_ms pools them straight into its Time-only curve alongside the High=0 points at longer Time, an honest compromise (documented, not hidden), since findings.md found the internal gate-shape breakdown is NOT as cleanly High-neutral as the overall gate_length_ms_at_20db is. t_knee_ms/fall_rate_db_per_s/plateau_droop_db_per_s instead correct those two Time settings via each parameter's own High-offset curve - see their own _notes entries.",
+    "plateau_droop_db_per_s_h0_only": "time_to_plateau_droop_db_per_s / high_to_plateau_droop_db_per_s_offset are built by _build_plateau_droop_curves, NOT pooled the way tau_a_ms is in this module's own main() loop - a real bug found and fixed after a listening complaint that turned out to be a gate-envelope issue, not the EQ/tank-topology issue it first looked like: pooling plateau_droop_db_per_s across ALL High values at a given Time (as an earlier version of this script did) corrupted the Time=9.8 High=0 baseline from its real -10.3dB/s to a blended -33.0dB/s (averaged in with High=-4/-9's own -43.6/-45.1dB/s), since findings.md's own 'High: NOT damping-neutral' finding means this parameter can't be pooled across High the way the other three (an honest, small compromise for those) can. Only High=0 captures form the baseline here - no coverage below Time=2.2s, an honest gap (Time=0.1/0.8 exist only at High=-3, and pooling them in would reintroduce this exact bug).",
+    "t_knee_ms_high_offset": "high_to_t_knee_ms_offset was added after a real validate.py run showed the largest remaining knee-time errors concentrated at very negative High (T=7.0/H=-7: -67ms; T=9.8/H=-4/-9: -47.5ms) while High=0 matched much more closely - direct measurement at the richest available High sweep supports at least an additive offset, the same combination model already used for plateau_droop_db_per_s. Built from only one Time setting's sweep (2-3 points), same Time-independence caveat as every other High-offset curve here.",
+    "fall_rate_db_per_s_h0_only_additive_corrected": "time_to_fall_rate_db_per_s / high_to_fall_rate_db_per_s_offset are built by _build_fall_rate_curves, NOT pooled the way tau_a_ms is in this module's own main() loop - the same two bugs plateau_droop_db_per_s and t_knee_ms already had, never re-examined for this parameter until a real 'the delay tail still isn't quite a match' listening complaint prompted it. Bug 1 (naive High-pooling): Time=9.8's old curve value (-179.557dB/s) was exactly the mean of its three real captures at High=0/-4/-9; Time=7.0's (-177.69) was exactly the mean of its two. Bug 2 (additive-vs-total): fallRateDbPerSec is layered on top of plateauDb(t), which never turns off at the knee, so what's written must be target_fall_total minus this Time's own target_plateau_droop_total, not the raw target - see _build_fall_rate_curves' and _FALL_RATE_CPP_VERIFIED_OVERRIDE's own docstrings for the direct-measurement verification and the one known-unstable case (Time=2.2, kept at its analytical estimate rather than chased further).",
+    "early_excess_db_new_gate_term": "time_to_early_excess_db / high_to_early_excess_db_offset are a NEW gate-shape term (see InhaltIRSynth.h's own earlyExcessDb comment), not a bug fix - added after a real 'let's go back to trying to get it to have the same decay and timing as the convolution' complaint. Root cause: real captures' post-knee fall is CURVED (core.features.post_knee_excess_db measures this directly), not the single constant dB/s rate fall_rate_db_per_s alone can represent - 7 of 9 real captures fall measurably STEEPER right at the knee than their own long-run average, but the two captures with the shallowest knee (Time=7.0/9.8 at High=0) show the OPPOSITE. Built with the same H0-equivalent-baseline-plus-offset architecture as fall_rate_db_per_s/t_knee_ms and the same additive-vs-total correction (InhaltIRSynth's own kneeSoftnessMs transition already contributes some curvature on its own - see _EARLY_EXCESS_NATURAL_CPP_MEASURED's own comment for the direct C++ measurement this is corrected against). No isotonic regression - unlike t_knee_ms/fall_rate_db_per_s, this parameter has no physical reason to be monotonic in Time.",
+    "per_band_gate_replaces_broadband": "time_to_{plateau_droop,fall_rate}_{low,mid,high}_db_per_s / high_to_..._offset REPLACE the single broadband time_to_plateau_droop_db_per_s/time_to_fall_rate_db_per_s (kept in curves.json for reference/comparison, but InhaltParameterMap.cpp no longer reads them) - see _build_per_band_gate_curves' own docstring and InhaltIRSynth.h's own comment on Params::plateauDroopLowDbPerSec for the full story. Added after a real 'huffy, low-mid resonance... rings out longer than the IR's' complaint traced to a genuine architectural gap (one broadband decay rate structurally cannot represent real hardware's own dramatic per-band decay variation) confirmed NOT fixable by reshaping the tank's single dampingWeight (tested directly: fixing the under-decaying low-mids over-damps the highs by 3-6x, a structural ceiling of the one-pole-per-line filter). A real finding worth flagging: each band's own High offset is small (<2dB/s across the full High=-9..0 sweep, every band) - MUCH smaller than the broadband droop's own -33 to -35dB/s offset was, suggesting that large broadband number was substantially an artifact of the tilt filter shifting which band dominates a single whole-signal measurement, not a genuine per-band effect - further evidence the per-band model is the physically correct one.",
+    "fit_only_time_params_repooled": "feedback_gain/damping_weight_mean/diffuser_gain/tau_k_ms are re-pooled across all 9 fitted captures HERE (see _repool_fit_only_time_params), independent of build_curves.py's own H-timing-neutrality gate (which checks t_knee_ms specifically, an unrelated parameter) - a fit run can fail that check for reasons that have nothing to do with these four, and did once (see that function's own docstring for the concrete InhaltParameterMapTests failure this caused before the fix: tau_k_ms going negative and feedback_gain exceeding 0.95 from extrapolating a curve missing its 0.1s/0.8s points).",
+    "tau_k_ms_not_measured": "tau_k_ms (the gate's knee softness/transition width) has no direct measurement - core.features has no function for it. Left as the fit's own value (not cross-checked against ground truth the way the other timing parameters were), flagged here as a real gap rather than a validated number."
+  },
+  "high_to_t_knee_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        87.79999999999998
+      ],
+      [
+        -4.0,
+        87.79999999999998
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "high_to_fall_rate_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        18.052
+      ],
+      [
+        -4.0,
+        27.301999999999985
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_early_excess_db": {
+    "points": [
+      [
+        0.1,
+        -5.98375
+      ],
+      [
+        0.8,
+        -6.62075
+      ],
+      [
+        2.2,
+        -3.1350000000000002
+      ],
+      [
+        4.8,
+        -3.8870000000000005
+      ],
+      [
+        7.0,
+        0.7110000000000001
+      ],
+      [
+        9.8,
+        0.8810000000000002
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_early_excess_db_offset": {
+    "points": [
+      [
+        -9.0,
+        -3.077
+      ],
+      [
+        -4.0,
+        -4.027
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_plateau_droop_low_db_per_s": {
+    "points": [
+      [
+        2.2,
+        -139.769
+      ],
+      [
+        4.8,
+        -112.114
+      ],
+      [
+        7.0,
+        -55.17
+      ],
+      [
+        9.8,
+        -46.525999999999996
+      ]
+    ],
+    "source": "direct_measurement_h0_only_natural_droop_corrected"
+  },
+  "high_to_plateau_droop_low_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -0.16400000000000148
+      ],
+      [
+        -4.0,
+        -0.12100000000000222
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_fall_rate_low_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -154.93676923076924
+      ],
+      [
+        0.8,
+        -162.23234615384612
+      ],
+      [
+        2.2,
+        -141.894
+      ],
+      [
+        4.8,
+        -155.27299999999997
+      ],
+      [
+        7.0,
+        -233.175
+      ],
+      [
+        9.8,
+        -241.077
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_fall_rate_low_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        0.3100000000000023
+      ],
+      [
+        -4.0,
+        0.06999999999999318
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_plateau_droop_mid_db_per_s": {
+    "points": [
+      [
+        2.2,
+        -9.311833333333336
+      ],
+      [
+        4.8,
+        11.795666666666662
+      ],
+      [
+        7.0,
+        -11.257166666666667
+      ],
+      [
+        9.8,
+        -14.752999999999993
+      ]
+    ],
+    "source": "direct_measurement_h0_only_natural_droop_corrected"
+  },
+  "high_to_plateau_droop_mid_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        0.333833333333331
+      ],
+      [
+        -4.0,
+        0.13799999999999102
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_fall_rate_mid_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -315.0510512820513
+      ],
+      [
+        0.8,
+        -320.6388397435897
+      ],
+      [
+        2.2,
+        -297.0838333333333
+      ],
+      [
+        4.8,
+        -337.9533333333333
+      ],
+      [
+        7.0,
+        -297.4273333333333
+      ],
+      [
+        9.8,
+        -297.4316666666667
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_fall_rate_mid_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        1.5133333333333212
+      ],
+      [
+        -4.0,
+        0.6216666666666697
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_plateau_droop_high_db_per_s": {
+    "points": [
+      [
+        2.2,
+        16.689
+      ],
+      [
+        4.8,
+        -14.937000000000001
+      ],
+      [
+        7.0,
+        73.714
+      ],
+      [
+        9.8,
+        65.016
+      ]
+    ],
+    "source": "direct_measurement_h0_only_natural_droop_corrected"
+  },
+  "high_to_plateau_droop_high_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -18.944000000000003
+      ],
+      [
+        -4.0,
+        0.18100000000000094
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_fall_rate_high_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -441.0525
+      ],
+      [
+        0.8,
+        -441.6625
+      ],
+      [
+        2.2,
+        -429.85
+      ],
+      [
+        4.8,
+        -386.995
+      ],
+      [
+        7.0,
+        -471.074
+      ],
+      [
+        9.8,
+        -418.85999999999996
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_fall_rate_high_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        231.88000000000002
+      ],
+      [
+        -4.0,
+        2.150000000000034
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_plateau_droop_subLow_db_per_s": {
+    "points": [
+      [
+        2.2,
+        -102.97900000000001
+      ],
+      [
+        4.8,
+        -80.97999999999999
+      ],
+      [
+        7.0,
+        33.193
+      ],
+      [
+        9.8,
+        -16.796
+      ]
+    ],
+    "source": "direct_measurement_h0_only_natural_droop_corrected"
+  },
+  "high_to_plateau_droop_subLow_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        0.04100000000000392
+      ],
+      [
+        -4.0,
+        -0.017000000000003013
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_fall_rate_subLow_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -179.81257692307685
+      ],
+      [
+        0.8,
+        -185.2953846153846
+      ],
+      [
+        2.2,
+        -71.80099999999996
+      ],
+      [
+        4.8,
+        -155.35200000000003
+      ],
+      [
+        7.0,
+        -296.71500000000003
+      ],
+      [
+        9.8,
+        -216.244
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_fall_rate_subLow_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        0.2799999999999727
+      ],
+      [
+        -4.0,
+        -0.12000000000000455
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_knee_time_subLow_ms": {
+    "points": [
+      [
+        0.1,
+        46.16850000000002
+      ],
+      [
+        0.8,
+        50.24950000000004
+      ],
+      [
+        2.2,
+        203.56146666666666
+      ],
+      [
+        4.8,
+        203.56146666666666
+      ],
+      [
+        7.0,
+        203.56146666666666
+      ],
+      [
+        9.8,
+        272.744
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_corrected_isotonic_per_band"
+  },
+  "high_to_knee_time_subLow_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        124.53499999999997
+      ],
+      [
+        -4.0,
+        123.71799999999996
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_knee_time_low_ms": {
+    "points": [
+      [
+        0.1,
+        68.86625000000001
+      ],
+      [
+        0.8,
+        72.94825
+      ],
+      [
+        2.2,
+        100.136
+      ],
+      [
+        4.8,
+        173.832
+      ],
+      [
+        7.0,
+        286.7706
+      ],
+      [
+        9.8,
+        286.7706
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_corrected_isotonic_per_band"
+  },
+  "high_to_knee_time_low_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        3.808999999999969
+      ],
+      [
+        -4.0,
+        2.992999999999995
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_knee_time_mid_ms": {
+    "points": [
+      [
+        0.1,
+        36.73524999999998
+      ],
+      [
+        0.8,
+        36.73524999999998
+      ],
+      [
+        2.2,
+        98.806
+      ],
+      [
+        4.8,
+        185.472
+      ],
+      [
+        7.0,
+        241.982
+      ],
+      [
+        9.8,
+        272.578
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_corrected_isotonic_per_band"
+  },
+  "high_to_knee_time_mid_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        7.6340000000000146
+      ],
+      [
+        -4.0,
+        10.309000000000026
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_knee_time_high_ms": {
+    "points": [
+      [
+        0.1,
+        119.90912500000002
+      ],
+      [
+        0.8,
+        119.90912500000002
+      ],
+      [
+        2.2,
+        119.90912500000002
+      ],
+      [
+        4.8,
+        119.90912500000002
+      ],
+      [
+        7.0,
+        150.7391
+      ],
+      [
+        9.8,
+        161.995
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_corrected_isotonic_per_band"
+  },
+  "high_to_knee_time_high_ms_offset": {
+    "points": [
+      [
+        -9.0,
+        23.76399999999998
+      ],
+      [
+        -4.0,
+        34.92099999999999
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_stereo_narrow_correlation": {
+    "points": [
+      [
+        0.1,
+        0.9698571428571429
+      ],
+      [
+        0.8,
+        0.9702816901408452
+      ],
+      [
+        2.2,
+        -0.2905930470347648
+      ],
+      [
+        4.8,
+        -0.09582781456953643
+      ],
+      [
+        7.0,
+        -0.06520192307692309
+      ],
+      [
+        9.8,
+        -0.06075
+      ]
+    ],
+    "source": "direct_measurement_time_only_input_output_corrected"
+  },
+  "time_to_plateau_droop_veryHigh_db_per_s": {
+    "points": [
+      [
+        2.2,
+        213.698
+      ],
+      [
+        4.8,
+        227.317
+      ],
+      [
+        7.0,
+        45.447
+      ],
+      [
+        9.8,
+        48.94300000000001
+      ]
+    ],
+    "source": "direct_measurement_h0_only_natural_droop_corrected"
+  },
+  "high_to_plateau_droop_veryHigh_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -4.491
+      ],
+      [
+        -4.0,
+        -0.2920000000000016
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  },
+  "time_to_fall_rate_veryHigh_db_per_s": {
+    "points": [
+      [
+        0.1,
+        -416.41749999999996
+      ],
+      [
+        0.8,
+        -87.3375
+      ],
+      [
+        2.2,
+        -105.31
+      ],
+      [
+        4.8,
+        -109.68
+      ],
+      [
+        7.0,
+        -236.429
+      ],
+      [
+        9.8,
+        -226.23
+      ]
+    ],
+    "source": "direct_measurement_h0_equivalent_additive_corrected"
+  },
+  "high_to_fall_rate_veryHigh_db_per_s_offset": {
+    "points": [
+      [
+        -9.0,
+        -7.390000000000015
+      ],
+      [
+        -4.0,
+        2.530000000000001
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ]
+  }
+}

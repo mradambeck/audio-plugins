@@ -1,0 +1,116 @@
+#pragma once
+
+#include <juce_audio_processors/juce_audio_processors.h>
+
+#include "../../common/Presets/FactoryPreset.h"
+#include "../../common/convolution/ConvolutionEngine.h"
+#include "../../common/dsp/OnePoleFilter.h"
+#include "InhaltIRWorker.h"
+
+// AMS RMX16 "NonLin" recreation - built by CONVOLVING a synthesized IR, not by running a live
+// FDN. See ml-toolkit/effects/nonlin/ and the project plan for why: the hardware's own response
+// to any input is a fixed, gated impulse response, so convolving a synthesized one is exact under
+// ANY input signal, unlike an envelope-follower-driven live gate (which only matches under a
+// single impulse). InhaltIRWorker synthesizes that IR off the audio thread whenever Time or High
+// change; ConvolutionEngine (shared with the convolution-base/variant family) owns pre-delay, low
+// cut, dry/wet and a click-free ramped bypass around it.
+class InhaltAudioProcessor : public juce::AudioProcessor
+{
+public:
+    InhaltAudioProcessor();
+    ~InhaltAudioProcessor() override;
+
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override;
+    void reset() override;
+
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override;
+
+    const juce::String getName() const override;
+
+    bool acceptsMidi() const override;
+    bool producesMidi() const override;
+    bool isMidiEffect() const override;
+    double getTailLengthSeconds() const override;
+
+    int getNumPrograms() override;
+    int getCurrentProgram() override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
+
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // Ramped bypass through the engine, not an early-out - see ConvolutionProcessor's own comment
+    // on why an early-out would guillotine a convolution tail.
+    juce::AudioParameterBool* getBypassParameter() const override { return bypassParam; }
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    // Time knob, deliberately in the hardware's OWN 0.1-9.8 label units, not seconds - the label
+    // is not seconds (see InhaltParameterMap::gateLengthMsForDisplay for the real mapping) and
+    // naming this ID/parameter "timeSeconds" would be actively false. The editor shows the mapped
+    // gate length underneath.
+    static constexpr auto timeKnobParamID = "timeKnob";
+    static constexpr auto highParamID = "high";
+    static constexpr auto preDelayMsParamID = "preDelayMs";
+    static constexpr auto lowCutHzParamID = "lowCutHz";
+    static constexpr auto widthParamID = "width";
+    static constexpr auto dryParamID = "dry";
+    static constexpr auto wetParamID = "wet";
+    static constexpr auto bypassParamID = "bypass";
+
+    // For the render harness and tests - same convention as every other plugin's
+    // getEngineForRenderHarness()/getEngineForTests() accessor.
+    wildjag::conv::ConvolutionEngine& getEngineForRenderHarness() noexcept { return engine; }
+    inhalt::InhaltIRWorker& getIRWorkerForRenderHarness() noexcept { return irWorker; }
+
+private:
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    static std::vector<wildjag::FactoryPreset> getFactoryPresets();
+
+    wildjag::conv::ConvolutionEngine engine;
+    inhalt::InhaltIRWorker irWorker;
+
+    std::atomic<float>* timeKnobParam = nullptr;
+    std::atomic<float>* highParam = nullptr;
+    std::atomic<float>* preDelayMsParam = nullptr;
+    std::atomic<float>* lowCutHzParam = nullptr;
+    std::atomic<float>* widthParam = nullptr;
+    std::atomic<float>* dryParam = nullptr;
+    std::atomic<float>* wetParam = nullptr;
+    juce::AudioParameterBool* bypassParam = nullptr;
+
+    float lastRequestedTimeKnob = -1.0f;
+    float lastRequestedHigh = 1000.0f; // deliberately outside the valid range, so the first
+    // processBlock always issues an initial synthesis request even if the default APVTS value is
+    // literally 0.
+
+    double currentSampleRate = 44100.0;
+
+    // Converter - fixed bandwidth + noise-floor + a gentle spec-derived saturation stage
+    // (harmonics were originally scoped OUT entirely - see the project plan - but a real
+    // "brassiness"/"harmonic richness" complaint survived three separate linear-architecture
+    // experiments, evidence it's the real hardware's own nonlinear character rather than a
+    // reachable modal/EQ gap; see PluginProcessor.cpp's own converterSaturationDrive comment for
+    // the full story). Applied post-engine, not inside ConvolutionEngine (which stays
+    // variant-agnostic). Fixed to the AMS RMX16's original ("Vintage") spec: 20Hz-18kHz -3/+0dB,
+    // ~90dB dynamic range (~16-bit-class quantization), ~0.03% THD at 0dBFS - there was briefly a
+    // user-selectable Modern alternative (near-flat to 18kHz, ~112dB, ~0.002% THD) exposed as a
+    // "Converter" parameter, removed 2026-09-19 since the plugin never actually needed it exposed
+    // as a control. All figures are from the AMS RMX16 spec sheet Adam supplied, not measured
+    // from a capture (no capture isolates the real unit's own saturation curve - see
+    // PluginProcessor.cpp's own comment on why) - see PluginProcessor.cpp's anonymous-namespace
+    // constants for the exact bandwidth/quantization numbers.
+    wildjag::dsp::OnePoleFilter converterBandwidthL, converterBandwidthR;
+
+    wildjag::FactoryPresetList factoryPresets;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InhaltAudioProcessor)
+};

@@ -13,7 +13,11 @@ also under `plugins/` but is a dev harness for `plugins/common/convolution/`, no
 no installer and is deliberately absent from `release.yml`, `installers/`, `sync-site-versions.yml`
 and the download counter; the real products built from that engine are branded variants in a
 separate private repo. See `plugins/convolution-base/README.md` before wiring it into anything
-else.
+else. `inhalt-nonlin` is a real product in development (AMS RMX16 "NonLin" recreation, built via
+convolving a synthesized IR - see that folder's own README) - registered in CI/scripts for
+continuous build/test coverage, but deliberately still absent from `release.yml`, `installers/`,
+`sync-site-versions.yml` and the download counter until it has real capture-calibrated data and a
+real UI, the same reasoning as `convolution-base`'s own registration split.
 
 Each plugin folder is a fully independent CMake project — `cd plugins/<plugin> && cmake -B build`
 works on its own. Do not introduce a unified CMake super-build; per-plugin independence is relied

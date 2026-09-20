@@ -1,0 +1,9 @@
+# Offline render-harness output (InhaltRenderIR). Regenerate with:
+#   cmake --build build --config Release --target InhaltRenderIR
+#   ./build/InhaltRenderIR_artefacts/Release/InhaltRenderIR --out rendered-irs/...
+rendered-irs/*.wav
+
+# analysis/validate.py's renders are regenerable (rerun InhaltRenderIR); the .md report and .json
+# results ARE meant to be committed once they reflect real (not placeholder) calibration data -
+# see analysis/validate.py's own module docstring.
+analysis/validation_renders/

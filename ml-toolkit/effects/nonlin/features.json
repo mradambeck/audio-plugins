@@ -1,0 +1,3200 @@
+{
+  "captures": [
+    {
+      "onset_time_s": 0.0021,
+      "gate": {
+        "build_up_ms": 16.349,
+        "plateau_level_db": -4.11,
+        "plateau_ripple_db": 1.798,
+        "plateau_droop_db_per_s": -175.555,
+        "knee_time_ms": 125.102,
+        "fall_rate_db_per_s": -151.11,
+        "knee_r2": 0.9736,
+        "gate_length_ms_at_20db": 107.14,
+        "post_knee_excess_db": -3.424
+      },
+      "gate_length_ms_at_20db_check": 107.14,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 45.283,
+          "plateau_level_db": -3.21,
+          "plateau_ripple_db": 1.816,
+          "plateau_droop_db_per_s": -163.225,
+          "knee_time_ms": 78.209,
+          "fall_rate_db_per_s": -300.65,
+          "knee_r2": 0.9827,
+          "gate_length_ms_at_20db": 7.37
+        },
+        "88-177Hz": {
+          "build_up_ms": 32.313,
+          "plateau_level_db": -0.99,
+          "plateau_ripple_db": 1.887,
+          "plateau_droop_db_per_s": -323.893,
+          "knee_time_ms": 75.215,
+          "fall_rate_db_per_s": -316.99,
+          "knee_r2": 0.9675,
+          "gate_length_ms_at_20db": 102.15
+        },
+        "177-354Hz": {
+          "build_up_ms": 31.315,
+          "plateau_level_db": -2.99,
+          "plateau_ripple_db": 1.761,
+          "plateau_droop_db_per_s": -527.173,
+          "knee_time_ms": 43.288,
+          "fall_rate_db_per_s": -315.92,
+          "knee_r2": 0.9839,
+          "gate_length_ms_at_20db": 103.15
+        },
+        "354-707Hz": {
+          "build_up_ms": 49.274,
+          "plateau_level_db": -2.48,
+          "plateau_ripple_db": 2.185,
+          "plateau_droop_db_per_s": -803.227,
+          "knee_time_ms": 65.238,
+          "fall_rate_db_per_s": -314.11,
+          "knee_r2": 0.9914,
+          "gate_length_ms_at_20db": 0.39
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.306,
+          "plateau_level_db": -4.52,
+          "plateau_ripple_db": 1.992,
+          "plateau_droop_db_per_s": -121.5,
+          "knee_time_ms": 48.277,
+          "fall_rate_db_per_s": -309.94,
+          "knee_r2": 0.99,
+          "gate_length_ms_at_20db": 100.16
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 33.311,
+          "plateau_level_db": -3.51,
+          "plateau_ripple_db": 1.843,
+          "plateau_droop_db_per_s": 186.388,
+          "knee_time_ms": 49.274,
+          "fall_rate_db_per_s": -330.5,
+          "knee_r2": 0.9941,
+          "gate_length_ms_at_20db": 105.15
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 31.315,
+          "plateau_level_db": -3.43,
+          "plateau_ripple_db": 1.633,
+          "plateau_droop_db_per_s": 196.762,
+          "knee_time_ms": 49.274,
+          "fall_rate_db_per_s": -366.98,
+          "knee_r2": 0.997,
+          "gate_length_ms_at_20db": 102.15
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 5.374,
+          "plateau_level_db": -4.09,
+          "plateau_ripple_db": 1.725,
+          "plateau_droop_db_per_s": 107.258,
+          "knee_time_ms": 49.274,
+          "fall_rate_db_per_s": -408.22,
+          "knee_r2": 0.9975,
+          "gate_length_ms_at_20db": 101.16
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 2.381,
+          "plateau_level_db": -3.51,
+          "plateau_ripple_db": 1.628,
+          "plateau_droop_db_per_s": -134.476,
+          "knee_time_ms": 295.714,
+          "fall_rate_db_per_s": -405.28,
+          "knee_r2": 0.9529,
+          "gate_length_ms_at_20db": 100.16
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 2.381,
+          "plateau_level_db": -3.59,
+          "plateau_ripple_db": 1.62,
+          "plateau_droop_db_per_s": 37.792,
+          "knee_time_ms": 49.274,
+          "fall_rate_db_per_s": -439.44,
+          "knee_r2": 0.9981,
+          "gate_length_ms_at_20db": 100.16
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 1.383,
+          "plateau_level_db": -3.96,
+          "plateau_ripple_db": 1.741,
+          "plateau_droop_db_per_s": -105.986,
+          "knee_time_ms": 296.712,
+          "fall_rate_db_per_s": -414.52,
+          "knee_r2": 0.9598,
+          "gate_length_ms_at_20db": 99.16
+        }
+      },
+      "normalized_echo_density_mean": 0.9379,
+      "ned_at_plateau_start": 0.3128,
+      "time_to_ned_0.9_ms": 137.71,
+      "mixing_time_ms": 136.81,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": -0.0052,
+        "iacc": 0.0057,
+        "coherence": {
+          "_noise_floor": 0.3466,
+          "44-89Hz": 0.9449447515945728,
+          "88-177Hz": 0.954879286533511,
+          "177-354Hz": 0.9617052991728208,
+          "354-707Hz": 0.9533383720267254,
+          "707-1414Hz": 0.9622982986761,
+          "1414-2828Hz": 0.9605876811371633,
+          "2828-5657Hz": 0.9624423683718571,
+          "5657-11314Hz": 0.9638209555910655,
+          "11314-22049Hz": 0.9618146521479896,
+          "11314-16000Hz": 0.9678609542659875,
+          "16000-22049Hz": 0.9571071740704052
+        },
+        "mid_side_ratio_db": 0.05,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 32.857,
+            "plateau_level_db": -3.75,
+            "plateau_ripple_db": 1.807,
+            "plateau_droop_db_per_s": -274.42,
+            "knee_time_ms": 205.465,
+            "fall_rate_db_per_s": -164.44,
+            "knee_r2": 0.9853,
+            "gate_length_ms_at_20db": 107.69
+          },
+          "right": {
+            "build_up_ms": 18.345,
+            "plateau_level_db": -3.61,
+            "plateau_ripple_db": 1.727,
+            "plateau_droop_db_per_s": -167.605,
+            "knee_time_ms": 118.118,
+            "fall_rate_db_per_s": -156.89,
+            "knee_r2": 0.9758,
+            "gate_length_ms_at_20db": 105.15
+          },
+          "knee_time_diff_ms": 87.347
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": 0.9781
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -72.43
+        ],
+        [
+          20.2,
+          -69.79
+        ],
+        [
+          32.0,
+          -67.98
+        ],
+        [
+          40.3,
+          -66.58
+        ],
+        [
+          50.8,
+          -66.83
+        ],
+        [
+          64.0,
+          -68.88
+        ],
+        [
+          80.6,
+          -68.63
+        ],
+        [
+          101.6,
+          -69.19
+        ],
+        [
+          128.0,
+          -70.88
+        ],
+        [
+          161.3,
+          -77.04
+        ],
+        [
+          203.2,
+          -84.37
+        ],
+        [
+          256.0,
+          -72.75
+        ],
+        [
+          322.5,
+          -67.72
+        ],
+        [
+          406.4,
+          -66.77
+        ],
+        [
+          512.0,
+          -69.97
+        ],
+        [
+          645.1,
+          -72.74
+        ],
+        [
+          812.7,
+          -67.19
+        ],
+        [
+          1024.0,
+          -72.35
+        ],
+        [
+          1290.2,
+          -69.34
+        ],
+        [
+          1625.5,
+          -69.67
+        ],
+        [
+          2048.0,
+          -70.98
+        ],
+        [
+          2580.3,
+          -70.46
+        ],
+        [
+          3251.0,
+          -72.67
+        ],
+        [
+          4096.0,
+          -73.78
+        ],
+        [
+          5160.6,
+          -75.45
+        ],
+        [
+          6502.0,
+          -77.47
+        ],
+        [
+          8192.0,
+          -79.84
+        ],
+        [
+          10321.3,
+          -81.73
+        ],
+        [
+          13004.0,
+          -83.57
+        ],
+        [
+          16384.0,
+          -86.42
+        ],
+        [
+          20642.5,
+          -93.87
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 418.3,
+          "level_db": -65.44,
+          "q": 2.11
+        },
+        {
+          "freq_hz": 789.6,
+          "level_db": -65.72,
+          "q": 3.89
+        },
+        {
+          "freq_hz": 42.7,
+          "level_db": -66.58,
+          "q": 0.5
+        },
+        {
+          "freq_hz": 1217.7,
+          "level_db": -66.61,
+          "q": 5.01
+        },
+        {
+          "freq_hz": 1625.5,
+          "level_db": -66.73,
+          "q": 7.02
+        },
+        {
+          "freq_hz": 1989.7,
+          "level_db": -67.48,
+          "q": 6.82
+        },
+        {
+          "freq_hz": 2435.5,
+          "level_db": -68.27,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 2813.9,
+          "level_db": -68.7,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 3251.0,
+          "level_db": -69.65,
+          "q": 11.71
+        },
+        {
+          "freq_hz": 3649.1,
+          "level_db": -70.45,
+          "q": 11.71
+        }
+      ],
+      "filename": "NonLin_0.1s_-3H.wav",
+      "params": {
+        "time": 0.1,
+        "high": -3
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 18.39,
+        "plateau_level_db": -4.11,
+        "plateau_ripple_db": 1.798,
+        "plateau_droop_db_per_s": -175.517,
+        "knee_time_ms": 127.143,
+        "fall_rate_db_per_s": -143.1,
+        "knee_r2": 0.9705,
+        "gate_length_ms_at_20db": 109.18,
+        "post_knee_excess_db": -3.571
+      },
+      "gate_length_ms_at_20db_check": 109.18,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 47.324,
+          "plateau_level_db": -3.21,
+          "plateau_ripple_db": 1.816,
+          "plateau_droop_db_per_s": -163.67,
+          "knee_time_ms": 80.249,
+          "fall_rate_db_per_s": -300.21,
+          "knee_r2": 0.9842,
+          "gate_length_ms_at_20db": 9.41
+        },
+        "88-177Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -0.99,
+          "plateau_ripple_db": 1.886,
+          "plateau_droop_db_per_s": -323.906,
+          "knee_time_ms": 77.256,
+          "fall_rate_db_per_s": -316.84,
+          "knee_r2": 0.9675,
+          "gate_length_ms_at_20db": 104.2
+        },
+        "177-354Hz": {
+          "build_up_ms": 33.356,
+          "plateau_level_db": -2.99,
+          "plateau_ripple_db": 1.761,
+          "plateau_droop_db_per_s": -527.18,
+          "knee_time_ms": 45.329,
+          "fall_rate_db_per_s": -315.82,
+          "knee_r2": 0.984,
+          "gate_length_ms_at_20db": 105.19
+        },
+        "354-707Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -2.48,
+          "plateau_ripple_db": 2.185,
+          "plateau_droop_db_per_s": -803.233,
+          "knee_time_ms": 67.279,
+          "fall_rate_db_per_s": -314.19,
+          "knee_r2": 0.9913,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "707-1414Hz": {
+          "build_up_ms": 37.347,
+          "plateau_level_db": -4.52,
+          "plateau_ripple_db": 1.992,
+          "plateau_droop_db_per_s": -121.466,
+          "knee_time_ms": 50.317,
+          "fall_rate_db_per_s": -309.81,
+          "knee_r2": 0.99,
+          "gate_length_ms_at_20db": 102.2
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -3.51,
+          "plateau_ripple_db": 1.843,
+          "plateau_droop_db_per_s": 186.371,
+          "knee_time_ms": 51.315,
+          "fall_rate_db_per_s": -330.71,
+          "knee_r2": 0.9941,
+          "gate_length_ms_at_20db": 107.19
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 33.356,
+          "plateau_level_db": -3.43,
+          "plateau_ripple_db": 1.633,
+          "plateau_droop_db_per_s": 196.772,
+          "knee_time_ms": 51.315,
+          "fall_rate_db_per_s": -366.26,
+          "knee_r2": 0.9967,
+          "gate_length_ms_at_20db": 104.2
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -4.09,
+          "plateau_ripple_db": 1.725,
+          "plateau_droop_db_per_s": 107.249,
+          "knee_time_ms": 51.315,
+          "fall_rate_db_per_s": -408.31,
+          "knee_r2": 0.9976,
+          "gate_length_ms_at_20db": 103.2
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 4.422,
+          "plateau_level_db": -3.55,
+          "plateau_ripple_db": 1.629,
+          "plateau_droop_db_per_s": -86.894,
+          "knee_time_ms": 87.234,
+          "fall_rate_db_per_s": -91.93,
+          "knee_r2": 0.9501,
+          "gate_length_ms_at_20db": 103.2
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 4.422,
+          "plateau_level_db": -3.59,
+          "plateau_ripple_db": 1.62,
+          "plateau_droop_db_per_s": 37.96,
+          "knee_time_ms": 51.315,
+          "fall_rate_db_per_s": -440.05,
+          "knee_r2": 0.9981,
+          "gate_length_ms_at_20db": 102.2
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 3.424,
+          "plateau_level_db": -3.95,
+          "plateau_ripple_db": 1.74,
+          "plateau_droop_db_per_s": -11.646,
+          "knee_time_ms": 71.27,
+          "fall_rate_db_per_s": -85.44,
+          "knee_r2": 0.9311,
+          "gate_length_ms_at_20db": 113.17
+        }
+      },
+      "normalized_echo_density_mean": 0.8186,
+      "ned_at_plateau_start": 0.3009,
+      "time_to_ned_0.9_ms": 137.71,
+      "mixing_time_ms": 139.76,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": -0.0052,
+        "iacc": 0.0056,
+        "coherence": {
+          "_noise_floor": 0.3797,
+          "44-89Hz": 0.944951487010343,
+          "88-177Hz": 0.9548740486322456,
+          "177-354Hz": 0.9617078317830519,
+          "354-707Hz": 0.9533386577352461,
+          "707-1414Hz": 0.9622985556160046,
+          "1414-2828Hz": 0.9605873995665568,
+          "2828-5657Hz": 0.9624420315548321,
+          "5657-11314Hz": 0.9638219334475696,
+          "11314-22049Hz": 0.9622219864562533,
+          "11314-16000Hz": 0.9678615115519259,
+          "16000-22049Hz": 0.957831213346051
+        },
+        "mid_side_ratio_db": 0.05,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 32.857,
+            "plateau_level_db": -3.75,
+            "plateau_ripple_db": 1.807,
+            "plateau_droop_db_per_s": -276.039,
+            "knee_time_ms": 152.585,
+            "fall_rate_db_per_s": -127.3,
+            "knee_r2": 0.9851,
+            "gate_length_ms_at_20db": 107.69
+          },
+          "right": {
+            "build_up_ms": 20.385,
+            "plateau_level_db": -3.61,
+            "plateau_ripple_db": 1.727,
+            "plateau_droop_db_per_s": -183.515,
+            "knee_time_ms": 126.145,
+            "fall_rate_db_per_s": -144.95,
+            "knee_r2": 0.9728,
+            "gate_length_ms_at_20db": 107.19
+          },
+          "knee_time_diff_ms": 26.44
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": 0.9784
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -70.97
+        ],
+        [
+          20.2,
+          -68.31
+        ],
+        [
+          32.0,
+          -66.5
+        ],
+        [
+          40.3,
+          -65.11
+        ],
+        [
+          50.8,
+          -65.35
+        ],
+        [
+          64.0,
+          -67.4
+        ],
+        [
+          80.6,
+          -67.15
+        ],
+        [
+          101.6,
+          -67.71
+        ],
+        [
+          128.0,
+          -69.4
+        ],
+        [
+          161.3,
+          -75.57
+        ],
+        [
+          203.2,
+          -82.89
+        ],
+        [
+          256.0,
+          -71.27
+        ],
+        [
+          322.5,
+          -66.24
+        ],
+        [
+          406.4,
+          -65.29
+        ],
+        [
+          512.0,
+          -68.49
+        ],
+        [
+          645.1,
+          -71.26
+        ],
+        [
+          812.7,
+          -65.72
+        ],
+        [
+          1024.0,
+          -70.87
+        ],
+        [
+          1290.2,
+          -67.86
+        ],
+        [
+          1625.5,
+          -68.2
+        ],
+        [
+          2048.0,
+          -69.51
+        ],
+        [
+          2580.3,
+          -68.98
+        ],
+        [
+          3251.0,
+          -71.19
+        ],
+        [
+          4096.0,
+          -72.31
+        ],
+        [
+          5160.6,
+          -73.98
+        ],
+        [
+          6502.0,
+          -75.99
+        ],
+        [
+          8192.0,
+          -78.37
+        ],
+        [
+          10321.3,
+          -80.26
+        ],
+        [
+          13004.0,
+          -82.09
+        ],
+        [
+          16384.0,
+          -84.94
+        ],
+        [
+          20642.5,
+          -92.49
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 418.3,
+          "level_db": -63.97,
+          "q": 2.11
+        },
+        {
+          "freq_hz": 789.6,
+          "level_db": -64.24,
+          "q": 3.89
+        },
+        {
+          "freq_hz": 42.7,
+          "level_db": -65.11,
+          "q": 0.5
+        },
+        {
+          "freq_hz": 1217.7,
+          "level_db": -65.14,
+          "q": 5.01
+        },
+        {
+          "freq_hz": 1625.5,
+          "level_db": -65.26,
+          "q": 7.02
+        },
+        {
+          "freq_hz": 1989.7,
+          "level_db": -66.0,
+          "q": 6.82
+        },
+        {
+          "freq_hz": 2435.5,
+          "level_db": -66.8,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 2813.9,
+          "level_db": -67.22,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 3251.0,
+          "level_db": -68.17,
+          "q": 11.71
+        },
+        {
+          "freq_hz": 3649.1,
+          "level_db": -68.97,
+          "q": 11.71
+        }
+      ],
+      "filename": "NonLin_0.8s_-3H.wav",
+      "params": {
+        "time": 0.8,
+        "high": -3
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 18.39,
+        "plateau_level_db": -3.19,
+        "plateau_ripple_db": 1.34,
+        "plateau_droop_db_per_s": -51.612,
+        "knee_time_ms": 137.12,
+        "fall_rate_db_per_s": -141.05,
+        "knee_r2": 0.9796,
+        "gate_length_ms_at_20db": 159.07,
+        "post_knee_excess_db": -2.915
+      },
+      "gate_length_ms_at_20db_check": 159.07,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.3,
+          "plateau_ripple_db": 1.52,
+          "plateau_droop_db_per_s": -206.979,
+          "knee_time_ms": 163.061,
+          "fall_rate_db_per_s": -278.78,
+          "knee_r2": 0.9616,
+          "gate_length_ms_at_20db": 3.42
+        },
+        "88-177Hz": {
+          "build_up_ms": 33.356,
+          "plateau_level_db": -3.83,
+          "plateau_ripple_db": 1.792,
+          "plateau_droop_db_per_s": -173.346,
+          "knee_time_ms": 76.259,
+          "fall_rate_db_per_s": -315.24,
+          "knee_r2": 0.9629,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -3.78,
+          "plateau_ripple_db": 1.402,
+          "plateau_droop_db_per_s": -166.857,
+          "knee_time_ms": 81.247,
+          "fall_rate_db_per_s": -317.37,
+          "knee_r2": 0.9787,
+          "gate_length_ms_at_20db": 144.1
+        },
+        "354-707Hz": {
+          "build_up_ms": 37.347,
+          "plateau_level_db": -3.77,
+          "plateau_ripple_db": 1.568,
+          "plateau_droop_db_per_s": 8.346,
+          "knee_time_ms": 77.256,
+          "fall_rate_db_per_s": -291.41,
+          "knee_r2": 0.9831,
+          "gate_length_ms_at_20db": 4.42
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -3.76,
+          "plateau_ripple_db": 1.517,
+          "plateau_droop_db_per_s": 25.285,
+          "knee_time_ms": 105.193,
+          "fall_rate_db_per_s": -303.54,
+          "knee_r2": 0.9945,
+          "gate_length_ms_at_20db": 156.08
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 37.347,
+          "plateau_level_db": -4.15,
+          "plateau_ripple_db": 1.451,
+          "plateau_droop_db_per_s": -33.732,
+          "knee_time_ms": 113.175,
+          "fall_rate_db_per_s": -328.5,
+          "knee_r2": 0.9918,
+          "gate_length_ms_at_20db": 152.09
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.4,
+          "plateau_ripple_db": 1.462,
+          "plateau_droop_db_per_s": -64.285,
+          "knee_time_ms": 124.15,
+          "fall_rate_db_per_s": -362.37,
+          "knee_r2": 0.9962,
+          "gate_length_ms_at_20db": 159.07
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 16.395,
+          "plateau_level_db": -3.06,
+          "plateau_ripple_db": 1.362,
+          "plateau_droop_db_per_s": 3.316,
+          "knee_time_ms": 108.186,
+          "fall_rate_db_per_s": -407.24,
+          "knee_r2": 0.9956,
+          "gate_length_ms_at_20db": 148.1
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 5.42,
+          "plateau_level_db": -3.27,
+          "plateau_ripple_db": 1.514,
+          "plateau_droop_db_per_s": -41.377,
+          "knee_time_ms": 124.15,
+          "fall_rate_db_per_s": -111.72,
+          "knee_r2": 0.972,
+          "gate_length_ms_at_20db": 151.09
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.83,
+          "plateau_ripple_db": 1.568,
+          "plateau_droop_db_per_s": -35.605,
+          "knee_time_ms": 116.168,
+          "fall_rate_db_per_s": -429.85,
+          "knee_r2": 0.9949,
+          "gate_length_ms_at_20db": 151.09
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 5.42,
+          "plateau_level_db": -3.04,
+          "plateau_ripple_db": 1.457,
+          "plateau_droop_db_per_s": 7.06,
+          "knee_time_ms": 100.204,
+          "fall_rate_db_per_s": -105.31,
+          "knee_r2": 0.9627,
+          "gate_length_ms_at_20db": 173.04
+        }
+      },
+      "normalized_echo_density_mean": 0.7955,
+      "ned_at_plateau_start": 0.423,
+      "time_to_ned_0.9_ms": 185.6,
+      "mixing_time_ms": 199.63,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": 0.0015,
+        "iacc": 0.0212,
+        "coherence": {
+          "_noise_floor": 0.3492,
+          "44-89Hz": 0.06617319922410178,
+          "88-177Hz": 0.42331179770187427,
+          "177-354Hz": 0.3676441054389458,
+          "354-707Hz": 0.31151222092889125,
+          "707-1414Hz": 0.33961107847087285,
+          "1414-2828Hz": 0.3467500419733451,
+          "2828-5657Hz": 0.347934114332004,
+          "5657-11314Hz": 0.36163304170128263,
+          "11314-22049Hz": 0.3762037887557852,
+          "11314-16000Hz": 0.3734753975164444,
+          "16000-22049Hz": 0.3783280362207006
+        },
+        "mid_side_ratio_db": -0.01,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 18.889,
+            "plateau_level_db": -3.42,
+            "plateau_ripple_db": 1.488,
+            "plateau_droop_db_per_s": -66.156,
+            "knee_time_ms": 134.626,
+            "fall_rate_db_per_s": -142.19,
+            "knee_r2": 0.9768,
+            "gate_length_ms_at_20db": 151.59
+          },
+          "right": {
+            "build_up_ms": 16.395,
+            "plateau_level_db": -4.23,
+            "plateau_ripple_db": 1.405,
+            "plateau_droop_db_per_s": -50.245,
+            "knee_time_ms": 146.1,
+            "fall_rate_db_per_s": -143.76,
+            "knee_r2": 0.9788,
+            "gate_length_ms_at_20db": 164.06
+          },
+          "knee_time_diff_ms": -11.474
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.4614
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -77.59
+        ],
+        [
+          20.2,
+          -75.12
+        ],
+        [
+          32.0,
+          -77.89
+        ],
+        [
+          40.3,
+          -76.34
+        ],
+        [
+          50.8,
+          -75.81
+        ],
+        [
+          64.0,
+          -72.59
+        ],
+        [
+          80.6,
+          -69.12
+        ],
+        [
+          101.6,
+          -68.05
+        ],
+        [
+          128.0,
+          -66.91
+        ],
+        [
+          161.3,
+          -68.41
+        ],
+        [
+          203.2,
+          -67.57
+        ],
+        [
+          256.0,
+          -68.87
+        ],
+        [
+          322.5,
+          -70.57
+        ],
+        [
+          406.4,
+          -71.11
+        ],
+        [
+          512.0,
+          -68.96
+        ],
+        [
+          645.1,
+          -68.87
+        ],
+        [
+          812.7,
+          -71.93
+        ],
+        [
+          1024.0,
+          -68.54
+        ],
+        [
+          1290.2,
+          -69.88
+        ],
+        [
+          1625.5,
+          -70.13
+        ],
+        [
+          2048.0,
+          -70.04
+        ],
+        [
+          2580.3,
+          -71.11
+        ],
+        [
+          3251.0,
+          -70.82
+        ],
+        [
+          4096.0,
+          -71.95
+        ],
+        [
+          5160.6,
+          -72.67
+        ],
+        [
+          6502.0,
+          -73.43
+        ],
+        [
+          8192.0,
+          -74.23
+        ],
+        [
+          10321.3,
+          -75.21
+        ],
+        [
+          13004.0,
+          -76.23
+        ],
+        [
+          16384.0,
+          -77.34
+        ],
+        [
+          20642.5,
+          -85.15
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 139.6,
+          "level_db": -66.01,
+          "q": 1.64
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -66.66,
+          "q": 4.2
+        },
+        {
+          "freq_hz": 215.3,
+          "level_db": -66.72,
+          "q": 1.96
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -67.18,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 483.3,
+          "level_db": -67.57,
+          "q": 11.71
+        },
+        {
+          "freq_hz": 351.7,
+          "level_db": -68.07,
+          "q": 11.71
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -68.2,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 1878.0,
+          "level_db": -68.22,
+          "q": 7.23
+        },
+        {
+          "freq_hz": 2981.2,
+          "level_db": -68.44,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 1328.0,
+          "level_db": -68.52,
+          "q": 2.92
+        }
+      ],
+      "filename": "NonLin_2.2s_0H.wav",
+      "params": {
+        "time": 2.2,
+        "high": 0
+      }
+    },
+    {
+      "onset_time_s": 0.0002,
+      "gate": {
+        "build_up_ms": 20.295,
+        "plateau_level_db": -3.03,
+        "plateau_ripple_db": 1.469,
+        "plateau_droop_db_per_s": -37.255,
+        "knee_time_ms": 204.875,
+        "fall_rate_db_per_s": -148.29,
+        "knee_r2": 0.9836,
+        "gate_length_ms_at_20db": 219.84,
+        "post_knee_excess_db": -3.107
+      },
+      "gate_length_ms_at_20db_check": 219.84,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.224,
+          "plateau_level_db": -3.37,
+          "plateau_ripple_db": 1.496,
+          "plateau_droop_db_per_s": -150.498,
+          "knee_time_ms": 138.027,
+          "fall_rate_db_per_s": -305.85,
+          "knee_r2": 0.9419,
+          "gate_length_ms_at_20db": 2.34
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.159,
+          "plateau_level_db": -2.7,
+          "plateau_ripple_db": 1.785,
+          "plateau_droop_db_per_s": -149.497,
+          "knee_time_ms": 189.909,
+          "fall_rate_db_per_s": -304.77,
+          "knee_r2": 0.9331,
+          "gate_length_ms_at_20db": 2.34
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.259,
+          "plateau_level_db": -4.5,
+          "plateau_ripple_db": 1.525,
+          "plateau_droop_db_per_s": -35.945,
+          "knee_time_ms": 184.921,
+          "fall_rate_db_per_s": -313.32,
+          "knee_r2": 0.9851,
+          "gate_length_ms_at_20db": 214.85
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.254,
+          "plateau_level_db": -3.39,
+          "plateau_ripple_db": 1.666,
+          "plateau_droop_db_per_s": -54.863,
+          "knee_time_ms": 206.871,
+          "fall_rate_db_per_s": -310.07,
+          "knee_r2": 0.9855,
+          "gate_length_ms_at_20db": 2.34
+        },
+        "707-1414Hz": {
+          "build_up_ms": 39.252,
+          "plateau_level_db": -3.73,
+          "plateau_ripple_db": 1.77,
+          "plateau_droop_db_per_s": -32.584,
+          "knee_time_ms": 185.918,
+          "fall_rate_db_per_s": -310.97,
+          "knee_r2": 0.9861,
+          "gate_length_ms_at_20db": 222.83
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.254,
+          "plateau_level_db": -3.7,
+          "plateau_ripple_db": 1.511,
+          "plateau_droop_db_per_s": -23.77,
+          "knee_time_ms": 177.937,
+          "fall_rate_db_per_s": -323.9,
+          "knee_r2": 0.9925,
+          "gate_length_ms_at_20db": 217.85
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.263,
+          "plateau_level_db": -3.02,
+          "plateau_ripple_db": 1.459,
+          "plateau_droop_db_per_s": -33.435,
+          "knee_time_ms": 185.918,
+          "fall_rate_db_per_s": -371.7,
+          "knee_r2": 0.9955,
+          "gate_length_ms_at_20db": 218.84
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.299,
+          "plateau_level_db": -2.83,
+          "plateau_ripple_db": 1.461,
+          "plateau_droop_db_per_s": -28.643,
+          "knee_time_ms": 185.918,
+          "fall_rate_db_per_s": -397.76,
+          "knee_r2": 0.9918,
+          "gate_length_ms_at_20db": 217.85
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.324,
+          "plateau_level_db": -2.64,
+          "plateau_ripple_db": 1.487,
+          "plateau_droop_db_per_s": 48.589,
+          "knee_time_ms": 96.122,
+          "fall_rate_db_per_s": -129.29,
+          "knee_r2": 0.9829,
+          "gate_length_ms_at_20db": 218.84
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.324,
+          "plateau_level_db": -3.07,
+          "plateau_ripple_db": 1.446,
+          "plateau_droop_db_per_s": -20.155,
+          "knee_time_ms": 178.934,
+          "fall_rate_db_per_s": -407.15,
+          "knee_r2": 0.9927,
+          "gate_length_ms_at_20db": 217.85
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 7.324,
+          "plateau_level_db": -3.2,
+          "plateau_ripple_db": 1.647,
+          "plateau_droop_db_per_s": 52.525,
+          "knee_time_ms": 100.113,
+          "fall_rate_db_per_s": -109.68,
+          "knee_r2": 0.9801,
+          "gate_length_ms_at_20db": 264.74
+        }
+      },
+      "normalized_echo_density_mean": 0.7741,
+      "ned_at_plateau_start": 0.423,
+      "time_to_ned_0.9_ms": 257.44,
+      "mixing_time_ms": 254.59,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": 0.0009,
+        "iacc": 0.0394,
+        "coherence": {
+          "_noise_floor": 0.3255,
+          "44-89Hz": 0.1380096115582125,
+          "88-177Hz": 0.36052578431192844,
+          "177-354Hz": 0.2581851313206504,
+          "354-707Hz": 0.15364845287178297,
+          "707-1414Hz": 0.13034705502439045,
+          "1414-2828Hz": 0.11614538793383787,
+          "2828-5657Hz": 0.16485505108421525,
+          "5657-11314Hz": 0.20051554934249335,
+          "11314-22049Hz": 0.20009574614171025,
+          "11314-16000Hz": 0.1793574479385586,
+          "16000-22049Hz": 0.2162419925998783
+        },
+        "mid_side_ratio_db": -0.01,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 18.798,
+            "plateau_level_db": -3.2,
+            "plateau_ripple_db": 1.639,
+            "plateau_droop_db_per_s": -38.818,
+            "knee_time_ms": 200.385,
+            "fall_rate_db_per_s": -147.91,
+            "knee_r2": 0.9825,
+            "gate_length_ms_at_20db": 215.35
+          },
+          "right": {
+            "build_up_ms": 18.299,
+            "plateau_level_db": -3.21,
+            "plateau_ripple_db": 1.367,
+            "plateau_droop_db_per_s": 55.445,
+            "knee_time_ms": 115.079,
+            "fall_rate_db_per_s": -170.25,
+            "knee_r2": 0.9833,
+            "gate_length_ms_at_20db": 222.83
+          },
+          "knee_time_diff_ms": 85.306
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.238
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -73.28
+        ],
+        [
+          20.2,
+          -70.94
+        ],
+        [
+          32.0,
+          -76.32
+        ],
+        [
+          40.3,
+          -73.9
+        ],
+        [
+          50.8,
+          -73.61
+        ],
+        [
+          64.0,
+          -70.65
+        ],
+        [
+          80.6,
+          -66.94
+        ],
+        [
+          101.6,
+          -65.51
+        ],
+        [
+          128.0,
+          -64.82
+        ],
+        [
+          161.3,
+          -66.62
+        ],
+        [
+          203.2,
+          -65.49
+        ],
+        [
+          256.0,
+          -67.58
+        ],
+        [
+          322.5,
+          -68.38
+        ],
+        [
+          406.4,
+          -67.95
+        ],
+        [
+          512.0,
+          -66.61
+        ],
+        [
+          645.1,
+          -67.4
+        ],
+        [
+          812.7,
+          -68.33
+        ],
+        [
+          1024.0,
+          -66.92
+        ],
+        [
+          1290.2,
+          -67.53
+        ],
+        [
+          1625.5,
+          -67.86
+        ],
+        [
+          2048.0,
+          -67.87
+        ],
+        [
+          2580.3,
+          -68.75
+        ],
+        [
+          3251.0,
+          -68.66
+        ],
+        [
+          4096.0,
+          -69.56
+        ],
+        [
+          5160.6,
+          -70.44
+        ],
+        [
+          6502.0,
+          -70.98
+        ],
+        [
+          8192.0,
+          -71.7
+        ],
+        [
+          10321.3,
+          -72.66
+        ],
+        [
+          13004.0,
+          -73.82
+        ],
+        [
+          16384.0,
+          -74.75
+        ],
+        [
+          20642.5,
+          -82.47
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 117.4,
+          "level_db": -64.35,
+          "q": 1.38
+        },
+        {
+          "freq_hz": 215.3,
+          "level_db": -65.02,
+          "q": 1.83
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -65.24,
+          "q": 4.2
+        },
+        {
+          "freq_hz": 558.3,
+          "level_db": -65.88,
+          "q": 1.5
+        },
+        {
+          "freq_hz": 351.7,
+          "level_db": -65.99,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 1290.2,
+          "level_db": -66.12,
+          "q": 2.46
+        },
+        {
+          "freq_hz": 2981.2,
+          "level_db": -66.66,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 406.4,
+          "level_db": -67.07,
+          "q": 11.71
+        },
+        {
+          "freq_hz": 4216.0,
+          "level_db": -68.56,
+          "q": 2.56
+        }
+      ],
+      "filename": "NonLin_4.8s_0H.wav",
+      "params": {
+        "time": 4.8,
+        "high": 0
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 35.351,
+        "plateau_level_db": -3.69,
+        "plateau_ripple_db": 1.553,
+        "plateau_droop_db_per_s": -52.584,
+        "knee_time_ms": 287.778,
+        "fall_rate_db_per_s": -182.27,
+        "knee_r2": 0.9871,
+        "gate_length_ms_at_20db": 287.78,
+        "post_knee_excess_db": -2.94
+      },
+      "gate_length_ms_at_20db_check": 287.78,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.86,
+          "plateau_ripple_db": 1.4,
+          "plateau_droop_db_per_s": -17.912,
+          "knee_time_ms": 240.884,
+          "fall_rate_db_per_s": -296.68,
+          "knee_r2": 0.9716,
+          "gate_length_ms_at_20db": 5.42
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.249,
+          "plateau_level_db": -2.14,
+          "plateau_ripple_db": 1.581,
+          "plateau_droop_db_per_s": -61.387,
+          "knee_time_ms": 281.791,
+          "fall_rate_db_per_s": -294.35,
+          "knee_r2": 0.9621,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -4.97,
+          "plateau_ripple_db": 1.266,
+          "plateau_droop_db_per_s": -40.958,
+          "knee_time_ms": 245.873,
+          "fall_rate_db_per_s": -310.51,
+          "knee_r2": 0.9755,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.48,
+          "plateau_ripple_db": 1.742,
+          "plateau_droop_db_per_s": -41.194,
+          "knee_time_ms": 259.841,
+          "fall_rate_db_per_s": -300.74,
+          "knee_r2": 0.9827,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -4.2,
+          "plateau_ripple_db": 1.813,
+          "plateau_droop_db_per_s": -24.641,
+          "knee_time_ms": 243.878,
+          "fall_rate_db_per_s": -296.43,
+          "knee_r2": 0.9892,
+          "gate_length_ms_at_20db": 285.78
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -4.07,
+          "plateau_ripple_db": 1.51,
+          "plateau_droop_db_per_s": -34.724,
+          "knee_time_ms": 251.859,
+          "fall_rate_db_per_s": -321.27,
+          "knee_r2": 0.9913,
+          "gate_length_ms_at_20db": 275.8
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.15,
+          "plateau_ripple_db": 1.517,
+          "plateau_droop_db_per_s": -36.029,
+          "knee_time_ms": 253.855,
+          "fall_rate_db_per_s": -375.48,
+          "knee_r2": 0.9928,
+          "gate_length_ms_at_20db": 279.8
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.39,
+          "plateau_level_db": -3.38,
+          "plateau_ripple_db": 1.541,
+          "plateau_droop_db_per_s": -29.016,
+          "knee_time_ms": 247.868,
+          "fall_rate_db_per_s": -379.57,
+          "knee_r2": 0.9896,
+          "gate_length_ms_at_20db": 278.8
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.84,
+          "plateau_ripple_db": 1.528,
+          "plateau_droop_db_per_s": -8.311,
+          "knee_time_ms": 193.991,
+          "fall_rate_db_per_s": -154.49,
+          "knee_r2": 0.9815,
+          "gate_length_ms_at_20db": 285.78
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.06,
+          "plateau_ripple_db": 1.482,
+          "plateau_droop_db_per_s": -26.702,
+          "knee_time_ms": 244.875,
+          "fall_rate_db_per_s": -395.28,
+          "knee_r2": 0.9925,
+          "gate_length_ms_at_20db": 278.8
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.25,
+          "plateau_ripple_db": 1.532,
+          "plateau_droop_db_per_s": -71.646,
+          "knee_time_ms": 414.49,
+          "fall_rate_db_per_s": -241.0,
+          "knee_r2": 0.9681,
+          "gate_length_ms_at_20db": 299.75
+        }
+      },
+      "normalized_echo_density_mean": 1.2671,
+      "ned_at_plateau_start": 0.5689,
+      "time_to_ned_0.9_ms": 329.27,
+      "mixing_time_ms": 334.32,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": -0.0006,
+        "iacc": 0.0115,
+        "coherence": {
+          "_noise_floor": 0.2543,
+          "44-89Hz": 0.05669842718796097,
+          "88-177Hz": 0.1264390616333779,
+          "177-354Hz": 0.09342025181929486,
+          "354-707Hz": 0.04639750184255084,
+          "707-1414Hz": 0.1578955881489143,
+          "1414-2828Hz": 0.1481828860053425,
+          "2828-5657Hz": 0.12711007678426625,
+          "5657-11314Hz": 0.1298558274368859,
+          "11314-22049Hz": 0.17774735112295845,
+          "11314-16000Hz": 0.1607165165561846,
+          "16000-22049Hz": 0.19100707232137526
+        },
+        "mid_side_ratio_db": 0.0,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 35.85,
+            "plateau_level_db": -3.57,
+            "plateau_ripple_db": 1.525,
+            "plateau_droop_db_per_s": -50.661,
+            "knee_time_ms": 285.283,
+            "fall_rate_db_per_s": -189.67,
+            "knee_r2": 0.9901,
+            "gate_length_ms_at_20db": 287.28
+          },
+          "right": {
+            "build_up_ms": 34.354,
+            "plateau_level_db": -3.61,
+            "plateau_ripple_db": 1.435,
+            "plateau_droop_db_per_s": -48.751,
+            "knee_time_ms": 275.805,
+            "fall_rate_db_per_s": -162.16,
+            "knee_r2": 0.9811,
+            "gate_length_ms_at_20db": 275.8
+          },
+          "knee_time_diff_ms": 9.478
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1914
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -65.72
+        ],
+        [
+          20.2,
+          -61.67
+        ],
+        [
+          32.0,
+          -65.7
+        ],
+        [
+          40.3,
+          -70.04
+        ],
+        [
+          50.8,
+          -65.71
+        ],
+        [
+          64.0,
+          -62.95
+        ],
+        [
+          80.6,
+          -61.21
+        ],
+        [
+          101.6,
+          -59.77
+        ],
+        [
+          128.0,
+          -59.98
+        ],
+        [
+          161.3,
+          -62.77
+        ],
+        [
+          203.2,
+          -61.51
+        ],
+        [
+          256.0,
+          -62.14
+        ],
+        [
+          322.5,
+          -61.19
+        ],
+        [
+          406.4,
+          -62.71
+        ],
+        [
+          512.0,
+          -62.21
+        ],
+        [
+          645.1,
+          -61.68
+        ],
+        [
+          812.7,
+          -63.47
+        ],
+        [
+          1024.0,
+          -62.01
+        ],
+        [
+          1290.2,
+          -63.44
+        ],
+        [
+          1625.5,
+          -63.93
+        ],
+        [
+          2048.0,
+          -64.81
+        ],
+        [
+          2580.3,
+          -66.48
+        ],
+        [
+          3251.0,
+          -67.74
+        ],
+        [
+          4096.0,
+          -70.02
+        ],
+        [
+          5160.6,
+          -72.18
+        ],
+        [
+          6502.0,
+          -74.45
+        ],
+        [
+          8192.0,
+          -76.78
+        ],
+        [
+          10321.3,
+          -79.1
+        ],
+        [
+          13004.0,
+          -81.63
+        ],
+        [
+          16384.0,
+          -83.41
+        ],
+        [
+          20642.5,
+          -91.27
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 139.6,
+          "level_db": -59.38,
+          "q": 1.44
+        },
+        {
+          "freq_hz": 341.7,
+          "level_db": -59.54,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -60.17,
+          "q": 8.9
+        },
+        {
+          "freq_hz": 248.7,
+          "level_db": -60.18,
+          "q": 5.76
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -60.49,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 1290.2,
+          "level_db": -62.21,
+          "q": 2.83
+        },
+        {
+          "freq_hz": 1772.6,
+          "level_db": -63.16,
+          "q": 5.6
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -63.32,
+          "q": 8.65
+        }
+      ],
+      "filename": "NonLin_7.0s_-7H.wav",
+      "params": {
+        "time": 7.0,
+        "high": -7
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 21.383,
+        "plateau_level_db": -2.87,
+        "plateau_ripple_db": 1.542,
+        "plateau_droop_db_per_s": -4.283,
+        "knee_time_ms": 190.0,
+        "fall_rate_db_per_s": -173.11,
+        "knee_r2": 0.9883,
+        "gate_length_ms_at_20db": 287.78,
+        "post_knee_excess_db": 1.845
+      },
+      "gate_length_ms_at_20db_check": 287.78,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.83,
+          "plateau_ripple_db": 1.386,
+          "plateau_droop_db_per_s": -17.936,
+          "knee_time_ms": 240.884,
+          "fall_rate_db_per_s": -296.63,
+          "knee_r2": 0.9716,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.249,
+          "plateau_level_db": -2.08,
+          "plateau_ripple_db": 1.57,
+          "plateau_droop_db_per_s": -61.337,
+          "knee_time_ms": 281.791,
+          "fall_rate_db_per_s": -294.46,
+          "knee_r2": 0.9621,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -4.97,
+          "plateau_ripple_db": 1.262,
+          "plateau_droop_db_per_s": -40.862,
+          "knee_time_ms": 245.873,
+          "fall_rate_db_per_s": -312.27,
+          "knee_r2": 0.9737,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.46,
+          "plateau_ripple_db": 1.724,
+          "plateau_droop_db_per_s": -41.344,
+          "knee_time_ms": 259.841,
+          "fall_rate_db_per_s": -300.84,
+          "knee_r2": 0.9828,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -4.21,
+          "plateau_ripple_db": 1.817,
+          "plateau_droop_db_per_s": -24.97,
+          "knee_time_ms": 243.878,
+          "fall_rate_db_per_s": -295.89,
+          "knee_r2": 0.9896,
+          "gate_length_ms_at_20db": 285.78
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -4.02,
+          "plateau_ripple_db": 1.507,
+          "plateau_droop_db_per_s": -34.38,
+          "knee_time_ms": 250.862,
+          "fall_rate_db_per_s": -320.54,
+          "knee_r2": 0.9914,
+          "gate_length_ms_at_20db": 276.8
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.16,
+          "plateau_ripple_db": 1.498,
+          "plateau_droop_db_per_s": -36.35,
+          "knee_time_ms": 253.855,
+          "fall_rate_db_per_s": -380.35,
+          "knee_r2": 0.9936,
+          "gate_length_ms_at_20db": 279.8
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.39,
+          "plateau_level_db": -3.12,
+          "plateau_ripple_db": 1.57,
+          "plateau_droop_db_per_s": -30.355,
+          "knee_time_ms": 248.866,
+          "fall_rate_db_per_s": -384.82,
+          "knee_r2": 0.9901,
+          "gate_length_ms_at_20db": 278.8
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.85,
+          "plateau_ripple_db": 1.542,
+          "plateau_droop_db_per_s": -7.241,
+          "knee_time_ms": 190.998,
+          "fall_rate_db_per_s": -150.19,
+          "knee_r2": 0.9785,
+          "gate_length_ms_at_20db": 286.78
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.02,
+          "plateau_ripple_db": 1.52,
+          "plateau_droop_db_per_s": -27.629,
+          "knee_time_ms": 246.871,
+          "fall_rate_db_per_s": -406.88,
+          "knee_r2": 0.992,
+          "gate_length_ms_at_20db": 278.8
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 16.395,
+          "plateau_level_db": -3.23,
+          "plateau_ripple_db": 1.478,
+          "plateau_droop_db_per_s": -75.204,
+          "knee_time_ms": 416.485,
+          "fall_rate_db_per_s": -235.28,
+          "knee_r2": 0.9712,
+          "gate_length_ms_at_20db": 288.78
+        }
+      },
+      "normalized_echo_density_mean": 1.1846,
+      "ned_at_plateau_start": 0.4379,
+      "time_to_ned_0.9_ms": 323.29,
+      "mixing_time_ms": 334.32,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": 0.0006,
+        "iacc": 0.0367,
+        "coherence": {
+          "_noise_floor": 0.2375,
+          "44-89Hz": 0.05675639891249299,
+          "88-177Hz": 0.12608804057782513,
+          "177-354Hz": 0.09329435271218073,
+          "354-707Hz": 0.04653488008948503,
+          "707-1414Hz": 0.158011285742151,
+          "1414-2828Hz": 0.14821899553609733,
+          "2828-5657Hz": 0.1271152118188555,
+          "5657-11314Hz": 0.1298508388099345,
+          "11314-22049Hz": 0.1698632321464171,
+          "11314-16000Hz": 0.16072320474247512,
+          "16000-22049Hz": 0.17697939633948623
+        },
+        "mid_side_ratio_db": -0.01,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 18.889,
+            "plateau_level_db": -3.23,
+            "plateau_ripple_db": 1.546,
+            "plateau_droop_db_per_s": -29.306,
+            "knee_time_ms": 255.351,
+            "fall_rate_db_per_s": -165.46,
+            "knee_r2": 0.9869,
+            "gate_length_ms_at_20db": 285.28
+          },
+          "right": {
+            "build_up_ms": 18.39,
+            "plateau_level_db": -3.09,
+            "plateau_ripple_db": 1.43,
+            "plateau_droop_db_per_s": 14.154,
+            "knee_time_ms": 171.043,
+            "fall_rate_db_per_s": -168.62,
+            "knee_r2": 0.9882,
+            "gate_length_ms_at_20db": 276.8
+          },
+          "knee_time_diff_ms": 84.308
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1855
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -73.01
+        ],
+        [
+          20.2,
+          -68.97
+        ],
+        [
+          32.0,
+          -72.99
+        ],
+        [
+          40.3,
+          -77.33
+        ],
+        [
+          50.8,
+          -73.0
+        ],
+        [
+          64.0,
+          -70.24
+        ],
+        [
+          80.6,
+          -68.5
+        ],
+        [
+          101.6,
+          -67.05
+        ],
+        [
+          128.0,
+          -67.26
+        ],
+        [
+          161.3,
+          -70.06
+        ],
+        [
+          203.2,
+          -68.78
+        ],
+        [
+          256.0,
+          -69.39
+        ],
+        [
+          322.5,
+          -68.4
+        ],
+        [
+          406.4,
+          -69.88
+        ],
+        [
+          512.0,
+          -69.3
+        ],
+        [
+          645.1,
+          -68.67
+        ],
+        [
+          812.7,
+          -70.3
+        ],
+        [
+          1024.0,
+          -68.58
+        ],
+        [
+          1290.2,
+          -69.62
+        ],
+        [
+          1625.5,
+          -69.57
+        ],
+        [
+          2048.0,
+          -69.72
+        ],
+        [
+          2580.3,
+          -70.47
+        ],
+        [
+          3251.0,
+          -70.59
+        ],
+        [
+          4096.0,
+          -71.53
+        ],
+        [
+          5160.6,
+          -72.21
+        ],
+        [
+          6502.0,
+          -72.89
+        ],
+        [
+          8192.0,
+          -73.62
+        ],
+        [
+          10321.3,
+          -74.44
+        ],
+        [
+          13004.0,
+          -75.63
+        ],
+        [
+          16384.0,
+          -76.46
+        ],
+        [
+          20642.5,
+          -84.24
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 139.6,
+          "level_db": -66.66,
+          "q": 1.44
+        },
+        {
+          "freq_hz": 341.7,
+          "level_db": -66.75,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -66.8,
+          "q": 8.9
+        },
+        {
+          "freq_hz": 248.7,
+          "level_db": -67.43,
+          "q": 5.76
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -67.47,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -68.04,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 1534.3,
+          "level_db": -68.33,
+          "q": 3.37
+        },
+        {
+          "freq_hz": 1772.6,
+          "level_db": -68.57,
+          "q": 5.6
+        },
+        {
+          "freq_hz": 1183.1,
+          "level_db": -68.61,
+          "q": 11.71
+        }
+      ],
+      "filename": "NonLin_7.0s_0H.wav",
+      "params": {
+        "time": 7.0,
+        "high": 0
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 35.351,
+        "plateau_level_db": -3.45,
+        "plateau_ripple_db": 1.501,
+        "plateau_droop_db_per_s": -45.061,
+        "knee_time_ms": 300.748,
+        "fall_rate_db_per_s": -179.43,
+        "knee_r2": 0.9902,
+        "gate_length_ms_at_20db": 306.73,
+        "post_knee_excess_db": -1.956
+      },
+      "gate_length_ms_at_20db_check": 306.73,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.74,
+          "plateau_ripple_db": 1.426,
+          "plateau_droop_db_per_s": -48.093,
+          "knee_time_ms": 312.721,
+          "fall_rate_db_per_s": -264.44,
+          "knee_r2": 0.9611,
+          "gate_length_ms_at_20db": 4.42
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.249,
+          "plateau_level_db": -2.11,
+          "plateau_ripple_db": 1.576,
+          "plateau_droop_db_per_s": -47.354,
+          "knee_time_ms": 285.782,
+          "fall_rate_db_per_s": -288.24,
+          "knee_r2": 0.9182,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -4.73,
+          "plateau_ripple_db": 1.253,
+          "plateau_droop_db_per_s": -38.331,
+          "knee_time_ms": 287.778,
+          "fall_rate_db_per_s": -312.54,
+          "knee_r2": 0.9794,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.38,
+          "plateau_ripple_db": 1.713,
+          "plateau_droop_db_per_s": -39.673,
+          "knee_time_ms": 295.76,
+          "fall_rate_db_per_s": -317.67,
+          "knee_r2": 0.9781,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -4.21,
+          "plateau_ripple_db": 1.826,
+          "plateau_droop_db_per_s": -37.488,
+          "knee_time_ms": 293.764,
+          "fall_rate_db_per_s": -306.06,
+          "knee_r2": 0.9858,
+          "gate_length_ms_at_20db": 295.76
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.99,
+          "plateau_ripple_db": 1.51,
+          "plateau_droop_db_per_s": -33.701,
+          "knee_time_ms": 272.812,
+          "fall_rate_db_per_s": -324.14,
+          "knee_r2": 0.9912,
+          "gate_length_ms_at_20db": 303.74
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.09,
+          "plateau_ripple_db": 1.516,
+          "plateau_droop_db_per_s": -33.834,
+          "knee_time_ms": 272.812,
+          "fall_rate_db_per_s": -352.63,
+          "knee_r2": 0.9937,
+          "gate_length_ms_at_20db": 306.73
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.39,
+          "plateau_level_db": -3.43,
+          "plateau_ripple_db": 1.551,
+          "plateau_droop_db_per_s": -32.055,
+          "knee_time_ms": 274.807,
+          "fall_rate_db_per_s": -383.73,
+          "knee_r2": 0.991,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.87,
+          "plateau_ripple_db": 1.602,
+          "plateau_droop_db_per_s": -12.405,
+          "knee_time_ms": 211.95,
+          "fall_rate_db_per_s": -149.61,
+          "knee_r2": 0.9835,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.07,
+          "plateau_ripple_db": 1.504,
+          "plateau_droop_db_per_s": -29.569,
+          "knee_time_ms": 271.814,
+          "fall_rate_db_per_s": -416.71,
+          "knee_r2": 0.9921,
+          "gate_length_ms_at_20db": 299.75
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.23,
+          "plateau_ripple_db": 1.53,
+          "plateau_droop_db_per_s": -67.523,
+          "knee_time_ms": 423.469,
+          "fall_rate_db_per_s": -223.7,
+          "knee_r2": 0.9685,
+          "gate_length_ms_at_20db": 306.73
+        }
+      },
+      "normalized_echo_density_mean": 1.3159,
+      "ned_at_plateau_start": 0.5004,
+      "time_to_ned_0.9_ms": 371.18,
+      "mixing_time_ms": 344.3,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": -0.0013,
+        "iacc": 0.0158,
+        "coherence": {
+          "_noise_floor": 0.2182,
+          "44-89Hz": 0.04336792660793197,
+          "88-177Hz": 0.1254417094475791,
+          "177-354Hz": 0.08670445090045954,
+          "354-707Hz": 0.04442658985088871,
+          "707-1414Hz": 0.148092112147786,
+          "1414-2828Hz": 0.13750701348065913,
+          "2828-5657Hz": 0.117771358677231,
+          "5657-11314Hz": 0.12102937211759042,
+          "11314-22049Hz": 0.15920703061991529,
+          "11314-16000Hz": 0.14924861011103585,
+          "16000-22049Hz": 0.16696037230182856
+        },
+        "mid_side_ratio_db": 0.01,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 35.85,
+            "plateau_level_db": -3.44,
+            "plateau_ripple_db": 1.514,
+            "plateau_droop_db_per_s": -42.139,
+            "knee_time_ms": 296.259,
+            "fall_rate_db_per_s": -183.93,
+            "knee_r2": 0.9905,
+            "gate_length_ms_at_20db": 304.24
+          },
+          "right": {
+            "build_up_ms": 34.354,
+            "plateau_level_db": -3.34,
+            "plateau_ripple_db": 1.431,
+            "plateau_droop_db_per_s": -49.547,
+            "knee_time_ms": 300.748,
+            "fall_rate_db_per_s": -169.07,
+            "knee_r2": 0.9857,
+            "gate_length_ms_at_20db": 302.74
+          },
+          "knee_time_diff_ms": -4.489
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1837
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -69.33
+        ],
+        [
+          20.2,
+          -65.21
+        ],
+        [
+          32.0,
+          -69.16
+        ],
+        [
+          40.3,
+          -73.39
+        ],
+        [
+          50.8,
+          -69.38
+        ],
+        [
+          64.0,
+          -66.58
+        ],
+        [
+          80.6,
+          -64.81
+        ],
+        [
+          101.6,
+          -63.36
+        ],
+        [
+          128.0,
+          -63.54
+        ],
+        [
+          161.3,
+          -66.49
+        ],
+        [
+          203.2,
+          -65.11
+        ],
+        [
+          256.0,
+          -65.71
+        ],
+        [
+          322.5,
+          -64.72
+        ],
+        [
+          406.4,
+          -66.24
+        ],
+        [
+          512.0,
+          -65.58
+        ],
+        [
+          645.1,
+          -65.12
+        ],
+        [
+          812.7,
+          -66.73
+        ],
+        [
+          1024.0,
+          -65.16
+        ],
+        [
+          1290.2,
+          -66.31
+        ],
+        [
+          1625.5,
+          -66.52
+        ],
+        [
+          2048.0,
+          -66.99
+        ],
+        [
+          2580.3,
+          -68.2
+        ],
+        [
+          3251.0,
+          -68.99
+        ],
+        [
+          4096.0,
+          -70.75
+        ],
+        [
+          5160.6,
+          -72.49
+        ],
+        [
+          6502.0,
+          -74.37
+        ],
+        [
+          8192.0,
+          -76.43
+        ],
+        [
+          10321.3,
+          -78.55
+        ],
+        [
+          13004.0,
+          -80.93
+        ],
+        [
+          16384.0,
+          -82.68
+        ],
+        [
+          20642.5,
+          -90.75
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 139.6,
+          "level_db": -62.97,
+          "q": 1.44
+        },
+        {
+          "freq_hz": 341.7,
+          "level_db": -62.98,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -63.41,
+          "q": 8.9
+        },
+        {
+          "freq_hz": 248.7,
+          "level_db": -63.64,
+          "q": 5.76
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -63.96,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 215.3,
+          "level_db": -64.1,
+          "q": 3.76
+        },
+        {
+          "freq_hz": 1290.2,
+          "level_db": -65.1,
+          "q": 2.83
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -65.43,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 1772.6,
+          "level_db": -65.71,
+          "q": 5.6
+        }
+      ],
+      "filename": "NonLin_9.8s_-4H.wav",
+      "params": {
+        "time": 9.8,
+        "high": -4
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 35.351,
+        "plateau_level_db": -3.71,
+        "plateau_ripple_db": 1.571,
+        "plateau_droop_db_per_s": -43.641,
+        "knee_time_ms": 300.748,
+        "fall_rate_db_per_s": -187.26,
+        "knee_r2": 0.9862,
+        "gate_length_ms_at_20db": 306.73,
+        "post_knee_excess_db": -0.986
+      },
+      "gate_length_ms_at_20db_check": 306.73,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.77,
+          "plateau_ripple_db": 1.425,
+          "plateau_droop_db_per_s": -48.035,
+          "knee_time_ms": 312.721,
+          "fall_rate_db_per_s": -264.04,
+          "knee_r2": 0.961,
+          "gate_length_ms_at_20db": 4.42
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.249,
+          "plateau_level_db": -2.15,
+          "plateau_ripple_db": 1.586,
+          "plateau_droop_db_per_s": -47.397,
+          "knee_time_ms": 285.782,
+          "fall_rate_db_per_s": -288.0,
+          "knee_r2": 0.9182,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -4.81,
+          "plateau_ripple_db": 1.253,
+          "plateau_droop_db_per_s": -38.351,
+          "knee_time_ms": 287.778,
+          "fall_rate_db_per_s": -312.38,
+          "knee_r2": 0.9794,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.35,
+          "plateau_ripple_db": 1.709,
+          "plateau_droop_db_per_s": -39.492,
+          "knee_time_ms": 295.76,
+          "fall_rate_db_per_s": -317.62,
+          "knee_r2": 0.978,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -4.06,
+          "plateau_ripple_db": 1.804,
+          "plateau_droop_db_per_s": -37.323,
+          "knee_time_ms": 293.764,
+          "fall_rate_db_per_s": -306.59,
+          "knee_r2": 0.9854,
+          "gate_length_ms_at_20db": 295.76
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -4.02,
+          "plateau_ripple_db": 1.513,
+          "plateau_droop_db_per_s": -33.34,
+          "knee_time_ms": 272.812,
+          "fall_rate_db_per_s": -323.85,
+          "knee_r2": 0.991,
+          "gate_length_ms_at_20db": 303.74
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.14,
+          "plateau_ripple_db": 1.53,
+          "plateau_droop_db_per_s": -33.779,
+          "knee_time_ms": 272.812,
+          "fall_rate_db_per_s": -352.13,
+          "knee_r2": 0.9934,
+          "gate_length_ms_at_20db": 306.73
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.39,
+          "plateau_level_db": -3.47,
+          "plateau_ripple_db": 1.549,
+          "plateau_droop_db_per_s": -31.622,
+          "knee_time_ms": 273.81,
+          "fall_rate_db_per_s": -378.85,
+          "knee_r2": 0.9911,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.85,
+          "plateau_ripple_db": 1.558,
+          "plateau_droop_db_per_s": -13.758,
+          "knee_time_ms": 215.941,
+          "fall_rate_db_per_s": -152.53,
+          "knee_r2": 0.9886,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.07,
+          "plateau_ripple_db": 1.503,
+          "plateau_droop_db_per_s": -48.694,
+          "knee_time_ms": 312.721,
+          "fall_rate_db_per_s": -186.98,
+          "knee_r2": 0.9687,
+          "gate_length_ms_at_20db": 299.75
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 16.395,
+          "plateau_level_db": -3.27,
+          "plateau_ripple_db": 1.515,
+          "plateau_droop_db_per_s": -71.722,
+          "knee_time_ms": 433.447,
+          "fall_rate_db_per_s": -233.62,
+          "knee_r2": 0.9758,
+          "gate_length_ms_at_20db": 307.73
+        }
+      },
+      "normalized_echo_density_mean": 1.4317,
+      "ned_at_plateau_start": 0.5868,
+      "time_to_ned_0.9_ms": 347.23,
+      "mixing_time_ms": 179.67,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": -0.0002,
+        "iacc": 0.0089,
+        "coherence": {
+          "_noise_floor": 0.2375,
+          "44-89Hz": 0.043337097300296966,
+          "88-177Hz": 0.12571545416521193,
+          "177-354Hz": 0.0867945926778745,
+          "354-707Hz": 0.044361806699921916,
+          "707-1414Hz": 0.1480061738869077,
+          "1414-2828Hz": 0.1374769479813457,
+          "2828-5657Hz": 0.11776945049810411,
+          "5657-11314Hz": 0.12103095943500441,
+          "11314-22049Hz": 0.16745102450619284,
+          "11314-16000Hz": 0.1492438599514977,
+          "16000-22049Hz": 0.18162660262377694
+        },
+        "mid_side_ratio_db": 0.0,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 35.85,
+            "plateau_level_db": -3.63,
+            "plateau_ripple_db": 1.498,
+            "plateau_droop_db_per_s": -40.545,
+            "knee_time_ms": 296.259,
+            "fall_rate_db_per_s": -202.98,
+            "knee_r2": 0.9896,
+            "gate_length_ms_at_20db": 298.25
+          },
+          "right": {
+            "build_up_ms": 34.354,
+            "plateau_level_db": -3.65,
+            "plateau_ripple_db": 1.467,
+            "plateau_droop_db_per_s": -51.546,
+            "knee_time_ms": 306.735,
+            "fall_rate_db_per_s": -166.02,
+            "knee_r2": 0.979,
+            "gate_length_ms_at_20db": 300.75
+          },
+          "knee_time_diff_ms": -10.476
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1807
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -64.8
+        ],
+        [
+          20.2,
+          -60.67
+        ],
+        [
+          32.0,
+          -64.62
+        ],
+        [
+          40.3,
+          -68.86
+        ],
+        [
+          50.8,
+          -64.84
+        ],
+        [
+          64.0,
+          -62.04
+        ],
+        [
+          80.6,
+          -60.27
+        ],
+        [
+          101.6,
+          -58.82
+        ],
+        [
+          128.0,
+          -59.01
+        ],
+        [
+          161.3,
+          -61.96
+        ],
+        [
+          203.2,
+          -60.61
+        ],
+        [
+          256.0,
+          -61.23
+        ],
+        [
+          322.5,
+          -60.28
+        ],
+        [
+          406.4,
+          -61.86
+        ],
+        [
+          512.0,
+          -61.31
+        ],
+        [
+          645.1,
+          -60.99
+        ],
+        [
+          812.7,
+          -62.79
+        ],
+        [
+          1024.0,
+          -61.51
+        ],
+        [
+          1290.2,
+          -63.11
+        ],
+        [
+          1625.5,
+          -63.86
+        ],
+        [
+          2048.0,
+          -64.98
+        ],
+        [
+          2580.3,
+          -66.9
+        ],
+        [
+          3251.0,
+          -68.42
+        ],
+        [
+          4096.0,
+          -70.87
+        ],
+        [
+          5160.6,
+          -73.21
+        ],
+        [
+          6502.0,
+          -75.57
+        ],
+        [
+          8192.0,
+          -77.98
+        ],
+        [
+          10321.3,
+          -80.35
+        ],
+        [
+          13004.0,
+          -82.88
+        ],
+        [
+          16384.0,
+          -84.71
+        ],
+        [
+          20642.5,
+          -92.7
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 139.6,
+          "level_db": -58.45,
+          "q": 1.44
+        },
+        {
+          "freq_hz": 341.7,
+          "level_db": -58.55,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 248.7,
+          "level_db": -59.16,
+          "q": 5.76
+        },
+        {
+          "freq_hz": 215.3,
+          "level_db": -59.6,
+          "q": 3.76
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -59.7,
+          "q": 8.9
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -59.82,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 1290.2,
+          "level_db": -61.89,
+          "q": 2.83
+        },
+        {
+          "freq_hz": 1772.6,
+          "level_db": -63.27,
+          "q": 5.6
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -63.59,
+          "q": 8.65
+        }
+      ],
+      "filename": "NonLin_9.8s_-9H.wav",
+      "params": {
+        "time": 9.8,
+        "high": -9
+      }
+    },
+    {
+      "onset_time_s": 0.0001,
+      "gate": {
+        "build_up_ms": 19.388,
+        "plateau_level_db": -2.98,
+        "plateau_ripple_db": 1.586,
+        "plateau_droop_db_per_s": -10.309,
+        "knee_time_ms": 212.948,
+        "fall_rate_db_per_s": -171.98,
+        "knee_r2": 0.9911,
+        "gate_length_ms_at_20db": 306.73,
+        "post_knee_excess_db": 2.091
+      },
+      "gate_length_ms_at_20db_check": 306.73,
+      "band_gate": {
+        "44-89Hz": {
+          "build_up_ms": 51.315,
+          "plateau_level_db": -3.78,
+          "plateau_ripple_db": 1.432,
+          "plateau_droop_db_per_s": -48.076,
+          "knee_time_ms": 312.721,
+          "fall_rate_db_per_s": -264.32,
+          "knee_r2": 0.9611,
+          "gate_length_ms_at_20db": 15.4
+        },
+        "88-177Hz": {
+          "build_up_ms": 80.249,
+          "plateau_level_db": -2.08,
+          "plateau_ripple_db": 1.573,
+          "plateau_droop_db_per_s": -47.233,
+          "knee_time_ms": 285.782,
+          "fall_rate_db_per_s": -288.31,
+          "knee_r2": 0.9177,
+          "gate_length_ms_at_20db": 10.41
+        },
+        "177-354Hz": {
+          "build_up_ms": 36.349,
+          "plateau_level_db": -4.72,
+          "plateau_ripple_db": 1.253,
+          "plateau_droop_db_per_s": -38.318,
+          "knee_time_ms": 287.778,
+          "fall_rate_db_per_s": -312.09,
+          "knee_r2": 0.9793,
+          "gate_length_ms_at_20db": 2.43
+        },
+        "354-707Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.43,
+          "plateau_ripple_db": 1.717,
+          "plateau_droop_db_per_s": -39.712,
+          "knee_time_ms": 295.76,
+          "fall_rate_db_per_s": -317.86,
+          "knee_r2": 0.9782,
+          "gate_length_ms_at_20db": 4.42
+        },
+        "707-1414Hz": {
+          "build_up_ms": 35.351,
+          "plateau_level_db": -4.19,
+          "plateau_ripple_db": 1.82,
+          "plateau_droop_db_per_s": -37.499,
+          "knee_time_ms": 293.764,
+          "fall_rate_db_per_s": -305.64,
+          "knee_r2": 0.9859,
+          "gate_length_ms_at_20db": 295.76
+        },
+        "1414-2828Hz": {
+          "build_up_ms": 38.345,
+          "plateau_level_db": -3.97,
+          "plateau_ripple_db": 1.487,
+          "plateau_droop_db_per_s": -33.921,
+          "knee_time_ms": 272.812,
+          "fall_rate_db_per_s": -324.13,
+          "knee_r2": 0.9914,
+          "gate_length_ms_at_20db": 303.74
+        },
+        "2828-5657Hz": {
+          "build_up_ms": 34.354,
+          "plateau_level_db": -3.12,
+          "plateau_ripple_db": 1.506,
+          "plateau_droop_db_per_s": -34.159,
+          "knee_time_ms": 273.81,
+          "fall_rate_db_per_s": -354.45,
+          "knee_r2": 0.9941,
+          "gate_length_ms_at_20db": 306.73
+        },
+        "5657-11314Hz": {
+          "build_up_ms": 18.39,
+          "plateau_level_db": -3.15,
+          "plateau_ripple_db": 1.548,
+          "plateau_droop_db_per_s": -32.301,
+          "knee_time_ms": 273.81,
+          "fall_rate_db_per_s": -386.33,
+          "knee_r2": 0.9911,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -2.91,
+          "plateau_ripple_db": 1.613,
+          "plateau_droop_db_per_s": -13.318,
+          "knee_time_ms": 214.943,
+          "fall_rate_db_per_s": -148.71,
+          "knee_r2": 0.9823,
+          "gate_length_ms_at_20db": 300.75
+        },
+        "11314-16000Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.1,
+          "plateau_ripple_db": 1.545,
+          "plateau_droop_db_per_s": -29.75,
+          "knee_time_ms": 271.814,
+          "fall_rate_db_per_s": -418.86,
+          "knee_r2": 0.9919,
+          "gate_length_ms_at_20db": 299.75
+        },
+        "16000-22049Hz": {
+          "build_up_ms": 7.415,
+          "plateau_level_db": -3.24,
+          "plateau_ripple_db": 1.53,
+          "plateau_droop_db_per_s": -67.231,
+          "knee_time_ms": 423.469,
+          "fall_rate_db_per_s": -226.23,
+          "knee_r2": 0.9677,
+          "gate_length_ms_at_20db": 307.73
+        }
+      },
+      "normalized_echo_density_mean": 1.1556,
+      "ned_at_plateau_start": 0.423,
+      "time_to_ned_0.9_ms": 347.23,
+      "mixing_time_ms": 339.31,
+      "modal_overlap_crossover_hz": null,
+      "stereo": {
+        "interchannel_correlation": 0.0074,
+        "iacc": 0.0356,
+        "coherence": {
+          "_noise_floor": 0.2298,
+          "44-89Hz": 0.04320369226989981,
+          "88-177Hz": 0.1268260732230777,
+          "177-354Hz": 0.08721428589387609,
+          "354-707Hz": 0.044752275853386606,
+          "707-1414Hz": 0.14816810330670457,
+          "1414-2828Hz": 0.13756025467640484,
+          "2828-5657Hz": 0.11750282788312871,
+          "5657-11314Hz": 0.12147316370844755,
+          "11314-22049Hz": 0.16206736744165307,
+          "11314-16000Hz": 0.14881005421577262,
+          "16000-22049Hz": 0.17238913273894568
+        },
+        "mid_side_ratio_db": -0.06,
+        "gate_alignment": {
+          "left": {
+            "build_up_ms": 18.889,
+            "plateau_level_db": -3.25,
+            "plateau_ripple_db": 1.553,
+            "plateau_droop_db_per_s": -33.425,
+            "knee_time_ms": 291.27,
+            "fall_rate_db_per_s": -158.65,
+            "knee_r2": 0.9873,
+            "gate_length_ms_at_20db": 304.24
+          },
+          "right": {
+            "build_up_ms": 18.39,
+            "plateau_level_db": -3.21,
+            "plateau_ripple_db": 1.462,
+            "plateau_droop_db_per_s": 7.384,
+            "knee_time_ms": 187.007,
+            "fall_rate_db_per_s": -161.94,
+            "knee_r2": 0.9892,
+            "gate_length_ms_at_20db": 301.75
+          },
+          "knee_time_diff_ms": 104.263
+        },
+        "dominant_lag_ms": 2.494,
+        "dominant_lag_correlation": -0.1778
+      },
+      "ltas_third_octave": [
+        [
+          10.1,
+          -73.06
+        ],
+        [
+          20.2,
+          -68.94
+        ],
+        [
+          32.0,
+          -72.91
+        ],
+        [
+          40.3,
+          -77.19
+        ],
+        [
+          50.8,
+          -73.12
+        ],
+        [
+          64.0,
+          -70.32
+        ],
+        [
+          80.6,
+          -68.54
+        ],
+        [
+          101.6,
+          -67.09
+        ],
+        [
+          128.0,
+          -67.28
+        ],
+        [
+          161.3,
+          -70.23
+        ],
+        [
+          203.2,
+          -68.84
+        ],
+        [
+          256.0,
+          -69.43
+        ],
+        [
+          322.5,
+          -68.43
+        ],
+        [
+          406.4,
+          -69.94
+        ],
+        [
+          512.0,
+          -69.25
+        ],
+        [
+          645.1,
+          -68.75
+        ],
+        [
+          812.7,
+          -70.3
+        ],
+        [
+          1024.0,
+          -68.64
+        ],
+        [
+          1290.2,
+          -69.64
+        ],
+        [
+          1625.5,
+          -69.61
+        ],
+        [
+          2048.0,
+          -69.75
+        ],
+        [
+          2580.3,
+          -70.49
+        ],
+        [
+          3251.0,
+          -70.65
+        ],
+        [
+          4096.0,
+          -71.56
+        ],
+        [
+          5160.6,
+          -72.26
+        ],
+        [
+          6502.0,
+          -72.92
+        ],
+        [
+          8192.0,
+          -73.66
+        ],
+        [
+          10321.3,
+          -74.47
+        ],
+        [
+          13004.0,
+          -75.63
+        ],
+        [
+          16384.0,
+          -76.49
+        ],
+        [
+          20642.5,
+          -84.06
+        ]
+      ],
+      "resonant_peaks": [
+        {
+          "freq_hz": 341.7,
+          "level_db": -66.69,
+          "q": 11.37
+        },
+        {
+          "freq_hz": 139.6,
+          "level_db": -66.71,
+          "q": 1.44
+        },
+        {
+          "freq_hz": 966.5,
+          "level_db": -66.91,
+          "q": 8.9
+        },
+        {
+          "freq_hz": 248.7,
+          "level_db": -67.36,
+          "q": 5.76
+        },
+        {
+          "freq_hz": 645.1,
+          "level_db": -67.6,
+          "q": 3.67
+        },
+        {
+          "freq_hz": 215.3,
+          "level_db": -67.83,
+          "q": 3.76
+        },
+        {
+          "freq_hz": 2169.8,
+          "level_db": -68.11,
+          "q": 8.65
+        },
+        {
+          "freq_hz": 1290.2,
+          "level_db": -68.43,
+          "q": 2.83
+        },
+        {
+          "freq_hz": 1878.0,
+          "level_db": -68.67,
+          "q": 5.01
+        }
+      ],
+      "filename": "NonLin_9.8s_0H.wav",
+      "params": {
+        "time": 9.8,
+        "high": 0
+      }
+    }
+  ]
+}

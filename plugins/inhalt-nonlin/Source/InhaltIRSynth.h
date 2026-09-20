@@ -1,0 +1,294 @@
+#pragma once
+
+#include "../../common/dsp/BandShelf.h"
+#include "../../common/dsp/CircularDelayBuffer.h"
+#include "../../common/dsp/OnePoleFilter.h"
+
+#include <array>
+#include <vector>
+
+// Time-domain synthesis of Inhalt's gated stereo impulse response - the offline C++ counterpart
+// to ml-toolkit/effects/nonlin/model.py's NonLinGatedFDN. That Python module renders via
+// frequency-sampling ONLY for gradient-fit speed (hundreds of Adam steps); this class is called
+// once per parameter change on a background thread (see InhaltIRWorker), so a plain per-sample
+// time-domain simulation - exact, no circular-aliasing concern at all - is both simpler and
+// sufficient. Keep the two in sync by construction, not by convention: every constant here
+// (delay sets, feedback-gain ceiling, gate-envelope formula) is copied from that module's own
+// constants/derivation, not re-derived - see model.py's docstring for why each one is what it is.
+//
+// Two fully INDEPENDENT 8-line tanks (left/right), not one shared Hadamard-mixed tank split
+// across channels the way AuraFDNEngine.h's does (see that file's own header comment on why:
+// mixing all 8 lines through one matrix means the two halves share every mode, which is not
+// decorrelation). The measured hardware (effects/nonlin/findings.md) runs two genuinely
+// independent networks - IACC over +-1ms of 0.006-0.037, not a fixed inter-channel delay
+// masquerading as decorrelation.
+//
+// JUCE-free, like every other hand-rolled DSP class in this catalog (ShieldsFDNEngine,
+// AuraFDNEngine, ...) - callable from a standalone clang++ diagnostic, not just from JUCE code.
+namespace inhalt
+{
+
+class InhaltIRSynth
+{
+public:
+    struct Params
+    {
+        // Tank (in feedback loop).
+        float feedbackGain = 0.78f;   // 0 < gain <= maxFeedbackGain
+        float dampingWeight = 0.5f;   // 0 < weight <= maxDampingWeight, one-pole per-line HF damping
+
+        // Input tilt (High's tonal effect) - applied ONCE to the closed-loop tank output, not
+        // recirculated; see model.py's NonLinGatedFDN.forward() for why this is mathematically an
+        // output-stage multiply on the whole tank spectrum even though it's conceptually "the
+        // input tilt" (LTI systems commute a single non-recirculated filter stage either way).
+        float tiltLowGain = 1.0f;
+        float tiltHighGain = 1.0f;
+        float tiltPivotHz = 1500.0f;
+
+        // Gate envelope (Time's timing effect) - explicit, dB-domain, applied after the tank/tilt
+        // stage. Every field here has a directly-measured twin in
+        // core.features.gate_envelope_params() - see effects/nonlin/findings.md.
+        //
+        // buildUpMs/kneeSoftnessMs are SHARED across all four decay bands below (not per-band).
+        // kneeTimeMs was ALSO believed shared - "the knee lands at essentially the same time in
+        // every octave band" - until a real "still trails the real capture's own level in the
+        // deep tail" complaint led to actually checking that claim directly: it does not hold.
+        // core.features.band_gate_params shows real hardware's own knee time varies by tens to
+        // over a hundred ms by octave band (e.g. 163ms at 44-89Hz vs. 76ms at 88-177Hz for the
+        // same Time=2.2 capture) - promoted to per-band below, see kneeTimeSubLowMs's own comment.
+        // buildUpMs shows an even larger, cleaner per-band pattern in the same data (roughly
+        // 45-80ms in the low bands vs. 2-18ms in the top two octaves, consistent across almost
+        // every Time setting) - NOT yet promoted, flagged here rather than silently assumed fine:
+        // unlike kneeTimeMs's own cross-check (see kneeTimeSubLowMs's comment on canceling the
+        // analysis filter's own smearing algebraically), build-up's per-band spread has not been
+        // separated from the octave analysis filter's own inherent rise-time artifact (a narrower
+        // bandpass filter settles more slowly for a purely mathematical reason, independent of
+        // whatever it's measuring) - a real per-band synthesis effect may or may not be hiding
+        // underneath that artifact, not yet checked.
+        float buildUpMs = 3.0f;
+        float kneeSoftnessMs = 4.0f;
+
+        // Per-band plateau droop / fall rate - REPLACES a single broadband
+        // plateauDroopDbPerSec/fallRateDbPerSec (see git history for that version) after a real
+        // "huffy, low-mid resonance... rings out longer than the IR's" complaint traced to a
+        // genuine architectural gap: core.features.band_gate_params shows real hardware's decay
+        // rate varies dramatically by octave band (e.g. roughly -35 to -48dB/s across 44Hz-5.6kHz
+        // at Time=9.8/High=0, but only -13dB/s in the top octave), while a single broadband dB
+        // multiplier can only ever apply ONE rate to the whole signal. Direct measurement also
+        // showed no single tank dampingWeight value can reproduce this shape (fixing the
+        // under-decaying low-mids requires over-damping the highs by 3-6x - a structural ceiling
+        // of the one-pole-per-line damping filter, not a calibration miss) - seeInhaltIRSynth.cpp's
+        // own crossover-split comment for the fix instead: split the signal into four bands
+        // (below subLowLowCrossoverHz, between it and lowMidCrossoverHz, between lowMidCrossoverHz
+        // and midHighCrossoverHz, above midHighCrossoverHz) and gate each independently with its
+        // own directly-measured decay rate, then sum back together.
+        //
+        // The low band was originally ONE band (below lowMidCrossoverHz, covering both the
+        // 44-89Hz and 88-177Hz analysis octaves), split into subLow/low after a real "way more low
+        // end than the IR's" complaint: those two analysis octaves have real, meaningfully
+        // different decay rates of their own (-207 vs -173dB/s at Time=2.2, for instance) that one
+        // shared parameter structurally cannot track independently - see
+        // build_measured_gate_curves.py's own _PER_BAND_GROUPS comment for the measurement.
+        //
+        // The high band was ALSO originally one band (above midHighCrossoverHz, the whole
+        // 11314-22049Hz octave), split into high/veryHigh after a real "more loudness in the
+        // 4k-5k...overall EQ" complaint traced - after ruling out the tilt shelf itself, which
+        // measured as already cutting MORE than the real hardware's own spec (-16.6dB vs. the
+        // spec's own -9.1dB at High=-9) - to this exact same one-band-can't-track-two-rates
+        // problem one octave higher: 11.3-16kHz decays steeply (-395 to -440dB/s at most settings)
+        // while 16-22kHz decays much more slowly (-85 to -241dB/s), a real, consistent ~200-350dB/s
+        // gap the single old "high" parameter averaged away. Shares kneeTimeHighMs/buildUpMs with
+        // the (now lower) high band rather than getting its own - only the decay RATE was found to
+        // differ between these two sub-bands, not the timing.
+        float plateauDroopSubLowDbPerSec = 0.0f;
+        float plateauDroopLowDbPerSec = 0.0f;
+        float plateauDroopMidDbPerSec = 0.0f;
+        float plateauDroopHighDbPerSec = 0.0f;
+        float plateauDroopVeryHighDbPerSec = 0.0f;
+        float fallRateSubLowDbPerSec = -250.0f;
+        float fallRateLowDbPerSec = -250.0f;
+        float fallRateMidDbPerSec = -250.0f;
+        float fallRateHighDbPerSec = -250.0f;
+        float fallRateVeryHighDbPerSec = -250.0f;
+
+        // Per-band knee time - REPLACES a single shared kneeTimeMs (see this struct's own comment
+        // above on buildUpMs/kneeSoftnessMs for why). Calibrating a per-band TARGET here is less
+        // direct than plateauDroop/fallRate's own additive dB-domain correction: a per-band
+        // knee_time_ms measured directly off either the render or the real capture is smeared by
+        // the analysis filter's own group delay, confirmed by measuring the render itself - even
+        // with a single TRUE shared kneeTimeMs, core.features.band_gate_params measures a real
+        // 40-100ms per-band SPREAD that isn't a synthesis defect at all, just the filter. Since
+        // that smearing is the SAME shared filter applied to both signals, it cancels out of
+        // (real_measured_band - render_measured_band) algebraically, leaving the genuine per-band
+        // hardware target once added back to whatever kneeTimeMs the render was already using -
+        // see build_measured_gate_curves.py's own _KNEE_TIME_PER_BAND_CPP_MEASURED_TARGET comment
+        // for the exact derivation and why it must be measured per-capture rather than at one
+        // isolated setting (kneeSoftnessMs varies 0.45-29.7ms across Time, and a sharper or softer
+        // knee transition smears differently through each band's own narrow analysis filter).
+        float kneeTimeSubLowMs = 150.0f;
+        float kneeTimeLowMs = 150.0f;
+        float kneeTimeMidMs = 150.0f;
+        float kneeTimeHighMs = 150.0f;
+
+        // Early-release excess (dB) - a SECOND, additive gate-shape term added BEFORE the
+        // per-band split above (when this engine still had one broadband fallRateDbPerSec),
+        // fixing a real gap that rate alone couldn't close: real captures' post-knee fall is
+        // CURVED, not a single constant dB/s rate - measured directly on the real captures (see
+        // build_measured_gate_curves.py's own _build_early_excess_curves docstring), the level
+        // 20ms after the knee sits earlyExcessDb dB BELOW (or, at two settings, above) where a
+        // pure straight-line extrapolation of the broadband fall rate would put it. Kept as a
+        // single SHARED value applied identically inside each band's own gate formula (not yet
+        // re-measured per band) now that the per-band split above exists - plausibly redundant
+        // with it (per-band rates summed back together may already reproduce the curved broadband
+        // shape as an emergent property, without needing this at all), not yet verified either
+        // way. Saturates smoothly to this fixed dB offset over earlyExcessTauMs (not an ongoing
+        // rate - it adds a one-time "kick" near the knee, then gets out of the way), so it doesn't
+        // disturb the already-verified deep-tail fallRateDbPerSec calibration. Zero by default -
+        // a neutral no-op matching this file's own convention for every other field here.
+        float earlyExcessDb = 0.0f;
+        float earlyExcessTauMs = 8.0f;
+
+        // Input diffuser (ahead of both tanks - see the Diffuser struct's own comment; TWO
+        // independent instances, one per channel, since the direct tap below reads their raw
+        // output). Fitted jointly with feedbackGain/dampingWeight, not hand-tuned - see
+        // ml-toolkit/effects/nonlin/model.py's DIFFUSER_DELAY_SAMPLES_AT_44K/MAX_DIFFUSER_GAIN and
+        // core.fit.onset_density_loss for why this exists and how it's fit.
+        float diffuserGain = 0.45f;
+
+        // Direct/early-arrival tap - each channel's OWN diffuser output, scaled by this gain and
+        // summed with that channel's tank output BEFORE tilt/gate. Added after a real, ear-caught
+        // complaint ("the convolution version sounds almost like a bow across strings, while the
+        // version you built still retains the pluck/attack/envelope of the synth"): direct
+        // measurement of the real captures found their own response starts at 13-16% of eventual
+        // peak on the VERY FIRST SAMPLE (RMS over the first 10ms averaging ~35-49% of the
+        // established 40-50ms RMS) - genuinely immediate, not built up from silence. This engine's
+        // tank alone cannot reproduce that: its shortest delay line (~10ms) means the tank's own
+        // output is EXACTLY ZERO until that first round trip completes, a true silence gap the
+        // real hardware doesn't have. Convolving that silent gap with a percussive input passes
+        // the input's own attack through completely unprocessed for ~10ms, before the reverb
+        // "catches up" - audibly different from real hardware, which starts blending from sample
+        // zero. Hand-measured constant (Time/High-independent within the real capture set's own
+        // sampling) - see InhaltParameterMap.cpp's own directGainConstant comment for the
+        // calibration and its known residual gap at very negative High.
+        float directGain = 0.96f;
+
+        // Stereo narrowing correlation - a real, ear-caught "the IR's and the algorithm plugin
+        // seem to have very different stereo widths" complaint, traced to a genuine hardware
+        // behaviour this engine's own two-tank architecture cannot reproduce on its own: the two
+        // independent tanks (and their own independent diffusers/direct taps) decorrelate from
+        // sample zero, at every Time setting, by construction - checked directly, not assumed
+        // (no significant correlation at any lag at either Time=0.1 or Time=9.8, peak <=0.10).
+        // Real hardware's own two channels are NOT like that: core.features.
+        // dominant_lag_correlation found them 97-98% correlated at a fixed lag of +2.49ms at
+        // Time=0.1/0.8 - essentially a mono signal with a small hardware inter-channel delay -
+        // decaying (through a sign flip) to a modest -0.18 to -0.24 residual by Time=4.8-9.8.
+        // Applied in render() as a post-process blend toward a shared, delayed mono reference
+        // derived from this engine's own already-independent left/right (see that function's own
+        // comment for the exact formula) - not baked into the tank/diffuser topology, since the
+        // topology's independence is still correct and wanted for the underlying tail, just
+        // needs blending down at short Time. 0 = neutral no-op (today's fully-independent
+        // behaviour), matching this struct's own convention; the sign is kept (not just
+        // magnitude) to reproduce the measured short-vs-long-Time flip directly.
+        float stereoNarrowCorrelation = 0.0f;
+    };
+
+    static constexpr int numLines = 8;
+    static constexpr int numDiffuserStages = 3;
+
+    // Matches ml-toolkit/effects/nonlin/model.py's MAX_FEEDBACK_GAIN exactly - see that module's
+    // "Feedback gain ceiling" docstring section for the empirical derivation (0.985, inherited
+    // from AmbienceFDN, left an under-converged near-DC mode at this topology's ~16ms mean delay;
+    // 0.95 measured two orders of magnitude better). This C++ engine doesn't face the same
+    // frequency-sampling aliasing risk (it's an exact time-domain simulation), but the ceiling is
+    // still capped here to keep the two implementations' valid parameter range identical - a
+    // ParameterMap-fitted value the Python side would refuse is not something this should render
+    // "successfully" with different-sounding results.
+    static constexpr float maxFeedbackGain = 0.95f;
+    static constexpr float maxDampingWeight = 0.99f;
+
+    // Per-band gate crossovers - fixed architecture constants, not fitted/calibrated (unlike the
+    // per-band decay rates themselves). Chosen directly from where core.features.band_gate_params'
+    // own 9 analysis bands (octave_bands()) show the real per-band decay pattern actually breaks:
+    // Time=9.8's own H=0/-4/-9 sweep (the cleanest, least noisy real data - longest gate, most
+    // samples) shows a fairly flat mid-region (~-32 to -40dB/s plateau droop from 177Hz-5.6kHz)
+    // bracketed by a distinctly steeper low end (44-177Hz, ~-47 to -48dB/s) and a distinctly
+    // shallower top octave (11.3-22kHz, ~-13dB/s) - both fall_rate_db_per_s and
+    // plateau_droop_db_per_s agree on the top-octave break specifically, across every Time/High
+    // setting checked, not just this one. Matches the analysis bands' own boundaries exactly
+    // (88.4-176.8Hz and 5657-11314Hz) so the synthesis bands stay directly interpretable against
+    // the measurement bands that motivated them.
+    //
+    // subLowLowCrossoverHz added later, splitting the original low band in two (see
+    // Params::plateauDroopSubLowDbPerSec's own comment) - same convention, the shared edge between
+    // the 44-89Hz and 88-177Hz analysis octaves (125Hz center / sqrt(2) = 88.39Hz).
+    static constexpr float subLowLowCrossoverHz = 88.4f;
+    static constexpr float lowMidCrossoverHz = 176.8f;
+    static constexpr float midHighCrossoverHz = 11313.7f;
+
+    // highVeryHighCrossoverHz added later, splitting the original high band in two (see
+    // Params::plateauDroopVeryHighDbPerSec's own comment) - unlike every other crossover here,
+    // there was no PRE-EXISTING analysis-band edge to reuse (octave_bands()' own 16kHz-center band
+    // runs 11313.7-22049Hz as ONE band, all the way to Nyquist) - 16000Hz is that band's own
+    // center frequency, the natural halfway point for splitting it, chosen the same way the
+    // original band boundaries were (from where core.features.band_gate_params, run with a custom
+    // [(11314,16000),(16000,22049)] split, shows the real per-band decay pattern actually breaks).
+    static constexpr float highVeryHighCrossoverHz = 16000.0f;
+
+    // Fixed inter-channel delay for the stereo-narrowing blend (see Params::stereoNarrowCorrelation's
+    // own comment) - core.features.dominant_lag_correlation measured this at EXACTLY +2.49ms in
+    // every one of the 9 real captures, independent of Time or High, so it's a fixed architecture
+    // constant here too, not a curve.
+    static constexpr float stereoNarrowFixedDelayMs = 2.49f;
+
+    // Renders `numSamples` of a stereo gated IR at `sampleRate` into left/right (resized to
+    // numSamples, overwritten). Allocates (line buffer sizing) - never call this on the audio
+    // thread; see InhaltIRWorker, which is exactly the class built to keep this off it.
+    static void render(const Params& params, double sampleRate, int numSamples,
+                        std::vector<float>& left, std::vector<float>& right);
+
+private:
+    struct Tank
+    {
+        std::array<wildjag::dsp::CircularDelayBuffer, numLines> lineBuffers;
+        std::array<int, numLines> lineDelaySamples {};
+        std::array<wildjag::dsp::OnePoleFilter, numLines> dampingFilter;
+
+        void prepare(const std::array<float, numLines>& delayMs, double sampleRate);
+
+        // Runs one sample: reads each line, dampens, Hadamard-mixes, scales by feedbackGain,
+        // injects `input` (the impulse - 1.0 at n=0, 0.0 thereafter) and writes back. Returns the
+        // tank's raw output for this sample (sum of the values read at the START of the call,
+        // before this sample's mix/inject - matches AuraFDNEngine.cpp's own convention).
+        float processSample(float input, float feedbackGain, float dampingWeight) noexcept;
+
+        void reset() noexcept;
+    };
+
+    // A short chain of Schroeder allpass diffusers, applied to the impulse before it feeds a tank
+    // (matches model.py's allpass_chain_transfer_function - see that function's docstring for the
+    // full "why this exists" story: a bare impulse into an 8-line FDN measured a real, ear-caught
+    // onset-density gap against the real hardware captures). TWO independent instances (different
+    // delay sets, matching leftDelaysMs/rightDelaysMs's own asymmetric-decorrelation convention) -
+    // each channel's OWN diffuser output also feeds that channel's own direct/early tap (see
+    // Params::directGain), so a shared mono diffuser would have correlated the two channels'
+    // earliest arrivals, undoing the stereo decorrelation work already done. Delays are FIXED
+    // (topology, like the tank's own delay lines - not fitted); diffuserGain is the one fitted
+    // parameter, shared across both instances and every stage.
+    struct Diffuser
+    {
+        std::array<wildjag::dsp::CircularDelayBuffer, numDiffuserStages> stageBuffers;
+        std::array<int, numDiffuserStages> stageDelaySamples {};
+
+        void prepare(const std::array<float, numDiffuserStages>& delayMs, double sampleRate);
+        float processSample(float input, float gain) noexcept;
+        void reset() noexcept;
+    };
+
+    static const std::array<float, numLines> leftDelaysMs;
+    static const std::array<float, numLines> rightDelaysMs;
+    static const std::array<std::array<float, numLines>, numLines> hadamard;
+    static const std::array<float, numDiffuserStages> leftDiffuserDelaysMs;
+    static const std::array<float, numDiffuserStages> rightDiffuserDelaysMs;
+};
+
+} // namespace inhalt

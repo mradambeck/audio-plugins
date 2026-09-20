@@ -21,6 +21,7 @@ and CMake, styled with a shared "hardware panel" visual language (see
 | Strike | [`plugins/strike-synth/`](plugins/strike-synth/) | Extended Karplus-Strong physical-modeling string synth |
 | Aura | [`plugins/aura-reverb/`](plugins/aura-reverb/) | Algorithmic reverb modeled on the AMS RMX16's Ambience program |
 | Concrete | [`plugins/concrete-sampler/`](plugins/concrete-sampler/) | Vintage sampler emulation instrument modeling twelve classic hardware samplers |
+| Inhalt | [`plugins/inhalt-nonlin/`](plugins/inhalt-nonlin/) | Gated reverb modeled on the AMS RMX16's NonLin program (in development - see that folder's README) |
 
 [`plugins/convolution-base/`](plugins/convolution-base/) is deliberately absent from that table: it
 is a development harness for the shared convolution reverb in
@@ -53,7 +54,8 @@ audio-plugins/
 │   ├── strike-synth/
 │   ├── aura-reverb/
 │   ├── concrete-sampler/
-│   └── convolution-base/        # Dev harness for common/convolution/ -- NOT a shipped plugin
+│   ├── convolution-base/        # Dev harness for common/convolution/ -- NOT a shipped plugin
+│   └── inhalt-nonlin/           # In development -- not yet in installers/, the site, or the download counter
 ├── installers/               # Combined "install everything" .pkg builder
 ├── scripts/                  # build-all.sh / test-all.sh (loop over all plugins)
 ├── .claude/skills/            # Project-scoped Claude Code skills for this catalog's conventions
