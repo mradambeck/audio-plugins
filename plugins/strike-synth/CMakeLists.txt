@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Strike VERSION 0.1.3)
+project(Strike VERSION 0.1.4)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
 
 juce_add_plugin(Strike
     COMPANY_NAME "Wild Jag"
@@ -20,7 +21,8 @@ juce_add_plugin(Strike
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE WJag
     PLUGIN_CODE Strk
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 Standalone ${WILDJAG_AAX_FORMAT}
+    AAX_CATEGORY "AAX_ePlugInCategory_SWGenerators"
     PRODUCT_NAME "Strike"
 )
 
