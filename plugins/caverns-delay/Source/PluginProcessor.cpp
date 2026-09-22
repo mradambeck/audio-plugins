@@ -4,6 +4,10 @@
 #include <cmath>
 #include <iterator>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Note subdivisions offered for tempo sync, longest to shortest, each expressed as a
@@ -276,6 +280,10 @@ CavernsAudioProcessor::CavernsAudioProcessor()
     modSpeedParam = apvts.getRawParameterValue(modSpeedParamID);
     modDepthParam = apvts.getRawParameterValue(modDepthParamID);
     degradeParam = apvts.getRawParameterValue(degradeParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("caverns", JucePlugin_VersionString);
+   #endif
 }
 
 CavernsAudioProcessor::~CavernsAudioProcessor() = default;
@@ -824,7 +832,14 @@ double CavernsAudioProcessor::getTailLengthSeconds() const { return 4.0; }
 
 int CavernsAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int CavernsAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void CavernsAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void CavernsAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("caverns", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String CavernsAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void CavernsAudioProcessor::changeProgramName(int, const juce::String&) {}
