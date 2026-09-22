@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.22)
 # ramped bypass), but NOT ConvolutionProcessor/ConvolutionEditor/IRLoadWorker/ConvolutionVariant -
 # those are shaped around "pick a bundled IR from a table", which doesn't fit continuously-knobbed
 # synthesis. See README.md before reaching for wildjag_add_convolution_core()/_ui() here.
-project(Inhalt VERSION 0.1.0)
+project(Inhalt VERSION 0.1.1)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
 
 set(INHALT_CONVOLUTION_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../common/convolution/ConvolutionEngine.cpp)
 
@@ -46,7 +47,8 @@ juce_add_plugin(Inhalt
     # plugin is the newer, still-pre-release one (see README's Status), so it changed rather than
     # the already-installer-ready variant.
     PLUGIN_CODE Nlin
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 Standalone ${WILDJAG_AAX_FORMAT}
+    AAX_CATEGORY "AAX_ePlugInCategory_Reverb"
     PRODUCT_NAME "Inhalt - Reverb"
 )
 

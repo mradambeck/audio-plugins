@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # Consequently it is registered in build-and-test.yml and scripts/, and deliberately NOT in
 # release.yml, installers/, sync-site-versions.yml, the site, or the download counter. See the
 # README here before adding it to any of those.
-project(ConvBase VERSION 0.1.0)
+project(ConvBase VERSION 0.1.1)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,6 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddConvolutionCore.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
 
 juce_add_plugin(ConvBase
     COMPANY_NAME "Wild Jag"
@@ -32,7 +33,8 @@ juce_add_plugin(ConvBase
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE WJag
     PLUGIN_CODE CvBs
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 Standalone ${WILDJAG_AAX_FORMAT}
+    AAX_CATEGORY "AAX_ePlugInCategory_Reverb"
     PRODUCT_NAME "ConvBase - Convolution"
 )
 

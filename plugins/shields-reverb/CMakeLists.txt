@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Shields VERSION 0.6.1)
+project(Shields VERSION 0.6.2)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
 
 juce_add_plugin(Shields
     COMPANY_NAME "Wild Jag"
@@ -22,7 +23,8 @@ juce_add_plugin(Shields
     COPY_PLUGIN_AFTER_BUILD TRUE
     PLUGIN_MANUFACTURER_CODE WJag
     PLUGIN_CODE Shld
-    FORMATS AU VST3 Standalone
+    FORMATS AU VST3 Standalone ${WILDJAG_AAX_FORMAT}
+    AAX_CATEGORY "AAX_ePlugInCategory_Reverb"
     PRODUCT_NAME "Shields - Reverb"
 )
 
