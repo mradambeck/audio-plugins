@@ -1,5 +1,9 @@
 #include "PluginProcessor.h"
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     constexpr float dcBlockerFrequency = 20.0f;
@@ -156,6 +160,10 @@ CorrosionAudioProcessor::CorrosionAudioProcessor()
     bypassParam = apvts.getRawParameterValue(bypassParamID);
     rectBlendParam = apvts.getRawParameterValue(rectBlendParamID);
     rectMixParam = apvts.getRawParameterValue(rectMixParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("corrosion", JucePlugin_VersionString);
+   #endif
 }
 
 CorrosionAudioProcessor::~CorrosionAudioProcessor() = default;
@@ -514,7 +522,14 @@ double CorrosionAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 int CorrosionAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int CorrosionAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void CorrosionAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void CorrosionAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("corrosion", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String CorrosionAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void CorrosionAudioProcessor::changeProgramName(int, const juce::String&) {}

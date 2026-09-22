@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Corrosion VERSION 0.1.6)
+project(Corrosion VERSION 0.2.0)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddTelemetry.cmake)
 
 juce_add_plugin(Corrosion
     COMPANY_NAME "Wild Jag"
@@ -45,14 +46,17 @@ target_sources(Corrosion
 target_compile_definitions(Corrosion
     PUBLIC
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        JUCE_USE_CURL=1
         JUCE_VST3_CAN_REPLACE_VST2=0
+    PRIVATE
+        WILDJAG_TELEMETRY_ENABLED=1
 )
 
 target_link_libraries(Corrosion
     PRIVATE
         CorrosionBinaryData
         HardwarePanelLookAndFeel
+        WildJagTelemetry
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC

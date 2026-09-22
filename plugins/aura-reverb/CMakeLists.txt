@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Aura VERSION 0.2.2)
+project(Aura VERSION 0.3.0)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning. Beta: the real
     # hardware-panel UI (juce-hardware-panel-ui skill, mockup-approved and screenshot-verified
     # against plugins/aura-reverb/mockups/aura-mockup-v1.html) is in place and Low Cut is wired, but no
@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddTelemetry.cmake)
 
 juce_add_plugin(Aura
     COMPANY_NAME "Wild Jag"
@@ -50,14 +51,17 @@ target_sources(Aura
 target_compile_definitions(Aura
     PUBLIC
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        JUCE_USE_CURL=1
         JUCE_VST3_CAN_REPLACE_VST2=0
+    PRIVATE
+        WILDJAG_TELEMETRY_ENABLED=1
 )
 
 target_link_libraries(Aura
     PRIVATE
         AuraBinaryData
         HardwarePanelLookAndFeel
+        WildJagTelemetry
         juce::juce_audio_utils
     PUBLIC
         juce::juce_recommended_config_flags

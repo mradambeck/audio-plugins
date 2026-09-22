@@ -2,6 +2,10 @@
 
 #include <cmath>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // The twelve machines from concrete-sampler-plugin-plan.md's machine table (see
@@ -135,6 +139,10 @@ ConcreteAudioProcessor::ConcreteAudioProcessor()
     apvts.addParameterListener(machineParamID, this);
 
     startThread();
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("concrete", JucePlugin_VersionString);
+   #endif
 }
 
 ConcreteAudioProcessor::~ConcreteAudioProcessor()
@@ -968,6 +976,14 @@ void ConcreteAudioProcessor::setCurrentProgram(int index)
     // both entry points in sync by construction, rather than duplicating the apply logic here too.
     if (auto* machine = apvts.getParameter(machineParamID))
         machine->setValueNotifyingHost(machine->convertTo0to1((float) (index + 1)));
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    // Deliberately here, not in applyMachine() - that runs from parameterChanged(), which per its
+    // own comment may be called from the audio thread for automation-driven changes. This
+    // function is the host-facing setCurrentProgram() entry point, called from the message
+    // thread same as every other Wild Jag plugin's preset-loaded telemetry call site.
+    wildjag::Telemetry::sendPresetLoaded("concrete", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
 }
 
 const juce::String ConcreteAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }

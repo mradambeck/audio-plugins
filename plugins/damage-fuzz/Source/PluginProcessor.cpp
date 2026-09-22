@@ -1,5 +1,9 @@
 #include "PluginProcessor.h"
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // A hard two-level comparator: whichever side of thresholdOffset the driven signal falls
@@ -198,6 +202,10 @@ DamageAudioProcessor::DamageAudioProcessor()
     oscFreqParam = apvts.getRawParameterValue(oscFreqParamID);
     wetParam = apvts.getRawParameterValue(wetParamID);
     slowReleaseParam = apvts.getRawParameterValue(slowReleaseParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("damage", JucePlugin_VersionString);
+   #endif
 }
 
 DamageAudioProcessor::~DamageAudioProcessor() = default;
@@ -562,7 +570,14 @@ double DamageAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 int DamageAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int DamageAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void DamageAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void DamageAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("damage", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String DamageAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void DamageAudioProcessor::changeProgramName(int, const juce::String&) {}

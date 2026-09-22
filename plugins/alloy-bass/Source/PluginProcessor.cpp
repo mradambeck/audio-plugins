@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Choice index 0 is the highest octave in both lists (+2 / -1) - the dropdowns list values
@@ -648,6 +652,10 @@ AlloyAudioProcessor::AlloyAudioProcessor()
     mixToneParam = apvts.getRawParameterValue(mixToneParamID);
     mixOutputParam = apvts.getRawParameterValue(mixOutputParamID);
     mixAgeParam = apvts.getRawParameterValue(mixAgeParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("alloy", JucePlugin_VersionString);
+   #endif
 }
 
 AlloyAudioProcessor::~AlloyAudioProcessor() = default;
@@ -1468,7 +1476,14 @@ double AlloyAudioProcessor::getTailLengthSeconds() const { return 2.0; }
 
 int AlloyAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int AlloyAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void AlloyAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void AlloyAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("alloy", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String AlloyAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void AlloyAudioProcessor::changeProgramName(int, const juce::String&) {}

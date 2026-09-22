@@ -4,6 +4,10 @@
 #include <cmath>
 #include <iterator>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Note subdivisions offered for LFO tempo sync, longest to shortest, each expressed as a
@@ -252,6 +256,10 @@ FluxAudioProcessor::FluxAudioProcessor()
     brightnessParam = apvts.getRawParameterValue(brightnessParamID);
     gritParam = apvts.getRawParameterValue(gritParamID);
     blendParam = apvts.getRawParameterValue(blendParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("flux", JucePlugin_VersionString);
+   #endif
 }
 
 FluxAudioProcessor::~FluxAudioProcessor() = default;
@@ -642,7 +650,14 @@ double FluxAudioProcessor::getTailLengthSeconds() const { return 0.0; }
 
 int FluxAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int FluxAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void FluxAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void FluxAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("flux", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String FluxAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void FluxAudioProcessor::changeProgramName(int, const juce::String&) {}
