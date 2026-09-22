@@ -1,5 +1,9 @@
 #include "PluginProcessor.h"
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Ramp time for the two live-smoothed parameters (damping, output level) - short enough to
@@ -241,6 +245,10 @@ StrikeAudioProcessor::StrikeAudioProcessor()
     filterEnvAmountParam = apvts.getRawParameterValue(filterEnvAmountParamID);
     filterAttackParam = apvts.getRawParameterValue(filterAttackParamID);
     filterDecayParam = apvts.getRawParameterValue(filterDecayParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("strike", JucePlugin_VersionString);
+   #endif
 }
 
 StrikeAudioProcessor::~StrikeAudioProcessor() = default;
@@ -836,7 +844,14 @@ double StrikeAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
 int StrikeAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int StrikeAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void StrikeAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void StrikeAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("strike", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String StrikeAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void StrikeAudioProcessor::changeProgramName(int, const juce::String&) {}

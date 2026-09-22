@@ -2,6 +2,10 @@
 
 #include <algorithm>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
@@ -125,6 +129,10 @@ ShieldsAudioProcessor::ShieldsAudioProcessor()
     wetParam = apvts.getRawParameterValue(wetParamID);
     wobbleParam = apvts.getRawParameterValue(wobbleParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("shields", JucePlugin_VersionString);
+   #endif
 }
 
 ShieldsAudioProcessor::~ShieldsAudioProcessor() = default;
@@ -366,7 +374,14 @@ double ShieldsAudioProcessor::getTailLengthSeconds() const { return 8.0; }
 
 int ShieldsAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int ShieldsAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void ShieldsAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void ShieldsAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("shields", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String ShieldsAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 void ShieldsAudioProcessor::changeProgramName(int, const juce::String&) {}
 

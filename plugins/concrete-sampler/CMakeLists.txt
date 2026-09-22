@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Concrete VERSION 0.1.1)
+project(Concrete VERSION 0.2.0)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddTelemetry.cmake)
 
 juce_add_plugin(Concrete
     COMPANY_NAME "Wild Jag"
@@ -57,7 +58,7 @@ target_sources(Concrete
 target_compile_definitions(Concrete
     PUBLIC
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        JUCE_USE_CURL=1
         JUCE_VST3_CAN_REPLACE_VST2=0
         # macOS's CoreGraphics "font smoothing" (CGContextSetShouldSmoothFonts, on by default)
         # embolds text beyond plain antialiasing - a legacy pre-Retina legibility technique that
@@ -65,12 +66,15 @@ target_compile_definitions(Concrete
         # its own rasterizer, not this). Scoped to Concrete only, not plugins/common, since this
         # plugin's pixel-art LCD font is the one place that difference is visually load-bearing.
         JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING=1
+    PRIVATE
+        WILDJAG_TELEMETRY_ENABLED=1
 )
 
 target_link_libraries(Concrete
     PRIVATE
         ConcreteBinaryData
         HardwarePanelLookAndFeel
+        WildJagTelemetry
         juce::juce_audio_utils
         juce::juce_audio_formats
     PUBLIC

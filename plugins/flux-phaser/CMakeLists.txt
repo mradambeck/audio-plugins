@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Flux VERSION 0.2.2)
+project(Flux VERSION 0.3.0)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/FetchJUCE.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddHardwarePanel.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddAAXSupport.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/cmake/AddTelemetry.cmake)
 
 juce_add_plugin(Flux
     COMPANY_NAME "Wild Jag"
@@ -45,14 +46,17 @@ target_sources(Flux
 target_compile_definitions(Flux
     PUBLIC
         JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
+        JUCE_USE_CURL=1
         JUCE_VST3_CAN_REPLACE_VST2=0
+    PRIVATE
+        WILDJAG_TELEMETRY_ENABLED=1
 )
 
 target_link_libraries(Flux
     PRIVATE
         FluxBinaryData
         HardwarePanelLookAndFeel
+        WildJagTelemetry
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC

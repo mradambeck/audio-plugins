@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <cmath>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     juce::String withSign(float v, int decimals, const char* unit)
@@ -27,6 +31,10 @@ IntruderAudioProcessor::IntruderAudioProcessor()
     outputGainDbParam = apvts.getRawParameterValue(outputGainDbParamID);
     triggerThresholdDbParam = apvts.getRawParameterValue(triggerThresholdDbParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("intruder", JucePlugin_VersionString);
+   #endif
 }
 
 IntruderAudioProcessor::~IntruderAudioProcessor() = default;

@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <iterator>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     // Note subdivisions offered for tempo sync, longest to shortest, each expressed as a multiple
@@ -278,6 +282,10 @@ GradientAudioProcessor::GradientAudioProcessor()
     crossFeedbackEnabledParam = apvts.getRawParameterValue(crossFeedbackEnabledParamID);
 
     bypassParam = apvts.getRawParameterValue(bypassParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("gradient", JucePlugin_VersionString);
+   #endif
 }
 
 GradientAudioProcessor::~GradientAudioProcessor() = default;
@@ -656,7 +664,14 @@ double GradientAudioProcessor::getTailLengthSeconds() const { return 2.0; }
 
 int GradientAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int GradientAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void GradientAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void GradientAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("gradient", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String GradientAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 
 void GradientAudioProcessor::changeProgramName(int, const juce::String&) {}

@@ -4,6 +4,10 @@
 #include <algorithm>
 #include <cmath>
 
+#if WILDJAG_TELEMETRY_ENABLED
+    #include "TelemetryClient.h"
+#endif
+
 namespace
 {
     juce::String withSign(float v, int decimals, const char* unit)
@@ -118,6 +122,10 @@ AuraAudioProcessor::AuraAudioProcessor()
     dryParam = apvts.getRawParameterValue(dryParamID);
     wetParam = apvts.getRawParameterValue(wetParamID);
     bypassParam = apvts.getRawParameterValue(bypassParamID);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendLaunch("aura", JucePlugin_VersionString);
+   #endif
 }
 
 AuraAudioProcessor::~AuraAudioProcessor() = default;
@@ -347,7 +355,14 @@ double AuraAudioProcessor::getTailLengthSeconds() const { return 10.0; }
 
 int AuraAudioProcessor::getNumPrograms() { return factoryPresets.getNumPrograms(); }
 int AuraAudioProcessor::getCurrentProgram() { return factoryPresets.getCurrentProgram(); }
-void AuraAudioProcessor::setCurrentProgram(int index) { factoryPresets.setCurrentProgram(index, apvts); }
+void AuraAudioProcessor::setCurrentProgram(int index)
+{
+    factoryPresets.setCurrentProgram(index, apvts);
+
+   #if WILDJAG_TELEMETRY_ENABLED
+    wildjag::Telemetry::sendPresetLoaded("aura", JucePlugin_VersionString, factoryPresets.getProgramName(index));
+   #endif
+}
 const juce::String AuraAudioProcessor::getProgramName(int index) { return factoryPresets.getProgramName(index); }
 void AuraAudioProcessor::changeProgramName(int, const juce::String&) {}
 
