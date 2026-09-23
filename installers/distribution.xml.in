@@ -64,6 +64,7 @@
             <line choice="choice_concrete_vst3"/>
             <line choice="choice_concrete_standalone"/>
         </line>
+        <line choice="choice_analytics"/>
     </choices-outline>
 
     <choice id="choice_caverns" title="Caverns - Delay" description="Caverns - reverb/delay plugin."/>
@@ -187,6 +188,10 @@
         <pkg-ref id="com.wildjag.concrete.standalone.pkg"/>
     </choice>
 
+    <choice id="choice_analytics" title="Opt out of anonymous usage analytics" description="Wild Jag plugins send an anonymous ping when they open and when you load a factory preset (plugin name, version, OS - never audio, project data, or anything personally identifying). Check this box to disable it for every plugin you install here." start_selected="false">
+        <pkg-ref id="com.wildjag.analytics-optout.pkg"/>
+    </choice>
+
     <pkg-ref id="com.wildjag.caverns.au.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.vst3.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.caverns.standalone.pkg" version="__CAVERNS_VERSION__" onConclusion="none">Caverns-Standalone-Component.pkg</pkg-ref>
@@ -228,4 +233,6 @@
     <pkg-ref id="com.wildjag.concrete.au.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.concrete.vst3.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.concrete.standalone.pkg" version="__CONCRETE_VERSION__" onConclusion="none">Concrete-Standalone-Component.pkg</pkg-ref>
+
+    <pkg-ref id="com.wildjag.analytics-optout.pkg" version="1.0" onConclusion="none">AnalyticsOptOut-Component.pkg</pkg-ref>
 </installer-gui-script>

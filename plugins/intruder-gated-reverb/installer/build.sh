@@ -29,6 +29,7 @@ STAGE_DIR="$INSTALLER_DIR/stage"
 OUT_DIR="$INSTALLER_DIR/output"
 
 source "$ROOT_DIR/../../installers/sign-and-notarize.sh"
+source "$ROOT_DIR/../../installers/build-analytics-optout-pkg.sh"
 
 VERSION="$("$ROOT_DIR/../../scripts/plugin-version.sh" "$ROOT_DIR" version)"
 
@@ -80,6 +81,9 @@ pkgbuild \
     --identifier "${BUNDLE_ID}.standalone.pkg" \
     --version "$VERSION" \
     "$OUT_DIR/${PLUGIN_NAME}-Standalone-Component.pkg"
+
+echo "==> Building analytics opt-out component package"
+build_analytics_optout_pkg "$OUT_DIR"
 
 if [[ "$COMPONENT_ONLY" == true ]]; then
     echo "==> Done: $OUT_DIR/${PLUGIN_NAME}-{AU,VST3,Standalone}-Component.pkg"

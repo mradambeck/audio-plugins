@@ -12,6 +12,7 @@
         <line choice="choice_au"/>
         <line choice="choice_vst3"/>
         <line choice="choice_standalone"/>
+        <line choice="choice_analytics"/>
     </choices-outline>
 
     <choice id="choice_au" title="Audio Unit (AU)" description="Installs Flux - Phaser.component into Library/Audio/Plug-Ins/Components." start_selected="true">
@@ -23,8 +24,12 @@
     <choice id="choice_standalone" title="Standalone App" description="Installs Flux - Phaser.app into Applications." start_selected="true">
         <pkg-ref id="com.wildjag.flux.standalone.pkg"/>
     </choice>
+    <choice id="choice_analytics" title="Opt out of anonymous usage analytics" description="Wild Jag plugins send an anonymous ping when they open and when you load a factory preset (plugin name, version, OS - never audio, project data, or anything personally identifying). Check this box to disable it." start_selected="false">
+        <pkg-ref id="com.wildjag.analytics-optout.pkg"/>
+    </choice>
 
     <pkg-ref id="com.wildjag.flux.au.pkg" version="__VERSION__" onConclusion="none">Flux-AU-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.flux.vst3.pkg" version="__VERSION__" onConclusion="none">Flux-VST3-Component.pkg</pkg-ref>
     <pkg-ref id="com.wildjag.flux.standalone.pkg" version="__VERSION__" onConclusion="none">Flux-Standalone-Component.pkg</pkg-ref>
+    <pkg-ref id="com.wildjag.analytics-optout.pkg" version="1.0" onConclusion="none">AnalyticsOptOut-Component.pkg</pkg-ref>
 </installer-gui-script>
