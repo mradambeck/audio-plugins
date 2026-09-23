@@ -145,6 +145,16 @@ ConcreteScreen::ConcreteScreen (ConcreteAudioProcessor& processorIn, ConcreteLoo
 {
     setSize ((int) screenWidth, (int) screenHeight);
     constructedAtMs = juce::Time::getMillisecondCounter();
+
+    // Only the first editor opened after this plugin was loaded onto a track strip should see the
+    // boot animation - reopening the editor afterward (this processor's hasShownBootAnimation
+    // already set) skips straight to the booted screen. See that flag's own comment in
+    // PluginProcessor.h.
+    if (processor.hasShownBootAnimation)
+        isBooted = true;
+    else
+        processor.hasShownBootAnimation = true;
+
     processor.processorStateBroadcaster.addChangeListener (this);
     startTimerHz (60);
 }
