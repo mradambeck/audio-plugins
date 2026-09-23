@@ -227,6 +227,15 @@ public:
     // from any thread, it always hops to the message thread internally via AsyncUpdater).
     juce::ChangeBroadcaster processorStateBroadcaster;
 
+    // ConcreteScreen's boot animation should only ever play once per instantiation - the first
+    // editor opened after this plugin was loaded onto a track, not every time the editor window
+    // is closed and reopened afterward. This processor outlives repeated open/close of the editor
+    // (a new ConcreteScreen is constructed each time), so the "have we already booted" flag has to
+    // live here rather than on the screen itself; ConcreteScreen's constructor checks and sets it.
+    // Deliberately not part of getStateInformation()/setStateInformation() - a saved project
+    // reopening this plugin fresh is itself a new load, so it should boot again too.
+    bool hasShownBootAnimation = false;
+
     // Cheap accessor for the embed-toggle's live payload readout - always returns immediately
     // (never runs encodeZoneAsFlac() on the calling thread). The TOTAL across every zone that
     // would actually be embedded (see isZoneCachedAsEmbedded() below for the per-zone breakdown -
