@@ -18,6 +18,7 @@ OUT_DIR="$INSTALLERS_DIR/output"
 STAGE_DIR="$INSTALLERS_DIR/stage"
 
 source "$INSTALLERS_DIR/sign-and-notarize.sh"
+source "$INSTALLERS_DIR/build-analytics-optout-pkg.sh"
 
 mkdir -p "$OUT_DIR"
 rm -rf "$STAGE_DIR"
@@ -41,6 +42,9 @@ for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugi
     name_upper="$(echo "$name" | tr '[:lower:]' '[:upper:]')"
     sed_args+=(-e "s/__${name_upper}_VERSION__/$version/g")
 done
+
+echo "==> Building analytics opt-out component package"
+build_analytics_optout_pkg "$STAGE_DIR"
 
 echo "==> Generating distribution.xml and welcome.html from templates"
 sed "${sed_args[@]}" "$INSTALLERS_DIR/distribution.xml.in" > "$STAGE_DIR/distribution.xml"
