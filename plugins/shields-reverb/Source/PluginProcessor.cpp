@@ -10,8 +10,21 @@ namespace
 {
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    // Captured from seven .aupreset files the user saved via a host's native preset UI (decoded
-    // from each preset's embedded jucePluginState, not hand-tuned).
+    // Seven of these (everything but Preset 45/Preset 49 below) were captured from .aupreset files
+    // the user saved via a host's native preset UI (decoded from each preset's embedded
+    // jucePluginState, not hand-tuned).
+    //
+    // Preset 45 and Preset 49 ARE hand-computed, deliberately breaking that convention: they're the
+    // Feedback/Treble Decay (damping) values a parameter sweep (analysis/validate.py's own
+    // compare_one(), swept over Feedback x Damping independently per reference) found closest to
+    // reference-irs/preset-45.wav and preset-49.wav respectively - the two real Midiverb II captures
+    // this plugin's whole default-tuning process is calibrated against (see README.md's "Offline
+    // validation workflow"). Every other parameter matches the plugin's own shipped defaults
+    // (Diffusion 0.5, Size 1.0x, Bandwidth 19kHz, Low Cut off, Bit Depth 13) - only Feedback and
+    // Treble Decay were swept, since those are what the sweep found actually move decay rate/tone
+    // per-reference; the rest of each preset's own remaining gap against its reference comes from
+    // the fixed output EQ and burst-bank timing constants in ShieldsFDNEngine.h, which aren't
+    // exposed as parameters and so can't be varied per-preset this way.
     const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
         static const std::vector<wildjag::FactoryPreset> presets = {
@@ -64,6 +77,32 @@ namespace
                 { ShieldsAudioProcessor::feedbackParamID, 65.20000457763672f },
                 { ShieldsAudioProcessor::lowCutHzParamID, 34.5f },
                 { ShieldsAudioProcessor::sizeParamID, 1.100000023841858f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 0.0f },
+            } },
+            { "Preset 45", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 19000.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 13.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 15.0f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.5f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 98.3f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 20.0f },
+                { ShieldsAudioProcessor::sizeParamID, 1.0f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 0.0f },
+            } },
+            { "Preset 49", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 19000.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 13.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 10.0f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.5f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 98.2f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 20.0f },
+                { ShieldsAudioProcessor::sizeParamID, 1.0f },
                 { ShieldsAudioProcessor::wetParamID, 200.0f },
                 { ShieldsAudioProcessor::wobbleParamID, 0.0f },
             } },
