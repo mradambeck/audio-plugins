@@ -224,33 +224,55 @@ private:
     // reinforcement at 1000/2000/3000Hz etc, on top of each other - confirmed by rendering each
     // burst line in isolation (feedback=0, all others silenced) and finding the SAME ~1000Hz peak
     // regardless of which single line was active alone, 30-40dB above the noise floor - versus the
-    // real Midiverb references in reference-irs/, whose peaks never exceed ~12dB. That gap, not
-    // this bank's per-line feedback gain, was the real source of the audible "resonant frequency"
-    // complaint. The fractional offsets below break every line out of the 1kHz-multiple grid.
+    // real Midiverb references in reference-irs/, whose peaks measure ~9.4-10.5dB above their own
+    // spectral floor (analysis/validate.py's own resonant_peak_height_db_reference - see
+    // maxBurstGain below for this bank's own current, post-fix number). That gap, not this bank's
+    // per-line feedback gain, was the real source of the audible "resonant frequency" complaint.
+    // The fractional offsets below break every line out of the 1kHz-multiple grid.
     static constexpr std::array<float, numBurstLines> baseBurstLengthsMs {
         13.4f, 37.9f, 61.2f, 89.6f, 113.3f, 149.7f
     };
 
-    // How long the burst (attack/buildup) takes at sizeMultiplier == 1, in ms - calibrated against
-    // the real Midiverb reference IRs' observed rise-to-peak time. Scaled by Size exactly like the
-    // main tank's lines, so Size remains the single "how slow is the shields" control.
-    static constexpr float baseAttackMs = 650.0f;
+    // How long the burst (attack/buildup) takes at sizeMultiplier == 1, in ms. Re-tuned (2026-09,
+    // 650->300) via analysis/validate.py's level_at_0.5s/1.0s measurements, not the rise-to-peak
+    // time alone: at 650ms the peak itself already landed close to the real Midiverb references'
+    // own ~0.3s (-46ms error), but the render stayed measurably LOUDER than the references relative
+    // to its own peak well past it (+4.4dB at 0.5s, +4.5dB at 1.0s, averaged across both
+    // preset-45/49) - the burst bank's own post-peak decay was too slow, not its rise. A
+    // baseAttackMs sweep (450 down to 150ms) showed peak timing and the 1.0-3.0s tank decay slope
+    // both degrade below ~250ms (peak error crosses validate.py's own 0.1s concern threshold at
+    // baseAttackMs=150), so 300ms was picked as the lowest value that still keeps every other
+    // metric flagged clean while closing most of the level gap (+2.9dB/+1.2dB remaining at 0.5s/
+    // 1.0s - see burstFloor below for the rest). Still scaled by Size exactly like the main tank's
+    // lines, so Size remains the single "how slow is the shields" control.
+    static constexpr float baseAttackMs = 300.0f;
 
     // Fraction of a burst line's initial amplitude it should have decayed to by baseAttackMs *
     // sizeMultiplier - i.e. how "used up" the attack is considered by the time the main tail takes
     // over. Lower = a more clearly bounded attack window; higher = a longer-lingering burst tail.
-    static constexpr float burstFloor = 0.1f;
+    // Re-tuned (2026-09, 0.1->0.05) alongside baseAttackMs above, for the same reason: a lower floor
+    // closes more of the remaining level_at_0.5s/1.0s gap (down to +2.4dB/+0.9dB averaged across
+    // both references) without moving peak timing at all (still -0.096s, same as at 0.1) - the two
+    // knobs act on the same post-peak-decay symptom but aren't fully redundant, since burstFloor
+    // shapes each line's own decay curve rather than the overall window length. Values below ~0.03
+    // start pushing peak timing past validate.py's own concern threshold, the same failure mode
+    // baseAttackMs hits below ~250ms - see analysis/validate.py and its validation_report.md.
+    static constexpr float burstFloor = 0.05f;
 
     // Ceiling on a burst line's per-sample feedback gain (see updateBurstLines()). Solving
     // g^(D/attackTimeSamples) = burstFloor for the SHORTEST line (13ms) demands g ~= 0.955 - each
     // round trip only needs to lose ~0.4dB to hit the floor in time, since a short line gets so few
     // round trips before baseAttackMs elapses. That's audible as a distinct, slowly-decaying pitch
-    // (a "boing") riding on top of the intended broadband swell, confirmed by comparing this
-    // engine's own spectral peaks against reference-irs/: ~150 peaks up to 30-50dB above the noise
-    // floor, versus the real hardware's ~40 peaks none louder than ~12dB. Capping gain trades a
-    // slightly-early floor crossing for the short lines against killing that audible ringing - the
-    // five longer lines (37-149ms have more round trips to spend in the same wall-clock window, so
-    // they land under this cap on their own and are unaffected.
+    // (a "boing") riding on top of the intended broadband swell - originally found via a "~150
+    // peaks up to 30-50dB above the noise floor" comparison against the real hardware's own "~40
+    // peaks none louder than ~12dB" (pre-fix numbers, before the mutually-prime-ms fix above AND
+    // the 2026-09 decay/attack/EQ re-tune - see analysis/validate.py). Re-measured post-re-tune: this
+    // engine's own loudest resonant peak now sits ~9.6-10.4dB above its own spectral floor, matching
+    // the real hardware's own ~9.4-10.5dB (resonant_peak_height_error_db in validation_report.md, no
+    // longer a flagged concern) - close enough that no further per-line-length tuning was needed.
+    // Capping gain trades a slightly-early floor crossing for the short lines against killing that
+    // audible ringing - the five longer lines (37-149ms) have more round trips to spend in the same
+    // wall-clock window, so they land under this cap on their own and are unaffected.
     static constexpr float maxBurstGain = 0.85f;
 
     std::array<BurstCombLine, numBurstLines> burstL, burstR;
@@ -321,32 +343,52 @@ private:
     std::array<float, numBandwidthStages> bandwidthStateL {}, bandwidthStateR {};
     float bandwidthCoefficient = 0.0f; // recomputed by setBandwidthHz() - same value for every stage
 
-    // Fixed (not user-exposed) output shelving pair, always active - corrects a broadband tonal
-    // gap found by comparing against the reference IRs. The raw tank+burst output measured ~8dB
-    // LIGHT in BOTH the 20-500Hz and 500-4000Hz bands relative to the real hardware, but ~4-5dB
-    // EXCESS above 4kHz - i.e. not really a "missing bass" problem specifically, more a broad tilt
-    // where everything below ~2-3kHz is relatively too quiet and everything above is relatively too
-    // loud. A high-shelf CUT does most of that correction in one stage (pulling the excess top end
-    // down brings the rest up in relative terms); the low-shelf boost on top of it targets the
-    // extra sub-100Hz-specific dip the spectral-difference plot showed beyond that broader tilt.
-    // Neither is exposed as its own parameter since both compensate for an inherent character gap
-    // between this topology and the real unit, not something a player would want to sweep - same
-    // rationale as the fixed Hadamard matrix or the allpass diffuser delays.
-    static constexpr float lowShelfFreqHz = 350.0f;
-    static constexpr float lowShelfGainDb = 7.0f;
-    static constexpr float highShelfFreqHz = 7000.0f;
-    static constexpr float highShelfGainDb = -5.0f;
+    // Fixed (not user-exposed) output shelving pair plus a mid-band peak, always active - corrects
+    // a broadband tonal gap found by comparing against the reference IRs. Re-fit (2026-09) via
+    // analysis/fit_output_eq.py, an offline least-squares fit against these three stages' own exact
+    // RBJ transfer functions (LTI, so the effect of any candidate constants on the render's
+    // long-term spectrum is fully predictable without a rebuild loop) - NOT the by-ear/log-spectral-
+    // distance-only process that produced the earlier constants below. That earlier process's own
+    // "no mid-band correction needed" conclusion (mid peak left inactive) turned out to be wrong:
+    // analysis/validate.py's finer 1/3-octave-band measurement (8 bands, vs. compare_wavs.py's own
+    // 3-band Low/Mid/High split) found the real gap is a ~5-7dB dip concentrated at 500Hz-2kHz that
+    // the coarser split's own averaging had hidden inside a "Mid (500-4000Hz)" bucket spanning both
+    // the dip and the much-better-matched 2-4kHz region.
+    //
+    // fit_output_eq.py's own target explicitly EXCLUDES a narrow ~81-102Hz spike (+13.6dB/+9.6dB in
+    // the raw per-band measurement) from what these three stages are fit against - that spike is
+    // almost certainly the same resonant low-band peak clustering resonant_peak_summary() measures
+    // at 96-362Hz (see maxBurstGain/baseBurstLengthsMs above), a narrow resonance no smooth
+    // shelf/peak filter can fix without measurably disturbing everything around it (confirmed
+    // directly: an early version of the fit that DIDN'T exclude it dragged several genuinely-fine
+    // neighboring bands, e.g. 64/128/161Hz, measurably worse chasing it). That gap is Step 4's
+    // problem (line-length tuning), not this EQ's.
+    static constexpr float lowShelfFreqHz = 206.5f;
+    static constexpr float lowShelfGainDb = 8.0f;
+    static constexpr float highShelfFreqHz = 8800.0f;
+    static constexpr float highShelfGainDb = -4.3f;
 
-    // No mid-band correction needed: once the spectral comparison was fixed to compare 1/3-octave-
-    // smoothed energy (see ../common/tools/compare_wavs.py's smooth_to_fractional_octave()) instead of raw FFT
-    // bins, the apparent ~10dB mid-band gap mostly turned out to be comb-filtering/resonance
-    // misalignment noise between this topology's and the real hardware's differently-spaced modes,
-    // not a genuine colour difference - the smoothed comparison put it at ~3dB, close enough to
-    // leave alone. Kept as a stage (at 0dB, i.e. inactive) rather than deleted, in case future
-    // reference IRs reveal a real mid-band gap worth addressing this way.
-    static constexpr float midPeakFreqHz = 1200.0f;
-    static constexpr float midPeakGainDb = 0.0f;
-    static constexpr float midPeakQ = 0.7f;
+    // See the shelf pair's own comment above - this mid peak is now ACTIVE (was 0dB/inactive), the
+    // main new correction from the 2026-09 re-fit: a broad (low Q), moderate boost centered in the
+    // 500Hz-2kHz dip fit_output_eq.py's own finer per-band measurement found. Q landed near its own
+    // fit lower bound (0.3) - the optimizer wants an even wider bell than allowed, consistent with
+    // the gap being a broad ~2-octave dip rather than a narrow resonance a tight peak would suit.
+    //
+    // KNOWN, ACCEPTED TRADE-OFF: activating this stage costs analysis/validate.py's own
+    // peak_time_error_s a near-constant ~0.055-0.06s (confirmed via direct in-C++ sweeps - happens
+    // regardless of this peak's own frequency 700-2500Hz, gain 2dB+, or Q; only whether it's active
+    // at all). Root cause isn't this EQ stage itself: the burst bank's OWN pre-EQ envelope already
+    // has several close-competing local maxima (the real Midiverb references' own envelope is a
+    // single clean monotonic rise to one peak; this engine's is measurably bumpier even before this
+    // stage exists), and any broadband gain change in the 500Hz-2.5kHz range is enough to tip which
+    // bump wins the render's own broadband-RMS argmax. Fixing the bumpiness itself is future work on
+    // the burst bank's own topology (BurstCombLine/updateBurstLines), not something this LTI,
+    // time-averaged-spectrum-only EQ fit can see or address - accepted here because the tonal gap
+    // this closes (multiple dB, several bands, both references) is larger and more broadly flagged
+    // than the timing cost is.
+    static constexpr float midPeakFreqHz = 1212.0f;
+    static constexpr float midPeakGainDb = 5.2f;
+    static constexpr float midPeakQ = 0.36f;
 
     Biquad lowShelfL, lowShelfR;
     Biquad highShelfL, highShelfR;

@@ -8,8 +8,18 @@ discrete-tap swelling delay or an envelope applied to a normal reverb tail. The 
 from a bank of short feedback combs ahead of an 8-line, Hadamard-mixed feedback delay network
 (FDN) tank - see "How it works" below for why the buildup needed that burst stage specifically,
 and what "buildup" actually means here. Default parameters are tuned against real Midiverb II
-captures (`reference-irs/`, scored via `../common/tools/compare_wavs.py`): ~0.94 envelope
-correlation against both preset 45 and preset 49 at time of writing.
+captures (`reference-irs/`), most recently (2026-09) via `analysis/validate.py`'s finer
+measurements (decay slope, buildup peak timing, per-band tonal balance, resonant peak prominence -
+each scored against BOTH the ml-toolkit and `../common/tools/compare_wavs.py` yardsticks, not just
+envelope correlation alone). Current numbers against both preset 45 and preset 49: ~0.94 envelope
+correlation, ~4.2-4.3dB log-spectral distance (down from ~5.1-5.2dB before this pass), decay slope
+matched to within ~0.15-0.3dB/s, and resonant peak prominence matched to within ~1dB. See
+`analysis/validation_report.md` for the full current numbers and `analysis/fit_output_eq.py` for
+how the output EQ constants were fit. One open, documented trade-off: closing most of the tonal gap
+required activating the output stage's mid-band peak, which costs buildup peak timing ~0.055-0.06s
+(the real captures' own envelope rises to a single clean peak; this engine's still has a few
+close-competing local maxima even after this pass, and any broadband EQ change nudges which one
+wins) - see `ShieldsFDNEngine.h`'s own comment on `midPeakFreqHz` for the full reasoning.
 
 See the [root README](../README.md) for shared build requirements, the exFAT/apostrophe build
 gotchas, and running tests across all plugins at once.
@@ -78,7 +88,23 @@ pieces support that, on top of the usual `ShieldsTests` unit-test target:
    python3 ../common/tools/compare_wavs.py rendered-irs/mine.wav reference-irs/preset-45.wav
    ```
 
-Rerun steps 2-3 after every parameter/topology change while tuning - that's the point of having
+4. **`analysis/validate.py`** - builds on the above with ml-toolkit's `core/features.py`
+   measurements: a fixed-window (1.0-3.0s) decay-rate fit, buildup peak timing, finer 8-band 1/3-
+   octave tonal balance (vs. `compare_wavs.py`'s own coarser 3-band split), and resonant-peak
+   prominence relative to each render's own spectral floor. Renders `ShieldsRenderIR` itself
+   (build it first, same as above) and compares against both reference captures at once:
+
+   ```sh
+   python3 analysis/validate.py
+   ```
+
+   Writes `analysis/validation_report.md` (a per-metric table plus any flagged concerns - see
+   `CONCERN_THRESHOLDS` in that script for what's currently tracked and why each threshold was
+   picked) and `analysis/validation_results.json`. `analysis/fit_output_eq.py` is a companion,
+   offline (no-rebuild-needed) least-squares fit for the fixed output EQ constants in
+   `ShieldsFDNEngine.h` - see that script's own module docstring.
+
+Rerun steps 2-4 after every parameter/topology change while tuning - that's the point of having
 them as scripts rather than one-off checks.
 
 ## How it works

@@ -1,0 +1,118 @@
+[
+  {
+    "reference": "preset-45.wav",
+    "envelope_correlation": 0.9433,
+    "log_spectral_distance_db": 4.17,
+    "decay_slope_db_per_s_rendered": -10.14,
+    "decay_slope_db_per_s_reference": -10.29,
+    "decay_slope_error_db_per_s": 0.1443,
+    "peak_time_s_rendered": 0.17,
+    "peak_time_s_reference": 0.325,
+    "peak_time_error_s": -0.155,
+    "level_at_0.5s_error_db": 2.61,
+    "level_at_1.0s_error_db": 0.32,
+    "band_errors": {
+      "20-125Hz": {
+        "rendered": -79.49370574951172,
+        "reference": -79.31209564208984,
+        "error": -0.1816
+      },
+      "125-250Hz": {
+        "rendered": -78.09683227539062,
+        "reference": -76.30812072753906,
+        "error": -1.7887
+      },
+      "250-500Hz": {
+        "rendered": -81.77510070800781,
+        "reference": -80.549072265625,
+        "error": -1.226
+      },
+      "500-1000Hz": {
+        "rendered": -79.20380401611328,
+        "reference": -75.64505767822266,
+        "error": -3.5587
+      },
+      "1000-2000Hz": {
+        "rendered": -79.57584381103516,
+        "reference": -78.02664184570312,
+        "error": -1.5492
+      },
+      "2000-4000Hz": {
+        "rendered": -83.18421173095703,
+        "reference": -81.42459869384766,
+        "error": -1.7596
+      },
+      "4000-8000Hz": {
+        "rendered": -89.4661865234375,
+        "reference": -86.8873291015625,
+        "error": -2.5789
+      },
+      "8000-16000Hz": {
+        "rendered": -97.7388916015625,
+        "reference": -97.1535873413086,
+        "error": -0.5853
+      }
+    },
+    "resonant_peak_height_db_rendered": 10.41,
+    "resonant_peak_height_db_reference": 10.51,
+    "resonant_peak_height_error_db": -0.1031
+  },
+  {
+    "reference": "preset-49.wav",
+    "envelope_correlation": 0.9421,
+    "log_spectral_distance_db": 4.29,
+    "decay_slope_db_per_s_rendered": -10.14,
+    "decay_slope_db_per_s_reference": -10.46,
+    "decay_slope_error_db_per_s": 0.3202,
+    "peak_time_s_rendered": 0.17,
+    "peak_time_s_reference": 0.325,
+    "peak_time_error_s": -0.155,
+    "level_at_0.5s_error_db": 2.62,
+    "level_at_1.0s_error_db": 1.08,
+    "band_errors": {
+      "20-125Hz": {
+        "rendered": -68.61669158935547,
+        "reference": -68.10477447509766,
+        "error": -0.5119
+      },
+      "125-250Hz": {
+        "rendered": -67.21981048583984,
+        "reference": -64.9457015991211,
+        "error": -2.2741
+      },
+      "250-500Hz": {
+        "rendered": -70.89808654785156,
+        "reference": -69.50455474853516,
+        "error": -1.3935
+      },
+      "500-1000Hz": {
+        "rendered": -68.3267822265625,
+        "reference": -65.35457611083984,
+        "error": -2.9722
+      },
+      "1000-2000Hz": {
+        "rendered": -68.69882202148438,
+        "reference": -67.3997802734375,
+        "error": -1.299
+      },
+      "2000-4000Hz": {
+        "rendered": -72.30718994140625,
+        "reference": -70.81948852539062,
+        "error": -1.4877
+      },
+      "4000-8000Hz": {
+        "rendered": -78.58916473388672,
+        "reference": -74.67179107666016,
+        "error": -3.9174
+      },
+      "8000-16000Hz": {
+        "rendered": -86.86187744140625,
+        "reference": -84.26387786865234,
+        "error": -2.598
+      }
+    },
+    "resonant_peak_height_db_rendered": 10.41,
+    "resonant_peak_height_db_reference": 9.61,
+    "resonant_peak_height_error_db": 0.8029
+  }
+]

@@ -152,14 +152,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
         juce::AudioParameterFloatAttributes()
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2); })));
 
-    // Default 99%: tuned against reference-irs/preset-45.wav and preset-49.wav (real Midiverb II
-    // captures) - both have a ~3.5s decay tail, which needs feedback pushed close to its ceiling to
-    // reproduce (85% dies out within ~1.3s, far short of the real hardware's tail).
+    // Default 98.4%: tuned via analysis/validate.py's decay-slope measurement (a linear fit to the
+    // RMS envelope over a fixed 1.0-3.0s post-onset window) against reference-irs/preset-45.wav and
+    // preset-49.wav. The earlier 99% default was picked by ear/envelope-correlation alone and was
+    // measurably wrong: it decayed at -8.4dB/s against the real hardware's own -10.3/-10.5dB/s (a
+    // ~2dB/s gap that compare_wavs.py's envelope correlation - which compares SHAPE, not slope -
+    // didn't surface at 0.94). A --feedback sweep via ShieldsRenderIR found 98.4% lands the slope
+    // error under 0.16dB/s on both references (compare against 85%, which dies out within ~1.3s,
+    // far short of the real hardware's own tail).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{feedbackParamID, 1},
         "Feedback",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
-        99.0f,
+        98.4f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));

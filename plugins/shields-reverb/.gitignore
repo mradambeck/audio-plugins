@@ -1,2 +1,7 @@
 # Regenerable output of Source/Tools/RenderIR.cpp (ShieldsRenderIR) - rerun that tool to recreate.
 rendered-irs/*.wav
+
+# analysis/validate.py's renders are regenerable (rerun it); the .md report and .json results ARE
+# meant to be committed once they reflect real calibration data - see plugins/inhalt-nonlin's
+# identical convention, which this mirrors.
+analysis/validation_renders/
