@@ -51,6 +51,20 @@ namespace
         if (auto* param = processor.apvts.getParameter(paramID))
             param->setValueNotifyingHost(param->convertTo0to1(rawValue));
     }
+
+    // Only touches a parameter when its flag was actually passed on the command line - leaving an
+    // unset one at APVTS's own createParameterLayout() default. Setting every parameter to a
+    // hardcoded fallback (the previous behaviour) meant a fallback value silently went stale the
+    // moment the real default changed elsewhere, and an unqualified run of this tool would then no
+    // longer render what the plugin actually ships with - exactly the failure mode this tool exists
+    // to avoid (see the header comment on --dry/--wet being the one deliberate exception).
+    void setParamIfPresent(ShieldsAudioProcessor& processor, const std::map<std::string, std::string>& args,
+                            const char* paramID, const std::string& key)
+    {
+        const auto it = args.find(key);
+        if (it != args.end())
+            setParam(processor, paramID, std::stof(it->second));
+    }
 }
 
 int main(int argc, char* argv[])
@@ -71,23 +85,22 @@ int main(int argc, char* argv[])
     const auto sampleRate = getFloatArg(args, "sampleRate", 44100.0f);
     const auto seconds = getFloatArg(args, "seconds", 4.0f);
 
-    // Fallback defaults below match PluginProcessor's own createParameterLayout() defaults (tuned
-    // against reference-irs/ - see that function's comments), so an unqualified run of this tool
-    // renders what the plugin actually ships with, not some other placeholder - EXCEPT dry/wet,
-    // deliberately overridden to 0/100 (not the plugin's real 100/40 defaults): this tool captures
-    // the ALGORITHM's impulse response for comparison against reference-irs/, where a dry click at
-    // sample 0 would only get in the way.
+    // Every flag below is left unset unless actually passed, so an unqualified run renders exactly
+    // APVTS's own createParameterLayout() defaults (see setParamIfPresent's comment for why a
+    // hardcoded fallback here was itself a bug) - EXCEPT dry/wet, deliberately overridden to 0/100
+    // (not the plugin's real 100/40 defaults): this tool captures the ALGORITHM's impulse response
+    // for comparison against reference-irs/, where a dry click at sample 0 would only get in the way.
     ShieldsAudioProcessor processor;
-    setParam(processor, ShieldsAudioProcessor::diffusionParamID, getFloatArg(args, "diffusion", 0.5f));
-    setParam(processor, ShieldsAudioProcessor::feedbackParamID, getFloatArg(args, "feedback", 99.0f));
-    setParam(processor, ShieldsAudioProcessor::sizeParamID, getFloatArg(args, "size", 1.0f));
-    setParam(processor, ShieldsAudioProcessor::dampingParamID, getFloatArg(args, "damping", 20.0f));
-    setParam(processor, ShieldsAudioProcessor::bandwidthHzParamID, getFloatArg(args, "bandwidth", 19000.0f));
-    setParam(processor, ShieldsAudioProcessor::lowCutHzParamID, getFloatArg(args, "lowcut", 20.0f));
-    setParam(processor, ShieldsAudioProcessor::bitDepthParamID, getFloatArg(args, "bitdepth", 13.0f));
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::diffusionParamID, "diffusion");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::feedbackParamID, "feedback");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::sizeParamID, "size");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::dampingParamID, "damping");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::bandwidthHzParamID, "bandwidth");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::lowCutHzParamID, "lowcut");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::bitDepthParamID, "bitdepth");
+    setParamIfPresent(processor, args, ShieldsAudioProcessor::wobbleParamID, "wobble");
     setParam(processor, ShieldsAudioProcessor::dryParamID, getFloatArg(args, "dry", 0.0f));
     setParam(processor, ShieldsAudioProcessor::wetParamID, getFloatArg(args, "wet", 100.0f));
-    setParam(processor, ShieldsAudioProcessor::wobbleParamID, getFloatArg(args, "wobble", 0.0f));
 
     constexpr int blockSize = 512;
     processor.prepareToPlay((double) sampleRate, blockSize);

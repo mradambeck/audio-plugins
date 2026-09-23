@@ -20,6 +20,15 @@ If a capture has significant pre-impulse silence or a visible direct-click befor
 tail starts, note that in this file (or trim it) so `compare_wavs.py`'s alignment stays honest -
 the comparison script does a simple onset-alignment, not a full cross-correlation search.
 
+**Known quirk, both current files (2026-09):** both `preset-45.wav` and `preset-49.wav` fall off a
+cliff in their last ~200-300ms (e.g. preset-45 drops from -35dB to -51dB rel. peak between 3.25s and
+the file's own end) that's far steeper than the decay rate anywhere else in the file - almost
+certainly a capture trim/fade artifact, not the real hardware's own tail actually stopping that
+abruptly. `analysis/validate.py`'s own decay-rate fit windows to 1.0-3.0s specifically to stay clear
+of it; any new decay-rate measurement against these files should do the same rather than trusting an
+automatic full-length fit (e.g. `core.features.full_decay_rt60`'s own -6..-70dB window would fit
+straight into this cliff on these captures).
+
 ## Usage
 
 Once files are here, render Shields's own IR at matching settings and compare:

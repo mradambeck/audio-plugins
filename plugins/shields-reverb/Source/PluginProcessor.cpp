@@ -10,8 +10,21 @@ namespace
 {
     // Factory presets: raw parameter values (the same values setValueNotifyingHost() takes after
     // normalising, not display percentages) applied in one shot when the preset is selected.
-    // Captured from seven .aupreset files the user saved via a host's native preset UI (decoded
-    // from each preset's embedded jucePluginState, not hand-tuned).
+    // Seven of these (everything but Preset 45/Preset 49 below) were captured from .aupreset files
+    // the user saved via a host's native preset UI (decoded from each preset's embedded
+    // jucePluginState, not hand-tuned).
+    //
+    // Preset 45 and Preset 49 ARE hand-computed, deliberately breaking that convention: they're the
+    // Feedback/Treble Decay (damping) values a parameter sweep (analysis/validate.py's own
+    // compare_one(), swept over Feedback x Damping independently per reference) found closest to
+    // reference-irs/preset-45.wav and preset-49.wav respectively - the two real Midiverb II captures
+    // this plugin's whole default-tuning process is calibrated against (see README.md's "Offline
+    // validation workflow"). Every other parameter matches the plugin's own shipped defaults
+    // (Diffusion 0.5, Size 1.0x, Bandwidth 19kHz, Low Cut off, Bit Depth 13) - only Feedback and
+    // Treble Decay were swept, since those are what the sweep found actually move decay rate/tone
+    // per-reference; the rest of each preset's own remaining gap against its reference comes from
+    // the fixed output EQ and burst-bank timing constants in ShieldsFDNEngine.h, which aren't
+    // exposed as parameters and so can't be varied per-preset this way.
     const std::vector<wildjag::FactoryPreset>& getFactoryPresets()
     {
         static const std::vector<wildjag::FactoryPreset> presets = {
@@ -64,6 +77,32 @@ namespace
                 { ShieldsAudioProcessor::feedbackParamID, 65.20000457763672f },
                 { ShieldsAudioProcessor::lowCutHzParamID, 34.5f },
                 { ShieldsAudioProcessor::sizeParamID, 1.100000023841858f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 0.0f },
+            } },
+            { "Preset 45", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 19000.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 13.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 15.0f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.5f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 98.3f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 20.0f },
+                { ShieldsAudioProcessor::sizeParamID, 1.0f },
+                { ShieldsAudioProcessor::wetParamID, 200.0f },
+                { ShieldsAudioProcessor::wobbleParamID, 0.0f },
+            } },
+            { "Preset 49", {
+                { ShieldsAudioProcessor::bandwidthHzParamID, 19000.0f },
+                { ShieldsAudioProcessor::bitDepthParamID, 13.0f },
+                { ShieldsAudioProcessor::bypassParamID, 0.0f },
+                { ShieldsAudioProcessor::dampingParamID, 10.0f },
+                { ShieldsAudioProcessor::diffusionParamID, 0.5f },
+                { ShieldsAudioProcessor::dryParamID, 0.0f },
+                { ShieldsAudioProcessor::feedbackParamID, 98.2f },
+                { ShieldsAudioProcessor::lowCutHzParamID, 20.0f },
+                { ShieldsAudioProcessor::sizeParamID, 1.0f },
                 { ShieldsAudioProcessor::wetParamID, 200.0f },
                 { ShieldsAudioProcessor::wobbleParamID, 0.0f },
             } },
@@ -152,14 +191,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout ShieldsAudioProcessor::creat
         juce::AudioParameterFloatAttributes()
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 2); })));
 
-    // Default 99%: tuned against reference-irs/preset-45.wav and preset-49.wav (real Midiverb II
-    // captures) - both have a ~3.5s decay tail, which needs feedback pushed close to its ceiling to
-    // reproduce (85% dies out within ~1.3s, far short of the real hardware's tail).
+    // Default 98.4%: tuned via analysis/validate.py's decay-slope measurement (a linear fit to the
+    // RMS envelope over a fixed 1.0-3.0s post-onset window) against reference-irs/preset-45.wav and
+    // preset-49.wav. The earlier 99% default was picked by ear/envelope-correlation alone and was
+    // measurably wrong: it decayed at -8.4dB/s against the real hardware's own -10.3/-10.5dB/s (a
+    // ~2dB/s gap that compare_wavs.py's envelope correlation - which compares SHAPE, not slope -
+    // didn't surface at 0.94). A --feedback sweep via ShieldsRenderIR found 98.4% lands the slope
+    // error under 0.16dB/s on both references (compare against 85%, which dies out within ~1.3s,
+    // far short of the real hardware's own tail).
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{feedbackParamID, 1},
         "Feedback",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
-        99.0f,
+        98.4f,
         juce::AudioParameterFloatAttributes()
             .withLabel("%")
             .withStringFromValueFunction([](float v, int) { return juce::String(v, 1) + "%"; })));
