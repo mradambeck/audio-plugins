@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # Consequently it is registered in build-and-test.yml and scripts/, and deliberately NOT in
 # release.yml, installers/, sync-site-versions.yml, the site, or the download counter. See the
 # README here before adding it to any of those.
-project(ConvBase VERSION 0.1.1)
+project(ConvBase VERSION 0.1.2)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)

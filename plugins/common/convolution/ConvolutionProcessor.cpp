@@ -140,6 +140,13 @@ void ConvolutionProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const auto index = (int) irIndexParam->load();
     const auto shapeParams = currentShapeParams();
 
+    // Tells the worker this rate is current BEFORE the synchronous shape below, so it drops
+    // anything left in its pending slot from before this re-prepare, and so any request already in
+    // flight on the background thread discards its result instead of delivering an IR shaped for a
+    // rate this instance has since moved on from - see IRLoadWorker::setSessionSampleRate()'s
+    // comment for why that race is real (a re-prepare can land mid-shape).
+    worker.setSessionSampleRate(sampleRate);
+
     // Synchronous, on the message thread, so the very first processBlock already has the right IR.
     // Leaving this to the worker would mean up to a debounce period of dry signal after every
     // transport start or sample-rate change.
@@ -216,25 +223,21 @@ void ConvolutionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 
     const auto numSamples = buffer.getNumSamples();
 
-    // The engine is sized with headroom in prepareToPlay so this never reallocates. If a host
-    // exceeds even that, process what fits rather than allocating on the audio thread.
-    jassert(numSamples <= maxBlockSize);
-    const auto n = std::min(numSamples, maxBlockSize);
-
-    if (n <= 0)
+    if (numSamples <= 0)
         return;
 
     const auto totalIn = getTotalNumInputChannels();
     const auto totalOut = getTotalNumOutputChannels();
 
-    // Mono in, stereo out: duplicate before anything reads channel 1, so a stereo IR still produces
-    // a proper stereo image from a correlated L=R input.
+    // Mono in, stereo out: duplicate before anything reads channel 1, over the FULL host buffer -
+    // not just the first maxBlockSize chunk below - so a stereo IR still produces a proper stereo
+    // image even when an oversized block has to be split across multiple engine.process() calls.
     if (totalIn < 2 && totalOut >= 2)
-        buffer.copyFrom(1, 0, buffer, 0, 0, n);
+        buffer.copyFrom(1, 0, buffer, 0, 0, numSamples);
 
     for (int channel = totalIn; channel < totalOut; ++channel)
         if (channel > 1)
-            buffer.clear(channel, 0, n);
+            buffer.clear(channel, 0, numSamples);
 
     // Ask for a re-shape only when the IR selection or its shape actually moved. The worker
     // debounces the resulting burst during a knob drag.
@@ -264,7 +267,22 @@ void ConvolutionProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
 
     applyParametersToEngine();
 
-    engine.process(buffer, n);
+    // The engine is sized with headroom in prepareToPlay() so a normal block runs as a single pass
+    // through this loop. If a host ever hands over more than that (Logic's offline bounce can),
+    // process it in maxBlockSize-sized chunks instead of silently truncating the tail - see
+    // ConvolutionProcessorTests' oversized-block test. juce::dsp::Convolution (and the rest of
+    // ConvolutionEngine's state - the pre-delay lines, the ramped smoothers) is a continuous
+    // per-sample streaming design that doesn't care how its input is chunked across calls, only
+    // that no single call exceeds the block size it was prepared for.
+    int processed = 0;
+    while (processed < numSamples)
+    {
+        const auto chunk = std::min(numSamples - processed, maxBlockSize);
+        juce::AudioBuffer<float> chunkView(buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                                            processed, chunk);
+        engine.process(chunkView, chunk);
+        processed += chunk;
+    }
 
     // Expected to be zero and never to change, so in practice this fires no host callbacks at all.
     // It is here so that the number the host gets is whatever the convolution actually reports,

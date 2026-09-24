@@ -117,6 +117,61 @@ public:
             const auto widthRms = rmsOfDifference(monoBuffer.getReadPointer(0), monoBuffer.getReadPointer(1), numSamples);
             expect(widthRms > 0.0005f, "L and R should differ - the reverb should have real stereo width from a mono source");
         }
+
+        beginTest("a block larger than the one it was prepared for is fully processed, not truncated");
+        {
+            // The engine is sized with headroom (4x samplesPerBlock - see blockSizeHeadroom) rather
+            // than reallocating on the audio thread; the contract is that an oversized block is
+            // chunked through the engine, not that everything past the first chunk is left
+            // dry-unmixed. 8x the prepared block size genuinely exceeds a single chunk (2x would
+            // still fit inside the 4x headroom and never exercise this path at all).
+            ShieldsAudioProcessor processor;
+            processor.apvts.getParameter(ShieldsAudioProcessor::dryParamID)->setValueNotifyingHost(0.0f);
+            processor.apvts.getParameter(ShieldsAudioProcessor::wetParamID)->setValueNotifyingHost(
+                processor.apvts.getParameter(ShieldsAudioProcessor::wetParamID)->convertTo0to1(100.0f));
+            processor.prepareToPlay(sampleRate, 256);
+
+            juce::AudioBuffer<float> buffer(2, 256 * 8);
+            fillSine(buffer, 0.5f, 220.0f, sampleRate);
+            juce::MidiBuffer midi;
+            processor.processBlock(buffer, midi);
+
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+                expect(std::isfinite(buffer.getSample(0, i)));
+
+            // With Dry at 0%, any sample the engine never reached stays exactly 0 - so a non-silent
+            // second half is direct evidence the engine ran on it, not just that reading it didn't
+            // crash.
+            const auto secondHalfRms = rms(buffer.getReadPointer(0) + 256 * 4, 256 * 4);
+            expect(secondHalfRms > 0.0f, "samples past the first chunk were left unprocessed");
+        }
+
+        beginTest("a fully bypassed mono-routed instance still passes the mono signal through both output channels");
+        {
+            // Bypass used to return before the mono-in duplication ran at all, so a mono input bus
+            // whose channel 1 the host hadn't populated (not guaranteed to be anything in
+            // particular) passed straight through untouched on that channel.
+            ShieldsAudioProcessor processor;
+            juce::AudioProcessor::BusesLayout layout;
+            layout.inputBuses.add(juce::AudioChannelSet::mono());
+            layout.outputBuses.add(juce::AudioChannelSet::stereo());
+            expect(processor.setBusesLayout(layout));
+            processor.prepareToPlay(sampleRate, 256);
+            processor.apvts.getParameter(ShieldsAudioProcessor::bypassParamID)->setValueNotifyingHost(1.0f);
+
+            constexpr int numSamples = 2048;
+            juce::AudioBuffer<float> buffer(2, numSamples);
+            fillSine(buffer, 0.5f, 220.0f, sampleRate); // channel 0 = the real mono input
+            for (int i = 0; i < numSamples; ++i)
+                buffer.setSample(1, i, 12345.0f); // poison channel 1, as an uninitialized host buffer might arrive
+
+            juce::MidiBuffer midi;
+            processor.processBlock(buffer, midi);
+
+            const auto diff = rmsOfDifference(buffer.getReadPointer(0), buffer.getReadPointer(1), numSamples);
+            expectWithinAbsoluteError(diff, 0.0f, 1.0e-9f,
+                                      "bypassed mono input should duplicate to both output channels, not leave channel 1 untouched");
+        }
     }
 };
 
