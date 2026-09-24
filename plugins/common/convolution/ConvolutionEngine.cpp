@@ -1,6 +1,7 @@
 #include "ConvolutionEngine.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace wildjag::conv
@@ -133,6 +134,17 @@ void ConvolutionEngine::process(juce::AudioBuffer<float>& buffer, int numSamples
     if (channelsToProcess <= 0 || n <= 0)
         return;
 
+    // Raw pointers, hoisted once per call rather than re-resolved through buffer.getSample()/
+    // setSample() on every channel of every sample below - those are bounds-checked accessors, and
+    // this is called at audio rate. Addressing only; every value read and written is identical.
+    std::array<float*, 2> dryChannel {};
+    std::array<float*, 2> wetChannel {};
+    for (int channel = 0; channel < channelsToProcess; ++channel)
+    {
+        dryChannel[(size_t) channel] = buffer.getWritePointer(channel);
+        wetChannel[(size_t) channel] = wetBuffer.getWritePointer(channel);
+    }
+
     // 1. Pre-delay, into the wet scratch. Done before the convolution because pre-delay is the gap
     //    between the dry sound and the onset of the reverb, not a delay applied to the reverb's
     //    output - the difference shows up as soon as the IR has any pre-ringing.
@@ -145,8 +157,8 @@ void ConvolutionEngine::process(juce::AudioBuffer<float>& buffer, int numSamples
         for (int channel = 0; channel < channelsToProcess; ++channel)
         {
             auto& line = preDelayLines[(size_t) channel];
-            line.write(buffer.getSample(channel, i));
-            wetBuffer.setSample(channel, i, line.readInterpolated(delay));
+            line.write(dryChannel[(size_t) channel][i]);
+            wetChannel[(size_t) channel][i] = line.readInterpolated(delay);
         }
     }
 
@@ -203,17 +215,17 @@ void ConvolutionEngine::process(juce::AudioBuffer<float>& buffer, int numSamples
     for (int i = 0; i < n; ++i)
     {
         const auto bypass = bypassAmount.getNextValue();
-        const auto dry = dryGain.getNextValue();
-        const auto wet = wetGain.getNextValue();
+        const auto dryGainValue = dryGain.getNextValue();
+        const auto wetGainValue = wetGain.getNextValue();
 
-        const auto dryCoefficient = dry + (1.0f - dry) * bypass;
-        const auto wetCoefficient = wet * (1.0f - bypass);
+        const auto dryCoefficient = dryGainValue + (1.0f - dryGainValue) * bypass;
+        const auto wetCoefficient = wetGainValue * (1.0f - bypass);
 
         for (int channel = 0; channel < channelsToProcess; ++channel)
         {
-            const auto drySample = buffer.getSample(channel, i);
-            const auto wetSample = wetBuffer.getSample(channel, i);
-            buffer.setSample(channel, i, drySample * dryCoefficient + wetSample * wetCoefficient);
+            const auto drySample = dryChannel[(size_t) channel][i];
+            const auto wetSample = wetChannel[(size_t) channel][i];
+            dryChannel[(size_t) channel][i] = drySample * dryCoefficient + wetSample * wetCoefficient;
         }
     }
 }

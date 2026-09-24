@@ -27,6 +27,8 @@ IRLibrary::IRLibrary(const ConvolutionVariant& variantToUse)
 
 void IRLibrary::setTargetSampleRate(double newSampleRate)
 {
+    const juce::ScopedLock sl(lock);
+
     if (std::abs(newSampleRate - targetSampleRate) < sampleRateEpsilon)
         return;
 
@@ -38,6 +40,15 @@ void IRLibrary::setTargetSampleRate(double newSampleRate)
 
 std::shared_ptr<const DecodedIR> IRLibrary::getDecodedIR(int index)
 {
+    // Held for the whole decode/resample/normalise pass, not just the cache lookup/store: the
+    // message thread (IRLoadWorker::shapeSynchronously(), from ConvolutionProcessor::
+    // prepareToPlay()) and the worker's own background thread can both call this on the same
+    // IRLibrary instance - a host re-prepare racing an in-flight background shape request is a real
+    // sequence, not a hypothetical one - and both read/write `cache` and `targetSampleRate`.
+    // Decoding/resampling under the lock serialises the two callers rather than letting them run
+    // concurrently, but neither runs on the audio thread, so that cost is fine here.
+    const juce::ScopedLock sl(lock);
+
     if (! juce::isPositiveAndBelow(index, (int) variant.irs.size()) || targetSampleRate <= 0.0)
         return nullptr;
 

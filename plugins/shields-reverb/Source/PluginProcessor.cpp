@@ -325,6 +325,15 @@ void ShieldsAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     // once here costs a few hundred KB and makes the audio path allocation-free.
     maxBlockSize = std::max(samplesPerBlock, 1) * blockSizeHeadroom;
     wetBuffer.setSize(2, maxBlockSize);
+
+    // Snap to the current parameter values rather than gliding up from zero on the first block of
+    // every transport start/re-prepare - matches ConvolutionProcessor's own applyParametersToEngine
+    // + engine.reset() pattern for the same reason.
+    dryGainSmoothed.reset(sampleRate, gainRampSeconds);
+    wetGainSmoothed.reset(sampleRate, gainRampSeconds);
+    dryGainSmoothed.setCurrentAndTargetValue(dryParam->load() * 0.01f);
+    wetGainSmoothed.setCurrentAndTargetValue(wetParam->load() * 0.01f);
+
     prepared = true;
 }
 
@@ -351,10 +360,19 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 {
     juce::ScopedNoDenormals noDenormals;
 
-    if (bypassParam->load() > 0.5f)
+    if (buffer.getNumChannels() < 2)
         return;
 
-    if (buffer.getNumChannels() < 2)
+    // No real second channel - duplicate the mono input onto it before anything else (including
+    // the bypass/prepared early-outs below) touches the buffer, so a correlated L=R signal reaches
+    // BOTH the engine and a fully bypassed dry passthrough. This used to run after the bypass
+    // check, so a bypassed mono-routed instance skipped it entirely and passed channel 1 through
+    // exactly as the host handed it over - which, for a mono input bus, is not guaranteed to be
+    // anything in particular (silence, a stale previous block, or leftover host-buffer contents).
+    if (getTotalNumInputChannels() < 2)
+        buffer.copyFrom(1, 0, buffer, 0, 0, buffer.getNumSamples());
+
+    if (bypassParam->load() > 0.5f)
         return;
 
     // prepareToPlay() must have run: the engine's delay lines are empty until it does, and indexing
@@ -363,18 +381,6 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         return;
 
     const auto numSamples = buffer.getNumSamples();
-
-    // wetBuffer is sized with headroom in prepareToPlay() so this never reallocates. If a host ever
-    // exceeds even that, process what fits rather than allocating on the audio thread - a truncated
-    // block is a far better failure than a dropout, and the assertion catches it in a debug build.
-    jassert(numSamples <= maxBlockSize);
-    const auto samplesToProcess = std::min(numSamples, maxBlockSize);
-
-    // No real second channel - duplicate the mono input onto it before the wetBuffer copy below
-    // reads it, so the (unmodified) stereo engine and the dry mix at the bottom both see a
-    // correlated L=R input, same as any stereo effect fed a mono source.
-    if (getTotalNumInputChannels() < 2)
-        buffer.copyFrom(1, 0, buffer, 0, 0, samplesToProcess);
 
     engine.setDiffusion(diffusionParam->load());
     engine.setFeedback(feedbackParam->load() * 0.01f);
@@ -385,23 +391,46 @@ void ShieldsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     engine.setBitDepth(bitDepthParam->load());
     engine.setWobble(wobbleParam->load() * 0.01f);
 
-    wetBuffer.copyFrom(0, 0, buffer, 0, 0, samplesToProcess);
-    wetBuffer.copyFrom(1, 0, buffer, 1, 0, samplesToProcess);
-
-    engine.processStereo(wetBuffer.getWritePointer(0), wetBuffer.getWritePointer(1), samplesToProcess);
-
-    const auto dryGain = dryParam->load() * 0.01f;
-    const auto wetGain = wetParam->load() * 0.01f;
+    // Targets only - the actual per-sample values are pulled from the smoothers inside the mix
+    // loop below, so a knob move (or automation) ramps in over gainRampSeconds instead of stepping
+    // the whole block to the new gain at once.
+    dryGainSmoothed.setTargetValue(dryParam->load() * 0.01f);
+    wetGainSmoothed.setTargetValue(wetParam->load() * 0.01f);
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
-    const auto* wetLeft = wetBuffer.getReadPointer(0);
-    const auto* wetRight = wetBuffer.getReadPointer(1);
 
-    for (int i = 0; i < samplesToProcess; ++i)
+    // wetBuffer is sized with headroom in prepareToPlay() so a normal block runs as a single pass
+    // through this loop. If a host ever hands over more than that (Logic's offline bounce can, or a
+    // buffer-size change landing ahead of a re-prepare), process it in maxBlockSize-sized chunks
+    // rather than silently leaving the samples past maxBlockSize dry-unmixed and reverb-free - the
+    // engine itself has no block-size limit of its own (see ShieldsFDNEngine::processStereo's
+    // per-sample loop), only wetBuffer's fixed scratch capacity does, so chunking here is sufficient
+    // and the engine's own continuous per-sample state carries across chunk boundaries exactly as
+    // it would across any other block-size split (see ShieldsFDNEngineTests' "varying block sizes"
+    // check for why that's already relied on elsewhere).
+    int processed = 0;
+    while (processed < numSamples)
     {
-        left[i] = left[i] * dryGain + wetLeft[i] * wetGain;
-        right[i] = right[i] * dryGain + wetRight[i] * wetGain;
+        const auto chunk = std::min(numSamples - processed, maxBlockSize);
+
+        wetBuffer.copyFrom(0, 0, buffer, 0, processed, chunk);
+        wetBuffer.copyFrom(1, 0, buffer, 1, processed, chunk);
+
+        engine.processStereo(wetBuffer.getWritePointer(0), wetBuffer.getWritePointer(1), chunk);
+
+        const auto* wetLeft = wetBuffer.getReadPointer(0);
+        const auto* wetRight = wetBuffer.getReadPointer(1);
+
+        for (int i = 0; i < chunk; ++i)
+        {
+            const auto dryGain = dryGainSmoothed.getNextValue();
+            const auto wetGain = wetGainSmoothed.getNextValue();
+            left[processed + i] = left[processed + i] * dryGain + wetLeft[i] * wetGain;
+            right[processed + i] = right[processed + i] * dryGain + wetRight[i] * wetGain;
+        }
+
+        processed += chunk;
     }
 }
 

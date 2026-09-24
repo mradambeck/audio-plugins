@@ -36,6 +36,18 @@ void IRLoadWorker::stop()
     stopThread(2000);
 }
 
+void IRLoadWorker::setSessionSampleRate(double sampleRate) noexcept
+{
+    sessionSampleRate.store(sampleRate, std::memory_order_relaxed);
+
+    // Drop anything already sitting in the pending slot - it was shaped for whatever rate was
+    // current before this call. Left in place, the very next processBlock() would pop it and hand
+    // it to loadIR(), which loads it as-is at the NEW rate with no resampling of its own.
+    const juce::SpinLock::ScopedLockType lock(slotLock);
+    pendingIR = juce::AudioBuffer<float>();
+    pendingReady = false;
+}
+
 void IRLoadWorker::requestShape(int irIndex, IRShaper::Params params, double sampleRate) noexcept
 {
     requestedIndex.store(irIndex, std::memory_order_relaxed);
@@ -179,8 +191,19 @@ void IRLoadWorker::run()
 
         if (shaped.getNumSamples() > 0)
         {
+            // The waveform display legitimately reflects the last IR asked for, even one that
+            // arrives too late to actually load, so this runs regardless of the rate check below.
             publishSnapshot(index, *decoded, shaped);
-            pushPendingIR(std::move(shaped));
+
+            // Discard rather than deliver if the session's sample rate moved on while this shape
+            // was in flight (see setSessionSampleRate()'s comment) - a host re-prepare landing mid-
+            // shape is a real sequence (prepareToPlay() calls setSessionSampleRate() itself, but a
+            // request already being worked on here has no way to know that happened until now).
+            // Written as a difference rather than == /!= to sidestep -Wfloat-equal (juce_recommended_
+            // warning_flags enables it) - same idiom ShieldsFDNEngine.cpp uses for the same reason;
+            // an exact, non-tolerance comparison is intended here, not a fuzzy one.
+            if (std::abs(sampleRate - sessionSampleRate.load(std::memory_order_relaxed)) <= 0.0)
+                pushPendingIR(std::move(shaped));
         }
 
         servedCounter = serving;

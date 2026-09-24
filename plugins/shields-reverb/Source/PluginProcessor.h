@@ -83,6 +83,15 @@ private:
 
     ShieldsFDNEngine engine;
 
+    // Per-sample ramped Dry/Wet gains, rather than the flat per-block value processBlock() used to
+    // apply. Automating (or fast-dragging) either knob moved the whole block's worth of samples to
+    // the new gain in one step, an audible zipper/step at the block boundary - matching
+    // ConvolutionEngine's own gainRampSeconds convention (20ms) for the same knobs. Snapped to the
+    // current parameter value in prepareToPlay() (see there) so a fresh instance doesn't fade in
+    // from zero on the very first block.
+    juce::SmoothedValue<float> dryGainSmoothed, wetGainSmoothed;
+    static constexpr double gainRampSeconds = 0.02;
+
     // Scratch buffer holding the engine's wet output before the dry/wet mix. Sized once in
     // prepareToPlay() with headroom over the host's stated block size and never resized on the
     // audio thread - see prepareToPlay() for why that headroom matters.

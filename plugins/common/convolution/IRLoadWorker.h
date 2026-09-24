@@ -45,6 +45,16 @@ public:
     void start();
     void stop();
 
+    // Message thread, called from ConvolutionProcessor::prepareToPlay(). Tells the worker which
+    // sample rate the session is now running at, so it can discard an IR that was already shaped
+    // for a PREVIOUS rate rather than deliver it: one still in flight on the background thread is
+    // checked against this at the end of its shaping pass (see run()), and one already sitting in
+    // the pending slot un-popped is dropped immediately by this call. Without this, loadIR() - which
+    // stamps whatever it's handed as the CURRENT session rate with no resampling of its own - could
+    // silently load an IR shaped for the wrong rate after a host re-prepare that landed while a
+    // shape was in flight or already queued.
+    void setSessionSampleRate(double sampleRate) noexcept;
+
     // Lock-free; safe from the audio thread. Repeated calls coalesce, and a burst (a knob drag)
     // settles into a single re-shape once it stops - see debounceMs in the .cpp.
     void requestShape(int irIndex, IRShaper::Params params, double sampleRate) noexcept;
@@ -83,6 +93,11 @@ private:
     std::atomic<double> requestedSampleRate { 0.0 };
     std::atomic<juce::uint32> requestCounter { 0 };
     juce::uint32 servedCounter = 0;
+
+    // The session's current sample rate, per the most recent setSessionSampleRate() call. run()
+    // compares a just-finished shape's own rate against this before delivering it - see
+    // setSessionSampleRate()'s comment.
+    std::atomic<double> sessionSampleRate { 0.0 };
 
     juce::SpinLock slotLock;
     juce::AudioBuffer<float> pendingIR;

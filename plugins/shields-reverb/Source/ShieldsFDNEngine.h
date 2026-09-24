@@ -73,15 +73,20 @@ public:
     // burst bank - its lines are short-lived transients scaled by Size, not where the sustained-tail
     // resonance this exists for actually lives) - a slow, per-line, mutually-detuned sinusoidal
     // drift on each line's read position (max ~1.5ms depth at Wobble=100%, rates under 0.4Hz so it
-    // reads as slow movement, not an obvious chorus). Genuinely off at 0: the read path only
-    // switches from the plain integer tap to a fractionally-interpolated one when wobbleAmount > 0,
-    // so a Wobble of 0 renders identically to the class's original static behavior, not just close
-    // to it. Exists to answer the "some knob settings produce audible resonant frequencies"
-    // question from tuning: those resonances are a genuine, static-topology consequence of a small
-    // (8-line) FDN at high Feedback (confirmed against the real Midiverb references too - see
-    // README's "How it works"), not a bug, and the spec explicitly ruled out fixing it by modulating
-    // by default. This gives a player who wants it a way to blur those peaks into motion without
-    // changing the default, unmodulated character at all.
+    // reads as slow movement, not an obvious chorus). This sets a TARGET the engine glides toward
+    // over wobbleSmoothingMs (see wobbleAmount's own comment) rather than jumping straight to, so
+    // turning it on/off (or moving it during a drag) fades the modulation depth in/out instead of
+    // stepping each line's effective delay length instantly. Still genuinely off at 0 once settled:
+    // the read path only switches from the plain integer tap to a fractionally-interpolated one
+    // once the SMOOTHED wobbleAmount is actually > 0, and a settle-epsilon guarantees it reaches
+    // exact 0 rather than approaching it forever - so a Wobble of 0, left untouched or faded back
+    // down to, still renders identically to the class's original static behavior. Exists to answer
+    // the "some knob settings produce audible resonant frequencies" question from tuning: those
+    // resonances are a genuine, static-topology consequence of a small (8-line) FDN at high
+    // Feedback (confirmed against the real Midiverb references too - see README's "How it works"),
+    // not a bug, and the spec explicitly ruled out fixing it by modulating by default. This gives a
+    // player who wants it a way to blur those peaks into motion without changing the default,
+    // unmodulated character at all.
     void setWobble(float wobbleAmount01);
 
     // In-place stereo process: L/R in, replaced with the wet signal out. Dry/wet mixing happens in
@@ -203,7 +208,29 @@ private:
     };
     static constexpr float wobbleDepthMs = 1.5f;
     std::array<float, numLines> wobblePhase {};
+
+    // wobbleAmount is the actual per-sample value the modulation depth is computed from; it glides
+    // toward targetWobbleAmount every sample in processStereo() rather than jumping straight to it
+    // the way setWobble() used to write it directly. Without the glide, turning Wobble on (or off,
+    // or moving it during a drag) stepped modSamples - and so each line's effective delay length -
+    // instantly, an audible click/step rather than the smooth depth fade-in the control is meant to
+    // provide. Same one-pole-smoother-plus-settle-epsilon pattern as targetSizeMultiplier/
+    // sizeMultiplier below, including the "genuinely off at 0" contract: wobbleSettleEpsilon
+    // guarantees wobbleAmount actually REACHES exactly 0.0f (not just asymptotically approaches it)
+    // once the target is 0, so the plain-integer-tap read path (and the sinf()-skipping branch) is
+    // restored exactly, not left paying a permanent near-zero-but-nonzero tax after Wobble is ever
+    // touched once.
+    float targetWobbleAmount = 0.0f;
     float wobbleAmount = 0.0f;
+    static constexpr float wobbleSmoothingMs = 50.0f;
+    float wobbleSmoothingCoeff = 1.0f;
+    static constexpr float wobbleSettleEpsilon = 1.0e-6f;
+
+    // wobbleRateHz[i] * 2*pi / sampleRateHz, precomputed once in prepare() instead of recomputed
+    // every sample for every line - a pure function of sampleRateHz (fixed between prepare() calls)
+    // and the fixed wobbleRateHz table, so caching it is bit-identical to recomputing it, just
+    // without the 8 divides/sample it used to cost regardless of whether Wobble was even on.
+    std::array<float, numLines> wobblePhaseIncrement {};
 
     std::array<AllpassStage, 3> allpassL, allpassR;
 

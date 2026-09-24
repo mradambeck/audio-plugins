@@ -9,6 +9,16 @@ namespace
 
     float clamp01(float v) { return std::max(0.0f, std::min(1.0f, v)); }
 
+    // Every circular-buffer wrap in this file adds `size` to a value before subtracting a delay
+    // that is itself always within [0, size] (delays are clamped to a line's own capacity), so the
+    // pre-wrap value is always within [0, 2*size) - a single conditional subtract is both correct
+    // and exact, and measurably cheaper than `%` (an integer divide) at the per-sample rates this
+    // runs at. Bit-identical to the `%` it replaces for every value in that range.
+    inline int wrapIndex(int value, int size) noexcept
+    {
+        return value >= size ? value - size : value;
+    }
+
     int msToSamples(float ms, double sampleRateHz)
     {
         return std::max(1, (int) std::round(ms * 0.001f * (float) sampleRateHz));
@@ -22,8 +32,8 @@ namespace
         const auto bufSize = (int) buf.size();
         const auto delayFloor = (int) delaySamplesFrac;
         const auto frac = delaySamplesFrac - (float) delayFloor;
-        const auto pos0 = (writePos + bufSize - delayFloor) % bufSize;
-        const auto pos1 = (pos0 + bufSize - 1) % bufSize;
+        const auto pos0 = wrapIndex(writePos + bufSize - delayFloor, bufSize);
+        const auto pos1 = wrapIndex(pos0 + bufSize - 1, bufSize);
         const auto y0 = buf[(size_t) pos0];
         const auto y1 = buf[(size_t) pos1];
         return y0 + (y1 - y0) * frac;
@@ -60,13 +70,15 @@ void ShieldsFDNEngine::AllpassStage::reset()
 
 float ShieldsFDNEngine::AllpassStage::processSample(float x)
 {
-    const auto readPos = (writePos + (int) buffer.size() - delaySamples) % (int) buffer.size();
-    const auto delayed = buffer[(size_t) readPos];
+    // delaySamples is set to buffer.size() once in prepare() and never changed again, so
+    // (writePos + size - delaySamples) % size collapses to writePos % size, which - since
+    // writePos is already kept within [0, size) by the wrap below - is just writePos itself.
+    const auto delayed = buffer[(size_t) writePos];
 
     const auto y = -coefficient * x + delayed;
     buffer[(size_t) writePos] = x + coefficient * y;
 
-    writePos = (writePos + 1) % (int) buffer.size();
+    writePos = wrapIndex(writePos + 1, (int) buffer.size());
     return y;
 }
 
@@ -91,7 +103,7 @@ float ShieldsFDNEngine::BurstCombLine::processSample(float x)
     // later, which is the entire point (an immediate, undiminished pass-through here would let
     // the full click straight through and defeat the burst stage's whole purpose).
     const auto bufSize = (int) buffer.size();
-    const auto readPos = (writePos + bufSize - delaySamples) % bufSize;
+    const auto readPos = wrapIndex(writePos + bufSize - delaySamples, bufSize);
     auto y = buffer[(size_t) readPos];
 
     // Mid-crossfade after a Size change (see lengthChangeFadeMs) - blend in the old tap position,
@@ -99,14 +111,14 @@ float ShieldsFDNEngine::BurstCombLine::processSample(float x)
     // so this is a genuine crossfade between two valid delayed signals, not a fade from/to silence.
     if (fadeWeight > 0.0f)
     {
-        const auto oldReadPos = (writePos + bufSize - fadeFromDelay) % bufSize;
+        const auto oldReadPos = wrapIndex(writePos + bufSize - fadeFromDelay, bufSize);
         const auto oldY = buffer[(size_t) oldReadPos];
         y += (oldY - y) * fadeWeight;
         fadeWeight = std::max(0.0f, fadeWeight - fadeStep);
     }
 
     buffer[(size_t) writePos] = x + feedbackGain * y;
-    writePos = (writePos + 1) % bufSize;
+    writePos = wrapIndex(writePos + 1, bufSize);
     return y;
 }
 
@@ -226,9 +238,15 @@ void ShieldsFDNEngine::prepare(double sampleRate)
     sampleRateHz = sampleRate;
     lengthChangeFadeStep = 1.0f / (float) std::max(1, msToSamples(lengthChangeFadeMs, sampleRateHz));
 
+    for (int i = 0; i < numLines; ++i)
+        wobblePhaseIncrement[(size_t) i] = wobbleRateHz[(size_t) i] * 2.0f * pi / (float) sampleRateHz;
+
     // One-pole time-constant smoother - see targetSizeMultiplier's comment for why this exists.
     // Standard exponential smoothing coefficient for reaching ~63% of a step in sizeSmoothingMs.
     sizeSmoothingCoeff = 1.0f - std::exp(-1.0f / (sizeSmoothingMs * 0.001f * (float) sampleRateHz));
+
+    // Same one-pole smoother, for Wobble's depth - see wobbleAmount's own comment.
+    wobbleSmoothingCoeff = 1.0f - std::exp(-1.0f / (wobbleSmoothingMs * 0.001f * (float) sampleRateHz));
 
     for (int i = 0; i < numLines; ++i)
     {
@@ -251,6 +269,24 @@ void ShieldsFDNEngine::prepare(double sampleRate)
         burstL[i].fadeStep = lengthChangeFadeStep;
         burstR[i].fadeStep = lengthChangeFadeStep;
     }
+
+    // Clear any in-flight Size-change crossfade from a PREVIOUS prepare() before recomputing
+    // lengths for the new rate below. Without this, a fade still marked in-progress (fadeWeight >
+    // 0, e.g. prepare() called while the player is mid-drag on Size) makes updateLineLengths()/
+    // updateBurstLines() DEFER applying the new length entirely (see their own "blocked by the
+    // in-flight fade" comment) - so delaySamples[i]/each burst line's delaySamples stay at whatever
+    // they were under the OLD sample rate. reset() below then zeroes fadeWeight but does NOT touch
+    // those stale delaySamples, so a line can be left with a length that exceeds the buffer it was
+    // just resized to for the NEW rate (e.g. going from 96kHz down to 44.1kHz shrinks every buffer's
+    // capacity) - a negative `% bufSize` and an out-of-bounds circular-buffer read the first time
+    // that line is touched. Zeroing here, before the recompute, makes the fadeWeight <= 0 guard
+    // pass unconditionally so the new rate's lengths always apply immediately instead of being
+    // deferred across a prepare() boundary. A no-op whenever no fade was in flight (the common
+    // case - fadeWeight is already 0), so this doesn't change prepare()'s behaviour otherwise.
+    fadeWeight.fill(0.0f);
+    for (auto& line : burstL) line.fadeWeight = 0.0f;
+    for (auto& line : burstR) line.fadeWeight = 0.0f;
+    lengthUpdateDeferred = false;
 
     updateLineLengths();
     updateBurstLines();
@@ -436,7 +472,20 @@ void ShieldsFDNEngine::setLowCutHz(float hz)
 {
     // See lowCutActive's comment: at the floor, skip the filter entirely rather than run it with a
     // near-transparent-but-not-quite coefficient - the control must be a genuine no-op there.
+    const auto wasActive = lowCutActive;
     lowCutActive = hz > lowCutFloorHz;
+
+    // Reset on the inactive->active edge only (same pattern ConvolutionEngine::process() already
+    // uses for its own low/high cut). Without this, re-engaging Low Cut after it had been active
+    // earlier resumes the biquad from whatever x1/x2/y1/y2 state it held from THAT earlier period,
+    // rather than starting clean the way a control that was just "off" should. A no-op the first
+    // time Low Cut is ever engaged (the biquad's state is already zero from construction/reset()),
+    // so this only changes the re-engage case.
+    if (lowCutActive && ! wasActive)
+    {
+        lowCutL.reset();
+        lowCutR.reset();
+    }
 
     const auto clampedHz = std::max(1.0f, std::min((float) (sampleRateHz * 0.45), hz));
     lowCutL.setHighPass(clampedHz, lowCutQ, sampleRateHz);
@@ -451,7 +500,9 @@ void ShieldsFDNEngine::setBitDepth(float bits)
 
 void ShieldsFDNEngine::setWobble(float wobbleAmount01)
 {
-    wobbleAmount = clamp01(wobbleAmount01);
+    // Just the target - see wobbleAmount's own comment. Actually applied per-sample in
+    // processStereo(), which glides wobbleAmount toward this.
+    targetWobbleAmount = clamp01(wobbleAmount01);
 }
 
 void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
@@ -475,6 +526,11 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
         sizeMultiplier += (targetSizeMultiplier - sizeMultiplier) * sizeSmoothingCoeff;
         if (std::abs(targetSizeMultiplier - sizeMultiplier) < sizeSettleEpsilon)
             sizeMultiplier = targetSizeMultiplier;
+
+        // Same glide-plus-settle pattern for Wobble's depth - see wobbleAmount's own comment.
+        wobbleAmount += (targetWobbleAmount - wobbleAmount) * wobbleSmoothingCoeff;
+        if (std::abs(targetWobbleAmount - wobbleAmount) < wobbleSettleEpsilon)
+            wobbleAmount = targetWobbleAmount;
 
         // Written as a difference rather than `!=` because this file is deliberately JUCE-free (see
         // the header) so the usual JUCE_..._IGNORE_WARNINGS macros aren't available to suppress
@@ -551,7 +607,7 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
             // from wherever it happens to be, not a reset; modSamples stays exactly 0.0 whenever
             // wobbleAmount is 0, and the branch below skips interpolation entirely in that case, so
             // Wobble=0 reads bit-identically to how this loop worked before Wobble existed at all.
-            wobblePhase[(size_t) i] += wobbleRateHz[(size_t) i] * 2.0f * pi / (float) sampleRateHz;
+            wobblePhase[(size_t) i] += wobblePhaseIncrement[(size_t) i];
             if (wobblePhase[(size_t) i] > 2.0f * pi)
                 wobblePhase[(size_t) i] -= 2.0f * pi;
 
@@ -577,7 +633,7 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
             }
             else
             {
-                const auto readPos = (writePos[(size_t) i] + bufSize - delaySamples[(size_t) i]) % bufSize;
+                const auto readPos = wrapIndex(writePos[(size_t) i] + bufSize - delaySamples[(size_t) i], bufSize);
                 y = buf[(size_t) readPos];
             }
 
@@ -595,7 +651,7 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
                 }
                 else
                 {
-                    const auto oldReadPos = (writePos[(size_t) i] + bufSize - fadeFromDelay[(size_t) i]) % bufSize;
+                    const auto oldReadPos = wrapIndex(writePos[(size_t) i] + bufSize - fadeFromDelay[(size_t) i], bufSize);
                     oldY = buf[(size_t) oldReadPos];
                 }
                 y += (oldY - y) * fadeWeight[(size_t) i];
@@ -637,7 +693,7 @@ void ShieldsFDNEngine::processStereo(float* left, float* right, int numSamples)
             // and leaves well-formed audio bit-identical.
             const auto next = mixed[(size_t) i] + injection;
             buf[(size_t) writePos[(size_t) i]] = std::isfinite(next) ? next : 0.0f;
-            writePos[(size_t) i] = (writePos[(size_t) i] + 1) % (int) buf.size();
+            writePos[(size_t) i] = wrapIndex(writePos[(size_t) i] + 1, (int) buf.size());
         }
 
         float wetL = 0.0f, wetR = 0.0f;

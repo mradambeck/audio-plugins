@@ -16,9 +16,13 @@
 // exactly the samples that get convolved; and the waveform the editor draws is exactly the IR the
 // engine is using, not a pre-resampling approximation of it.
 //
-// Threading: every non-const member is blocking (decode, resample, allocation) and the cache is
-// unsynchronised. IRLoadWorker's thread is the only owner in production; tests and the render
-// harness call it synchronously. Never touch it from the audio thread.
+// Threading: every non-const member is blocking (decode, resample, allocation), so never call one
+// from the audio thread. Two non-audio threads DO reach it in production, though, not one:
+// IRLoadWorker's own background thread (via requestShape()'s debounced path), and the message
+// thread directly, via IRLoadWorker::shapeSynchronously() - which ConvolutionProcessor::
+// prepareToPlay() calls for the very first IR, so a host re-prepare racing an in-flight background
+// request is a real sequence, not a hypothetical one. cache/targetSampleRate are therefore guarded
+// by `lock` below rather than actually being single-owner.
 namespace wildjag::conv
 {
 
@@ -40,7 +44,11 @@ public:
     // Discards the cache if the rate actually changed. Cheap and safe to call on every
     // prepareToPlay, including the common case where the host re-prepares at the same rate.
     void setTargetSampleRate(double newSampleRate);
-    double getTargetSampleRate() const noexcept { return targetSampleRate; }
+    double getTargetSampleRate() const noexcept
+    {
+        const juce::ScopedLock sl(lock);
+        return targetSampleRate;
+    }
 
     int getNumIRs() const noexcept { return (int) variant.irs.size(); }
 
@@ -71,6 +79,8 @@ public:
 
 private:
     const ConvolutionVariant& variant;
+
+    mutable juce::CriticalSection lock;
     double targetSampleRate = 0.0;
     std::vector<std::shared_ptr<const DecodedIR>> cache;
 

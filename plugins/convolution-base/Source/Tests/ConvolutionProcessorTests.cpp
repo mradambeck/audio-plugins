@@ -217,16 +217,22 @@ public:
             expect(sawAnyOutput, "the processor produced silence at its defaults");
         }
 
-        beginTest("tolerates a block larger than the one it was prepared for");
+        beginTest("tolerates a block larger than the one it was prepared for, and actually processes all of it");
         {
-            // Logic's offline bounce does exactly this. The engine is sized with headroom rather
-            // than reallocating on the audio thread; the contract is that an oversized block is
-            // truncated, not that it crashes.
+            // Logic's offline bounce does exactly this. The engine is sized with headroom (4x
+            // samplesPerBlock - see blockSizeHeadroom) rather than reallocating on the audio
+            // thread; the contract is that an oversized block is chunked through the engine, not
+            // that everything past the first chunk is silently left dry-unmixed. Using 8x the
+            // prepared block size here (not 2x, which fits inside the 4x headroom and so never
+            // actually exercised the oversized path at all) so the buffer genuinely exceeds a
+            // single chunk.
             ConvolutionProcessor processor(variantConfig());
+            setRaw(processor, ConvolutionProcessor::dryParamID, 0.0f);
+            setRaw(processor, ConvolutionProcessor::wetParamID, 100.0f);
             processor.setPlayConfigDetails(2, 2, sampleRate, blockSize);
             processor.prepareToPlay(sampleRate, blockSize);
 
-            juce::AudioBuffer<float> buffer(2, blockSize * 2);
+            juce::AudioBuffer<float> buffer(2, blockSize * 8);
             fillSine(buffer, 0.5f, 220.0f);
 
             juce::MidiBuffer midi;
@@ -234,6 +240,15 @@ public:
 
             for (int i = 0; i < buffer.getNumSamples(); ++i)
                 expect(std::isfinite(buffer.getSample(0, i)));
+
+            // With Dry at 0%, any sample the engine never touched stays exactly 0 (that channel's
+            // own dry contribution is zeroed out, and nothing else writes it) - so a non-silent
+            // second half is direct evidence the engine actually ran on it, not just that nothing
+            // crashed reading it.
+            const auto secondHalfRms = rms(juce::AudioBuffer<float>(
+                buffer.getArrayOfWritePointers(), 2, blockSize * 4, blockSize * 4), 0);
+            expect(secondHalfRms > 0.0f,
+                   "samples past the first chunk were left unprocessed by an oversized block");
         }
 
         beginTest("state round-trips through the host's save/restore");
@@ -271,6 +286,37 @@ public:
 
             for (int i = 0; i < irParam->choices.size(); ++i)
                 expectEquals(irParam->choices[i], juce::String(variantConfig().irs[(size_t) i].displayName));
+        }
+
+        beginTest("a shape request completed after the session's sample rate has moved on is discarded, not delivered");
+        {
+            // Exercises IRLoadWorker::setSessionSampleRate() directly: request a re-shape at the
+            // OLD rate, then tell the worker the session has moved to a NEW rate before the
+            // request's debounce period elapses (IRLoadWorker.cpp's debounceMs is 80ms) - the same
+            // sequence a host re-prepare landing mid-shape produces. Without the fix, the worker has
+            // no way to know the rate it was asked to shape for is now stale, and would deliver it
+            // anyway; loadIR() stamps whatever it's handed as the CURRENT rate with no resampling.
+            ConvolutionProcessor processor(variantConfig());
+            processor.setPlayConfigDetails(2, 2, sampleRate, blockSize);
+            processor.prepareToPlay(sampleRate, blockSize);
+
+            auto& worker = processor.getIRLoadWorker();
+
+            worker.requestShape(1, { 100.0f, 0.0f }, sampleRate); // old rate: 48000
+            worker.setSessionSampleRate(sampleRate * 2.0); // session moves to 96000 before delivery
+
+            juce::Thread::sleep(400); // clears the debounce plus the decode/resample/shape pass
+
+            juce::AudioBuffer<float> delivered;
+            expect(! worker.tryPopShapedIR(delivered),
+                   "an IR shaped for a stale sample rate was delivered after the session moved on");
+
+            // The worker is otherwise healthy - a fresh request at the NEW (current) rate still
+            // delivers normally, so this isn't a case of the fix wedging the pipeline.
+            worker.requestShape(1, { 100.0f, 0.0f }, sampleRate * 2.0);
+            juce::Thread::sleep(400);
+            expect(worker.tryPopShapedIR(delivered),
+                   "a request matching the current session rate was not delivered");
         }
     }
 };
