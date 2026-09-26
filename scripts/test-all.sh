@@ -10,7 +10,7 @@ set -uo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 overall_status=0
 
-for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/strike-synth:StrikeProcessor" "plugins/aura-reverb:Aura" "plugins/concrete-sampler:Concrete" "plugins/concrete-sampler:ConcreteProcessor" "plugins/convolution-base:ConvBase" "plugins/inhalt-nonlin:Inhalt"; do
+for entry in "plugins/caverns-delay:Caverns" "plugins/damage-fuzz:Damage" "plugins/corrosion-drive:Corrosion" "plugins/flux-phaser:Flux" "plugins/alloy-bass:Alloy" "plugins/gradient-pitch:Gradient" "plugins/shields-reverb:Shields" "plugins/intruder-gated-reverb:Intruder" "plugins/strike-synth:Strike" "plugins/strike-synth:StrikeProcessor" "plugins/aura-reverb:Aura" "plugins/concrete-sampler:Concrete" "plugins/concrete-sampler:ConcreteProcessor" "plugins/convolution-base:ConvBase"; do
     repo="${entry%%:*}"
     name="${entry##*:}"
     echo "==> Configuring $name"
