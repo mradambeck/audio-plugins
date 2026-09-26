@@ -13,11 +13,19 @@ also under `plugins/` but is a dev harness for `plugins/common/convolution/`, no
 no installer and is deliberately absent from `release.yml`, `installers/`, `sync-site-versions.yml`
 and the download counter; the real products built from that engine are branded variants in a
 separate private repo. See `plugins/convolution-base/README.md` before wiring it into anything
-else. `inhalt-nonlin` is a real product in development (AMS RMX16 "NonLin" recreation, built via
-convolving a synthesized IR - see that folder's own README) - registered in CI/scripts for
-continuous build/test coverage, but deliberately still absent from `release.yml`, `installers/`,
-`sync-site-versions.yml` and the download counter until it has real capture-calibrated data and a
-real UI, the same reasoning as `convolution-base`'s own registration split.
+else.
+
+This repo is also consumed as a git submodule by two separate private repos building
+commercially-sold plugins on top of `plugins/common/` (and, for ML-fitted DSP, `ml-toolkit/core/`)
+the same way any plugin here does, but whose own Source/, assets, and captured hardware data must
+never enter public git history: `wildjag-convolution-variants` (convolution-engine variants, e.g.
+`bloom`) and `wj-audio-commercial` (full independent plugins, e.g. Inhalt, formerly
+`plugins/inhalt-nonlin` in this repo - moved out, history preserved via `git subtree split`).
+Neither has a `.gitmodules` entry here - the submodule pointer lives only on the private side.
+Treat `plugins/common/cmake/*.cmake`, `plugins/common/LookAndFeel/`, and `ml-toolkit/core/` as a
+public API surface for both: any change there must keep resolving paths via `CMAKE_CURRENT_LIST_DIR`
+(cmake) or stay independently importable (Python), not assume it's only ever included from this
+repo's own tree.
 
 Each plugin folder is a fully independent CMake project — `cd plugins/<plugin> && cmake -B build`
 works on its own. Do not introduce a unified CMake super-build; per-plugin independence is relied

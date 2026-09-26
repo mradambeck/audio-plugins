@@ -7,8 +7,14 @@ analysis -> differentiable fit -> curve export), documented in that module's own
 (`fit.py`, `dsp_primitives.py`), curve interpolation (`interp.py`), export (`export.py`), I/O
 (`io.py`).
 
-Shipped modules: `effects/ambience` (AMS RMX16 Ambience -> the Aura plugin), `effects/nonlin`
-(AMS RMX16 NonLin -> the Inhalt plugin).
+Shipped modules: `effects/ambience` (AMS RMX16 Ambience -> the Aura plugin).
+
+`effects/nonlin` (AMS RMX16 NonLin -> the Inhalt plugin) shipped from here too, but has since moved
+to the private `wj-audio-commercial` repo alongside the plugin it feeds (Inhalt is commercially
+sold, not part of this public catalog) - history preserved via `git subtree split`, not deleted.
+Several lessons below still cite `effects/nonlin/...` and `plugins/inhalt-nonlin/...` paths from
+when it lived here; those paths now resolve inside `wj-audio-commercial`, not this repo, but the
+lessons themselves remain accurate and worth keeping as cross-module record.
 
 This file is the durable, cross-module record - lessons that cost real debugging time on one
 module and apply to the next one too, not effect-specific findings (those stay in each module's
