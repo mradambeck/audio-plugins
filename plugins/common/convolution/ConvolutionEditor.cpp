@@ -487,10 +487,19 @@ void ConvolutionEditorContent::resized()
     filterSectionBounds = filterSection.toFloat();
     mixSectionBounds = mixColumn.toFloat();
 
+    // When the label breaks the border (see drawHardwareSection/HardwarePanelTheme.h) there's no
+    // longer a filled badge eating extra room at the top, so an equal split centres the knobs/
+    // faders within the section box instead of the default badge-clearance-heavy split. The sum
+    // (sectionPaddingTop + sectionPaddingBottom) is unchanged either way, so this never affects
+    // the section-height/window-size constants above, which are derived from that sum only.
+    const auto labelBreaksBorder = variantTheme().sectionLabelBreaksBorder;
+    const int contentPaddingTop = labelBreaksBorder ? (sectionPaddingTop + sectionPaddingBottom) / 2 : sectionPaddingTop;
+    const int contentPaddingBottom = labelBreaksBorder ? (sectionPaddingTop + sectionPaddingBottom) / 2 : sectionPaddingBottom;
+
     // ---- IMPULSE: the IR dropdown and its metadata, over the waveform. ----
     auto impulseInner = impulseSection;
-    impulseInner.removeFromTop(sectionPaddingTop);
-    impulseInner.removeFromBottom(sectionPaddingBottom);
+    impulseInner.removeFromTop(contentPaddingTop);
+    impulseInner.removeFromBottom(contentPaddingBottom);
     impulseInner = impulseInner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
     auto comboRow = impulseInner.removeFromTop(comboHeight);
@@ -514,8 +523,8 @@ void ConvolutionEditorContent::resized()
     auto layOutKnobRow = [&](juce::Rectangle<int> section, int firstKnob, int count)
     {
         auto inner = section;
-        inner.removeFromTop(sectionPaddingTop);
-        inner.removeFromBottom(sectionPaddingBottom);
+        inner.removeFromTop(contentPaddingTop);
+        inner.removeFromBottom(contentPaddingBottom);
         inner = inner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
         for (int i = 0; i < count; ++i)
@@ -533,8 +542,8 @@ void ConvolutionEditorContent::resized()
 
     // ---- MIX: Dry and Wet faders, full height. ----
     auto mixInner = mixColumn;
-    mixInner.removeFromTop(sectionPaddingTop);
-    mixInner.removeFromBottom(sectionPaddingBottom);
+    mixInner.removeFromTop(contentPaddingTop);
+    mixInner.removeFromBottom(contentPaddingBottom);
     mixInner = mixInner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
     auto positionFader = [](juce::Rectangle<int> cell, juce::Slider& slider, juce::Label& nameLabel)
