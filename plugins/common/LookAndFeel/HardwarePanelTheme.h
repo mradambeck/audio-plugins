@@ -43,8 +43,8 @@ namespace wildjag
         float sectionBorderThickness = 3.5f;
         float sectionBorderCornerRadius = 7.0f;
 
-        // When true, drawHardwareSection() draws the section label as plain accentBrightHi text
-        // breaking a gap in the border (like a <fieldset><legend>) instead of the default filled
+        // When true, drawHardwareSection() draws the section label as plain text (in
+        // sectionBorderColour, matching the border it breaks) instead of the default filled
         // accentMuted badge sitting inside/on it. Off by default - every existing plugin's own
         // drawHardwareSection() copy keeps its current filled-badge look; only the shared
         // convolution editor reads this field so far.

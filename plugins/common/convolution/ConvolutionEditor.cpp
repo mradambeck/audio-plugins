@@ -282,9 +282,9 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
 
     if (variantTheme().sectionLabelBreaksBorder)
     {
-        // Label breaks the border like a <fieldset><legend> - plain accent-coloured text centred
-        // on the top edge, with a gap in the line behind it (via excludeClipRegion) rather than a
-        // filled badge sitting inside/on the border.
+        // Label breaks the border like a <fieldset><legend> - plain text, the same colour as the
+        // border itself, centred on the top edge, with a gap in the line behind it (via
+        // excludeClipRegion) rather than a filled badge sitting inside/on the border.
         constexpr float labelPaddingX = 10.0f;
         const auto labelBounds = juce::Rectangle<float>(textWidth + labelPaddingX * 2.0f, font.getHeight())
                                       .withCentre({bounds.getCentreX(), bounds.getY()});
@@ -295,7 +295,7 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
         g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
         g.restoreState();
 
-        g.setColour(variantTheme().accentBrightHi);
+        g.setColour(variantTheme().sectionBorderColour);
         g.setFont(font);
         g.drawText(text, labelBounds, juce::Justification::centred);
         return;
