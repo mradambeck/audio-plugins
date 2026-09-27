@@ -116,7 +116,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout ConvolutionProcessor::create
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID { wetParamID, 1 }, "Wet",
-        juce::NormalisableRange<float> { 0.0f, 200.0f, 0.1f }, 40.0f,
+        juce::NormalisableRange<float> { 0.0f, variant.wetMaxPercent, 0.1f }, 40.0f,
         juce::AudioParameterFloatAttributes().withLabel("%").withStringFromValueFunction(percentString)));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
