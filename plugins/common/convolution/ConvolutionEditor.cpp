@@ -123,7 +123,9 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
     {
         logoDrawable = juce::Drawable::createFromImageData(processorRef.getVariant().logoSvgData,
                                                              processorRef.getVariant().logoSvgDataSize);
-        logoDrawable->replaceColour(juce::Colours::black, variantTheme().accentBrightHi);
+        // White, not the accent - matches inhalt-nonlin's own private editor, which uses the same
+        // source SVG.
+        logoDrawable->replaceColour(juce::Colours::black, juce::Colours::white);
     }
     else
     {
@@ -274,8 +276,8 @@ void ConvolutionEditorContent::rebuildChassisTexture()
 void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                     const juce::String& label)
 {
-    g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
-    g.drawRoundedRectangle(bounds, 7.0f, 3.5f);
+    g.setColour(variantTheme().sectionBorderColour);
+    g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
 
     const auto font = lookAndFeel.getDisplayFont(12.5f).withExtraKerningFactor(0.14f);
     const auto textWidth = juce::GlyphArrangement::getStringWidth(font, label.toUpperCase());

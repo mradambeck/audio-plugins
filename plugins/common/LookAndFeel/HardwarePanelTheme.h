@@ -34,6 +34,15 @@ namespace wildjag
         // terracotta accent instead of the generic grey.
         juce::Colour sliderTextBoxTextColour{0xff7f938f};
 
+        // The hardware-section outline (the rounded rectangle drawHardwareSection() strokes around
+        // each control group). Defaults match every existing plugin's own copy-pasted
+        // drawHardwareSection() literals - only the shared convolution editor reads these fields
+        // today (see ConvolutionEditor.cpp), so every other plugin's private drawHardwareSection()
+        // copy is unaffected either way.
+        juce::Colour sectionBorderColour = juce::Colour(0xffe6ece6).withAlpha(0.62f);
+        float sectionBorderThickness = 3.5f;
+        float sectionBorderCornerRadius = 7.0f;
+
         EmbeddedTypeface displayTypeface;
         EmbeddedTypeface smallPrintTypeface;
     };
