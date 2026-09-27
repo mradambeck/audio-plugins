@@ -405,7 +405,7 @@ void ConvolutionEditorContent::resized()
 
     // Baseline-align the wordmark and the tag line (mockup: .brand{align-items:baseline}).
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
-    const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
+    auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 
     if (logoDrawable != nullptr)
     {
@@ -418,6 +418,12 @@ void ConvolutionEditorContent::resized()
         auto logoBounds = header.removeFromLeft((int) std::ceil(logoWidth) + 8)
                                  .withSizeKeepingCentre((int) std::ceil(logoWidth), (int) std::ceil(logoHeight));
         logoDrawable->setDrawableTransformToFit(logoBounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+
+        // Anchor the tag line's baseline to the logo's own bottom edge, not the fixed
+        // header-height fraction above (that fraction was tuned for titleLabel's text baseline) -
+        // tagLabel's text is all-caps (no descenders), so its bounding-box bottom IS its visual
+        // baseline, and this is what "aligned with the bottom of the logo" actually means.
+        baselineY = (float) logoBounds.getBottom();
     }
     else
     {
