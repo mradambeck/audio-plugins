@@ -65,6 +65,11 @@ private:
 
     juce::Label titleLabel, tagLabel;
 
+    // Set instead of titleLabel's text when the variant supplies logoSvgData - see
+    // ConvolutionVariant.h. Not a Component in this JUCE version (juce::Drawable is a plain
+    // paintable object), so it's drawn explicitly from paint() rather than added to the hierarchy.
+    std::unique_ptr<juce::Drawable> logoDrawable;
+
     juce::ToggleButton bypassButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 

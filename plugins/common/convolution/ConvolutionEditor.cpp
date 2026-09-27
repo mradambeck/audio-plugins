@@ -119,13 +119,22 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
                                ? juce::String(processorRef.getVariant().displayName)
                                : juce::String("Convolution");
 
-    titleLabel.setText(productName.toUpperCase(), juce::dontSendNotification);
-    // topLeft, not centred: resized() positions this from the font's own ascent so it shares a
-    // baseline with tagLabel, which a centred justification would undo.
-    titleLabel.setJustificationType(juce::Justification::topLeft);
-    titleLabel.setFont(lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f));
-    titleLabel.setColour(juce::Label::textColourId, variantTheme().accentBrightHi);
-    addAndMakeVisible(titleLabel);
+    if (processorRef.getVariant().logoSvgData != nullptr)
+    {
+        logoDrawable = juce::Drawable::createFromImageData(processorRef.getVariant().logoSvgData,
+                                                             processorRef.getVariant().logoSvgDataSize);
+        logoDrawable->replaceColour(juce::Colours::black, variantTheme().accentBrightHi);
+    }
+    else
+    {
+        titleLabel.setText(productName.toUpperCase(), juce::dontSendNotification);
+        // topLeft, not centred: resized() positions this from the font's own ascent so it shares a
+        // baseline with tagLabel, which a centred justification would undo.
+        titleLabel.setJustificationType(juce::Justification::topLeft);
+        titleLabel.setFont(lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f));
+        titleLabel.setColour(juce::Label::textColourId, variantTheme().accentBrightHi);
+        addAndMakeVisible(titleLabel);
+    }
 
     tagLabel.setText(juce::String("Convolution Reverb").toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
@@ -350,6 +359,12 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.drawRoundedRectangle(fullPanelBounds, 8.0f, 1.0f);
 
+    // Wordmark, when the variant supplies one (see ConvolutionVariant.h) - positioned/sized in
+    // resized() via setDrawableTransformToFit(); draw() here just renders it with that transform
+    // already baked in. Otherwise titleLabel (a real Component) paints itself as usual.
+    if (logoDrawable != nullptr)
+        logoDrawable->draw(g, 1.0f);
+
     // --- PLUGIN-SPECIFIC: section names/grouping, matched to the approved mockup. ---
     drawHardwareSection(g, impulseSectionBounds, "Impulse");
     drawHardwareSection(g, shapeSectionBounds, "Shape");
@@ -387,15 +402,31 @@ void ConvolutionEditorContent::resized()
                                 .expanded((int) wildjag::HardwarePanelLookAndFeel::buttonShadowMargin));
 
     // Baseline-align the wordmark and the tag line (mockup: .brand{align-items:baseline}).
-    const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
-    const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, titleLabel.getText()) + 8;
     const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 
-    auto titleBounds = header.removeFromLeft(titleWidth);
-    titleBounds.setY((int) (baselineY - titleFont.getAscent()));
-    titleBounds.setHeight((int) std::ceil(titleFont.getHeight()));
-    titleLabel.setBounds(titleBounds);
+    if (logoDrawable != nullptr)
+    {
+        // Fixed header-relative height, vertically centred, preserving the logo's own aspect
+        // ratio - no baseline math needed for a mark, unlike titleLabel's plain-text fallback.
+        constexpr float logoHeight = 24.0f;
+        const auto logoNativeBounds = logoDrawable->getDrawableBounds();
+        const auto logoWidth = logoHeight * (logoNativeBounds.getWidth() / logoNativeBounds.getHeight());
+
+        auto logoBounds = header.removeFromLeft((int) std::ceil(logoWidth) + 8)
+                                 .withSizeKeepingCentre((int) std::ceil(logoWidth), (int) std::ceil(logoHeight));
+        logoDrawable->setDrawableTransformToFit(logoBounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+    }
+    else
+    {
+        const auto titleFont = lookAndFeel.getDisplayFont(27.0f).withExtraKerningFactor(0.035f);
+        const auto titleWidth = (int) juce::GlyphArrangement::getStringWidth(titleFont, titleLabel.getText()) + 8;
+
+        auto titleBounds = header.removeFromLeft(titleWidth);
+        titleBounds.setY((int) (baselineY - titleFont.getAscent()));
+        titleBounds.setHeight((int) std::ceil(titleFont.getHeight()));
+        titleLabel.setBounds(titleBounds);
+    }
 
     header.removeFromLeft(12);
     auto tagBounds = header;

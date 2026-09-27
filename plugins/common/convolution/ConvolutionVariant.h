@@ -29,7 +29,8 @@ namespace wildjag::conv
     struct ConvolutionVariant
     {
         // The product name as shown in the UI. Not the CMake project name or PRODUCT_NAME, though
-        // in practice they match.
+        // in practice they match. Still used for the header when logoSvgData is null (see below),
+        // and always used for the footer credit regardless.
         const char* displayName = nullptr;
 
         // The bundled IRs, in dropdown order. Must not be empty - a convolution reverb with no IR
@@ -38,6 +39,17 @@ namespace wildjag::conv
 
         // Which IR a fresh instance starts on. Clamped into range at construction.
         int defaultIRIndex = 0;
+
+        // Optional wordmark, drawn in the header in place of displayName as plain text when
+        // present. Raw SVG bytes owned by the variant's BinaryData target (e.g.
+        // BinaryData::logo_svg) - no juce_gui_basics dependency here, same as IRAsset::data, so the
+        // headless test/render harnesses stay unaffected. Null (the default) means "no logo - draw
+        // displayName as text", which is every existing variant's current behaviour. Deliberately
+        // last: every existing variant's VariantConfig.cpp brace-initializes this struct
+        // positionally (displayName, irs, defaultIRIndex), and a trailing field with a default
+        // keeps those working unchanged - inserting it earlier breaks that positional init.
+        const void* logoSvgData = nullptr;
+        size_t logoSvgDataSize = 0;
     };
 
     // Supplied by each variant, in its own VariantConfig.cpp. Declared here rather than in a
