@@ -276,11 +276,34 @@ void ConvolutionEditorContent::rebuildChassisTexture()
 void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                     const juce::String& label)
 {
+    const auto font = lookAndFeel.getDisplayFont(12.5f).withExtraKerningFactor(0.14f);
+    const auto text = label.toUpperCase();
+    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, text);
+
+    if (variantTheme().sectionLabelBreaksBorder)
+    {
+        // Label breaks the border like a <fieldset><legend> - plain accent-coloured text centred
+        // on the top edge, with a gap in the line behind it (via excludeClipRegion) rather than a
+        // filled badge sitting inside/on the border.
+        constexpr float labelPaddingX = 10.0f;
+        const auto labelBounds = juce::Rectangle<float>(textWidth + labelPaddingX * 2.0f, font.getHeight())
+                                      .withCentre({bounds.getCentreX(), bounds.getY()});
+
+        g.saveState();
+        g.excludeClipRegion(labelBounds.getSmallestIntegerContainer());
+        g.setColour(variantTheme().sectionBorderColour);
+        g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
+        g.restoreState();
+
+        g.setColour(variantTheme().accentBrightHi);
+        g.setFont(font);
+        g.drawText(text, labelBounds, juce::Justification::centred);
+        return;
+    }
+
     g.setColour(variantTheme().sectionBorderColour);
     g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
 
-    const auto font = lookAndFeel.getDisplayFont(12.5f).withExtraKerningFactor(0.14f);
-    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, label.toUpperCase());
     constexpr float badgeHeight = 25.0f;
     const auto badgeBounds = juce::Rectangle<float>(textWidth + 36.0f, badgeHeight)
                                   .withCentre({bounds.getCentreX(), bounds.getY() + 12.0f + badgeHeight * 0.5f});
@@ -290,7 +313,7 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
 
     g.setColour(lookAndFeel.getBadgeInkColour());
     g.setFont(font);
-    g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
+    g.drawText(text, badgeBounds, juce::Justification::centred);
 }
 
 void ConvolutionEditorContent::paint(juce::Graphics& g)
