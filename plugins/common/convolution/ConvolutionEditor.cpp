@@ -412,11 +412,11 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     if (variantTheme().drawMixDividerTicks)
     {
         constexpr int numTicks = 9;
-        constexpr float tickWidth = 30.0f;
+        constexpr float tickWidth = 24.0f;
         const auto tickThickness = variantTheme().sectionBorderThickness * 0.5f;
 
-        const auto top = (float) dryFader.slider.getY();
-        const auto bottom = (float) dryFader.slider.getBottom();
+        const auto top = (float) dryFader.slider.getY() + 30.0f;
+        const auto bottom = (float) dryFader.slider.getBottom() - 50.0f;
         const auto centreX = ((float) dryFader.slider.getRight() + (float) wetFader.slider.getX()) * 0.5f;
 
         g.setColour(variantTheme().sectionBorderColour);
