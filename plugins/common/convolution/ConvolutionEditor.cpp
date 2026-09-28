@@ -407,8 +407,9 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     drawHardwareSection(g, mixSectionBounds, "Mix");
 
     // Hardware-fader-panel tick marks between Dry and Wet, evenly spaced across the faders' own
-    // vertical travel - same colour as the section outline, half its thickness. Wide enough (30px)
-    // to extend into both fader cells' own padding, not just the (narrower) gap between them.
+    // vertical travel - same grey as the footer's "WILD JAG" text (drawn further below), half the
+    // section outline's own thickness. Wide enough (24px) to extend into both fader cells' own
+    // padding, not just the (narrower) gap between them.
     if (variantTheme().drawMixDividerTicks)
     {
         constexpr int numTicks = 9;
@@ -419,7 +420,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
         const auto bottom = (float) dryFader.slider.getBottom() - 50.0f;
         const auto centreX = ((float) dryFader.slider.getRight() + (float) wetFader.slider.getX()) * 0.5f;
 
-        g.setColour(variantTheme().sectionBorderColour);
+        g.setColour(juce::Colour(0xff3a4547));
         for (int i = 0; i < numTicks; ++i)
         {
             const auto y = top + (float) i / (float) (numTicks - 1) * (bottom - top);
