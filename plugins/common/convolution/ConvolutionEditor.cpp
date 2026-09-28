@@ -43,10 +43,12 @@ namespace
     constexpr int filterSectionWidth = 2 * knobSize + knobGap + 2 * sectionPaddingSide;      // 222
     constexpr int leftColumnWidth = shapeSectionWidth + columnGap + filterSectionWidth;      // 584
 
-    // Wider than the mockup's measured 110px, deliberately - the same correction Aura's Mix column
-    // needed. The mockup's example fader values never exercised Wet's real 0-200% range, and
-    // "200.0%" needs meaningfully more textbox width than "40.0%" suggested.
-    constexpr int mixSectionWidth = 130;
+    // The default Mix width - wider than the mockup's measured 110px, deliberately, the same
+    // correction Aura's Mix column needed (the mockup's example fader values never exercised Wet's
+    // real 0-200% range, and "200.0%" needs meaningfully more textbox width than "40.0%"
+    // suggested). A variant can widen this via ConvolutionVariant::mixSectionWidth - see
+    // editorWidth's own comment below for why that makes this no longer a compile-time constant.
+    constexpr int defaultMixSectionWidth = 130;
 
     constexpr int impulseSectionHeight = sectionPaddingTop + comboHeight + waveformGap
                                          + waveformHeight + sectionPaddingBottom;            // 216
@@ -54,8 +56,11 @@ namespace
 
     constexpr int panelContentHeight = impulseSectionHeight + rowGap + knobSectionHeight;     // 430
 
-    constexpr int editorWidth = chassisMargin * 2 + contentPadding * 2
-                                + leftColumnWidth + columnGap + mixSectionWidth;
+    // Not editorWidth's own constexpr sibling: since ConvolutionVariant::mixSectionWidth can widen
+    // the Mix column per-variant, the editor's native width has to be computed per-instance (in the
+    // constructor, from the real variant) rather than once at compile time for every variant.
+    constexpr int editorWidthWithDefaultMix = chassisMargin * 2 + contentPadding * 2
+                                              + leftColumnWidth + columnGap + defaultMixSectionWidth;
     constexpr int editorHeight = chassisMargin * 2 + headerHeight + footerHeight
                                  + contentPadding * 2 + panelContentHeight;
 
@@ -138,7 +143,10 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
         addAndMakeVisible(titleLabel);
     }
 
-    tagLabel.setText(juce::String("Convolution Reverb").toUpperCase(), juce::dontSendNotification);
+    const auto tagline = processorRef.getVariant().tagline != nullptr
+                           ? juce::String(processorRef.getVariant().tagline)
+                           : juce::String("Convolution Reverb");
+    tagLabel.setText(tagline.toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
     tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
@@ -186,6 +194,8 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
     wetFader.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ConvolutionProcessor::wetParamID, wetFader.slider);
 
+    const auto editorWidth = editorWidthWithDefaultMix
+                              + (processorRef.getVariant().mixSectionWidth - defaultMixSectionWidth);
     setSize(editorWidth, editorHeight);
     startTimerHz(uiRefreshHz);
 }
@@ -472,7 +482,7 @@ void ConvolutionEditorContent::resized()
     // Two columns, not two rows: MIX is a sibling of the whole left column, so it spans the full
     // body height and its faders are full-length. IMPULSE therefore ends flush with FILTER's right
     // edge rather than running the panel's whole width.
-    auto mixColumn = content.removeFromRight(mixSectionWidth);
+    auto mixColumn = content.removeFromRight(processorRef.getVariant().mixSectionWidth);
     content.removeFromRight(columnGap);
     auto leftColumn = content;
 

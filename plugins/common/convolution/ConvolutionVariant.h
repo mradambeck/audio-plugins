@@ -58,6 +58,15 @@ namespace wildjag::conv
         // since it's already inside both ranges. Also last, for the same positional-init reason as
         // logoSvgData above.
         float wetMaxPercent = 200.0f;
+
+        // The subtitle drawn next to the header wordmark/title. Null (the default) means
+        // "Convolution Reverb", every existing variant's current text.
+        const char* tagline = nullptr;
+
+        // Width, in px, of the MIX (Dry/Wet fader) column. Every existing variant ships 130; a
+        // variant can widen it (e.g. to match a sibling plugin's own Mix column) at the cost of a
+        // proportionally wider window, since this also feeds the editor's fixed native size.
+        int mixSectionWidth = 130;
     };
 
     // Supplied by each variant, in its own VariantConfig.cpp. Declared here rather than in a
