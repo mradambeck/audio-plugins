@@ -405,6 +405,27 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     drawHardwareSection(g, shapeSectionBounds, "Shape");
     drawHardwareSection(g, filterSectionBounds, "Filter");
     drawHardwareSection(g, mixSectionBounds, "Mix");
+
+    // Hardware-fader-panel tick marks between Dry and Wet, evenly spaced across the faders' own
+    // vertical travel - same colour as the section outline, half its thickness. Wide enough (30px)
+    // to extend into both fader cells' own padding, not just the (narrower) gap between them.
+    if (variantTheme().drawMixDividerTicks)
+    {
+        constexpr int numTicks = 9;
+        constexpr float tickWidth = 30.0f;
+        const auto tickThickness = variantTheme().sectionBorderThickness * 0.5f;
+
+        const auto top = (float) dryFader.slider.getY();
+        const auto bottom = (float) dryFader.slider.getBottom();
+        const auto centreX = ((float) dryFader.slider.getRight() + (float) wetFader.slider.getX()) * 0.5f;
+
+        g.setColour(variantTheme().sectionBorderColour);
+        for (int i = 0; i < numTicks; ++i)
+        {
+            const auto y = top + (float) i / (float) (numTicks - 1) * (bottom - top);
+            g.drawLine(centreX - tickWidth * 0.5f, y, centreX + tickWidth * 0.5f, y, tickThickness);
+        }
+    }
     // --- END PLUGIN-SPECIFIC ---
 
     auto footerBoundsCopy = fullPanelBounds;

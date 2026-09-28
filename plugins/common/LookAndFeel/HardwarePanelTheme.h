@@ -59,6 +59,11 @@ namespace wildjag
         // width without changing every other variant's (proportional, column-width-dependent) one.
         float linearSliderThumbWidthOverride = 0.0f;
 
+        // When true, the shared convolution editor draws 9 evenly-spaced hardware-fader-panel tick
+        // marks between the Dry and Wet faders (sectionBorderColour, half sectionBorderThickness).
+        // Off by default - purely decorative, opt-in per variant.
+        bool drawMixDividerTicks = false;
+
         EmbeddedTypeface displayTypeface;
         EmbeddedTypeface smallPrintTypeface;
     };
