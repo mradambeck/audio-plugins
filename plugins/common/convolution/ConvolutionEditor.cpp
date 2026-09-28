@@ -453,8 +453,12 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     g.drawText(productName.toUpperCase() + juce::String::fromUTF8(" \xC2\xB7 v") + JucePlugin_VersionString,
                footerArea.removeFromLeft(220.0f), juce::Justification::topLeft);
 
+    const auto manufacturerCredit = processorRef.getVariant().manufacturerCredit != nullptr
+                                      ? juce::String(processorRef.getVariant().manufacturerCredit)
+                                      : juce::String("Wild Jag");
+
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(manufacturerCredit.toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
 void ConvolutionEditorContent::resized()
