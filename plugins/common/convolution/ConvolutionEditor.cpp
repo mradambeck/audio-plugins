@@ -123,7 +123,9 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
     {
         logoDrawable = juce::Drawable::createFromImageData(processorRef.getVariant().logoSvgData,
                                                              processorRef.getVariant().logoSvgDataSize);
-        logoDrawable->replaceColour(juce::Colours::black, variantTheme().accentBrightHi);
+        // White, not the accent - matches inhalt-nonlin's own private editor, which uses the same
+        // source SVG.
+        logoDrawable->replaceColour(juce::Colours::black, juce::Colours::white);
     }
     else
     {
@@ -274,11 +276,34 @@ void ConvolutionEditorContent::rebuildChassisTexture()
 void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rectangle<float> bounds,
                                                     const juce::String& label)
 {
-    g.setColour(juce::Colour(0xffe6ece6).withAlpha(0.62f));
-    g.drawRoundedRectangle(bounds, 7.0f, 3.5f);
-
     const auto font = lookAndFeel.getDisplayFont(12.5f).withExtraKerningFactor(0.14f);
-    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, label.toUpperCase());
+    const auto text = label.toUpperCase();
+    const auto textWidth = juce::GlyphArrangement::getStringWidth(font, text);
+
+    if (variantTheme().sectionLabelBreaksBorder)
+    {
+        // Label breaks the border like a <fieldset><legend> - plain text, the same colour as the
+        // border itself, centred on the top edge, with a gap in the line behind it (via
+        // excludeClipRegion) rather than a filled badge sitting inside/on the border.
+        constexpr float labelPaddingX = 10.0f;
+        const auto labelBounds = juce::Rectangle<float>(textWidth + labelPaddingX * 2.0f, font.getHeight())
+                                      .withCentre({bounds.getCentreX(), bounds.getY()});
+
+        g.saveState();
+        g.excludeClipRegion(labelBounds.getSmallestIntegerContainer());
+        g.setColour(variantTheme().sectionBorderColour);
+        g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
+        g.restoreState();
+
+        g.setColour(variantTheme().sectionBorderColour);
+        g.setFont(font);
+        g.drawText(text, labelBounds, juce::Justification::centred);
+        return;
+    }
+
+    g.setColour(variantTheme().sectionBorderColour);
+    g.drawRoundedRectangle(bounds, variantTheme().sectionBorderCornerRadius, variantTheme().sectionBorderThickness);
+
     constexpr float badgeHeight = 25.0f;
     const auto badgeBounds = juce::Rectangle<float>(textWidth + 36.0f, badgeHeight)
                                   .withCentre({bounds.getCentreX(), bounds.getY() + 12.0f + badgeHeight * 0.5f});
@@ -288,7 +313,7 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
 
     g.setColour(lookAndFeel.getBadgeInkColour());
     g.setFont(font);
-    g.drawText(label.toUpperCase(), badgeBounds, juce::Justification::centred);
+    g.drawText(text, badgeBounds, juce::Justification::centred);
 }
 
 void ConvolutionEditorContent::paint(juce::Graphics& g)
@@ -403,7 +428,7 @@ void ConvolutionEditorContent::resized()
 
     // Baseline-align the wordmark and the tag line (mockup: .brand{align-items:baseline}).
     const auto tagFont = lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f);
-    const auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
+    auto baselineY = (float) header.getY() + (float) header.getHeight() * 0.62f;
 
     if (logoDrawable != nullptr)
     {
@@ -416,6 +441,12 @@ void ConvolutionEditorContent::resized()
         auto logoBounds = header.removeFromLeft((int) std::ceil(logoWidth) + 8)
                                  .withSizeKeepingCentre((int) std::ceil(logoWidth), (int) std::ceil(logoHeight));
         logoDrawable->setDrawableTransformToFit(logoBounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+
+        // Anchor the tag line's baseline to the logo's own bottom edge, not the fixed
+        // header-height fraction above (that fraction was tuned for titleLabel's text baseline) -
+        // tagLabel's text is all-caps (no descenders), so its bounding-box bottom IS its visual
+        // baseline, and this is what "aligned with the bottom of the logo" actually means.
+        baselineY = (float) logoBounds.getBottom();
     }
     else
     {
@@ -456,10 +487,19 @@ void ConvolutionEditorContent::resized()
     filterSectionBounds = filterSection.toFloat();
     mixSectionBounds = mixColumn.toFloat();
 
+    // When the label breaks the border (see drawHardwareSection/HardwarePanelTheme.h) there's no
+    // longer a filled badge eating extra room at the top, so an equal split centres the knobs/
+    // faders within the section box instead of the default badge-clearance-heavy split. The sum
+    // (sectionPaddingTop + sectionPaddingBottom) is unchanged either way, so this never affects
+    // the section-height/window-size constants above, which are derived from that sum only.
+    const auto labelBreaksBorder = variantTheme().sectionLabelBreaksBorder;
+    const int contentPaddingTop = labelBreaksBorder ? (sectionPaddingTop + sectionPaddingBottom) / 2 : sectionPaddingTop;
+    const int contentPaddingBottom = labelBreaksBorder ? (sectionPaddingTop + sectionPaddingBottom) / 2 : sectionPaddingBottom;
+
     // ---- IMPULSE: the IR dropdown and its metadata, over the waveform. ----
     auto impulseInner = impulseSection;
-    impulseInner.removeFromTop(sectionPaddingTop);
-    impulseInner.removeFromBottom(sectionPaddingBottom);
+    impulseInner.removeFromTop(contentPaddingTop);
+    impulseInner.removeFromBottom(contentPaddingBottom);
     impulseInner = impulseInner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
     auto comboRow = impulseInner.removeFromTop(comboHeight);
@@ -483,8 +523,8 @@ void ConvolutionEditorContent::resized()
     auto layOutKnobRow = [&](juce::Rectangle<int> section, int firstKnob, int count)
     {
         auto inner = section;
-        inner.removeFromTop(sectionPaddingTop);
-        inner.removeFromBottom(sectionPaddingBottom);
+        inner.removeFromTop(contentPaddingTop);
+        inner.removeFromBottom(contentPaddingBottom);
         inner = inner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
         for (int i = 0; i < count; ++i)
@@ -502,8 +542,8 @@ void ConvolutionEditorContent::resized()
 
     // ---- MIX: Dry and Wet faders, full height. ----
     auto mixInner = mixColumn;
-    mixInner.removeFromTop(sectionPaddingTop);
-    mixInner.removeFromBottom(sectionPaddingBottom);
+    mixInner.removeFromTop(contentPaddingTop);
+    mixInner.removeFromBottom(contentPaddingBottom);
     mixInner = mixInner.withTrimmedLeft(sectionPaddingSide).withTrimmedRight(sectionPaddingSide);
 
     auto positionFader = [](juce::Rectangle<int> cell, juce::Slider& slider, juce::Label& nameLabel)

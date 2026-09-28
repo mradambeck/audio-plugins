@@ -53,7 +53,15 @@ void IRWaveformDisplay::paint(juce::Graphics& g)
         const auto halfHeight = bounds.getHeight() * 0.5f - verticalMargin;
 
         // Envelopes are absolute peaks, so each point becomes a symmetric vertical span about the
-        // centre line - the familiar mirrored waveform, without needing signed min/max pairs.
+        // centre line - the familiar mirrored waveform, without needing signed min/max pairs. Drawn
+        // as ONE closed, filled Path (top edge left-to-right, then bottom edge back right-to-left)
+        // rather than ~1000 individual adjacent hairline-width rectangles - the previous
+        // RectangleList/fillRectList approach could show seams between rectangles (each one gets
+        // its own antialiased edge, and adjacent sub-pixel-width rects don't always cover each
+        // other's edge fringe) that came and went with backing-store/scale-factor changes, e.g. the
+        // waveform looking solid on first paint and hairline-gapped after the window's peer
+        // finalises its scale following any interaction. A single filled polygon has no adjacent
+        // edges to show a seam between, so it can't exhibit that regardless of root cause.
         auto drawEnvelope = [&](const std::vector<float>& envelope, juce::Colour colour)
         {
             if (envelope.empty())
@@ -63,19 +71,23 @@ void IRWaveformDisplay::paint(juce::Graphics& g)
             // points and so stops partway across, which is exactly how a Length cut should read.
             const auto pointWidth = bounds.getWidth() / (float) snapshot->source.size();
 
-            juce::RectangleList<float> bars;
-            for (size_t i = 0; i < envelope.size(); ++i)
+            auto xAt = [&](size_t i) { return bounds.getX() + (float) i * pointWidth; };
+            auto barHeightAt = [&](size_t i)
             {
                 const auto magnitude = juce::jlimit(0.0f, 1.0f, envelope[i]);
-                const auto barHeight = std::max(magnitude * halfHeight, 0.5f);
-                bars.addWithoutMerging({ bounds.getX() + (float) i * pointWidth,
-                                         midY - barHeight,
-                                         std::max(pointWidth, 1.0f),
-                                         barHeight * 2.0f });
-            }
+                return std::max(magnitude * halfHeight, 0.5f);
+            };
+
+            juce::Path path;
+            path.startNewSubPath(xAt(0), midY - barHeightAt(0));
+            for (size_t i = 1; i < envelope.size(); ++i)
+                path.lineTo(xAt(i), midY - barHeightAt(i));
+            for (size_t i = envelope.size(); i-- > 0;)
+                path.lineTo(xAt(i), midY + barHeightAt(i));
+            path.closeSubPath();
 
             g.setColour(colour);
-            g.fillRectList(bars);
+            g.fillPath(path);
         };
 
         drawEnvelope(snapshot->source, findColour(sourceWaveformColourId));

@@ -50,6 +50,14 @@ namespace wildjag::conv
         // keeps those working unchanged - inserting it earlier breaks that positional init.
         const void* logoSvgData = nullptr;
         size_t logoSvgDataSize = 0;
+
+        // Upper bound of the Wet parameter's range, as a percent. Every existing variant ships
+        // 200 (unity-plus-headroom, so there's no separate output gain stage - see
+        // ConvolutionProcessor.cpp's own comment on why). A variant can cap this at the more
+        // conventional 100 instead; the default parameter value (40%) is unaffected either way
+        // since it's already inside both ranges. Also last, for the same positional-init reason as
+        // logoSvgData above.
+        float wetMaxPercent = 200.0f;
     };
 
     // Supplied by each variant, in its own VariantConfig.cpp. Declared here rather than in a
