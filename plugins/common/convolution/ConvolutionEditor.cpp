@@ -43,10 +43,12 @@ namespace
     constexpr int filterSectionWidth = 2 * knobSize + knobGap + 2 * sectionPaddingSide;      // 222
     constexpr int leftColumnWidth = shapeSectionWidth + columnGap + filterSectionWidth;      // 584
 
-    // Wider than the mockup's measured 110px, deliberately - the same correction Aura's Mix column
-    // needed. The mockup's example fader values never exercised Wet's real 0-200% range, and
-    // "200.0%" needs meaningfully more textbox width than "40.0%" suggested.
-    constexpr int mixSectionWidth = 130;
+    // The default Mix width - wider than the mockup's measured 110px, deliberately, the same
+    // correction Aura's Mix column needed (the mockup's example fader values never exercised Wet's
+    // real 0-200% range, and "200.0%" needs meaningfully more textbox width than "40.0%"
+    // suggested). A variant can widen this via ConvolutionVariant::mixSectionWidth - see
+    // editorWidth's own comment below for why that makes this no longer a compile-time constant.
+    constexpr int defaultMixSectionWidth = 130;
 
     constexpr int impulseSectionHeight = sectionPaddingTop + comboHeight + waveformGap
                                          + waveformHeight + sectionPaddingBottom;            // 216
@@ -54,8 +56,11 @@ namespace
 
     constexpr int panelContentHeight = impulseSectionHeight + rowGap + knobSectionHeight;     // 430
 
-    constexpr int editorWidth = chassisMargin * 2 + contentPadding * 2
-                                + leftColumnWidth + columnGap + mixSectionWidth;
+    // Not editorWidth's own constexpr sibling: since ConvolutionVariant::mixSectionWidth can widen
+    // the Mix column per-variant, the editor's native width has to be computed per-instance (in the
+    // constructor, from the real variant) rather than once at compile time for every variant.
+    constexpr int editorWidthWithDefaultMix = chassisMargin * 2 + contentPadding * 2
+                                              + leftColumnWidth + columnGap + defaultMixSectionWidth;
     constexpr int editorHeight = chassisMargin * 2 + headerHeight + footerHeight
                                  + contentPadding * 2 + panelContentHeight;
 
@@ -138,7 +143,10 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
         addAndMakeVisible(titleLabel);
     }
 
-    tagLabel.setText(juce::String("Convolution Reverb").toUpperCase(), juce::dontSendNotification);
+    const auto tagline = processorRef.getVariant().tagline != nullptr
+                           ? juce::String(processorRef.getVariant().tagline)
+                           : juce::String("Convolution Reverb");
+    tagLabel.setText(tagline.toUpperCase(), juce::dontSendNotification);
     tagLabel.setJustificationType(juce::Justification::topLeft);
     tagLabel.setFont(lookAndFeel.getSmallPrintFont(11.0f).withExtraKerningFactor(0.26f));
     tagLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6f8280));
@@ -186,6 +194,8 @@ ConvolutionEditorContent::ConvolutionEditorContent(ConvolutionProcessor& process
     wetFader.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ConvolutionProcessor::wetParamID, wetFader.slider);
 
+    const auto editorWidth = editorWidthWithDefaultMix
+                              + (processorRef.getVariant().mixSectionWidth - defaultMixSectionWidth);
     setSize(editorWidth, editorHeight);
     startTimerHz(uiRefreshHz);
 }
@@ -319,34 +329,46 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
 void ConvolutionEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
-    juce::Path devicePath;
-    devicePath.addRoundedRectangle(deviceBounds, 14.0f);
+    const auto hideChassisBezel = variantTheme().hideChassisBezel;
 
-    juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 24, {0, 10}).drawForPath(g, devicePath);
+    // The outer "chassis" bezel - a separately-rounded, drop-shadowed, grain-textured device shape
+    // the panel normally sits inset within. Opt-out per variant (see HardwarePanelTheme.h): when
+    // hidden, the panel below fills deviceBounds directly instead of an inset fullPanelBounds, and
+    // goes square instead of rounded (0.0f corner radius passed to it further down) so there's no
+    // gap between the panel's rounded corners and the component's own sharp ones with nothing
+    // behind them to fill it.
+    if (! hideChassisBezel)
+    {
+        juce::Path devicePath;
+        devicePath.addRoundedRectangle(deviceBounds, 14.0f);
 
-    g.saveState();
-    g.reduceClipRegion(devicePath);
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1c1f20), 0.0f, 0.0f,
-                                            juce::Colour(0xff0a0c0d), (float) getWidth(), (float) getHeight(), false));
-    g.fillAll();
-    if (chassisTexture.isValid())
-        g.drawImageAt(chassisTexture, 0, 0);
+        juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 24, {0, 10}).drawForPath(g, devicePath);
 
-    g.setColour(juce::Colours::white.withAlpha(0.05f));
-    g.drawLine(deviceBounds.getX() + 14.0f, deviceBounds.getY() + 1.5f,
-               deviceBounds.getRight() - 14.0f, deviceBounds.getY() + 1.5f, 1.5f);
+        g.saveState();
+        g.reduceClipRegion(devicePath);
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1c1f20), 0.0f, 0.0f,
+                                                juce::Colour(0xff0a0c0d), (float) getWidth(), (float) getHeight(), false));
+        g.fillAll();
+        if (chassisTexture.isValid())
+            g.drawImageAt(chassisTexture, 0, 0);
 
-    juce::ColourGradient bottomShadow(juce::Colours::transparentBlack, 0.0f, deviceBounds.getBottom() - 18.0f,
-                                       juce::Colours::black.withAlpha(0.45f), 0.0f, deviceBounds.getBottom(), false);
-    g.setGradientFill(bottomShadow);
-    g.fillRect(deviceBounds.withTop(deviceBounds.getBottom() - 18.0f));
-    g.restoreState();
+        g.setColour(juce::Colours::white.withAlpha(0.05f));
+        g.drawLine(deviceBounds.getX() + 14.0f, deviceBounds.getY() + 1.5f,
+                   deviceBounds.getRight() - 14.0f, deviceBounds.getY() + 1.5f, 1.5f);
 
-    const auto fullPanelBounds = deviceBounds.reduced((float) chassisMargin);
+        juce::ColourGradient bottomShadow(juce::Colours::transparentBlack, 0.0f, deviceBounds.getBottom() - 18.0f,
+                                           juce::Colours::black.withAlpha(0.45f), 0.0f, deviceBounds.getBottom(), false);
+        g.setGradientFill(bottomShadow);
+        g.fillRect(deviceBounds.withTop(deviceBounds.getBottom() - 18.0f));
+        g.restoreState();
+    }
+
+    const auto fullPanelBounds = hideChassisBezel ? deviceBounds : deviceBounds.reduced((float) chassisMargin);
+    const auto panelCornerRadius = hideChassisBezel ? 0.0f : 8.0f;
 
     {
         juce::Path panelClip;
-        panelClip.addRoundedRectangle(fullPanelBounds, 8.0f);
+        panelClip.addRoundedRectangle(fullPanelBounds, panelCornerRadius);
         g.saveState();
         g.reduceClipRegion(panelClip);
 
@@ -382,7 +404,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     }
 
     g.setColour(juce::Colours::black.withAlpha(0.6f));
-    g.drawRoundedRectangle(fullPanelBounds, 8.0f, 1.0f);
+    g.drawRoundedRectangle(fullPanelBounds, panelCornerRadius, 1.0f);
 
     // Wordmark, when the variant supplies one (see ConvolutionVariant.h) - positioned/sized in
     // resized() via setDrawableTransformToFit(); draw() here just renders it with that transform
@@ -395,6 +417,28 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     drawHardwareSection(g, shapeSectionBounds, "Shape");
     drawHardwareSection(g, filterSectionBounds, "Filter");
     drawHardwareSection(g, mixSectionBounds, "Mix");
+
+    // Hardware-fader-panel tick marks between Dry and Wet, evenly spaced across the faders' own
+    // vertical travel - same grey as the footer's "WILD JAG" text (drawn further below), half the
+    // section outline's own thickness. Wide enough (24px) to extend into both fader cells' own
+    // padding, not just the (narrower) gap between them.
+    if (variantTheme().drawMixDividerTicks)
+    {
+        constexpr int numTicks = 9;
+        constexpr float tickWidth = 24.0f;
+        const auto tickThickness = variantTheme().sectionBorderThickness * 0.5f;
+
+        const auto top = (float) dryFader.slider.getY() + 30.0f;
+        const auto bottom = (float) dryFader.slider.getBottom() - 50.0f;
+        const auto centreX = ((float) dryFader.slider.getRight() + (float) wetFader.slider.getX()) * 0.5f;
+
+        g.setColour(juce::Colour(0xff3a4547));
+        for (int i = 0; i < numTicks; ++i)
+        {
+            const auto y = top + (float) i / (float) (numTicks - 1) * (bottom - top);
+            g.drawLine(centreX - tickWidth * 0.5f, y, centreX + tickWidth * 0.5f, y, tickThickness);
+        }
+    }
     // --- END PLUGIN-SPECIFIC ---
 
     auto footerBoundsCopy = fullPanelBounds;
@@ -409,13 +453,20 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     g.drawText(productName.toUpperCase() + juce::String::fromUTF8(" \xC2\xB7 v") + JucePlugin_VersionString,
                footerArea.removeFromLeft(220.0f), juce::Justification::topLeft);
 
+    // Not .toUpperCase(): a variant's own credit (see ConvolutionVariant.h) may deliberately mix
+    // case (e.g. a lowercase "x" in an otherwise-uppercase co-branding credit), so it's taken
+    // as-typed. The default is already typed upper to match every existing variant's look.
+    const auto manufacturerCredit = processorRef.getVariant().manufacturerCredit != nullptr
+                                      ? juce::String(processorRef.getVariant().manufacturerCredit)
+                                      : juce::String("WILD JAG");
+
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(manufacturerCredit, footerArea, juce::Justification::topRight);
 }
 
 void ConvolutionEditorContent::resized()
 {
-    auto panelArea = getLocalBounds().reduced(chassisMargin);
+    auto panelArea = variantTheme().hideChassisBezel ? getLocalBounds() : getLocalBounds().reduced(chassisMargin);
 
     auto header = panelArea.removeFromTop(headerHeight).reduced(22, 0);
 
@@ -472,7 +523,7 @@ void ConvolutionEditorContent::resized()
     // Two columns, not two rows: MIX is a sibling of the whole left column, so it spans the full
     // body height and its faders are full-length. IMPULSE therefore ends flush with FILTER's right
     // edge rather than running the panel's whole width.
-    auto mixColumn = content.removeFromRight(mixSectionWidth);
+    auto mixColumn = content.removeFromRight(processorRef.getVariant().mixSectionWidth);
     content.removeFromRight(columnGap);
     auto leftColumn = content;
 
@@ -559,7 +610,9 @@ void ConvolutionEditorContent::resized()
     mixInner.removeFromLeft(faderGap);
     positionFader(mixInner, wetFader.slider, wetFader.name);
 
-    rebuildChassisTexture();
+    // No chassis, no texture to build for it.
+    if (! variantTheme().hideChassisBezel)
+        rebuildChassisTexture();
 }
 
 ConvolutionAudioProcessorEditor::ConvolutionAudioProcessorEditor(ConvolutionProcessor& processorToUse)

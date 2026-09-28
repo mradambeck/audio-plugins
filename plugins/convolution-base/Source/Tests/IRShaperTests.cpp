@@ -146,6 +146,51 @@ public:
             expectWithinAbsoluteError(envelope[0], 0.0f, 1.0e-6f);
             expectWithinAbsoluteError(envelope[9], 0.0f, 1.0e-6f);
         }
+
+        beginTest("findActiveLength trims a genuinely silent tail, with padding, not past it");
+        {
+            // Loud (peak 1.0) for the first second, then true digital silence for the second -
+            // unlike makeTestIR's own +0.1 DC-offset signal above, this can actually drop below any
+            // dB threshold relative to its own peak.
+            juce::AudioBuffer<float> buffer(1, (int) sampleRate * 2);
+            buffer.clear();
+            for (int i = 0; i < (int) sampleRate; ++i)
+                buffer.setSample(0, i, std::sin(0.05f * (float) i));
+
+            const auto activeLength = IRShaper::findActiveLength(buffer, sampleRate);
+
+            // Should land at (or just past, via the tail padding) the one-second loud/silent
+            // boundary - nowhere near the full two seconds, and not absurdly short either.
+            expect(activeLength > (int) sampleRate, "must not trim before the loud content ends");
+            expect(activeLength < (int) (sampleRate * 1.5), "must not keep most of the true silence");
+        }
+
+        beginTest("findActiveLength never trims a buffer that's loud throughout");
+        {
+            const auto activeLength = IRShaper::findActiveLength(source, sampleRate);
+            expectEquals(activeLength, source.getNumSamples());
+        }
+
+        beginTest("findActiveLength returns the full length for a silent buffer");
+        {
+            juce::AudioBuffer<float> silence(1, 1000);
+            silence.clear();
+            expectEquals(IRShaper::findActiveLength(silence, sampleRate), 1000);
+        }
+
+        beginTest("findActiveLength respects its minimum-fraction floor");
+        {
+            // Loud for only the first 1% of a 2-second buffer, then silent - without the floor this
+            // would trim to a sliver; minimumFraction (default 5%) must win instead.
+            juce::AudioBuffer<float> buffer(1, (int) sampleRate * 2);
+            buffer.clear();
+            for (int i = 0; i < (int) (sampleRate * 0.01); ++i)
+                buffer.setSample(0, i, std::sin(0.5f * (float) i));
+
+            const auto activeLength = IRShaper::findActiveLength(buffer, sampleRate);
+            expect(activeLength >= (int) std::lround(buffer.getNumSamples() * 0.05),
+                   "must not trim below the minimum-fraction floor");
+        }
     }
 };
 

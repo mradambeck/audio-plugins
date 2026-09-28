@@ -90,7 +90,16 @@ namespace wildjag
         // overrides to 0.4x for its slimmer single fader; Flux overrides to 0.8x-20px for its
         // wider single Blend fader. Not plugin-uniform despite looking that way at a glance --
         // verified by a pre/post-migration pixel diff per plugin, not by inspection alone.
-        virtual float getLinearSliderThumbWidth(juce::Rectangle<float> bounds) const { return bounds.getWidth() * 0.8f; }
+        //
+        // theme.linearSliderThumbWidthOverride wins when set (nonzero): the shared convolution
+        // editor has no per-variant subclass to override this virtual in directly, so a variant
+        // that needs a fixed width (rather than this proportional default) sets that theme field
+        // instead - see HardwarePanelTheme.h's own comment on it.
+        virtual float getLinearSliderThumbWidth(juce::Rectangle<float> bounds) const
+        {
+            return theme.linearSliderThumbWidthOverride > 0.0f ? theme.linearSliderThumbWidthOverride
+                                                                 : bounds.getWidth() * 0.8f;
+        }
 
         // The slider text box's font height. Default (10.5px) matches every plugin except
         // Gradient, which overrides to 10.0px to match its mockup's .knob-value. Same

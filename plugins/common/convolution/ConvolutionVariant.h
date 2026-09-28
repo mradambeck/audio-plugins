@@ -58,6 +58,24 @@ namespace wildjag::conv
         // since it's already inside both ranges. Also last, for the same positional-init reason as
         // logoSvgData above.
         float wetMaxPercent = 200.0f;
+
+        // The subtitle drawn next to the header wordmark/title. Null (the default) means
+        // "Convolution Reverb", every existing variant's current text.
+        const char* tagline = nullptr;
+
+        // Width, in px, of the MIX (Dry/Wet fader) column. Every existing variant ships 130; a
+        // variant can widen it (e.g. to match a sibling plugin's own Mix column) at the cost of a
+        // proportionally wider window, since this also feeds the editor's fixed native size.
+        int mixSectionWidth = 130;
+
+        // The footer's manufacturer credit (bottom-right corner). Null (the default) means "WILD
+        // JAG", every existing variant's current text. Separate from COMPANY_NAME (the CMakeLists.txt
+        // property, used for the actual AU/VST3 manufacturer metadata) - this is only what's drawn
+        // on screen, for a variant that wants the two to read differently (e.g. a co-branding
+        // credit) without touching the plugin's real registered manufacturer. Drawn exactly as
+        // typed here, NOT run through .toUpperCase() - so a variant can mix case deliberately (e.g.
+        // a lowercase "x" in an otherwise-uppercase credit) rather than being forced fully upper.
+        const char* manufacturerCredit = nullptr;
     };
 
     // Supplied by each variant, in its own VariantConfig.cpp. Declared here rather than in a

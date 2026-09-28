@@ -47,5 +47,31 @@ namespace wildjag::conv::IRShaper
     // Downsampled absolute-peak envelope for the waveform display, one value per output point, each
     // the maximum absolute sample across all channels within that point's span. Computed off the
     // audio thread alongside the shaped buffer so the editor never reads the live IR.
-    std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, int numPoints);
+    //
+    // numSamplesOverride, when >= 0, computes the envelope over only that many leading samples
+    // instead of the buffer's own full length (clamped to it either way) - see findActiveLength()
+    // below for the intended caller.
+    std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, int numPoints,
+                                            int numSamplesOverride = -1);
+
+    // How many leading samples of `buffer` are worth showing in the waveform DISPLAY - never used
+    // to shorten what's actually convolved. Real captures often carry a trailing tail well below
+    // the noise floor (mic self-noise, room tone) that's inaudible but still occupies waveform
+    // width one-for-one with the loud part, squeezing the actual decay into a sliver on the left.
+    // Scans backward in ~5ms windows for the last one whose peak is within thresholdDb of the
+    // buffer's own peak, then adds tailPaddingSeconds so the decay's visible taper isn't cut off
+    // abruptly. Never returns less than minimumFraction of the full length, so a heuristic miss (or
+    // a genuinely near-silent capture) can't collapse the display to a sliver of its own.
+    //
+    // -45dB/60ms measured empirically against a real gated capture (a NonLin IR whose audible
+    // content ends abruptly around -22dB at its gate, crosses -40dB ~10ms later, then keeps
+    // decaying into its own noise floor for another ~150-200ms before reaching -60dB) - -45dB
+    // trims right after the gate's own tail instead of also keeping that noise-floor decay, and
+    // was checked against every ConvBase test IR too: Room and Hall's own (deliberately gradual,
+    // no hard gate) decays never actually reach -45dB before their files end, so neither is
+    // trimmed at all by this - only a capture with real silence-or-noise-floor content to trim
+    // is affected.
+    int findActiveLength(const juce::AudioBuffer<float>& buffer, double sampleRate,
+                          float thresholdDb = -45.0f, double tailPaddingSeconds = 0.06,
+                          float minimumFraction = 0.05f);
 }

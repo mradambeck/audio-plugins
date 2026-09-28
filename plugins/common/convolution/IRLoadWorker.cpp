@@ -96,23 +96,37 @@ juce::AudioBuffer<float> IRLoadWorker::shapeSynchronously(int irIndex, IRShaper:
 void IRLoadWorker::publishSnapshot(int irIndex, const DecodedIR& decoded,
                                    const juce::AudioBuffer<float>& shaped)
 {
+    // Trims trailing near-silence from the DISPLAY's time axis only - decoded.samples itself (and
+    // therefore what's actually convolved) is untouched. A real capture's tail commonly runs well
+    // below the noise floor for a while before the file actually ends, and drawing that 1:1 with
+    // the loud part squeezed the actual decay into a sliver on the left - see findActiveLength()'s
+    // own comment.
+    const auto activeLength = IRShaper::findActiveLength(decoded.samples, library.getTargetSampleRate());
+
     auto frame = std::make_shared<WaveformSnapshot>();
     frame->irIndex = irIndex;
     frame->nativeSampleRate = decoded.nativeSampleRate;
     frame->sourceChannels = decoded.samples.getNumChannels();
     frame->sourceSeconds = library.getTargetSampleRate() > 0.0
-                             ? (double) decoded.samples.getNumSamples() / library.getTargetSampleRate()
+                             ? (double) activeLength / library.getTargetSampleRate()
                              : 0.0;
-    frame->source = IRShaper::computePeakEnvelope(decoded.samples, envelopePoints);
+    frame->source = IRShaper::computePeakEnvelope(decoded.samples, envelopePoints, activeLength);
 
-    // The shaped envelope is drawn on the source's time axis, so it gets proportionally fewer
-    // points rather than being stretched back out to full width - that is what makes a Length cut
-    // read as "the tail is gone" instead of "the whole IR got shorter".
-    const auto shapedPoints = decoded.samples.getNumSamples() > 0
-                                ? (int) std::lround((double) envelopePoints * (double) shaped.getNumSamples()
-                                                    / (double) decoded.samples.getNumSamples())
+    // The shaped envelope is drawn on the source's (now trimmed) time axis, so it gets
+    // proportionally fewer points rather than being stretched back out to full width - that is what
+    // makes a Length cut read as "the tail is gone" instead of "the whole IR got shorter". Ratio
+    // against activeLength, not the untrimmed sample count, so it lines up with frame->source above.
+    //
+    // effectiveShapedSamples clamps to activeLength: at Length=100%, `shaped` is a straight copy of
+    // decoded.samples at its own UNTRIMMED length, which is typically longer than activeLength once
+    // trailing near-silence has been trimmed off - without the clamp, shapedPoints would exceed
+    // envelopePoints and the shaped envelope would be drawn wider than the panel itself.
+    const auto effectiveShapedSamples = std::min(shaped.getNumSamples(), activeLength);
+    const auto shapedPoints = activeLength > 0
+                                ? (int) std::lround((double) envelopePoints * (double) effectiveShapedSamples
+                                                    / (double) activeLength)
                                 : 0;
-    frame->shaped = IRShaper::computePeakEnvelope(shaped, std::max(shapedPoints, 1));
+    frame->shaped = IRShaper::computePeakEnvelope(shaped, std::max(shapedPoints, 1), effectiveShapedSamples);
 
     // Scale both envelopes so the SOURCE's loudest point reaches full height. The display is there
     // to show an IR's shape - where the onset is, how it decays, what Length and Attack removed -
