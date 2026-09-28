@@ -68,11 +68,13 @@ namespace wildjag::conv
         // proportionally wider window, since this also feeds the editor's fixed native size.
         int mixSectionWidth = 130;
 
-        // The footer's manufacturer credit (bottom-right corner). Null (the default) means "Wild
-        // Jag", every existing variant's current text. Separate from COMPANY_NAME (the CMakeLists.txt
+        // The footer's manufacturer credit (bottom-right corner). Null (the default) means "WILD
+        // JAG", every existing variant's current text. Separate from COMPANY_NAME (the CMakeLists.txt
         // property, used for the actual AU/VST3 manufacturer metadata) - this is only what's drawn
         // on screen, for a variant that wants the two to read differently (e.g. a co-branding
-        // credit) without touching the plugin's real registered manufacturer.
+        // credit) without touching the plugin's real registered manufacturer. Drawn exactly as
+        // typed here, NOT run through .toUpperCase() - so a variant can mix case deliberately (e.g.
+        // a lowercase "x" in an otherwise-uppercase credit) rather than being forced fully upper.
         const char* manufacturerCredit = nullptr;
     };
 

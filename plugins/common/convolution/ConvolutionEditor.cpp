@@ -453,12 +453,15 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     g.drawText(productName.toUpperCase() + juce::String::fromUTF8(" \xC2\xB7 v") + JucePlugin_VersionString,
                footerArea.removeFromLeft(220.0f), juce::Justification::topLeft);
 
+    // Not .toUpperCase(): a variant's own credit (see ConvolutionVariant.h) may deliberately mix
+    // case (e.g. a lowercase "x" in an otherwise-uppercase co-branding credit), so it's taken
+    // as-typed. The default is already typed upper to match every existing variant's look.
     const auto manufacturerCredit = processorRef.getVariant().manufacturerCredit != nullptr
                                       ? juce::String(processorRef.getVariant().manufacturerCredit)
-                                      : juce::String("Wild Jag");
+                                      : juce::String("WILD JAG");
 
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(manufacturerCredit.toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(manufacturerCredit, footerArea, juce::Justification::topRight);
 }
 
 void ConvolutionEditorContent::resized()
