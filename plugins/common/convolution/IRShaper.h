@@ -62,7 +62,16 @@ namespace wildjag::conv::IRShaper
     // buffer's own peak, then adds tailPaddingSeconds so the decay's visible taper isn't cut off
     // abruptly. Never returns less than minimumFraction of the full length, so a heuristic miss (or
     // a genuinely near-silent capture) can't collapse the display to a sliver of its own.
+    //
+    // -45dB/60ms measured empirically against a real gated capture (a NonLin IR whose audible
+    // content ends abruptly around -22dB at its gate, crosses -40dB ~10ms later, then keeps
+    // decaying into its own noise floor for another ~150-200ms before reaching -60dB) - -45dB
+    // trims right after the gate's own tail instead of also keeping that noise-floor decay, and
+    // was checked against every ConvBase test IR too: Room and Hall's own (deliberately gradual,
+    // no hard gate) decays never actually reach -45dB before their files end, so neither is
+    // trimmed at all by this - only a capture with real silence-or-noise-floor content to trim
+    // is affected.
     int findActiveLength(const juce::AudioBuffer<float>& buffer, double sampleRate,
-                          float thresholdDb = -60.0f, double tailPaddingSeconds = 0.08,
+                          float thresholdDb = -45.0f, double tailPaddingSeconds = 0.06,
                           float minimumFraction = 0.05f);
 }
