@@ -50,6 +50,15 @@ namespace wildjag
         // convolution editor reads this field so far.
         bool sectionLabelBreaksBorder = false;
 
+        // Fixed-pixel override for getLinearSliderThumbWidth()'s default 0.8x-of-bounds proportional
+        // width (see that method's own comment on why the default isn't actually catalog-uniform).
+        // 0 (the default) keeps that proportional behaviour - every plugin with its own LookAndFeel
+        // subclass overrides the virtual directly instead (that's most of the catalog); this field
+        // exists because the shared convolution editor has no per-variant subclass to override it
+        // in, so a theme-driven escape hatch is the only way one variant can fix its fader thumb
+        // width without changing every other variant's (proportional, column-width-dependent) one.
+        float linearSliderThumbWidthOverride = 0.0f;
+
         EmbeddedTypeface displayTypeface;
         EmbeddedTypeface smallPrintTypeface;
     };
