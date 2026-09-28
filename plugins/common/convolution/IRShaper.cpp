@@ -92,7 +92,8 @@ juce::AudioBuffer<float> shape(const juce::AudioBuffer<float>& source, double sa
     return shaped;
 }
 
-std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, int numPoints)
+std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, int numPoints,
+                                        int numSamplesOverride)
 {
     if (numPoints <= 0)
         return {};
@@ -100,7 +101,9 @@ std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, i
     std::vector<float> envelope((size_t) numPoints, 0.0f);
 
     const auto numChannels = buffer.getNumChannels();
-    const auto numSamples = buffer.getNumSamples();
+    const auto numSamples = numSamplesOverride >= 0
+                              ? std::min(numSamplesOverride, buffer.getNumSamples())
+                              : buffer.getNumSamples();
 
     if (numChannels <= 0 || numSamples <= 0)
         return envelope;
@@ -126,6 +129,41 @@ std::vector<float> computePeakEnvelope(const juce::AudioBuffer<float>& buffer, i
     }
 
     return envelope;
+}
+
+int findActiveLength(const juce::AudioBuffer<float>& buffer, double sampleRate,
+                      float thresholdDb, double tailPaddingSeconds, float minimumFraction)
+{
+    const auto numSamples = buffer.getNumSamples();
+
+    if (numSamples <= 0 || buffer.getNumChannels() <= 0 || sampleRate <= 0.0)
+        return numSamples;
+
+    const auto peak = buffer.getMagnitude(0, numSamples);
+
+    // Silent (or empty) buffer - nothing to trim towards, so don't pretend otherwise.
+    if (peak <= 0.0f)
+        return numSamples;
+
+    const auto threshold = peak * juce::Decibels::decibelsToGain(thresholdDb);
+
+    // ~5ms windows rather than sample-by-sample: fast, and immune to a single near-zero-crossing
+    // sample mid-decay looking like silence when its neighbours plainly aren't.
+    const auto windowSamples = std::max(1, (int) std::lround(sampleRate * 0.005));
+
+    int lastActiveWindowEnd = 0;
+    for (int start = 0; start < numSamples; start += windowSamples)
+    {
+        const auto length = std::min(windowSamples, numSamples - start);
+
+        if (buffer.getMagnitude(start, length) >= threshold)
+            lastActiveWindowEnd = start + length;
+    }
+
+    const auto padded = lastActiveWindowEnd + (int) std::lround(sampleRate * tailPaddingSeconds);
+    const auto floor = (int) std::lround((double) numSamples * (double) minimumFraction);
+
+    return juce::jlimit(std::max(floor, 1), numSamples, padded);
 }
 
 } // namespace wildjag::conv::IRShaper
