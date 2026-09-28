@@ -64,6 +64,14 @@ namespace wildjag
         // Off by default - purely decorative, opt-in per variant.
         bool drawMixDividerTicks = false;
 
+        // When true, the shared convolution editor skips the outer "chassis" bezel (a separately-
+        // rounded, drop-shadowed, grain-textured device shape the panel normally sits inset within)
+        // and instead fills the panel edge to edge across the whole component. The editor's own
+        // fixed window size (editorWidth/editorHeight) is unaffected either way - only how much
+        // of it the chassis eats into. Off by default - every existing variant keeps its current
+        // chassis-framed look.
+        bool hideChassisBezel = false;
+
         EmbeddedTypeface displayTypeface;
         EmbeddedTypeface smallPrintTypeface;
     };

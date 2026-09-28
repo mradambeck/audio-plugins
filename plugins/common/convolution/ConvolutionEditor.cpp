@@ -329,34 +329,46 @@ void ConvolutionEditorContent::drawHardwareSection(juce::Graphics& g, juce::Rect
 void ConvolutionEditorContent::paint(juce::Graphics& g)
 {
     const auto deviceBounds = getLocalBounds().toFloat();
-    juce::Path devicePath;
-    devicePath.addRoundedRectangle(deviceBounds, 14.0f);
+    const auto hideChassisBezel = variantTheme().hideChassisBezel;
 
-    juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 24, {0, 10}).drawForPath(g, devicePath);
+    // The outer "chassis" bezel - a separately-rounded, drop-shadowed, grain-textured device shape
+    // the panel normally sits inset within. Opt-out per variant (see HardwarePanelTheme.h): when
+    // hidden, the panel below fills deviceBounds directly instead of an inset fullPanelBounds, and
+    // goes square instead of rounded (0.0f corner radius passed to it further down) so there's no
+    // gap between the panel's rounded corners and the component's own sharp ones with nothing
+    // behind them to fill it.
+    if (! hideChassisBezel)
+    {
+        juce::Path devicePath;
+        devicePath.addRoundedRectangle(deviceBounds, 14.0f);
 
-    g.saveState();
-    g.reduceClipRegion(devicePath);
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1c1f20), 0.0f, 0.0f,
-                                            juce::Colour(0xff0a0c0d), (float) getWidth(), (float) getHeight(), false));
-    g.fillAll();
-    if (chassisTexture.isValid())
-        g.drawImageAt(chassisTexture, 0, 0);
+        juce::DropShadow(juce::Colours::black.withAlpha(0.55f), 24, {0, 10}).drawForPath(g, devicePath);
 
-    g.setColour(juce::Colours::white.withAlpha(0.05f));
-    g.drawLine(deviceBounds.getX() + 14.0f, deviceBounds.getY() + 1.5f,
-               deviceBounds.getRight() - 14.0f, deviceBounds.getY() + 1.5f, 1.5f);
+        g.saveState();
+        g.reduceClipRegion(devicePath);
+        g.setGradientFill(juce::ColourGradient(juce::Colour(0xff1c1f20), 0.0f, 0.0f,
+                                                juce::Colour(0xff0a0c0d), (float) getWidth(), (float) getHeight(), false));
+        g.fillAll();
+        if (chassisTexture.isValid())
+            g.drawImageAt(chassisTexture, 0, 0);
 
-    juce::ColourGradient bottomShadow(juce::Colours::transparentBlack, 0.0f, deviceBounds.getBottom() - 18.0f,
-                                       juce::Colours::black.withAlpha(0.45f), 0.0f, deviceBounds.getBottom(), false);
-    g.setGradientFill(bottomShadow);
-    g.fillRect(deviceBounds.withTop(deviceBounds.getBottom() - 18.0f));
-    g.restoreState();
+        g.setColour(juce::Colours::white.withAlpha(0.05f));
+        g.drawLine(deviceBounds.getX() + 14.0f, deviceBounds.getY() + 1.5f,
+                   deviceBounds.getRight() - 14.0f, deviceBounds.getY() + 1.5f, 1.5f);
 
-    const auto fullPanelBounds = deviceBounds.reduced((float) chassisMargin);
+        juce::ColourGradient bottomShadow(juce::Colours::transparentBlack, 0.0f, deviceBounds.getBottom() - 18.0f,
+                                           juce::Colours::black.withAlpha(0.45f), 0.0f, deviceBounds.getBottom(), false);
+        g.setGradientFill(bottomShadow);
+        g.fillRect(deviceBounds.withTop(deviceBounds.getBottom() - 18.0f));
+        g.restoreState();
+    }
+
+    const auto fullPanelBounds = hideChassisBezel ? deviceBounds : deviceBounds.reduced((float) chassisMargin);
+    const auto panelCornerRadius = hideChassisBezel ? 0.0f : 8.0f;
 
     {
         juce::Path panelClip;
-        panelClip.addRoundedRectangle(fullPanelBounds, 8.0f);
+        panelClip.addRoundedRectangle(fullPanelBounds, panelCornerRadius);
         g.saveState();
         g.reduceClipRegion(panelClip);
 
@@ -392,7 +404,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     }
 
     g.setColour(juce::Colours::black.withAlpha(0.6f));
-    g.drawRoundedRectangle(fullPanelBounds, 8.0f, 1.0f);
+    g.drawRoundedRectangle(fullPanelBounds, panelCornerRadius, 1.0f);
 
     // Wordmark, when the variant supplies one (see ConvolutionVariant.h) - positioned/sized in
     // resized() via setDrawableTransformToFit(); draw() here just renders it with that transform
@@ -447,7 +459,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
 
 void ConvolutionEditorContent::resized()
 {
-    auto panelArea = getLocalBounds().reduced(chassisMargin);
+    auto panelArea = variantTheme().hideChassisBezel ? getLocalBounds() : getLocalBounds().reduced(chassisMargin);
 
     auto header = panelArea.removeFromTop(headerHeight).reduced(22, 0);
 
@@ -591,7 +603,9 @@ void ConvolutionEditorContent::resized()
     mixInner.removeFromLeft(faderGap);
     positionFader(mixInner, wetFader.slider, wetFader.name);
 
-    rebuildChassisTexture();
+    // No chassis, no texture to build for it.
+    if (! variantTheme().hideChassisBezel)
+        rebuildChassisTexture();
 }
 
 ConvolutionAudioProcessorEditor::ConvolutionAudioProcessorEditor(ConvolutionProcessor& processorToUse)
