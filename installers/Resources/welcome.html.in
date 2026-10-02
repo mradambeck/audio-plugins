@@ -4,13 +4,11 @@
 <p>On the next screen, use the checkboxes to choose which plugins to install, and within each plugin which formats (Audio Unit, VST3, Standalone App):</p>
 <ul>
 <li><b>Caverns</b> v__CAVERNS_VERSION__ - reverb/delay</li>
-<li><b>Damage</b> v__DAMAGE_VERSION__ - fuzz/distortion</li>
 <li><b>Corrosion</b> v__CORROSION_VERSION__ - lo-fi drive</li>
 <li><b>Flux</b> v__FLUX_VERSION__ - analog phase shifter</li>
 <li><b>Alloy</b> v__ALLOY_VERSION__ - industrial bass synth</li>
 <li><b>Gradient</b> v__GRADIENT_VERSION__ - pitch shifting delay</li>
 <li><b>Shields</b> v__SHIELDS_VERSION__ - diffuse reverb</li>
-<li><b>Intruder</b> v__INTRUDER_VERSION__ - non-linear gated reverb</li>
 <li><b>Strike</b> v__STRIKE_VERSION__ - Karplus-Strong physical-modeling string synth</li>
 <li><b>Aura</b> v__AURA_VERSION__ - AMS RMX16 Ambience reverb emulation</li>
 </ul>

@@ -5,13 +5,11 @@ macOS `.pkg` installers for the Wild Jag plugins:
 | Plugin    | Repo                             | Description                          |
 |-----------|----------------------------------|--------------------------------------|
 | Caverns   | `plugins/caverns-delay/`         | Reverb/delay plugin                  |
-| Damage    | `plugins/damage-fuzz/`           | Fuzz/distortion plugin               |
 | Corrosion | `plugins/corrosion-drive/`       | Lo-fi drive plugin                   |
 | Flux      | `plugins/flux-phaser/`           | Analog phase shifter plugin          |
 | Alloy     | `plugins/alloy-bass/`            | Industrial bass synth                |
 | Gradient  | `plugins/gradient-pitch/`        | Pitch shifting delay plugin          |
 | Shields   | `plugins/shields-reverb/`        | Diffuse reverb                       |
-| Intruder  | `plugins/intruder-gated-reverb/` | Non-linear gated reverb              |
 | Strike    | `plugins/strike-synth/`          | Karplus-Strong string synth          |
 | Aura      | `plugins/aura-reverb/`           | AMS RMX16 Ambience reverb emulation  |
 | Concrete  | `plugins/concrete-sampler/`      | Vintage sampler emulation instrument |
@@ -41,7 +39,7 @@ Each plugin repo has its own `installer/` folder:
 To build one:
 
 ```sh
-cd plugins/caverns-delay   # or damage-fuzz / corrosion-drive / flux-phaser / alloy-bass / gradient-pitch / shields-reverb / intruder-gated-reverb / strike-synth
+cd plugins/caverns-delay   # or corrosion-drive / flux-phaser / alloy-bass / gradient-pitch / shields-reverb / strike-synth
 ./installer/build.sh
 ```
 

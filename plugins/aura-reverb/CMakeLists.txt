@@ -1,10 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Aura VERSION 0.3.1)
-set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning. Beta: the real
-    # hardware-panel UI (juce-hardware-panel-ui skill, mockup-approved and screenshot-verified
-    # against plugins/aura-reverb/mockups/aura-mockup-v1.html) is in place and Low Cut is wired, but no
-    # installer exists yet (wildjag-plugin-installer skill) - not a manual channel bump on its own.
+project(Aura VERSION 1.0.0)
+set(WILDJAG_RELEASE_CHANNEL "stable") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

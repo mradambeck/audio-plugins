@@ -1,4 +1,4 @@
-Wild Jag Plugins (Caverns, Damage, Corrosion)
+Wild Jag Plugins (Caverns, Corrosion, Gradient, Aura, Concrete, Flux, Alloy, Shields, Strike)
 Copyright (c) Wild Jag
 
 This software is provided for personal use. By installing this software you
