@@ -29,6 +29,10 @@ juce_add_plugin(Corrosion
     PRODUCT_NAME "Corrosion - Overdrive"
 )
 
+# PACE Central Wrap Configuration GUID for AAX signing (installers/sign-aax.sh) -- distinct from
+# PLUGIN_CODE above, created once per plugin in PACE Central after Avid/PACE AAX approval.
+set(WILDJAG_AAX_WRAP_CONFIG_GUID "028698F0-BDE2-11F1-8E61-00505692C25A")
+
 juce_add_binary_data(CorrosionBinaryData
     SOURCES
         ../common/Assets/WildJagLogo.svg
