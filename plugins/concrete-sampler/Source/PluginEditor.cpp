@@ -294,7 +294,7 @@ void ConcreteEditorContent::paint(juce::Graphics& g)
     g.drawText(juce::String(juce::CharPointer_UTF8("CONCRETE \xc2\xb7 v")) + concreteVersion,
                footerArea, juce::Justification::centredLeft);
     g.setColour(footerRightColour);
-    g.drawText("WILD JAG", footerArea, juce::Justification::centredRight);
+    g.drawText("WILD JAG AUDIO", footerArea, juce::Justification::centredRight);
 }
 
 void ConcreteEditorContent::resized()

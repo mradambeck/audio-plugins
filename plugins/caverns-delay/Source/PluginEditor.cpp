@@ -466,7 +466,7 @@ void CavernsEditorContent::paint(juce::Graphics& g)
     // than the separate logo graphic that has no equivalent in the mockup to match against.
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(juce::String("Wild Jag Audio").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
 void CavernsEditorContent::resized()

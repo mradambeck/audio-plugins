@@ -419,7 +419,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     drawHardwareSection(g, mixSectionBounds, "Mix");
 
     // Hardware-fader-panel tick marks between Dry and Wet, evenly spaced across the faders' own
-    // vertical travel - same grey as the footer's "WILD JAG" text (drawn further below), half the
+    // vertical travel - same grey as the footer's "WILD JAG AUDIO" text (drawn further below), half the
     // section outline's own thickness. Wide enough (24px) to extend into both fader cells' own
     // padding, not just the (narrower) gap between them.
     if (variantTheme().drawMixDividerTicks)
@@ -458,7 +458,7 @@ void ConvolutionEditorContent::paint(juce::Graphics& g)
     // as-typed. The default is already typed upper to match every existing variant's look.
     const auto manufacturerCredit = processorRef.getVariant().manufacturerCredit != nullptr
                                       ? juce::String(processorRef.getVariant().manufacturerCredit)
-                                      : juce::String("WILD JAG");
+                                      : juce::String("WILD JAG AUDIO");
 
     g.setColour(juce::Colour(0xff3a4547));
     g.drawText(manufacturerCredit, footerArea, juce::Justification::topRight);

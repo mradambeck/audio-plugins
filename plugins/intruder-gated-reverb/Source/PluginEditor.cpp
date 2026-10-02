@@ -284,7 +284,7 @@ void IntruderEditorContent::paint(juce::Graphics& g)
 
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerTextArea, juce::Justification::topRight);
+    g.drawText(juce::String("Wild Jag Audio").toUpperCase(), footerTextArea, juce::Justification::topRight);
 }
 
 void IntruderEditorContent::resized()
