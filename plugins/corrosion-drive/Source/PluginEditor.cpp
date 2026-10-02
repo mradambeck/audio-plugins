@@ -333,7 +333,7 @@ void CorrosionEditorContent::paint(juce::Graphics& g)
     // Wild Jag wordmark -- plain styled text, matching the mockup's .footer .wm exactly.
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(juce::String("Wild Jag Audio").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
 void CorrosionEditorContent::resized()

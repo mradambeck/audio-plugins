@@ -429,7 +429,7 @@ void DamageEditorContent::paint(juce::Graphics& g)
 
     g.setFont(lookAndFeel.getSmallPrintFont(9.5f).withExtraKerningFactor(0.14f));
     g.setColour(juce::Colour(0xff3a4547));
-    g.drawText(juce::String("Wild Jag").toUpperCase(), footerArea, juce::Justification::topRight);
+    g.drawText(juce::String("Wild Jag Audio").toUpperCase(), footerArea, juce::Justification::topRight);
 }
 
 void DamageEditorContent::resized()
