@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Corrosion VERSION 0.2.0)
+project(Corrosion VERSION 0.2.1)
 set(WILDJAG_RELEASE_CHANNEL "beta") # stable | beta -- see AGENTS.md > Versioning
 
 set(CMAKE_CXX_STANDARD 17)
@@ -28,6 +28,10 @@ juce_add_plugin(Corrosion
     AAX_CATEGORY "AAX_ePlugInCategory_Harmonic"
     PRODUCT_NAME "Corrosion - Overdrive"
 )
+
+# PACE Central Wrap Configuration GUID for AAX signing (installers/sign-aax.sh) -- distinct from
+# PLUGIN_CODE above, created once per plugin in PACE Central after Avid/PACE AAX approval.
+set(WILDJAG_AAX_WRAP_CONFIG_GUID "028698F0-BDE2-11F1-8E61-00505692C25A")
 
 juce_add_binary_data(CorrosionBinaryData
     SOURCES
